@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eNewcleus Business Manager</title>
+<style>
+  :root {
+    --primary:#1F3864; --secondary:#2E75B6; --accent:#E67E22;
+    --green:#27ae60; --amber:#f39c12; --red:#e74c3c; --purple:#8e44ad;
+    --teal:#16a085; --orange:#d35400;
+    --bg:#F0F4F8; --card:#FFFFFF; --text:#2c3e50; --text-muted:#7f8c8d;
+    --border:#e0e6ed; --sidebar-w:240px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+  /* AUTH */
+  #auth-screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%); z-index:9999; }
+  .auth-card { background:#fff; border-radius:20px; padding:40px; width:380px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+  .auth-logo { text-align:center; margin-bottom:24px; }
+  .auth-logo h1 { font-size:28px; font-weight:800; color:var(--primary); }
+  .auth-logo p { color:var(--text-muted); font-size:13px; margin-top:4px; }
+
+  /* APP LAYOUT */
+  #app { display:none; height:100vh; overflow:hidden; }
+  .sidebar { width:var(--sidebar-w); height:100vh; background:var(--primary); display:flex; flex-direction:column; position:fixed; left:0; top:0; z-index:100; transition:transform 0.3s; overflow-y:auto; }
+  .sidebar-header { padding:20px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo { font-size:20px; font-weight:800; color:#fff; }
+  .sidebar-logo span { color:#64B5F6; }
+  .sidebar-user { display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .user-avatar { width:36px; height:36px; border-radius:50%; background:var(--secondary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0; }
+  .user-info .name { color:#fff; font-size:13px; font-weight:600; }
+  .user-info .role { color:#90CAF9; font-size:11px; }
+  #sidebar-nav { flex:1; padding:12px 8px; }
+  .nav-section-label { color:rgba(255,255,255,0.4); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:8px 8px 4px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer; color:rgba(255,255,255,0.7); font-size:13px; font-weight:500; margin-bottom:2px; position:relative; transition:all 0.15s; }
+  .nav-item:hover { background:rgba(255,255,255,0.1); color:#fff; }
+  .nav-item.active { background:var(--secondary); color:#fff; }
+  .nav-icon { font-size:16px; width:20px; text-align:center; flex-shrink:0; }
+  .nav-badge { background:var(--red); color:#fff; border-radius:10px; font-size:10px; padding:1px 6px; margin-left:auto; font-weight:700; }
+  .logout-btn { padding:16px; border-top:1px solid rgba(255,255,255,0.1); }
+
+  /* MAIN */
+  .main { margin-left:var(--sidebar-w); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  .topbar { background:#fff; border-bottom:1px solid var(--border); padding:0 20px; height:56px; display:flex; align-items:center; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; flex-direction:column; gap:4px; }
+  .hamburger span { display:block; width:22px; height:2px; background:var(--text); border-radius:2px; }
+  .page-title { font-size:16px; font-weight:700; color:var(--primary); flex:1; }
+  .topbar-search { flex:1; max-width:280px; }
+  .topbar-search input { width:100%; padding:7px 14px; border:1px solid var(--border); border-radius:20px; font-size:13px; outline:none; background:var(--bg); }
+  .notif-btn { position:relative; background:none; border:none; cursor:pointer; padding:6px; font-size:20px; }
+  .notif-count { position:absolute; top:0; right:0; background:var(--red); color:#fff; border-radius:50%; width:16px; height:16px; font-size:9px; display:none; align-items:center; justify-content:center; font-weight:700; }
+  .notif-dropdown { position:absolute; top:52px; right:12px; background:#fff; border:1px solid var(--border); border-radius:12px; width:320px; max-height:400px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.15); display:none; z-index:200; }
+  .notif-dropdown.show { display:block; }
+  .notif-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .notif-item { padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .notif-item:hover { background:var(--bg); }
+  .notif-type { font-size:10px; font-weight:700; color:var(--secondary); text-transform:uppercase; }
+  .notif-msg { font-size:13px; color:var(--text); margin-top:2px; }
+  .notif-time { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .page-content { flex:1; overflow-y:auto; padding:20px; }
+
+  /* CARDS & TABLES */
+  .card { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:16px; }
+  .card-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .card-title { font-size:15px; font-weight:700; color:var(--primary); }
+  .card-body { padding:16px 20px; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--primary); color:#fff; padding:10px 12px; text-align:left; font-size:12px; font-weight:600; white-space:nowrap; }
+  td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:hover td { background:#f8fafc; }
+
+  /* KPI GRID */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+  .kpi-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-top:3px solid var(--primary); }
+  .kpi-card.blue { border-color:var(--secondary); }
+  .kpi-card.green { border-color:var(--green); }
+  .kpi-card.amber { border-color:var(--amber); }
+  .kpi-card.red { border-color:var(--red); }
+  .kpi-card.orange { border-color:var(--orange); }
+  .kpi-card.purple { border-color:var(--purple); }
+  .kpi-card.teal { border-color:var(--teal); }
+  .kpi-label { font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+  .kpi-value { font-size:28px; font-weight:800; color:var(--primary); line-height:1.1; margin-top:4px; }
+  .kpi-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+  /* FORMS */
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+  .form-control { width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; transition:border 0.2s; background:#fff; font-family:inherit; }
+  .form-control:focus { border-color:var(--secondary); }
+  textarea.form-control { min-height:80px; resize:vertical; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  /* BUTTONS */
+  .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.15s; font-family:inherit; }
+  .btn-primary { background:var(--secondary); color:#fff; }
+  .btn-primary:hover { background:#1a5fa8; }
+  .btn-secondary { background:#ecf0f1; color:var(--text); }
+  .btn-success { background:var(--green); color:#fff; }
+  .btn-danger { background:var(--red); color:#fff; }
+  .btn-warning { background:var(--amber); color:#fff; }
+  .btn-outline { background:#fff; color:var(--primary); border:1.5px solid var(--border); }
+  .btn-sm { padding:5px 10px; font-size:12px; }
+  .btn-full { width:100%; padding:12px; font-size:14px; margin-top:8px; }
+  .btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+  /* BADGES */
+  .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; }
+  .badge-green { background:#d5f5e3; color:#1e8449; }
+  .badge-amber { background:#fef9e7; color:#b7950b; }
+  .badge-red { background:#fadbd8; color:#922b21; }
+  .badge-blue { background:#d6eaf8; color:#1a5276; }
+  .badge-orange { background:#fdebd0; color:#a04000; }
+  .badge-gray { background:#f2f3f4; color:#566573; }
+  .badge-purple { background:#e8daef; color:#6c3483; }
+
+  /* TICKETS */
+  .ticket-card { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; border-left:4px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+  .ticket-card.critical { border-left-color:var(--red); }
+  .ticket-card.high { border-left-color:var(--orange); }
+  .ticket-card.medium { border-left-color:var(--amber); }
+  .ticket-card.low { border-left-color:var(--green); }
+  .ticket-card.breached { background:#fff8f8; }
+  .ticket-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+  .ticket-id { font-size:11px; color:var(--text-muted); font-weight:600; }
+  .ticket-client { font-size:13px; font-weight:700; color:var(--primary); }
+  .ticket-desc { font-size:12px; color:var(--text-muted); margin:6px 0; }
+  .ticket-footer { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .sla-timer { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  .sla-ok { background:#d5f5e3; color:#1e8449; }
+  .sla-warn { background:#fef9e7; color:#b7950b; }
+  .sla-breach { background:#fadbd8; color:#922b21; }
+
+  /* QUICK ACTIONS */
+  .quick-actions { display:flex; gap:4px; flex-wrap:wrap; }
+  .qa-btn { padding:3px 8px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:600; }
+  .qa-btn.green { background:#d5f5e3; color:#1e8449; }
+  .qa-btn.blue { background:#d6eaf8; color:#1a5276; }
+  .qa-btn.orange { background:#fdebd0; color:#a04000; }
+  .qa-btn.amber { background:#fef9e7; color:#b7950b; }
+  .qa-btn.red { background:#fadbd8; color:#922b21; }
+
+  /* CSI STARS */
+  .star-box { padding:8px 4px; border-radius:8px; border:2px solid var(--border); font-size:18px; text-align:center; cursor:pointer; transition:all 0.15s; }
+
+  /* PROGRESS */
+  .progress { background:#ecf0f1; border-radius:4px; height:6px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:4px; background:var(--secondary); transition:width 0.5s; }
+  .progress-fill.green { background:var(--green); }
+  .progress-fill.amber { background:var(--amber); }
+  .progress-fill.red { background:var(--red); }
+
+  /* PANEL (SLIDE-IN) */
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:flex-start; justify-content:flex-end; }
+  #overlay.show { display:flex; }
+  .panel { background:#fff; width:480px; max-width:100vw; height:100vh; overflow-y:auto; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,0.15); }
+  .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .panel-title { font-size:17px; font-weight:700; color:var(--primary); }
+  .panel-close { background:none; border:none; cursor:pointer; font-size:22px; color:var(--text-muted); }
+
+  /* TASK CARDS */
+  .task-section { margin-bottom:16px; }
+  .task-section-header { padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; margin-bottom:8px; }
+  .task-section-header.urgent { background:#fadbd8; color:#922b21; }
+  .task-section-header.today { background:#fef9e7; color:#b7950b; }
+  .task-section-header.done { background:#d5f5e3; color:#1e8449; }
+
+  /* REPORT */
+  .report-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .report-tab { padding:8px 16px; border-radius:8px; border:1.5px solid var(--border); background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-muted); }
+  .report-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .report-block { margin-top:16px; }
+  .report-block h4 { font-size:14px; font-weight:700; color:var(--primary); margin-bottom:10px; }
+
+  /* MOBILE */
+  .mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); z-index:100; }
+  .mobile-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:8px 4px; cursor:pointer; font-size:10px; color:var(--text-muted); gap:2px; }
+  .mobile-nav-item.active { color:var(--secondary); }
+  .mobile-nav-item .icon { font-size:20px; }
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+
+  /* MISC */
+  .loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:40px; color:var(--text-muted); }
+  .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--secondary); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty-state { text-align:center; padding:48px 20px; color:var(--text-muted); }
+  .empty-state .emoji { font-size:48px; margin-bottom:12px; }
+  .empty-state h3 { font-size:16px; font-weight:600; }
+  .auth-error { background:#fadbd8; color:#922b21; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:12px; display:none; }
+  .toast { padding:12px 16px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); margin-bottom:8px; animation:slideIn 0.3s; }
+  .toast.success { background:#d5f5e3; color:#1e8449; }
+  .toast.error { background:#fadbd8; color:#922b21; }
+  .toast.info { background:#d6eaf8; color:#1a5276; }
+  @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  #toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; min-width:250px; }
+  .client-card { background:#fff; border-radius:12px; padding:14px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); border-left:4px solid var(--green); }
+  .client-card.warning { border-left-color:var(--amber); }
+  .client-card.at-risk { border-left-color:var(--red); }
+  .client-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .client-name { font-size:14px; font-weight:700; color:var(--primary); }
+  .client-meta { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .mobile-cards { display:none; }
+
+  @media (max-width:768px) {
+    .sidebar { transform:translateX(-100%); }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-overlay.show { display:block; }
+    .main { margin-left:0; padding-bottom:60px; }
+    .hamburger { display:flex; }
+    .mobile-nav { display:flex; }
+    .mobile-cards { display:block; }
+    .table-wrap { display:none; }
+    .form-row { grid-template-columns:1fr; }
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .panel { width:100vw; }
+    .topbar-search { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>eNewcleus</h1>
+      <p>Business Manager v2.0</p>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" class="form-control" id="login-email" placeholder="you@enewcleus.in" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" class="form-control" id="login-pass" placeholder="Password">
+    </div>
+    <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">eNew<span>cleus</span></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="user-avatar">A</div>
+      <div class="user-info">
+        <div class="name" id="sidebar-username">Loading...</div>
+        <div class="role" id="sidebar-role">—</div>
+      </div>
+    </div>
+    <div id="sidebar-nav"></div>
+    <div class="logout-btn">
+      <button class="btn btn-outline btn-full" onclick="doLogout()" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">🚪 Logout</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="topbar-search">
+        <input type="text" placeholder="🔍 Search clients..." oninput="globalSearch(this.value)">
+      </div>
+      <div style="position:relative;">
+        <button class="notif-btn" id="notif-btn" onclick="toggleNotifications()">
+          🔔<span class="notif-count" id="notif-count">0</span>
+        </button>
+        <div class="notif-dropdown" id="notif-dropdown">
+          <div class="notif-header">
+            <span style="font-weight:700;font-size:13px;">Notifications</span>
+            <button class="btn btn-sm btn-outline" onclick="markAllRead()">Mark all read</button>
+          </div>
+          <div id="notif-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="page-content" id="page-content">
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    </div>
+  </div>
+
+  <div class="mobile-nav" id="mobile-nav"></div>
+</div>
+
+<!-- PANEL OVERLAY -->
+<div id="overlay" onclick="closePanel(event)">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title" id="panel-title">Panel</div>
+      <button class="panel-close" onclick="document.getElementById('overlay').classList.remove('show')">✕</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// eNewcleus Business Manager v2.0 — Frontend JS
+// Fast, Reliable, 40+ Users
+// ═══════════════════════════════════════════════════════════
+
+const API = window.location.origin + '/api';
+let TOKEN = localStorage.getItem('en_token') || '';
+let APP = { user: null, page: '', clients: [], tickets: [], tasks: [] };
+
+const NAV_CONFIG = {
+  'Admin': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'admin',icon:'⚙️',label:'Admin Panel'},
+  ],
+  'Ops Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'reports',icon:'📋',label:'Reports'},
+  ],
+  'CSI Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+  ],
+  'Account Manager': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'clients',icon:'👥',label:'My Clients'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+  ],
+  'Ads Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+  ],
+  'CRM Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Forms'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+  ],
+};
+
+const QUICK_ACTIONS = {
+  'Account Manager': [
+    {label:'✅ Order Done',type:'green',action:'Order Processed'},
+    {label:'📋 Listing Updated',type:'blue',action:'Listing Updated'},
+    {label:'🩺 Health Fixed',type:'green',action:'Account Health Fixed'},
+    {label:'📞 Called Seller',type:'orange',action:'Called Seller'},
+    {label:'⏳ Awaiting',type:'amber',action:'Awaiting Seller Response'},
+    {label:'🚨 Escalated',type:'red',action:'Issue Escalated'},
+  ],
+  'Ads Executive': [
+    {label:'💰 Budget Updated',type:'blue',action:'Budget Updated'},
+    {label:'⚡ Optimized',type:'green',action:'Campaign Optimized'},
+    {label:'🚀 Campaign Live',type:'orange',action:'New Campaign Live'},
+    {label:'⏸ Paused',type:'amber',action:'Campaign Paused'},
+  ],
+  'CRM Executive': [
+    {label:'✅ Connected',type:'green',action:'Called — Connected'},
+    {label:'📵 No Response',type:'amber',action:'Called — No Response'},
+    {label:'🔁 Callback',type:'orange',action:'Callback Requested'},
+    {label:'📋 CSI Done',type:'blue',action:'CSI Form Submitted'},
+  ],
+};
+
+const CSI_QUESTIONS = [
+  {id:'q1',label:'Q1: Service Quality',desc:'How satisfied are you with our overall service quality?'},
+  {id:'q2',label:'Q2: Communication',desc:'How would you rate our communication and responsiveness?'},
+  {id:'q3',label:'Q3: Issue Resolution',desc:'How effectively do we resolve your issues?'},
+  {id:'q4',label:'Q4: Account Growth',desc:'How satisfied are you with your account growth and results?'},
+  {id:'q5',label:'Q5: Overall Satisfaction',desc:'Overall, how satisfied are you with eNewcleus services?'},
+];
+
+// ── API HELPER ───────────────────────────────────────────────
+async function api(method, path, body) {
+  try {
+    const res = await fetch(API + path, {
+      method, headers: {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) { doLogout(); return null; }
+    return await res.json();
+  } catch(e) {
+    showToast('Network error — check connection', 'error');
+    return null;
+  }
+}
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('auth-error');
+  if (!email || !pass) { showError(err,'Email and password required'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in...'; err.style.display='none';
+  const res = await fetch(API+'/auth/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password:pass}),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (data.success) {
+    TOKEN = data.token;
+    localStorage.setItem('en_token', TOKEN);
+    APP.user = data.user;
+    initApp();
+  } else {
+    showError(err, data.message || 'Login failed');
+  }
+}
+
+function doLogout() {
+  TOKEN = ''; localStorage.removeItem('en_token');
+  APP = {user:null,page:'',clients:[],tickets:[],tasks:[]};
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keypress', e => { if(e.key==='Enter') doLogin(); });
+
+// Auto-login if token exists
+window.addEventListener('load', async () => {
+  if (TOKEN) {
+    const res = await api('GET', '/auth/me');
+    if (res?.success) {
+      APP.user = res.user;
+      APP.user.name = res.user.name;
+      APP.user.role = res.user.role;
+      initApp();
+    } else {
+      TOKEN = ''; localStorage.removeItem('en_token');
+    }
+  }
+});
+
+// ── INIT ─────────────────────────────────────────────────────
+function initApp() {
+  const u = APP.user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-avatar').textContent = u.name.charAt(0).toUpperCase();
+  document.getElementById('sidebar-username').textContent = u.name;
+  document.getElementById('sidebar-role').textContent = u.role;
+  buildNav(u.role); buildMobileNav(u.role);
+  if(window.innerWidth<768) document.querySelector('.hamburger').style.display='flex';
+  loadNotifications();
+  const firstPage = NAV_CONFIG[u.role]?.[0]?.id || 'dashboard';
+  navigate(firstPage);
+  setInterval(loadNotifications, 90000);
+}
+
+function buildNav(role) {
+  const items = NAV_CONFIG[role] || [];
+  document.getElementById('sidebar-nav').innerHTML = '<div class="nav-section-label">Navigation</div>' +
+    items.map(i=>`<div class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')">
+      <span class="nav-icon">${i.icon}</span><span>${i.label}</span>
+      ${i.badge?`<span class="nav-badge" id="badge-${i.badge}" style="display:none;">0</span>`:''}
+    </div>`).join('');
+}
+
+function buildMobileNav(role) {
+  const items = (NAV_CONFIG[role]||[]).slice(0,4);
+  document.getElementById('mobile-nav').innerHTML = items.map(i=>`
+    <div class="mobile-nav-item" id="mnav-${i.id}" onclick="navigate('${i.id}')">
+      <span class="icon">${i.icon}</span><span>${i.label.split(' ')[0]}</span>
+    </div>`).join('');
+}
+
+// ── NAVIGATE ─────────────────────────────────────────────────
+function navigate(page) {
+  APP.page = page;
+  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  document.getElementById('mnav-'+page)?.classList.add('active');
+  const titles = {dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
+  document.getElementById('page-title').textContent = titles[page]||page;
+  closeSidebar();
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const pages = {dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
+  (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────
+async function renderDashboard() {
+  const [dash, team] = await Promise.all([api('GET','/dashboard'), api('GET','/dashboard/team')]);
+  if (!dash) return;
+  const u = APP.user; const isLead = ['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash.totalClients}</div><div class="kpi-sub">${dash.active} Active</div></div>
+      <div class="kpi-card green"><div class="kpi-label">🟢 Healthy</div><div class="kpi-value">${dash.healthy}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">🟡 Warning</div><div class="kpi-value">${dash.warning}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">🔴 At Risk</div><div class="kpi-value">${dash.atRisk}</div></div>
+      <div class="kpi-card orange"><div class="kpi-label">Open Tickets</div><div class="kpi-value">${dash.openTickets}</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">Renewals Due</div><div class="kpi-value">${dash.renewalsDue}</div><div class="kpi-sub">≤15 days</div></div>
+    </div>
+    ${isLead && team?.length ? `
+    <div class="card">
+      <div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
+        <tbody>${team.map(e=>`<tr>
+          <td><strong>${e.name}</strong></td>
+          <td><span class="badge badge-blue">${e.role}</span></td>
+          <td><strong>${e.todayActivity}</strong></td>
+          <td>${e.ticketsClosed}</td>
+          <td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>` : `
+    <div class="card">
+      <div class="card-header"><span class="card-title">⚡ Quick Start</span></div>
+      <div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="navigate('tasks')">📝 My Tasks</button>
+        <button class="btn btn-secondary" onclick="navigate('clients')">👥 My Clients</button>
+        <button class="btn btn-outline" onclick="navigate('crm')">📞 Log Call</button>
+        <button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>
+      </div></div>
+    </div>`}`;
+}
+
+// ── CLIENTS ──────────────────────────────────────────────────
+async function renderClients() {
+  const clients = await api('GET', '/clients');
+  if (!clients) return;
+  APP.clients = clients;
+  renderClientsUI(clients);
+}
+
+function renderClientsUI(clients) {
+  const u = APP.user; const qa = QUICK_ACTIONS[u.role]||[];
+  const canAdd = ['Admin','Ops Lead'].includes(u.role);
+  document.getElementById('page-content').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👥 Clients (${clients.length})</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)">
+            <option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option>
+          </select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)">
+            <option value="">All Markets</option><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option>
+          </select>
+          ${canAdd?'<button class="btn btn-primary btn-sm" onclick="openAddClient()">➕ Add Client</button>':''}
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap" id="clients-table">${clientTableRows(clients,qa)}</div>
+        <div class="mobile-cards" id="clients-cards" style="padding:12px;">${clientCards(clients)}</div>
+      </div>
+    </div>`;
+}
+
+function clientTableRows(clients, qa) {
+  if (!clients.length) return '<div class="empty-state"><div class="emoji">👥</div><h3>No clients</h3></div>';
+  return `<table><thead><tr><th>#</th><th>Code</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Status</th><th>Health</th><th>Renewal</th><th>Quick Actions</th><th>More</th></tr></thead>
+  <tbody>${clients.map((c,i)=>`<tr>
+    <td>${i+1}</td><td><strong>${c.clientCode}</strong></td><td><strong>${c.busyName}</strong></td>
+    <td><span class="badge badge-blue">${c.marketplace}</span></td>
+    <td>${c.amName||'—'}</td><td>${statusBadge(c.status)}</td><td>${healthBadge(c.healthStatus)}</td>
+    <td>${renewalBadge(c.renewalDate)}</td>
+    <td><div class="quick-actions">${qa.map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
+    <td><div style="display:flex;gap:4px;">
+      <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
+      <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
+    </div></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function clientCards(clients) {
+  return clients.map(c=>`
+    <div class="client-card ${c.healthStatus==='Warning'?'warning':c.healthStatus==='At Risk'?'at-risk':''}">
+      <div class="client-card-header"><div><div class="client-name">${c.busyName}</div><div style="font-size:12px;color:var(--text-muted);">${c.clientCode}</div></div>${healthBadge(c.healthStatus)}</div>
+      <div class="client-meta"><span class="badge badge-blue">${c.marketplace}</span>${statusBadge(c.status)}</div>
+      <div class="quick-actions">${(QUICK_ACTIONS[APP.user.role]||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋 History</button>
+        <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫 Ticket</button>
+      </div>
+    </div>`).join('');
+}
+
+let _cf = {health:'',market:''};
+function filterClientsByHealth(v){_cf.health=v;applyClientFilters();}
+function filterClientsByMarket(v){_cf.market=v;applyClientFilters();}
+function applyClientFilters(){
+  let f=APP.clients;
+  if(_cf.health) f=f.filter(c=>c.healthStatus===_cf.health);
+  if(_cf.market) f=f.filter(c=>c.marketplace===_cf.market);
+  const qa=QUICK_ACTIONS[APP.user.role]||[];
+  document.getElementById('clients-table').innerHTML=clientTableRows(f,qa);
+  document.getElementById('clients-cards').innerHTML=clientCards(f);
+}
+function globalSearch(q){
+  if(!q.trim()||APP.page!=='clients') return;
+  const f=APP.clients.filter(c=>c.busyName.toLowerCase().includes(q.toLowerCase())||c.clientCode.toLowerCase().includes(q.toLowerCase()));
+  const qa=QUICK_ACTIONS[APP.user.role]||[];
+  document.getElementById('clients-table')?.innerHTML && (document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
+}
+
+async function quickAction(cc,cn,action){
+  await api('POST','/clients/quickaction',{clientCode:cc,clientName:cn,action});
+  showToast('✅ '+action+' — '+cn,'success');
+}
+
+async function viewTimeline(cc,cn){
+  openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
+  const logs = await api('GET',`/clients/${cc}/activity`);
+  document.getElementById('panel-body').innerHTML = !logs?.length
+    ?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>'
+    :logs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid var(--secondary);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${l.timestamp}</span>
+        </div>
+        <div style="font-size:13px;">${l.actionDetail||''}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName}</div>
+      </div>`).join('');
+}
+
+function openAddClient(){
+  openPanel('➕ Add Client',`
+    <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
+    <div class="form-group"><label>Marketplace</label>
+      <select class="form-control" id="nc-market"><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Account Manager</label><input type="text" class="form-control" id="nc-am"></div>
+      <div class="form-group"><label>Ads Manager</label><input type="text" class="form-control" id="nc-ads"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CRM Executive</label><input type="text" class="form-control" id="nc-crm"></div>
+      <div class="form-group"><label>Plan</label>
+        <select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
+    <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
+}
+
+async function submitAddClient(){
+  const name=document.getElementById('nc-name').value.trim();
+  if(!name){showToast('Name required','error');return;}
+  const r = await api('POST','/clients',{
+    busyName:name, marketplace:document.getElementById('nc-market').value,
+    amName:document.getElementById('nc-am').value, adsManager:document.getElementById('nc-ads').value,
+    crmExecutive:document.getElementById('nc-crm').value, servicePlan:document.getElementById('nc-plan').value,
+    renewalDate:document.getElementById('nc-renewal').value||null,
+  });
+  if(r?.success){showToast('✅ '+r.clientCode+' added!','success');closePanel();renderClients();}
+}
+
+// ── TICKETS ──────────────────────────────────────────────────
+async function renderTickets(){
+  const tickets = await api('GET','/tickets');
+  if(!tickets) return;
+  APP.tickets = tickets;
+  const open = tickets.filter(t=>t.status!=='Done').length;
+  const b = document.getElementById('badge-tickets');
+  if(b){b.textContent=open;b.style.display=open?'':'none';}
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">In Progress</div><div class="kpi-value">${tickets.filter(t=>t.status==='In Progress').length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">SLA Breached</div><div class="kpi-value">${tickets.filter(t=>t.slaBreached).length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${tickets.filter(t=>t.resolvedAt&&isToday(t.resolvedAt)).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">🎫 Tickets</span>
+        <div style="display:flex;gap:8px;">
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)">
+            <option value="">All</option><option>Open</option><option>In Progress</option><option>Done</option>
+          </select>
+          <button class="btn btn-danger btn-sm" onclick="openRaiseTicket()">🎫 Raise</button>
+        </div>
+      </div>
+      <div class="card-body" id="tickets-body">${ticketCards(tickets)}</div>
+    </div>`;
+}
+
+function ticketCards(tickets){
+  if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
+  return [...tickets].sort((a,b)=>(a.status==='Done'?1:0)-(b.status==='Done'?1:0)).map(t=>`
+    <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}">
+      <div class="ticket-header">
+        <div><div class="ticket-id">${t.ticketId}</div><div class="ticket-client">${t.clientName}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
+          <span class="badge badge-gray">${t.status}</span>
+        </div>
+      </div>
+      <div class="ticket-desc">${t.category} — ${t.description.slice(0,80)}</div>
+      <div class="ticket-footer">
+        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">
+          ${t.status==='Done'?'✅ Resolved':t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}
+        </span>
+        <span style="font-size:11px;color:var(--text-muted);">→ ${t.assignedTo}</span>
+        ${t.status!=='Done'?`<div style="margin-left:auto;display:flex;gap:4px;">
+          ${t.status==='Open'?`<button class="btn btn-sm btn-outline" onclick="updateTicket('${t.ticketId}','In Progress')">▶ Accept</button>`:''}
+          ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCloseTicket('${t.ticketId}','${t.clientName}')">✅ Done</button>`:''}
+        </div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function filterTickets(s){const f=s?APP.tickets.filter(t=>t.status===s):APP.tickets;document.getElementById('tickets-body').innerHTML=ticketCards(f);}
+
+async function updateTicket(id,status,note){
+  const r = await api('PATCH',`/tickets/${id}`,{status,resolutionNote:note||''});
+  if(r?.success){showToast('Ticket: '+status,'success');renderTickets();}
+}
+function promptCloseTicket(id,cn){const n=prompt(`Close ticket for ${cn}\nResolution note:`);if(n!==null)updateTicket(id,'Done',n);}
+
+function openRaiseTicket(){
+  if(!APP.clients.length){api('GET','/clients').then(c=>{if(c){APP.clients=c;openRaiseTicket();}});return;}
+  openPanel('🎫 Raise Ticket',`
+    <div class="form-group"><label>Client *</label>
+      <select class="form-control" id="tk-client">
+        <option value="">Select client...</option>
+        ${APP.clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="tk-cat">
+          <option>Account Health</option><option>Listing Issue</option><option>Order Issue</option>
+          <option>Fulfillment Issue</option><option>Ads / Campaign</option><option>Seller Complaint</option>
+          <option>Escalation</option><option>Renewal Follow-up</option><option>CSI Review Due</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="tk-pri"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Description *</label>
+      <textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea>
+    </div>
+    <button class="btn btn-danger btn-full" onclick="submitTicket()">🎫 Raise Ticket</button>`);
+}
+function openRaiseTicketFor(cc,cn){openRaiseTicket();setTimeout(()=>{const s=document.getElementById('tk-client');if(s)s.value=cc;},150);}
+async function submitTicket(){
+  const sel=document.getElementById('tk-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.dataset?.name||'';
+  const desc=document.getElementById('tk-desc').value.trim();
+  if(!cc){showToast('Select client','error');return;} if(!desc){showToast('Add description','error');return;}
+  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,description:desc});
+  if(r?.success){showToast(`✅ ${r.ticketId} → ${r.assignedTo}`,'success');closePanel();if(APP.page==='tickets')renderTickets();}
+}
+
+// ── CRM ──────────────────────────────────────────────────────
+async function renderCRM(){
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
+  const [clients, todayCalls] = await Promise.all([api('GET','/clients'), api('GET','/crm/today')]);
+  if(clients) APP.clients=clients;
+  renderCRMPage(APP.clients, todayCalls||[]);
+}
+
+function renderCRMPage(clients, todayCalls){
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">My Clients</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Calls Today</div><div class="kpi-value">${todayCalls.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('Connected')).length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('No Response')).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📞 Log a Call</span></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label>Client *</label>
+            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value)">
+              <option value="">Select...</option>
+              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.clientCode})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Call Outcome</label>
+            <select class="form-control" id="crm-outcome">
+              <option>Called — Connected</option><option>Called — No Response</option>
+              <option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Seller Feedback</label>
+            <textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea>
+          </div>
+          <div class="form-group"><label>Severity</label>
+            <select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label>Next Follow-up</label><input type="date" class="form-control" id="crm-followup"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="saveCRMCall()">📞 Save Call</button>
+          <button class="btn btn-danger" onclick="saveCRMCall(true)">📞 + 🎫 Save & Raise Ticket</button>
+          <button class="btn btn-secondary" onclick="openCSIForClient()">📝 Fill CSI</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':
+        `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${todayCalls.map(c=>`<tr>
+          <td><strong>${c.clientName}</strong></td>
+          <td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td>
+          <td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td>
+          <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td>
+        </tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card" id="crm-history-card" style="display:none;">
+      <div class="card-header"><span class="card-title" id="crm-hist-title">📋 Call History</span></div>
+      <div class="card-body" id="crm-history"></div>
+    </div>`;
+}
+
+async function saveCRMCall(andTicket){
+  const sel=document.getElementById('crm-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
+  if(!cc){showToast('Select a client','error');return;}
+  const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
+  if(r?.success){
+    showToast('✅ Call logged!','success');
+    document.getElementById('crm-comment').value='';
+    document.getElementById('crm-followup').value='';
+    loadCRMHistory(cc);
+    if(andTicket) openRaiseTicketFor(cc,cn);
+  }
+}
+
+async function loadCRMHistory(cc){
+  if(!cc) return;
+  const client=APP.clients.find(c=>c.clientCode===cc);
+  document.getElementById('crm-history-card').style.display='';
+  if(client) document.getElementById('crm-hist-title').textContent=`📋 Call History — ${client.busyName}`;
+  document.getElementById('crm-history').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  const calls=await api('GET',`/crm/client/${cc}`);
+  document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':
+    `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
+    <tbody>${calls.map(c=>`<tr>
+      <td style="font-size:12px;">${c.callDate}</td>
+      <td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td>
+      <td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td>
+      <td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td>
+      <td style="font-size:12px;">${c.nextFollowUp||'—'}</td>
+      <td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+function openCSIForClient(){const sel=document.getElementById('crm-client');openCSIForm(sel.value,sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'');}
+
+// ── CSI ───────────────────────────────────────────────────────
+async function renderCSI(){
+  const [clients, csiData]=await Promise.all([api('GET','/clients'),api('GET','/csi')]);
+  if(clients) APP.clients=clients;
+  const csiMap={};(csiData||[]).forEach(r=>{if(!csiMap[r.clientCode])csiMap[r.clientCode]=r;});
+  const canFill=['CRM Executive','Admin','CSI Lead'].includes(APP.user.role);
+  const reviewed=Object.keys(csiMap).length;
+  const lowScore=(csiData||[]).filter(r=>r.csiPercent<50).length;
+  const dueSoon=(clients||[]).filter(c=>{const last=csiMap[c.clientCode];if(!last||!last.reviewDate)return true;return Math.ceil((new Date()-new Date(last.reviewDate))/86400000)>=13;}).length;
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${(clients||[]).length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Reviewed</div><div class="kpi-value">${reviewed}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Due Soon</div><div class="kpi-value">${dueSoon}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Low Score</div><div class="kpi-value">${lowScore}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📊 CSI Health Index</span>
+        ${canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI Form</button>':''}
+      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Market</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Q5</th><th>CSI %</th><th>Health</th><th>Last Review</th>${canFill?'<th>Action</th>':''}</tr></thead>
+        <tbody>${(clients||[]).map(c=>{
+          const csi=csiMap[c.clientCode];const score=csi?csi.csiPercent:null;
+          const health=score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
+          return `<tr>
+            <td><strong>${c.busyName}</strong><div style="font-size:11px;color:var(--text-muted);">${c.clientCode}</div></td>
+            <td><span class="badge badge-blue">${c.marketplace}</span></td>
+            <td>${csi?starRating(csi.q1):'—'}</td><td>${csi?starRating(csi.q2):'—'}</td>
+            <td>${csi?starRating(csi.q3):'—'}</td><td>${csi?starRating(csi.q4):'—'}</td><td>${csi?starRating(csi.q5):'—'}</td>
+            <td>${score!==null?`<div style="font-weight:700;font-size:14px;color:${score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)'};">${score}%</div>
+              <div class="progress" style="width:70px;"><div class="progress-fill ${score>=80?'green':score>=50?'amber':'red'}" style="width:${score}%;"></div></div>`:'<span style="font-size:12px;color:var(--text-muted);">—</span>'}</td>
+            <td>${healthBadge(health)}</td>
+            <td style="font-size:11px;color:var(--text-muted);">${csi?csi.reviewDate:'—'}</td>
+            ${canFill?`<td><button class="btn btn-sm btn-secondary" onclick="openCSIForm('${c.clientCode}','${c.busyName}')">📝</button></td>`:''}
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+}
+
+function starRating(val){const n=parseInt(val)||0;return `<span title="${n}/5" style="font-size:12px;">${'⭐'.repeat(n)}${'☆'.repeat(5-n)}</span>`;}
+
+function openCSIForm(cc,cn){
+  const opts=(APP.clients||[]).map(c=>`<option value="${c.clientCode}" ${cc===c.clientCode?'selected':''}>${c.busyName} (${c.clientCode})</option>`).join('');
+  openPanel('📝 CSI Review Form',`
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1 (Poor) to 5 (Excellent)</div>
+    <div class="form-group"><label>Select Client *</label>
+      <select class="form-control" id="csi-client"><option value="">Select...</option>${opts}</select>
+    </div>
+    ${CSI_QUESTIONS.map(q=>`
+      <div class="form-group">
+        <label>${q.label}</label>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">${q.desc}</div>
+        <div style="display:flex;gap:8px;">
+          ${[1,2,3,4,5].map(n=>`
+            <div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar('${q.id}',${n})">
+              <div id="star-${q.id}-${n}" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">${n}</span></div>
+            </div>`).join('')}
+        </div>
+        <input type="hidden" id="val-${q.id}" value="0">
+      </div>`).join('')}
+    <div class="form-group"><label>Seller Remarks</label>
+      <textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea>
+    </div>
+    <div class="form-group"><label>Next Review Date</label>
+      <input type="date" class="form-control" id="csi-next" value="${dateAfterDays(15)}">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>`);
+}
+
+function selectStar(qId,val){
+  for(let i=1;i<=5;i++){
+    const el=document.getElementById(`star-${qId}-${i}`);
+    if(el){el.style.background=i<=val?'var(--amber)':'white';el.style.borderColor=i<=val?'var(--amber)':'var(--border)';el.style.color=i<=val?'white':'var(--text)';el.innerHTML=(i<=val?'⭐':'☆')+`<br><span style="font-size:11px;font-weight:600;">${i}</span>`;}
+  }
+  document.getElementById('val-'+qId).value=val;
+}
+
+async function submitCSI(){
+  const sel=document.getElementById('csi-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
+  if(!cc){showToast('Select a client','error');return;}
+  const scores={};let allFilled=true;
+  CSI_QUESTIONS.forEach(q=>{const v=parseInt(document.getElementById('val-'+q.id).value);if(!v||v<1)allFilled=false;else scores[q.id]=v;});
+  if(!allFilled){showToast('Please rate all 5 questions','error');return;}
+  const total=Object.values(scores).reduce((a,b)=>a+b,0);
+  const percent=Math.round((total/25)*100);
+  const r=await api('POST','/csi',{clientCode:cc,clientName:cn,...scores,csiScore:total,csiPercent:percent,remarks:document.getElementById('csi-remarks').value,nextReviewDate:document.getElementById('csi-next').value,healthStatus:percent>=80?'Healthy':percent>=50?'Warning':'At Risk'});
+  if(r?.success){showToast(`✅ CSI Saved! ${percent}% — ${percent>=80?'Healthy':percent>=50?'Warning':'At Risk'}`,'success');closePanel();renderCSI();}
+}
+
+// ── TASKS ────────────────────────────────────────────────────
+async function renderTasks(){
+  const tasks=await api('GET','/tasks');
+  if(!tasks) return;
+  APP.tasks=tasks;
+  const isLead=['Admin','Ops Lead','CSI Lead'].includes(APP.user.role);
+  const pending=tasks.filter(t=>t.status==='Pending');
+  const inprog=tasks.filter(t=>t.status==='In Progress');
+  const done=tasks.filter(t=>t.status==='Completed'&&isToday(t.completedAt));
+  const overdue=tasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  const b=document.getElementById('badge-tasks');
+  if(b){const c=pending.length+inprog.length;b.textContent=c;b.style.display=c?'':'none';}
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value">${overdue.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Pending</div><div class="kpi-value">${pending.length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">In Progress</div><div class="kpi-value">${inprog.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${done.length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📝 Tasks</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTasks(this.value)">
+            <option value="">All</option><option>Pending</option><option>In Progress</option><option>Completed</option><option value="overdue">Overdue</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>
+          ${isLead?'<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>':''}
+        </div>
+      </div>
+      <div class="card-body" id="tasks-body">${taskCards(tasks)}</div>
+    </div>`;
+}
+
+function taskCards(tasks){
+  if(!tasks.length) return '<div class="empty-state"><div class="emoji">📝</div><h3>No tasks yet</h3><p style="color:var(--text-muted);">Create a task or wait for assignment</p></div>';
+  return [...tasks].sort((a,b)=>({'Pending':0,'In Progress':1,'Completed':2}[a.status]||0)-({'Pending':0,'In Progress':1,'Completed':2}[b.status]||0)).map(t=>`
+    <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.isOverdue?'breached':''}">
+      <div class="ticket-header">
+        <div>
+          <div class="ticket-id">${t.taskId}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--primary);">${t.title}</div>
+          ${t.clientName?`<div class="ticket-client">👥 ${t.clientName}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
+          <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-gray'}">${t.status}</span>
+        </div>
+      </div>
+      ${t.description?`<div class="ticket-desc">${t.description}</div>`:''}
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--text-muted);">
+        ${t.assignedBy!==t.assignedTo?`<span>📤 From: <strong>${t.assignedBy}</strong></span>`:''}
+        <span>👤 <strong>${t.assignedTo}</strong></span>
+        ${t.deadline?`<span style="color:${t.isOverdue?'var(--red)':''};">📅 ${t.deadline}${t.isOverdue?' 🔴':''}</span>`:''}
+      </div>
+      ${t.status!=='Completed'?`
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        ${t.status==='Pending'?`<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')">▶ Start</button>`:''}
+        ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${t.title}')">✅ Complete</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${t.clientName||''}')">📓 Log Work</button>
+      </div>`:`<div style="margin-top:6px;font-size:12px;color:var(--green);">✅ Completed: ${t.completedAt}${t.workLog?' — "'+t.workLog+'"':''}</div>`}
+    </div>`).join('');
+}
+
+function filterTasks(val){let f=APP.tasks;if(val==='overdue')f=f.filter(t=>t.isOverdue&&t.status!=='Completed');else if(val)f=f.filter(t=>t.status===val);document.getElementById('tasks-body').innerHTML=taskCards(f);}
+
+async function openCreateTask(){
+  showToast('Loading...','info');
+  const clients=await api('GET','/clients');
+  if(clients) APP.clients=clients;
+  openPanel('📝 Create Task',`
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="tsk-title" placeholder="e.g. Review seller listings"></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..."></textarea></div>
+    <div class="form-group"><label>Related Client (optional)</label>
+      <select class="form-control" id="tsk-client">
+        <option value="">No specific client</option>
+        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="tsk-cat"><option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option><option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option></select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="tsk-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="tsk-deadline"></div>
+    <button class="btn btn-primary btn-full" onclick="submitCreateTask()">📝 Create Task</button>`);
+}
+
+async function openAssignTask(){
+  const [users, clients]=await Promise.all([api('GET','/users'),api('GET','/clients')]);
+  if(clients) APP.clients=clients;
+  const execs=(users||[]).filter(u=>['Account Manager','Ads Executive','CRM Executive'].includes(u.role)&&u.isActive);
+  openPanel('📤 Assign Task',`
+    <div class="form-group"><label>Assign To *</label>
+      <select class="form-control" id="at-exec">
+        <option value="">Select executive...</option>
+        ${execs.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc"></textarea></div>
+    <div class="form-group"><label>Client (optional)</label>
+      <select class="form-control" id="at-client">
+        <option value="">No specific client</option>
+        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="at-cat"><option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option><option>Ads Campaign</option><option>General</option></select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
+    <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
+}
+
+async function submitCreateTask(){
+  const title=document.getElementById('tsk-title').value.trim();if(!title){showToast('Title required','error');return;}
+  const csel=document.getElementById('tsk-client'),u=APP.user;
+  const r=await api('POST','/tasks',{title,description:document.getElementById('tsk-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:u.name,assignedToRole:u.role,priority:document.getElementById('tsk-pri').value,category:document.getElementById('tsk-cat').value,deadline:document.getElementById('tsk-deadline').value||null});
+  if(r?.success){showToast('✅ Task created: '+r.taskId,'success');closePanel();renderTasks();}
+}
+
+async function submitAssignTask(){
+  const esel=document.getElementById('at-exec'),to=esel.value,toRole=esel.options[esel.selectedIndex]?.dataset?.role||'';
+  const title=document.getElementById('at-title').value.trim(),deadline=document.getElementById('at-deadline').value;
+  if(!to){showToast('Select executive','error');return;} if(!title){showToast('Title required','error');return;} if(!deadline){showToast('Deadline required','error');return;}
+  const csel=document.getElementById('at-client');
+  const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
+  if(r?.success){showToast('✅ Task assigned to '+to,'success');closePanel();renderTasks();}
+}
+
+async function updateTask(id,status,workLog){
+  const r=await api('PATCH',`/tasks/${id}`,{status,workLog:workLog||''});
+  if(r?.success){showToast('Task: '+status,'success');renderTasks();}
+}
+function promptCompleteTask(id,title){const n=prompt(`Complete: "${title}"\nWork log (optional):`);if(n!==null)updateTask(id,'Completed',n||'Done');}
+
+function openWorkLogEntry(taskId,cc,cn){
+  openPanel('📓 Log Work',`
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="wl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
+    </div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
+    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save</button>`);
+}
+
+async function submitWorkLog(taskId,cc,cn){
+  const desc=document.getElementById('wl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const r=await api('POST','/tasks/worklog',{clientCode:cc,clientName:cn,workType:document.getElementById('wl-type').value,description:desc,outcome:document.getElementById('wl-outcome').value,timeSpent:document.getElementById('wl-time').value});
+  if(r?.success){showToast('✅ Work logged!','success');closePanel();renderTasks();}
+}
+
+// ── WORK LOG ─────────────────────────────────────────────────
+async function renderWorkLog(){
+  const [logs, clients]=await Promise.all([api('GET','/tasks/worklog'),api('GET','/clients')]);
+  if(clients) APP.clients=clients;
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">📓 Work Log</span>
+        <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':
+        `<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+        <tbody>${logs.map(l=>`<tr>
+          <td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td>
+          <td><strong>${l.executiveName}</strong></td>
+          <td>${l.clientName||'—'}</td>
+          <td><span class="badge badge-blue">${l.workType}</span></td>
+          <td style="font-size:12px;max-width:200px;">${l.description}</td>
+          <td style="font-size:12px;">${l.outcome||'—'}</td>
+          <td>${l.timeSpent||'—'}</td>
+        </tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>`;
+}
+
+function openQuickWorkLog(){
+  openPanel('📓 Quick Work Log',`
+    <div class="form-group"><label>Client (optional)</label>
+      <select class="form-control" id="qwl-client">
+        <option value="">No specific client</option>
+        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
+    </div>
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
+    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save</button>`);
+}
+
+async function submitQuickWorkLog(){
+  const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const csel=document.getElementById('qwl-client');
+  const r=await api('POST','/tasks/worklog',{clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
+  if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
+}
+
+// ── RENEWALS ─────────────────────────────────────────────────
+async function renderRenewals(){
+  const renewals=await api('GET','/renewals');if(!renewals) return;
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Due ≤15 Days</div><div class="kpi-value">${renewals.filter(r=>r.daysLeft!==null&&r.daysLeft<=15&&r.status==='Pending').length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Pending</div><div class="kpi-value">${renewals.filter(r=>r.status==='Pending').length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${renewals.length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">🔄 Renewal Pipeline</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${renewals.map(r=>`<tr>
+          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
+          <td>${r.amount?'₹'+Number(r.amount).toLocaleString():'—'}</td>
+          <td>${r.renewalDate||'—'}</td>
+          <td>${r.daysLeft!==null?`<strong style="color:${r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.daysLeft}d</strong>`:'—'}</td>
+          <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
+          <td><div style="display:flex;gap:4px;">
+            <button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>
+            <button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+}
+async function updateRenewal(id,status){const r=await api('PATCH',`/renewals/${id}`,{status});if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}}
+
+// ── ADS ───────────────────────────────────────────────────────
+async function renderAds(){
+  const ads=await api('GET','/ads');if(!ads) return;
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">📢 Ads Manager</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Market</th><th>Budget</th><th>Spent</th><th>Used%</th><th>ACOS</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${ads.map(a=>`<tr>
+          <td><strong>${a.clientName}</strong></td>
+          <td><span class="badge badge-blue">${a.marketplace||'—'}</span></td>
+          <td>₹${Number(a.budgetAllocated||0).toLocaleString()}</td>
+          <td>₹${Number(a.budgetSpent||0).toLocaleString()}</td>
+          <td><div style="min-width:70px;">
+            <div style="font-size:12px;font-weight:700;color:${(a.budgetPercent||0)>=95?'var(--red)':(a.budgetPercent||0)>=80?'var(--amber)':'var(--green)'};">${a.budgetPercent||0}%</div>
+            <div class="progress"><div class="progress-fill ${(a.budgetPercent||0)>=95?'red':(a.budgetPercent||0)>=80?'amber':'green'}" style="width:${Math.min(a.budgetPercent||0,100)}%;"></div></div>
+          </div></td>
+          <td>${a.acos?a.acos+'%':'—'}</td>
+          <td><span class="badge ${a.campaignStatus==='Active'?'badge-green':'badge-amber'}">${a.campaignStatus||'—'}</span></td>
+          <td><div class="quick-actions">${(QUICK_ACTIONS['Ads Executive']||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${a.clientCode}','${a.clientName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+}
+
+// ── REPORTS ──────────────────────────────────────────────────
+function renderReports(){
+  document.getElementById('page-content').innerHTML=`
+    <div class="report-tabs">
+      <button class="report-tab active" onclick="loadReport('daily',this)">📅 Daily</button>
+      <button class="report-tab" onclick="loadReport('weekly',this)">📊 Weekly</button>
+      <button class="report-tab" onclick="loadReport('monthly',this)">📈 Monthly</button>
+    </div>
+    <div id="report-content"><div class="loading"><div class="spinner"></div></div></div>`;
+  loadReport('daily',document.querySelector('.report-tab.active'));
+}
+
+async function loadReport(type,btn){
+  document.querySelectorAll('.report-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
+  const el=document.getElementById('report-content');
+  el.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash?.totalClients||0}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Healthy</div><div class="kpi-value">${dash?.healthy||0}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Warning</div><div class="kpi-value">${dash?.warning||0}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">At Risk</div><div class="kpi-value">${dash?.atRisk||0}</div></div>
+    </div>
+    ${team?.length?`<div class="card"><div class="card-header"><span class="card-title">👥 Team Today</span></div>
+    <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Role</th><th>Actions</th><th>Tickets Closed</th><th>Status</th></tr></thead>
+      <tbody>${team.map(e=>`<tr>
+        <td><strong>${e.name}</strong></td><td><span class="badge badge-blue">${e.role}</span></td>
+        <td><strong>${e.todayActivity}</strong></td><td>${e.ticketsClosed}</td>
+        <td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴</span>':'<span class="badge badge-green">🟢 Active</span>'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div></div>`:''}`;
+}
+
+// ── ADMIN ────────────────────────────────────────────────────
+async function renderAdmin(){
+  const users=await api('GET','/users');if(!users) return;
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">⚙️ Users (${users.length})</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="openAddUser()">➕ Add User</button>
+          <button class="btn btn-outline btn-sm" onclick="openResetPassword()">🔑 Reset Password</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+        <tbody>${users.map((u,i)=>`<tr>
+          <td>${i+1}</td><td><strong>${u.name}</strong></td><td>${u.email}</td>
+          <td><span class="badge badge-blue">${u.role}</span></td>
+          <td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+}
+
+function openAddUser(){
+  openPanel('➕ Add User',`
+    <div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div>
+    <div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div>
+    <div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div>
+    <div class="form-group"><label>Role</label>
+      <select class="form-control" id="nu-role"><option>Account Manager</option><option>Ads Executive</option><option>CRM Executive</option><option>Ops Lead</option><option>CSI Lead</option><option>Admin</option></select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitAddUser()">Add User</button>`);
+}
+
+async function submitAddUser(){
+  const name=document.getElementById('nu-name').value.trim(),email=document.getElementById('nu-email').value.trim(),pass=document.getElementById('nu-pass').value,role=document.getElementById('nu-role').value;
+  if(!name||!email||!pass){showToast('All fields required','error');return;}
+  const r=await api('POST','/users',{name,email,password:pass,role});
+  if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}
+  else showToast(r?.error||'Failed','error');
+}
+
+function openResetPassword(){
+  openPanel('🔑 Reset Password',`
+    <div class="form-group"><label>User Code (e.g. USR001)</label><input type="text" class="form-control" id="rp-code" placeholder="USR001"></div>
+    <div class="form-group"><label>New Password *</label><input type="password" class="form-control" id="rp-pass"></div>
+    <button class="btn btn-warning btn-full" onclick="submitResetPassword()">🔑 Reset Password</button>`);
+}
+async function submitResetPassword(){
+  const code=document.getElementById('rp-code').value.trim(),pass=document.getElementById('rp-pass').value;
+  if(!code||!pass){showToast('All fields required','error');return;}
+  const r=await api('PATCH',`/users/${code}/password`,{password:pass});
+  if(r?.success){showToast('✅ Password reset!','success');closePanel();}
+  else showToast('Failed','error');
+}
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────
+async function loadNotifications(){
+  const notifs=await api('GET','/notifications');
+  if(!notifs) return;
+  const badge=document.getElementById('notif-count');
+  if(notifs.length){badge.textContent=notifs.length;badge.style.display='flex';}else{badge.style.display='none';}
+  const el=document.getElementById('notif-list');if(!el) return;
+  el.innerHTML=!notifs.length?'<div class="empty-state" style="padding:24px;"><div class="emoji">🔕</div><h3>All clear!</h3></div>':
+    notifs.map(n=>`<div class="notif-item" onclick="handleNotif('${n.notifId}','${n.type}')">
+      <div class="notif-type">${n.type.replace(/_/g,' ')}</div>
+      <div class="notif-msg">${n.message}</div>
+      <div class="notif-time">${n.createdAt}</div>
+    </div>`).join('');
+}
+function toggleNotifications(){document.getElementById('notif-dropdown').classList.toggle('show');}
+async function markAllRead(){
+  const notifs=document.querySelectorAll('.notif-item');
+  notifs.forEach((_,i)=>{});
+  await api('GET','/notifications').then(ns=>(ns||[]).forEach(n=>api('PATCH',`/notifications/${n.notifId}/read`,{})));
+  document.getElementById('notif-count').style.display='none';
+  document.getElementById('notif-list').innerHTML='<div class="empty-state" style="padding:24px;"><div class="emoji">✅</div><h3>All read!</h3></div>';
+  document.getElementById('notif-dropdown').classList.remove('show');
+}
+async function handleNotif(id,type){
+  await api('PATCH',`/notifications/${id}/read`,{});
+  document.getElementById('notif-dropdown').classList.remove('show');
+  if(type==='NEW_TICKET'||type==='SLA_BREACH') navigate('tickets');
+  else if(type==='RENEWAL_ALERT') navigate('renewals');
+  else if(type==='CSI_DUE') navigate('csi');
+  else if(type==='NEW_TASK') navigate('tasks');
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function healthBadge(s){const m={'Healthy':'badge-green','Warning':'badge-amber','At Risk':'badge-red'};const d={'Healthy':'🟢','Warning':'🟡','At Risk':'🔴'};return `<span class="badge ${m[s]||'badge-gray'}">${d[s]||''} ${s||'Unknown'}</span>`;}
+function statusBadge(s){return `<span class="badge ${s==='Active'?'badge-green':s==='Inactive'?'badge-red':'badge-gray'}">${s||'—'}</span>`;}
+function renewalBadge(d){if(!d)return '—';try{const days=Math.ceil((new Date(d)-new Date())/86400000);return `<span class="badge ${days<=7?'badge-red':days<=15?'badge-amber':'badge-green'}">${new Date(d).toLocaleDateString('en-IN')} (${days}d)</span>`;}catch(e){return d;}}
+function isToday(ds){if(!ds)return false;try{const d=new Date(ds),t=new Date();return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear();}catch(e){return false;}}
+function dateAfterDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function openPanel(title,html){document.getElementById('panel-title').textContent=title;document.getElementById('panel-body').innerHTML=html;document.getElementById('overlay').classList.add('show');}
+function closePanel(e){if(e&&e.target!==document.getElementById('overlay'))return;document.getElementById('overlay').classList.remove('show');}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('show');}
+function showToast(msg,type='info'){const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;document.getElementById('toast-container').appendChild(t);setTimeout(()=>t.remove(),3500);}
+function showError(el,msg){el.textContent=msg;el.style.display='block';}
+document.addEventListener('click',e=>{const dd=document.getElementById('notif-dropdown'),btn=document.getElementById('notif-btn');if(dd&&!dd.contains(e.target)&&btn&&!btn.contains(e.target))dd.classList.remove('show');});
+window.addEventListener('resize',()=>{const h=document.querySelector('.hamburger');if(h)h.style.display=window.innerWidth<768?'flex':'none';});
+</script>
+</body>
+</html>

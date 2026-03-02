@@ -12,6 +12,7 @@ app.use(express.static('public'));
 
 // Rate limiting — simple version without express-rate-limit
 app.use('/api/', (req, res, next) => { next(); });
+app.use('/api/import', require('./routes/import'));
 
 app.use('/api/auth',          require('./routes/auth'));
 app.use('/api/clients',       require('./routes/clients'));

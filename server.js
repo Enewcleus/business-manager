@@ -10,10 +10,6 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.static('public'));
 
-// Rate limiting — simple version without express-rate-limit
-app.use('/api/', (req, res, next) => { next(); });
-app.use('/api/import', require('./routes/import'));
-
 app.use('/api/auth',          require('./routes/auth'));
 app.use('/api/clients',       require('./routes/clients'));
 app.use('/api/tickets',       require('./routes/tickets'));
@@ -25,6 +21,7 @@ app.use('/api/ads',           require('./routes/ads'));
 app.use('/api/dashboard',     require('./routes/dashboard'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/users',         require('./routes/users'));
+app.use('/api/import',        require('./routes/import'));
 
 app.get('*', (req, res) => {
   res.sendFile(__dirname + '/public/index.html');

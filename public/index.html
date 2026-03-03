@@ -1632,54 +1632,203 @@ async function loadReport(type,btn){
 
 // ── ADMIN ────────────────────────────────────────────────────
 async function renderAdmin(){
-  const users=await api('GET','/users');if(!users) return;
+  const [users, hierarchy] = await Promise.all([api('GET','/users'), api('GET','/users/hierarchy')]);
+  if(!users) return;
+  
+  const depts = [...new Set(users.map(u=>u.department).filter(Boolean))];
+  
   document.getElementById('page-content').innerHTML=`
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Users</div><div class="kpi-value">${users.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Active</div><div class="kpi-value">${users.filter(u=>u.isActive).length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Departments</div><div class="kpi-value">${depts.length||'—'}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Inactive</div><div class="kpi-value">${users.filter(u=>!u.isActive).length}</div></div>
+    </div>
+
+    <!-- Actions -->
     <div class="card">
-      <div class="card-header"><span class="card-title">⚙️ Users (${users.length})</span>
-        <div style="display:flex;gap:8px;">
+      <div class="card-header">
+        <span class="card-title">👥 Team Management</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="openAddUser()">➕ Add User</button>
           <button class="btn btn-outline btn-sm" onclick="openResetPassword()">🔑 Reset Password</button>
+          <button class="btn btn-secondary btn-sm" onclick="showHierarchy()">🏢 Hierarchy View</button>
         </div>
       </div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
-        <tbody>${users.map((u,i)=>`<tr>
-          <td>${i+1}</td><td><strong>${u.name}</strong></td><td>${u.email}</td>
-          <td><span class="badge badge-blue">${u.role}</span></td>
-          <td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
-        </tr>`).join('')}</tbody>
-      </table></div></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>${users.map((u,i)=>{
+            const manager = users.find(m=>m.id===u.reportingTo);
+            return `<tr>
+              <td>${i+1}</td>
+              <td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td>
+              <td>${u.department||'<span style="color:#ccc;">—</span>'}</td>
+              <td>${u.department||'<span style="color:#ccc;">—</span>'}</td>
+              <td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td>
+              <td style="font-size:12px;">${u.email}</td>
+              <td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
+              <td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- Hierarchy Visual -->
+    <div class="card" id="hierarchy-card" style="display:none;">
+      <div class="card-header"><span class="card-title">🏢 Reporting Hierarchy</span></div>
+      <div class="card-body" id="hierarchy-body"></div>
+    </div>
+  `;
+  
+  // Store users globally for forms
+  window._adminUsers = users;
+}
+
+function showHierarchy() {
+  const card = document.getElementById('hierarchy-card');
+  card.style.display = card.style.display==='none' ? '' : 'none';
+  if(card.style.display==='') buildHierarchyView();
+}
+
+function buildHierarchyView() {
+  const users = window._adminUsers || [];
+  const topLevel = users.filter(u => !u.reportingTo && u.isActive);
+  
+  function renderUser(u, depth=0) {
+    const reports = users.filter(r => r.reportingTo === u.id);
+    return `<div style="margin-left:${depth*24}px;margin-bottom:8px;">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:${depth===0?'#1F3864':depth===1?'#2E75B6':'#e8f4fd'};color:${depth<2?'#fff':'#333'};padding:6px 14px;border-radius:20px;font-size:13px;">
+        ${depth===0?'👑':depth===1?'⭐':'👤'} <strong>${u.name}</strong> ${u.designation?`<span style="opacity:0.8;font-size:11px;">(${u.designation})</span>`:''}
+        ${u.department?`<span style="opacity:0.7;font-size:11px;">[${u.department}]</span>`:''}
+      </div>
+      ${reports.map(r=>renderUser(r, depth+1)).join('')}
     </div>`;
+  }
+  
+  document.getElementById('hierarchy-body').innerHTML = 
+    topLevel.length ? topLevel.map(u=>renderUser(u)).join('') : '<p style="color:#999;">No hierarchy set yet — edit users to set reporting managers!</p>';
 }
 
 function openAddUser(){
-  openPanel('➕ Add User',`
-    <div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div>
-    <div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div>
-    <div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div>
-    <div class="form-group"><label>Role</label>
-      <select class="form-control" id="nu-role"><option>Account Manager</option><option>Ads Executive</option><option>CRM Executive</option><option>Ops Lead</option><option>CSI Lead</option><option>Admin</option></select>
+  const users = window._adminUsers || [];
+  openPanel('➕ Add New User',`
+    <div class="form-row">
+      <div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div>
+      <div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div>
     </div>
-    <button class="btn btn-primary btn-full" onclick="submitAddUser()">Add User</button>`);
+    <div class="form-row">
+      <div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div>
+      <div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Department</label>
+        <select class="form-control" id="nu-dept">
+          <option value="">-- Select --</option>
+          <option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Operations</option><option>Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Role (Permission Level)</label>
+        <select class="form-control" id="nu-role">
+          <option value="Executive">Executive</option>
+          <option value="Team Lead">Team Lead</option>
+          <option value="Ops Lead">Ops Lead</option>
+          <option value="Admin">Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Reports To (Manager)</label>
+      <select class="form-control" id="nu-manager">
+        <option value="">-- Top Level / No Manager --</option>
+        ${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
 }
 
 async function submitAddUser(){
-  const name=document.getElementById('nu-name').value.trim(),email=document.getElementById('nu-email').value.trim(),pass=document.getElementById('nu-pass').value,role=document.getElementById('nu-role').value;
-  if(!name||!email||!pass){showToast('All fields required','error');return;}
-  const r=await api('POST','/users',{name,email,password:pass,role});
+  const name=document.getElementById('nu-name').value.trim();
+  const email=document.getElementById('nu-email').value.trim();
+  const pass=document.getElementById('nu-pass').value;
+  const role=document.getElementById('nu-role').value;
+  const designation=document.getElementById('nu-designation').value.trim();
+  const department=document.getElementById('nu-dept').value;
+  const reportingTo=document.getElementById('nu-manager').value;
+  if(!name||!email||!pass){showToast('Name, email, password required','error');return;}
+  const r=await api('POST','/users',{name,email,password:pass,role,designation,department,reportingTo});
   if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}
   else showToast(r?.error||'Failed','error');
 }
 
+function openEditUser(userId){
+  const users = window._adminUsers || [];
+  const u = users.find(x=>x.userId===userId);
+  if(!u) return;
+  openPanel(`✏️ Edit — ${u.name}`,`
+    <div class="form-row">
+      <div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div>
+      <div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Department</label>
+        <select class="form-control" id="eu-dept">
+          <option value="">-- Select --</option>
+          ${['CRM','Ads','Account Management','CSI','Operations','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Role</label>
+        <select class="form-control" id="eu-role">
+          ${['Executive','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Reports To</label>
+      <select class="form-control" id="eu-manager">
+        <option value="">-- Top Level --</option>
+        ${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="eu-active">
+        <option value="true" ${u.isActive?'selected':''}>Active</option>
+        <option value="false" ${!u.isActive?'selected':''}>Inactive</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary btn-full" onclick="submitEditUser('${userId}')">💾 Save Changes</button>
+    </div>`);
+}
+
+async function submitEditUser(userId){
+  const name=document.getElementById('eu-name').value.trim();
+  const designation=document.getElementById('eu-designation').value.trim();
+  const department=document.getElementById('eu-dept').value;
+  const role=document.getElementById('eu-role').value;
+  const reportingTo=document.getElementById('eu-manager').value;
+  const isActive=document.getElementById('eu-active').value==='true';
+  const r=await api('PATCH',`/users/${userId}`,{name,designation,department,role,reportingTo,isActive});
+  if(r?.success){showToast('✅ User updated!','success');closePanel();renderAdmin();}
+  else showToast(r?.error||'Failed','error');
+}
+
 function openResetPassword(){
+  const users = window._adminUsers || [];
   openPanel('🔑 Reset Password',`
-    <div class="form-group"><label>User Code (e.g. USR001)</label><input type="text" class="form-control" id="rp-code" placeholder="USR001"></div>
+    <div class="form-group"><label>User Select Karo</label>
+      <select class="form-control" id="rp-code">
+        <option value="">-- Select User --</option>
+        ${users.map(u=>`<option value="${u.userId}">${u.name} (${u.userId})</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group"><label>New Password *</label><input type="password" class="form-control" id="rp-pass"></div>
     <button class="btn btn-warning btn-full" onclick="submitResetPassword()">🔑 Reset Password</button>`);
 }
 async function submitResetPassword(){
-  const code=document.getElementById('rp-code').value.trim(),pass=document.getElementById('rp-pass').value;
-  if(!code||!pass){showToast('All fields required','error');return;}
+  const code=document.getElementById('rp-code').value.trim();
+  const pass=document.getElementById('rp-pass').value;
+  if(!code||!pass){showToast('User aur password required','error');return;}
   const r=await api('PATCH',`/users/${code}/password`,{password:pass});
   if(r?.success){showToast('✅ Password reset!','success');closePanel();}
   else showToast('Failed','error');

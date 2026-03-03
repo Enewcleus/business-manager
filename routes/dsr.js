@@ -2,13 +2,15 @@ const router = require('express').Router();
 const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
-// GET /api/dsr?date=2026-03-03&client=CLT001
+// GET /api/dsr?date=2026-03-03&client=CLT001&from=2026-03-01&to=2026-03-31
 router.get('/', authMiddleware, async (req, res) => {
-  const { date, client } = req.query;
+  const { date, client, from, to } = req.query;
   let query = supabase.from('dsr_data').select('*').order('report_date', { ascending: false });
   if (date) query = query.eq('report_date', date);
   if (client) query = query.eq('client_code', client);
-  const { data, error } = await query.limit(100);
+  if (from) query = query.gte('report_date', from);
+  if (to) query = query.lte('report_date', to);
+  const { data, error } = await query.limit(500);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });

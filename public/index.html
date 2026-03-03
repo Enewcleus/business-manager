@@ -1736,39 +1736,203 @@ async function renderAds(){
 }
 
 // ── REPORTS ──────────────────────────────────────────────────
-function renderReports(){
+async function renderReports(){
+  const clients=await api('GET','/clients');
+  if(clients) APP.clients=clients;
+  const today=new Date().toISOString().split('T')[0];
+  const monthStart=today.slice(0,7)+'-01';
+  window._currentReport='dsr';
   document.getElementById('page-content').innerHTML=`
-    <div class="report-tabs">
-      <button class="report-tab active" onclick="loadReport('daily',this)">📅 Daily</button>
-      <button class="report-tab" onclick="loadReport('weekly',this)">📊 Weekly</button>
-      <button class="report-tab" onclick="loadReport('monthly',this)">📈 Monthly</button>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📋 Reports & Export</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn btn-primary" onclick="window._currentReport='dsr';generateReport()">📊 DSR Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='crm';generateReport()">📞 CRM Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='renewal';generateReport()">🔄 Renewal Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='ticket';generateReport()">🎫 Ticket Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='team';generateReport()">👥 Team Report</button>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
+          <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="rpt-to" value="${today}"></div>
+          <div class="form-group"><label>Seller</label>
+            <select class="form-control" id="rpt-client">
+              <option value="">-- All Sellers --</option>
+              ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+            <button class="btn btn-primary" onclick="generateReport()">🔍 Generate</button>
+            <button class="btn btn-success" onclick="exportExcel()">📥 Excel</button>
+            <button class="btn btn-outline" onclick="window.print()">📄 PDF</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="report-content"><div class="loading"><div class="spinner"></div></div></div>`;
-  loadReport('daily',document.querySelector('.report-tab.active'));
+    <div id="report-output"><div class="loading"><div class="spinner"></div></div></div>`;
+  generateReport();
 }
 
-async function loadReport(type,btn){
-  document.querySelectorAll('.report-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
-  const el=document.getElementById('report-content');
-  el.innerHTML=`
-    <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash?.totalClients||0}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Healthy</div><div class="kpi-value">${dash?.healthy||0}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Warning</div><div class="kpi-value">${dash?.warning||0}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">At Risk</div><div class="kpi-value">${dash?.atRisk||0}</div></div>
-    </div>
-    ${team?.length?`<div class="card"><div class="card-header"><span class="card-title">👥 Team Today</span></div>
-    <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Role</th><th>Actions</th><th>Tickets Closed</th><th>Status</th></tr></thead>
-      <tbody>${team.map(e=>`<tr>
-        <td><strong>${e.name}</strong></td><td><span class="badge badge-blue">${e.role}</span></td>
-        <td><strong>${e.todayActivity}</strong></td><td>${e.ticketsClosed}</td>
-        <td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴</span>':'<span class="badge badge-green">🟢 Active</span>'}</td>
-      </tr>`).join('')}</tbody>
-    </table></div></div></div>`:''}`;
+async function generateReport(){
+  const type=window._currentReport||'dsr';
+  const from=document.getElementById('rpt-from')?.value;
+  const to=document.getElementById('rpt-to')?.value;
+  const cc=document.getElementById('rpt-client')?.value;
+  const el=document.getElementById('report-output');
+  if(!el) return;
+  el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  if(type==='dsr'){
+    let url='/dsr?x=1';
+    if(from) url+=`&from=${from}`;
+    if(to) url+=`&to=${to}`;
+    if(cc) url+=`&client=${cc}`;
+    const data=await api('GET',url)||[];
+    window._reportData=data; window._reportType='dsr';
+    const zeros=data.filter(d=>!d.sales_amount||!d.orders_count);
+    el.innerHTML=`<div class="card">
+      <div class="card-header">
+        <span class="card-title">📊 DSR Report (${data.length} records)</span>
+        ${zeros.length?`<span class="badge badge-red">⚠️ ${zeros.length} Zero Sale Days</span>`:''}
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>Koi data nahi — pehle DSR enter karo</h3></div>':
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Seller</th><th>Orders</th><th>Sales(Rs)</th><th>Returns</th><th>Return%</th><th>Ad Spend</th><th>Budget</th><th>Used%</th><th>Alert</th><th>By</th></tr></thead>
+          <tbody>${data.map(d=>{
+            const z=!d.sales_amount||!d.orders_count;
+            const al=[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':'',d.alert_budget_80?'80%Budget':''].filter(Boolean).join(' ')||'OK';
+            return `<tr style="${z?'background:#fdf2f2;':''}">
+              <td>${d.report_date}</td>
+              <td><strong>${d.client_name||d.client_code}</strong></td>
+              <td>${z&&!d.orders_count?'<b style="color:red">0</b>':d.orders_count||0}</td>
+              <td>${z&&!d.sales_amount?'<b style="color:red">Rs 0</b>':`Rs ${(d.sales_amount||0).toLocaleString('en-IN')}`}</td>
+              <td>${d.returns_count||0}</td>
+              <td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td>
+              <td>Rs ${(d.ad_spend||0).toLocaleString('en-IN')}</td>
+              <td>Rs ${(d.seller_budget||0).toLocaleString('en-IN')}</td>
+              <td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td>
+              <td style="font-size:11px;">${al}</td>
+              <td style="font-size:11px;">${d.entered_by||'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>`}
+      </div></div>`;
+
+  } else if(type==='crm'){
+    let url='/crm?x=1'; if(cc) url+=`&client=${cc}`;
+    const data=await api('GET',url)||[];
+    window._reportData=data; window._reportType='crm';
+    el.innerHTML=`<div class="card">
+      <div class="card-header"><span class="card-title">📞 CRM Report (${data.length} calls)</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls</h3></div>':
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Seller</th><th>Executive</th><th>Outcome</th><th>Severity</th><th>Follow Up</th><th>Feedback</th></tr></thead>
+          <tbody>${data.map(d=>`<tr>
+            <td>${d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td><strong>${d.client_name||d.client_code||'—'}</strong></td>
+            <td>${d.crm_executive||d.entered_by||'—'}</td>
+            <td><span class="badge ${d.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${d.call_outcome||'—'}</span></td>
+            <td><span class="badge ${d.severity==='Critical'?'badge-red':d.severity==='High'?'badge-amber':'badge-blue'}">${d.severity||'Low'}</span></td>
+            <td>${d.next_follow_up||'—'}</td>
+            <td style="font-size:12px;max-width:160px;">${d.seller_comment||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div></div>`;
+
+  } else if(type==='renewal'){
+    const data=await api('GET','/renewals')||[];
+    window._reportData=data; window._reportType='renewal';
+    el.innerHTML=`<div class="card">
+      <div class="card-header"><span class="card-title">🔄 Renewal Report (${data.length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No renewals</h3></div>':
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Client</th><th>Plan</th><th>Amount(Rs)</th><th>Renewal Date</th><th>Days Left</th><th>Status</th><th>Owner</th></tr></thead>
+          <tbody>${data.map(d=>`<tr>
+            <td><strong>${d.clientName||d.clientCode}</strong></td>
+            <td>${d.servicePlan||'—'}</td>
+            <td>Rs ${(d.amount||0).toLocaleString('en-IN')}</td>
+            <td>${d.renewalDate||'—'}</td>
+            <td><span class="badge ${(d.daysLeft||99)<=7?'badge-red':(d.daysLeft||99)<=15?'badge-amber':'badge-green'}">${d.daysLeft!=null?d.daysLeft+' days':'—'}</span></td>
+            <td>${d.status||'—'}</td>
+            <td>${d.owner||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div></div>`;
+
+  } else if(type==='ticket'){
+    const data=await api('GET','/tickets')||[];
+    window._reportData=data; window._reportType='ticket';
+    el.innerHTML=`<div class="card">
+      <div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':
+        `<div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead>
+          <tbody>${data.map(d=>`<tr>
+            <td style="font-size:11px;">${d.ticketId||'—'}</td>
+            <td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td>
+            <td><strong>${d.clientName||'—'}</strong></td>
+            <td>${d.subject||'—'}</td>
+            <td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td>
+            <td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td>
+            <td>${d.assignedTo||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div></div>`;
+
+  } else if(type==='team'){
+    const data=await api('GET','/dashboard/team')||[];
+    window._reportData=data; window._reportType='team';
+    el.innerHTML=`<div class="card">
+      <div class="card-header"><span class="card-title">👥 Team Performance</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
+          <tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}">
+            <td><strong>${d.name}</strong></td>
+            <td><span class="badge badge-blue">${d.role}</span></td>
+            <td>${d.todayActivity||0}</td>
+            <td>${d.ticketsClosed||0}</td>
+            <td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div></div>`;
+  }
 }
+
+function exportExcel(){
+  const data=window._reportData||[]; const type=window._reportType||'report';
+  if(!data.length){showToast('Pehle report generate karo','error');return;}
+  let csv='';
+  if(type==='dsr'){
+    csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';
+    csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');
+  } else if(type==='crm'){
+    csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';
+    csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');
+  } else if(type==='renewal'){
+    csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';
+    csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');
+  } else if(type==='ticket'){
+    csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';
+    csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');
+  } else if(type==='team'){
+    csv='Name,Role,ActionsToday,TicketsClosed,Status\n';
+    csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');
+  }
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  showToast('Excel download ho raha hai!','success');
+}
+
 
 // ── ADMIN ────────────────────────────────────────────────────
 async function renderAdmin(){
@@ -2070,4 +2234,3 @@ document.addEventListener('click', (e) => {
 </script>
 </body>
 </html>
-

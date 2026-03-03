@@ -13,7 +13,18 @@
     --border:#e0e6ed; --sidebar-w:240px;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
+  html { height:100%; overflow:hidden; }
+  body { height:100%; width:100%; overflow:hidden; max-width:100vw; }
   body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+
+  /* THEME SWITCHER */
+  .theme-btn { width:24px; height:24px; border-radius:50%; border:3px solid #fff; cursor:pointer; display:inline-block; transition:transform 0.2s; }
+  .theme-btn:hover { transform:scale(1.2); }
+  .theme-panel { position:fixed; bottom:70px; left:8px; background:#fff; border-radius:12px; padding:12px; box-shadow:0 4px 20px rgba(0,0,0,0.2); display:none; z-index:200; width:224px; }
+  .theme-panel.show { display:block; }
+  .theme-panel h4 { font-size:12px; color:#666; margin-bottom:8px; text-transform:uppercase; }
+  .theme-colors { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
 
   /* AUTH */
   #auth-screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%); z-index:9999; }
@@ -24,7 +35,7 @@
 
   /* APP LAYOUT */
   #app { display:none; height:100vh; overflow:hidden; }
-  .sidebar { width:var(--sidebar-w); height:100vh; background:var(--primary); display:flex; flex-direction:column; position:fixed; left:0; top:0; z-index:100; transition:transform 0.3s; overflow-y:auto; }
+  .sidebar { width:var(--sidebar-w); height:100vh; background:var(--primary); display:flex; flex-direction:column; position:fixed; left:0; top:0; z-index:100; transition:transform 0.3s; overflow:hidden; }
   .sidebar-header { padding:20px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
   .sidebar-logo { font-size:20px; font-weight:800; color:#fff; }
   .sidebar-logo span { color:#64B5F6; }
@@ -32,7 +43,7 @@
   .user-avatar { width:36px; height:36px; border-radius:50%; background:var(--secondary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0; }
   .user-info .name { color:#fff; font-size:13px; font-weight:600; }
   .user-info .role { color:#90CAF9; font-size:11px; }
-  #sidebar-nav { flex:1; padding:12px 8px; }
+  #sidebar-nav { flex:1; padding:12px 8px; overflow-y:auto; overflow-x:hidden; }
   .nav-section-label { color:rgba(255,255,255,0.4); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:8px 8px 4px; }
   .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer; color:rgba(255,255,255,0.7); font-size:13px; font-weight:500; margin-bottom:2px; position:relative; transition:all 0.15s; }
   .nav-item:hover { background:rgba(255,255,255,0.1); color:#fff; }
@@ -42,7 +53,7 @@
   .logout-btn { padding:16px; border-top:1px solid rgba(255,255,255,0.1); }
 
   /* MAIN */
-  .main { margin-left:var(--sidebar-w); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  .main { margin-left:var(--sidebar-w); height:100vh; width:calc(100% - var(--sidebar-w)); display:flex; flex-direction:column; overflow:hidden; position:relative; }
   .topbar { background:#fff; border-bottom:1px solid var(--border); padding:0 20px; height:56px; display:flex; align-items:center; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
   .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; flex-direction:column; gap:4px; }
   .hamburger span { display:block; width:22px; height:2px; background:var(--text); border-radius:2px; }
@@ -59,7 +70,7 @@
   .notif-type { font-size:10px; font-weight:700; color:var(--secondary); text-transform:uppercase; }
   .notif-msg { font-size:13px; color:var(--text); margin-top:2px; }
   .notif-time { font-size:11px; color:var(--text-muted); margin-top:2px; }
-  .page-content { flex:1; overflow-y:auto; padding:20px; }
+  .page-content { flex:1; overflow-y:auto; overflow-x:hidden; padding:20px; max-width:100%; }
 
   /* CARDS & TABLES */
   .card { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:16px; }
@@ -257,7 +268,9 @@
       </div>
     </div>
     <div id="sidebar-nav"></div>
-    <div class="logout-btn">
+    <div class="logout-btn" style="flex-shrink:0;">
+      <button onclick="toggleThemePanel()" style="background:rgba(255,255,255,0.1);border:none;cursor:pointer;color:rgba(255,255,255,0.8);font-size:12px;width:100%;text-align:left;padding:8px 12px;border-radius:8px;margin-bottom:8px;">🎨 Theme Change</button>
+      <div id="theme-panel" class="theme-panel"><h4>Color Theme</h4><div class="theme-colors" id="theme-colors"></div></div>
       <button class="btn btn-outline btn-full" onclick="doLogout()" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">🚪 Logout</button>
     </div>
   </div>
@@ -324,6 +337,7 @@ const NAV_CONFIG = {
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
   ],
   'Ops Lead': [
@@ -332,6 +346,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
   ],
   'CSI Lead': [
@@ -340,6 +355,7 @@ const NAV_CONFIG = {
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
   'Account Manager': [
@@ -359,6 +375,7 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'csi',icon:'📊',label:'CSI Forms'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
 };
@@ -497,15 +514,153 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
+  const titles = {seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
+  const pages = {seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────
+
+// ── SELLER 360 VIEW ──────────────────────────────────────────
+async function renderSeller360() {
+  const clients = await api('GET', '/clients');
+  if (clients) APP.clients = clients;
+  document.getElementById('page-content').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔍 Seller 360° View — Sab Ek Jagah</span>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Seller Select Karo</label>
+            <select class="form-control" id="s360-client" onchange="load360(this.value)">
+              <option value="">-- Seller Choose Karo --</option>
+              ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.marketplace})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;">
+            <div id="s360-health-badge" style="padding:8px 16px;border-radius:8px;font-weight:700;background:#eee;">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="s360-content"></div>
+  `;
+}
+
+async function load360(cc) {
+  if (!cc) return;
+  const client = APP.clients.find(c => c.clientCode === cc);
+  if (!client) return;
+  
+  const hColor = client.healthStatus === 'Healthy' ? '#27ae60' : client.healthStatus === 'Warning' ? '#f39c12' : '#e74c3c';
+  document.getElementById('s360-health-badge').textContent = '🩺 ' + (client.healthStatus || 'Unknown');
+  document.getElementById('s360-health-badge').style.background = hColor;
+  document.getElementById('s360-health-badge').style.color = '#fff';
+
+  document.getElementById('s360-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
+  
+  const data = await api('GET', '/clients/' + cc + '/timeline');
+  if (!data) return;
+  
+  document.getElementById('s360-content').innerHTML = `
+    <!-- Client Info -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));">
+      <div class="kpi-card blue"><div class="kpi-label">Marketplace</div><div class="kpi-value" style="font-size:18px;">${client.marketplace||'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Plan</div><div class="kpi-value" style="font-size:18px;">${client.servicePlan||'—'}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Account Manager</div><div class="kpi-value" style="font-size:16px;">${client.amName||'—'}</div></div>
+      <div class="kpi-card orange"><div class="kpi-label">Ads Manager</div><div class="kpi-value" style="font-size:16px;">${client.adsManager||'—'}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">CRM Executive</div><div class="kpi-value" style="font-size:16px;">${client.crmExecutive||'—'}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Renewal</div><div class="kpi-value" style="font-size:16px;">${client.renewalDate||'—'}</div></div>
+    </div>
+
+    <!-- CRM Calls -->
+    <div class="card">
+      <div class="card-header" style="background:#e8f4fd;">
+        <span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span>
+        <button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!data.crmCalls.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+          <tbody>${data.crmCalls.map(c=>`<tr>
+            <td>${c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—'}</td>
+            <td>${c.crm_executive||'—'}</td>
+            <td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td>
+            <td style="max-width:200px;font-size:12px;">${c.seller_comment||'—'}</td>
+            <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="card">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">🎫 Tickets (${data.tickets.length})</span>
+        <button class="btn btn-primary" style="font-size:12px;" onclick="openRaiseTicket()">+ Raise Ticket</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tickets.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+          <tbody>${data.tickets.map(t=>`<tr>
+            <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : '—'}</td>
+            <td>${t.subject||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Resolved'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td>
+            <td>${t.assigned_to||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- CSI Data -->
+    <div class="card">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">📊 CSI Reviews (${data.csiData.length})</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!data.csiData.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>No CSI reviews yet</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Reviewer</th><th>Notes</th></tr></thead>
+          <tbody>${data.csiData.map(c=>`<tr>
+            <td>${c.review_date||'—'}</td>
+            <td><strong>${c.total_score||0}/25</strong> (${Math.round((c.total_score||0)/25*100)}%)</td>
+            <td><span class="badge ${c.health_status==='Healthy'?'badge-green':c.health_status==='Warning'?'badge-amber':'badge-red'}">${c.health_status||'—'}</span></td>
+            <td>${c.reviewed_by||'—'}</td>
+            <td style="font-size:12px;">${c.notes||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card">
+      <div class="card-header" style="background:#f4f0fb;">
+        <span class="card-title">📝 Tasks (${data.tasks.length})</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+          <tbody>${data.tasks.map(t=>`<tr>
+            <td>${t.title||'—'}</td>
+            <td>${t.assigned_to||'—'}</td>
+            <td>${t.due_date||'—'}</td>
+            <td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+  `;
+}
+
 async function renderDashboard() {
   const [dash, team] = await Promise.all([api('GET','/dashboard'), api('GET','/dashboard/team')]);
   if (!dash) return;
@@ -775,7 +930,11 @@ async function submitTicket(){
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
   const [clients, todayCalls] = await Promise.all([api('GET','/clients'), api('GET','/crm/today')]);
-  if(clients) APP.clients=clients;
+  if(clients && clients.length) APP.clients=clients;
+  else if(!APP.clients.length) {
+    const c2 = await api('GET','/clients');
+    if(c2) APP.clients=c2;
+  }
   renderCRMPage(APP.clients, todayCalls||[]);
 }
 
@@ -1367,6 +1526,50 @@ function showToast(msg,type='info'){const t=document.createElement('div');t.clas
 function showError(el,msg){el.textContent=msg;el.style.display='block';}
 document.addEventListener('click',e=>{const dd=document.getElementById('notif-dropdown'),btn=document.getElementById('notif-btn');if(dd&&!dd.contains(e.target)&&btn&&!btn.contains(e.target))dd.classList.remove('show');});
 window.addEventListener('resize',()=>{const h=document.querySelector('.hamburger');if(h)h.style.display=window.innerWidth<768?'flex':'none';});
+
+// ── THEME SYSTEM ─────────────────────────────────────────────
+const THEMES = [
+  {name:'Navy Blue', primary:'#1F3864', secondary:'#2E75B6'},
+  {name:'Dark Green', primary:'#1a5c38', secondary:'#27ae60'},
+  {name:'Purple', primary:'#4a235a', secondary:'#8e44ad'},
+  {name:'Dark Red', primary:'#6E2C2C', secondary:'#e74c3c'},
+  {name:'Teal', primary:'#0d4f4f', secondary:'#16a085'},
+  {name:'Charcoal', primary:'#2c3e50', secondary:'#34495e'},
+  {name:'Orange', primary:'#6E3A1A', secondary:'#d35400'},
+  {name:'Indigo', primary:'#1a1a6e', secondary:'#3498db'},
+];
+
+function initTheme() {
+  const saved = localStorage.getItem('en_theme');
+  if (saved) {
+    const t = JSON.parse(saved);
+    applyTheme(t.primary, t.secondary);
+  }
+  const tc = document.getElementById('theme-colors');
+  if (tc) {
+    tc.innerHTML = THEMES.map(t => `
+      <div class="theme-btn" style="background:${t.primary};" title="${t.name}" onclick="applyTheme('${t.primary}','${t.secondary}')"></div>
+    `).join('');
+  }
+}
+
+function applyTheme(primary, secondary) {
+  document.documentElement.style.setProperty('--primary', primary);
+  document.documentElement.style.setProperty('--secondary', secondary);
+  localStorage.setItem('en_theme', JSON.stringify({primary, secondary}));
+}
+
+function toggleThemePanel() {
+  document.getElementById('theme-panel').classList.toggle('show');
+}
+
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('theme-panel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('[onclick="toggleThemePanel()"]')) {
+    panel.classList.remove('show');
+  }
+});
+
 </script>
 </body>
 </html>

@@ -337,6 +337,7 @@ const NAV_CONFIG = {
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
   ],
@@ -346,6 +347,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
   ],
@@ -367,12 +369,14 @@ const NAV_CONFIG = {
   'Ads Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
   'CRM Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'csi',icon:'📊',label:'CSI Forms'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -514,15 +518,216 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────
+
+// ── DSR — DAILY SALES REPORT ─────────────────────────────────
+async function renderDSR() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
+  
+  const [clients, todayStatus, alerts] = await Promise.all([
+    api('GET', '/clients'),
+    api('GET', '/dsr/today-status'),
+    api('GET', '/dsr/alerts'),
+  ]);
+  
+  if (clients) APP.clients = clients;
+  
+  document.getElementById('page-content').innerHTML = `
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">${todayStatus?.total||0}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">DSR Done Today</div><div class="kpi-value">${todayStatus?.done||0}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Pending Today</div><div class="kpi-value">${todayStatus?.pending?.length||0}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts?.length||0}</div></div>
+    </div>
+
+    <!-- Alerts -->
+    ${alerts?.length ? `
+    <div class="card" style="border-left:4px solid #e74c3c;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">🚨 Active Alerts (${alerts.length})</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Seller</th><th>Date</th><th>Alert</th><th>Details</th></tr></thead>
+          <tbody>${alerts.map(a => {
+            const alertList = [];
+            if(a.alert_overspend) alertList.push('<span class="badge badge-red">💸 Over Budget</span>');
+            if(a.alert_budget_80) alertList.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
+            if(a.alert_high_returns) alertList.push('<span class="badge badge-red">🔄 High Returns</span>');
+            if(a.alert_sales_drop) alertList.push('<span class="badge badge-amber">📉 Sales Drop</span>');
+            return `<tr>
+              <td><strong>${a.client_name}</strong></td>
+              <td>${a.report_date}</td>
+              <td>${alertList.join(' ')}</td>
+              <td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>` : ''}
+
+    <!-- Add DSR Form -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">➕ Daily Report Enter Karo</span>
+        <input type="date" class="form-control" id="dsr-date" value="${today}" style="width:160px;">
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Seller Select Karo *</label>
+          <select class="form-control" id="dsr-client" onchange="loadDSRTrend(this.value)">
+            <option value="">-- Seller Choose Karo --</option>
+            ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}" data-budget="${c.sellerBudget||0}">${c.busyName} (${c.marketplace})</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>📦 Orders Count</label><input type="number" class="form-control" id="dsr-orders" placeholder="0" min="0"></div>
+          <div class="form-group"><label>💰 Sales Amount (₹)</label><input type="number" class="form-control" id="dsr-sales" placeholder="0.00" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>🔄 Returns Count</label><input type="number" class="form-control" id="dsr-ret-count" placeholder="0" min="0"></div>
+          <div class="form-group"><label>🔄 Returns Amount (₹)</label><input type="number" class="form-control" id="dsr-ret-amount" placeholder="0.00" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>📢 Ad Spend (₹)</label><input type="number" class="form-control" id="dsr-spend" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+          <div class="form-group"><label>🎯 Seller Budget (₹)</label><input type="number" class="form-control" id="dsr-budget" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+        </div>
+        <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">
+          ⚠️ Ad Spend budget se zyada ho gaya!
+        </div>
+        <div class="form-group"><label>Notes</label><textarea class="form-control" id="dsr-notes" placeholder="Koi special note..."></textarea></div>
+        <button class="btn btn-primary" onclick="saveDSR()">💾 Save Daily Report</button>
+      </div>
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="card" id="dsr-trend-card" style="display:none;">
+      <div class="card-header"><span class="card-title" id="dsr-trend-title">📈 Last 7 Days Trend</span></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Return %</th><th>Ad Spend</th><th>Budget</th><th>Used %</th><th>Status</th></tr></thead>
+          <tbody id="dsr-trend-body"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- Pending Sellers -->
+    ${todayStatus?.pending?.length ? `
+    <div class="card">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">⏳ Aaj DSR Pending (${todayStatus.pending.length} sellers)</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Seller</th><th>Marketplace</th><th>Ads Manager</th><th>Action</th></tr></thead>
+          <tbody>${todayStatus.pending.map(p=>`<tr>
+            <td><strong>${p.busy_name}</strong></td>
+            <td>${p.marketplace||'—'}</td>
+            <td>${p.ads_manager||'—'}</td>
+            <td><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="selectDSRClient('${p.client_code}','${p.busy_name}')">+ Enter DSR</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#27ae60;font-weight:700;font-size:16px;">✅ Aaj sab sellers ka DSR enter ho gaya!</div></div>'}
+  `;
+}
+
+function checkBudget() {
+  const spend = parseFloat(document.getElementById('dsr-spend')?.value)||0;
+  const budget = parseFloat(document.getElementById('dsr-budget')?.value)||0;
+  const warn = document.getElementById('dsr-budget-warning');
+  if (warn) warn.style.display = (budget > 0 && spend > budget) ? 'block' : 'none';
+}
+
+function selectDSRClient(cc, name) {
+  const sel = document.getElementById('dsr-client');
+  if (sel) { sel.value = cc; loadDSRTrend(cc); }
+  window.scrollTo(0, 0);
+}
+
+async function loadDSRTrend(cc) {
+  if (!cc) return;
+  const client = APP.clients.find(c => c.clientCode === cc);
+  
+  // Auto-fill budget if available
+  const budgetField = document.getElementById('dsr-budget');
+  if (budgetField && client?.sellerBudget) budgetField.value = client.sellerBudget;
+
+  const data = await api('GET', '/dsr/trend/' + cc);
+  if (!data || !data.length) return;
+  
+  document.getElementById('dsr-trend-card').style.display = '';
+  document.getElementById('dsr-trend-title').textContent = `📈 ${client?.busyName||cc} — Last 7 Days`;
+  
+  document.getElementById('dsr-trend-body').innerHTML = data.map((d, i) => {
+    const prev = data[i-1];
+    const salesTrend = prev ? (d.sales_amount > prev.sales_amount ? '📈' : d.sales_amount < prev.sales_amount ? '📉' : '➡️') : '—';
+    const alerts = [];
+    if(d.alert_overspend) alerts.push('<span class="badge badge-red">Over Budget</span>');
+    if(d.alert_budget_80) alerts.push('<span class="badge badge-amber">80% Used</span>');
+    if(d.alert_high_returns) alerts.push('<span class="badge badge-red">High Returns</span>');
+    if(d.alert_sales_drop) alerts.push('<span class="badge badge-amber">Sales Drop</span>');
+    return `<tr>
+      <td>${d.report_date}</td>
+      <td>${d.orders_count||0}</td>
+      <td>${salesTrend} ₹${(d.sales_amount||0).toLocaleString('en-IN')}</td>
+      <td>${d.returns_count||0}</td>
+      <td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td>
+      <td>₹${(d.ad_spend||0).toLocaleString('en-IN')}</td>
+      <td>₹${(d.seller_budget||0).toLocaleString('en-IN')}</td>
+      <td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td>
+      <td>${alerts.length ? alerts.join(' ') : '<span class="badge badge-green">✅ OK</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveDSR() {
+  const sel = document.getElementById('dsr-client');
+  const cc = sel?.value;
+  const cn = sel?.options[sel.selectedIndex]?.dataset?.name || '';
+  if (!cc) { showToast('Seller select karo', 'error'); return; }
+  
+  const date = document.getElementById('dsr-date')?.value;
+  if (!date) { showToast('Date select karo', 'error'); return; }
+
+  const r = await api('POST', '/dsr', {
+    clientCode: cc, clientName: cn,
+    reportDate: date,
+    ordersCount: document.getElementById('dsr-orders')?.value||0,
+    salesAmount: document.getElementById('dsr-sales')?.value||0,
+    returnsCount: document.getElementById('dsr-ret-count')?.value||0,
+    returnsAmount: document.getElementById('dsr-ret-amount')?.value||0,
+    adSpend: document.getElementById('dsr-spend')?.value||0,
+    sellerBudget: document.getElementById('dsr-budget')?.value||0,
+    notes: document.getElementById('dsr-notes')?.value||'',
+  });
+
+  if (r?.success) {
+    let msg = '✅ DSR saved!';
+    if (r.alerts?.alertOverspend) msg = '⚠️ Saved! Ad spend budget se zyada!';
+    else if (r.alerts?.alertHighReturns) msg = '⚠️ Saved! Returns ' + r.returnRate + '% — zyada hain!';
+    else if (r.alerts?.alertBudget80) msg = '⚠️ Saved! Budget 80% use ho gaya!';
+    showToast(msg, r.alerts?.alertOverspend || r.alerts?.alertHighReturns ? 'error' : 'success');
+    
+    // Clear form
+    ['dsr-orders','dsr-sales','dsr-ret-count','dsr-ret-amount','dsr-spend','dsr-notes'].forEach(id => {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    loadDSRTrend(cc);
+    renderDSR();
+  }
+}
+
 
 // ── SELLER 360 VIEW ──────────────────────────────────────────
 async function renderSeller360() {

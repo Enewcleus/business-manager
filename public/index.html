@@ -1733,8 +1733,11 @@ function openAddUser(){
       <div class="form-group"><label>Role (Permission Level)</label>
         <select class="form-control" id="nu-role">
           <option value="Executive">Executive</option>
+          <option value="Senior Executive">Senior Executive</option>
+          <option value="SME">SME</option>
           <option value="Team Lead">Team Lead</option>
           <option value="Ops Lead">Ops Lead</option>
+          <option value="CSI Lead">CSI Lead</option>
           <option value="Admin">Admin</option>
         </select>
       </div>
@@ -1780,7 +1783,7 @@ function openEditUser(userId){
       </div>
       <div class="form-group"><label>Role</label>
         <select class="form-control" id="eu-role">
-          ${['Executive','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
+          ${['Executive','Senior Executive','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
         </select>
       </div>
     </div>

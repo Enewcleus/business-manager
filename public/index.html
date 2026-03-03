@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>eNewcleus Business Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root {
     --primary:#1F3864; --secondary:#2E75B6; --accent:#E67E22;
@@ -757,10 +758,20 @@ async function renderSeller360() {
   `;
 }
 
+// Chart instances store
+let _charts = {};
+
+function destroyCharts() {
+  Object.values(_charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  _charts = {};
+}
+
 async function load360(cc) {
   if (!cc) return;
   const client = APP.clients.find(c => c.clientCode === cc);
   if (!client) return;
+  
+  destroyCharts();
   
   const hColor = client.healthStatus === 'Healthy' ? '#27ae60' : client.healthStatus === 'Warning' ? '#f39c12' : '#e74c3c';
   document.getElementById('s360-health-badge').textContent = '🩺 ' + (client.healthStatus || 'Unknown');
@@ -769,7 +780,10 @@ async function load360(cc) {
 
   document.getElementById('s360-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
   
-  const data = await api('GET', '/clients/' + cc + '/timeline');
+  const [data, dsrData] = await Promise.all([
+    api('GET', '/clients/' + cc + '/timeline'),
+    api('GET', '/dsr/trend/' + cc),
+  ]);
   if (!data) return;
   
   document.getElementById('s360-content').innerHTML = `
@@ -863,7 +877,133 @@ async function load360(cc) {
         </table></div>`}
       </div>
     </div>
+
+    <!-- DSR CHARTS -->
+    ${dsrData && dsrData.length ? `
+    <div class="card">
+      <div class="card-header" style="background:#f0f4ff;">
+        <span class="card-title">📈 Sales & Ads Performance (Last ${dsrData.length} Days)</span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📦 Daily Orders & Sales (₹)</div>
+            <canvas id="chart-sales" height="180"></canvas>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">💰 Ad Spend vs Budget (₹)</div>
+            <canvas id="chart-spend" height="180"></canvas>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">🔄 Returns Count & Rate (%)</div>
+            <canvas id="chart-returns" height="180"></canvas>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📊 Orders Count Trend</div>
+            <canvas id="chart-orders" height="180"></canvas>
+          </div>
+        </div>
+        <!-- 0 Sale Alert -->
+        ${dsrData.some(d=>d.sales_amount===0||d.orders_count===0) ? `
+        <div style="background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:12px;margin-top:12px;">
+          <strong style="color:#e74c3c;">⚠️ Zero Sale Days:</strong>
+          ${dsrData.filter(d=>d.sales_amount===0||d.orders_count===0).map(d=>`<span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;margin:2px;font-size:12px;">${d.report_date}</span>`).join('')}
+        </div>` : ''}
+      </div>
+    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}
   `;
+
+  // Draw charts after DOM update
+  if (dsrData && dsrData.length) {
+    setTimeout(() => draw360Charts(dsrData), 100);
+  }
+}
+
+function draw360Charts(dsrData) {
+  const labels = dsrData.map(d => d.report_date);
+  const sales = dsrData.map(d => d.sales_amount || 0);
+  const orders = dsrData.map(d => d.orders_count || 0);
+  const spend = dsrData.map(d => d.ad_spend || 0);
+  const budget = dsrData.map(d => d.seller_budget || 0);
+  const returns = dsrData.map(d => d.returns_count || 0);
+  const returnRate = dsrData.map(d => d.return_rate || 0);
+
+  // Sales Chart
+  const salesCtx = document.getElementById('chart-sales');
+  if (salesCtx) {
+    _charts.sales = new Chart(salesCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Sales (₹)', data: sales,
+          backgroundColor: sales.map(s => s === 0 ? '#e74c3c' : '#2E75B6'),
+          borderRadius: 4,
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  // Spend vs Budget Chart
+  const spendCtx = document.getElementById('chart-spend');
+  if (spendCtx) {
+    _charts.spend = new Chart(spendCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Ad Spend (₹)', data: spend, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true, tension: 0.3 },
+          { label: 'Budget (₹)', data: budget, borderColor: '#27ae60', borderDash: [5,5], backgroundColor: 'transparent', tension: 0.3 }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  // Returns Chart
+  const retCtx = document.getElementById('chart-returns');
+  if (retCtx) {
+    _charts.returns = new Chart(retCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Returns Count', data: returns, backgroundColor: '#f39c12', borderRadius: 4, yAxisID: 'y' },
+          { label: 'Return Rate %', data: returnRate, type: 'line', borderColor: '#e74c3c', yAxisID: 'y1', tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          y: { beginAtZero: true, position: 'left' },
+          y1: { beginAtZero: true, position: 'right', max: 100, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+
+  // Orders Chart
+  const ordCtx = document.getElementById('chart-orders');
+  if (ordCtx) {
+    _charts.orders = new Chart(ordCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Orders', data: orders,
+          borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.1)',
+          fill: true, tension: 0.3,
+          pointBackgroundColor: orders.map(o => o === 0 ? '#e74c3c' : '#8e44ad'),
+          pointRadius: orders.map(o => o === 0 ? 8 : 4),
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
 }
 
 async function renderDashboard() {

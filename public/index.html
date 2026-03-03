@@ -18,8 +18,6 @@
   body { height:100%; width:100%; overflow:hidden; max-width:100vw; }
   body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
 
-
-  /* THEME SWITCHER */
   .theme-btn { width:24px; height:24px; border-radius:50%; border:3px solid #fff; cursor:pointer; display:inline-block; transition:transform 0.2s; }
   .theme-btn:hover { transform:scale(1.2); }
   .theme-panel { position:fixed; bottom:70px; left:8px; background:#fff; border-radius:12px; padding:12px; box-shadow:0 4px 20px rgba(0,0,0,0.2); display:none; z-index:200; width:224px; }
@@ -27,14 +25,12 @@
   .theme-panel h4 { font-size:12px; color:#666; margin-bottom:8px; text-transform:uppercase; }
   .theme-colors { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
 
-  /* AUTH */
   #auth-screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%); z-index:9999; }
   .auth-card { background:#fff; border-radius:20px; padding:40px; width:380px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
   .auth-logo { text-align:center; margin-bottom:24px; }
   .auth-logo h1 { font-size:28px; font-weight:800; color:var(--primary); }
   .auth-logo p { color:var(--text-muted); font-size:13px; margin-top:4px; }
 
-  /* APP LAYOUT */
   #app { display:none; height:100vh; overflow:hidden; }
   .sidebar { width:var(--sidebar-w); height:100vh; background:var(--primary); display:flex; flex-direction:column; position:fixed; left:0; top:0; z-index:100; transition:transform 0.3s; overflow:hidden; }
   .sidebar-header { padding:20px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
@@ -53,7 +49,6 @@
   .nav-badge { background:var(--red); color:#fff; border-radius:10px; font-size:10px; padding:1px 6px; margin-left:auto; font-weight:700; }
   .logout-btn { padding:16px; border-top:1px solid rgba(255,255,255,0.1); }
 
-  /* MAIN */
   .main { margin-left:var(--sidebar-w); height:100vh; width:calc(100% - var(--sidebar-w)); display:flex; flex-direction:column; overflow:hidden; position:relative; }
   .topbar { background:#fff; border-bottom:1px solid var(--border); padding:0 20px; height:56px; display:flex; align-items:center; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
   .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; flex-direction:column; gap:4px; }
@@ -73,7 +68,6 @@
   .notif-time { font-size:11px; color:var(--text-muted); margin-top:2px; }
   .page-content { flex:1; overflow-y:auto; overflow-x:hidden; padding:20px; max-width:100%; }
 
-  /* CARDS & TABLES */
   .card { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:16px; }
   .card-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
   .card-title { font-size:15px; font-weight:700; color:var(--primary); }
@@ -84,7 +78,6 @@
   td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
   tr:hover td { background:#f8fafc; }
 
-  /* KPI GRID */
   .kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
   .kpi-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-top:3px solid var(--primary); }
   .kpi-card.blue { border-color:var(--secondary); }
@@ -98,7 +91,6 @@
   .kpi-value { font-size:28px; font-weight:800; color:var(--primary); line-height:1.1; margin-top:4px; }
   .kpi-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
 
-  /* FORMS */
   .form-group { margin-bottom:14px; }
   .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
   .form-control { width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; transition:border 0.2s; background:#fff; font-family:inherit; }
@@ -106,7 +98,6 @@
   textarea.form-control { min-height:80px; resize:vertical; }
   .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-  /* BUTTONS */
   .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.15s; font-family:inherit; }
   .btn-primary { background:var(--secondary); color:#fff; }
   .btn-primary:hover { background:#1a5fa8; }
@@ -119,7 +110,6 @@
   .btn-full { width:100%; padding:12px; font-size:14px; margin-top:8px; }
   .btn:disabled { opacity:0.6; cursor:not-allowed; }
 
-  /* BADGES */
   .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; }
   .badge-green { background:#d5f5e3; color:#1e8449; }
   .badge-amber { background:#fef9e7; color:#b7950b; }
@@ -129,7 +119,6 @@
   .badge-gray { background:#f2f3f4; color:#566573; }
   .badge-purple { background:#e8daef; color:#6c3483; }
 
-  /* TICKETS */
   .ticket-card { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; border-left:4px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.05); }
   .ticket-card.critical { border-left-color:var(--red); }
   .ticket-card.high { border-left-color:var(--orange); }
@@ -146,7 +135,6 @@
   .sla-warn { background:#fef9e7; color:#b7950b; }
   .sla-breach { background:#fadbd8; color:#922b21; }
 
-  /* QUICK ACTIONS */
   .quick-actions { display:flex; gap:4px; flex-wrap:wrap; }
   .qa-btn { padding:3px 8px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:600; }
   .qa-btn.green { background:#d5f5e3; color:#1e8449; }
@@ -155,17 +143,14 @@
   .qa-btn.amber { background:#fef9e7; color:#b7950b; }
   .qa-btn.red { background:#fadbd8; color:#922b21; }
 
-  /* CSI STARS */
   .star-box { padding:8px 4px; border-radius:8px; border:2px solid var(--border); font-size:18px; text-align:center; cursor:pointer; transition:all 0.15s; }
 
-  /* PROGRESS */
   .progress { background:#ecf0f1; border-radius:4px; height:6px; overflow:hidden; }
   .progress-fill { height:100%; border-radius:4px; background:var(--secondary); transition:width 0.5s; }
   .progress-fill.green { background:var(--green); }
   .progress-fill.amber { background:var(--amber); }
   .progress-fill.red { background:var(--red); }
 
-  /* PANEL (SLIDE-IN) */
   #overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:flex-start; justify-content:flex-end; }
   #overlay.show { display:flex; }
   .panel { background:#fff; width:480px; max-width:100vw; height:100vh; overflow-y:auto; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,0.15); }
@@ -173,28 +158,24 @@
   .panel-title { font-size:17px; font-weight:700; color:var(--primary); }
   .panel-close { background:none; border:none; cursor:pointer; font-size:22px; color:var(--text-muted); }
 
-  /* TASK CARDS */
   .task-section { margin-bottom:16px; }
   .task-section-header { padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; margin-bottom:8px; }
   .task-section-header.urgent { background:#fadbd8; color:#922b21; }
   .task-section-header.today { background:#fef9e7; color:#b7950b; }
   .task-section-header.done { background:#d5f5e3; color:#1e8449; }
 
-  /* REPORT */
   .report-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
   .report-tab { padding:8px 16px; border-radius:8px; border:1.5px solid var(--border); background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-muted); }
   .report-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
   .report-block { margin-top:16px; }
   .report-block h4 { font-size:14px; font-weight:700; color:var(--primary); margin-bottom:10px; }
 
-  /* MOBILE */
   .mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); z-index:100; }
   .mobile-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:8px 4px; cursor:pointer; font-size:10px; color:var(--text-muted); gap:2px; }
   .mobile-nav-item.active { color:var(--secondary); }
   .mobile-nav-item .icon { font-size:20px; }
   .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
 
-  /* MISC */
   .loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:40px; color:var(--text-muted); }
   .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--secondary); border-radius:50%; animation:spin 0.8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -234,7 +215,6 @@
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-logo">
@@ -254,7 +234,6 @@
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   <div class="sidebar" id="sidebar">
@@ -304,7 +283,6 @@
   <div class="mobile-nav" id="mobile-nav"></div>
 </div>
 
-<!-- PANEL OVERLAY -->
 <div id="overlay" onclick="closePanel(event)">
   <div class="panel">
     <div class="panel-header">
@@ -318,11 +296,6 @@
 <div id="toast-container"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════════
-// eNewcleus Business Manager v2.0 — Frontend JS
-// Fast, Reliable, 40+ Users
-// ═══════════════════════════════════════════════════════════
-
 const API = window.location.origin + '/api';
 let TOKEN = localStorage.getItem('en_token') || '';
 let APP = { user: null, page: '', clients: [], tickets: [], tasks: [] };
@@ -500,7 +473,6 @@ function doLogout() {
 
 document.getElementById('login-pass').addEventListener('keypress', e => { if(e.key==='Enter') doLogin(); });
 
-// Auto-login if token exists
 window.addEventListener('load', async () => {
   if (TOKEN) {
     const res = await api('GET', '/auth/me');
@@ -562,65 +534,41 @@ function navigate(page) {
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
-// ── DASHBOARD ────────────────────────────────────────────────
-
-// ── DSR — DAILY SALES REPORT ─────────────────────────────────
+// ── DSR ──────────────────────────────────────────────────────
 async function renderDSR() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
-  
-  const [clients, todayStatus, alerts] = await Promise.all([
-    api('GET', '/clients'),
-    api('GET', '/dsr/today-status'),
-    api('GET', '/dsr/alerts'),
-  ]);
-  
+  const [clients, todayStatus, alerts] = await Promise.all([api('GET', '/clients'), api('GET', '/dsr/today-status'), api('GET', '/dsr/alerts')]);
   if (clients) APP.clients = clients;
-  
   document.getElementById('page-content').innerHTML = `
-    <!-- KPIs -->
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">${todayStatus?.total||0}</div></div>
       <div class="kpi-card green"><div class="kpi-label">DSR Done Today</div><div class="kpi-value">${todayStatus?.done||0}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">Pending Today</div><div class="kpi-value">${todayStatus?.pending?.length||0}</div></div>
       <div class="kpi-card red"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts?.length||0}</div></div>
     </div>
-
-    <!-- Alerts -->
     ${alerts?.length ? `
     <div class="card" style="border-left:4px solid #e74c3c;">
-      <div class="card-header" style="background:#fdf2f2;">
-        <span class="card-title">🚨 Active Alerts (${alerts.length})</span>
-      </div>
-      <div class="card-body" style="padding:0;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Seller</th><th>Date</th><th>Alert</th><th>Details</th></tr></thead>
-          <tbody>${alerts.map(a => {
-            const alertList = [];
-            if(a.alert_overspend) alertList.push('<span class="badge badge-red">💸 Over Budget</span>');
-            if(a.alert_budget_80) alertList.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
-            if(a.alert_high_returns) alertList.push('<span class="badge badge-red">🔄 High Returns</span>');
-            if(a.alert_sales_drop) alertList.push('<span class="badge badge-amber">📉 Sales Drop</span>');
-            return `<tr>
-              <td><strong>${a.client_name}</strong></td>
-              <td>${a.report_date}</td>
-              <td>${alertList.join(' ')}</td>
-              <td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table></div>
-      </div>
+      <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Active Alerts (${alerts.length})</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th><th>Date</th><th>Alert</th><th>Details</th></tr></thead>
+        <tbody>${alerts.map(a => {
+          const al=[];
+          if(a.alert_overspend) al.push('<span class="badge badge-red">💸 Over Budget</span>');
+          if(a.alert_budget_80) al.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
+          if(a.alert_high_returns) al.push('<span class="badge badge-red">🔄 High Returns</span>');
+          if(a.alert_sales_drop) al.push('<span class="badge badge-amber">📉 Sales Drop</span>');
+          return `<tr><td><strong>${a.client_name}</strong></td><td>${a.report_date}</td><td>${al.join(' ')}</td><td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td></tr>`;
+        }).join('')}</tbody>
+      </table></div></div>
     </div>` : ''}
-
-    <!-- Add DSR Form -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">➕ Daily Report Enter Karo</span>
         <input type="date" class="form-control" id="dsr-date" value="${today}" style="width:160px;">
       </div>
       <div class="card-body">
-        <div class="form-group">
-          <label>Seller Select Karo *</label>
+        <div class="form-group"><label>Seller Select Karo *</label>
           <select class="form-control" id="dsr-client" onchange="loadDSRTrend(this.value)">
             <option value="">-- Seller Choose Karo --</option>
             ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}" data-budget="${c.sellerBudget||0}">${c.busyName} (${c.marketplace})</option>`).join('')}
@@ -638,146 +586,102 @@ async function renderDSR() {
           <div class="form-group"><label>📢 Ad Spend (₹)</label><input type="number" class="form-control" id="dsr-spend" placeholder="0.00" min="0" oninput="checkBudget()"></div>
           <div class="form-group"><label>🎯 Seller Budget (₹)</label><input type="number" class="form-control" id="dsr-budget" placeholder="0.00" min="0" oninput="checkBudget()"></div>
         </div>
-        <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">
-          ⚠️ Ad Spend budget se zyada ho gaya!
-        </div>
+        <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">⚠️ Ad Spend budget se zyada ho gaya!</div>
         <div class="form-group"><label>Notes</label><textarea class="form-control" id="dsr-notes" placeholder="Koi special note..."></textarea></div>
         <button class="btn btn-primary" onclick="saveDSR()">💾 Save Daily Report</button>
       </div>
     </div>
-
-    <!-- Trend Chart -->
     <div class="card" id="dsr-trend-card" style="display:none;">
       <div class="card-header"><span class="card-title" id="dsr-trend-title">📈 Last 7 Days Trend</span></div>
-      <div class="card-body" style="padding:0;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Return %</th><th>Ad Spend</th><th>Budget</th><th>Used %</th><th>Status</th></tr></thead>
-          <tbody id="dsr-trend-body"></tbody>
-        </table></div>
-      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Return %</th><th>Ad Spend</th><th>Budget</th><th>Used %</th><th>Status</th></tr></thead>
+        <tbody id="dsr-trend-body"></tbody>
+      </table></div></div>
     </div>
-
-    <!-- Pending Sellers -->
     ${todayStatus?.pending?.length ? `
     <div class="card">
-      <div class="card-header" style="background:#fef9e7;">
-        <span class="card-title">⏳ Aaj DSR Pending (${todayStatus.pending.length} sellers)</span>
-      </div>
-      <div class="card-body" style="padding:0;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Seller</th><th>Marketplace</th><th>Ads Manager</th><th>Action</th></tr></thead>
-          <tbody>${todayStatus.pending.map(p=>`<tr>
-            <td><strong>${p.busy_name}</strong></td>
-            <td>${p.marketplace||'—'}</td>
-            <td>${p.ads_manager||'—'}</td>
-            <td><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="selectDSRClient('${p.client_code}','${p.busy_name}')">+ Enter DSR</button></td>
-          </tr>`).join('')}</tbody>
-        </table></div>
-      </div>
-    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#27ae60;font-weight:700;font-size:16px;">✅ Aaj sab sellers ka DSR enter ho gaya!</div></div>'}
-  `;
+      <div class="card-header" style="background:#fef9e7;"><span class="card-title">⏳ Aaj DSR Pending (${todayStatus.pending.length} sellers)</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th><th>Marketplace</th><th>Ads Manager</th><th>Action</th></tr></thead>
+        <tbody>${todayStatus.pending.map(p=>`<tr>
+          <td><strong>${p.busy_name}</strong></td><td>${p.marketplace||'—'}</td><td>${p.ads_manager||'—'}</td>
+          <td><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="selectDSRClient('${p.client_code}','${p.busy_name}')">+ Enter DSR</button></td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#27ae60;font-weight:700;font-size:16px;">✅ Aaj sab sellers ka DSR enter ho gaya!</div></div>'}`;
 }
 
 function checkBudget() {
-  const spend = parseFloat(document.getElementById('dsr-spend')?.value)||0;
-  const budget = parseFloat(document.getElementById('dsr-budget')?.value)||0;
-  const warn = document.getElementById('dsr-budget-warning');
-  if (warn) warn.style.display = (budget > 0 && spend > budget) ? 'block' : 'none';
+  const spend=parseFloat(document.getElementById('dsr-spend')?.value)||0;
+  const budget=parseFloat(document.getElementById('dsr-budget')?.value)||0;
+  const warn=document.getElementById('dsr-budget-warning');
+  if(warn) warn.style.display=(budget>0&&spend>budget)?'block':'none';
 }
 
-function selectDSRClient(cc, name) {
-  const sel = document.getElementById('dsr-client');
-  if (sel) { sel.value = cc; loadDSRTrend(cc); }
-  window.scrollTo(0, 0);
+function selectDSRClient(cc,name) {
+  const sel=document.getElementById('dsr-client');
+  if(sel){sel.value=cc;loadDSRTrend(cc);}
+  window.scrollTo(0,0);
 }
 
 async function loadDSRTrend(cc) {
-  if (!cc) return;
-  const client = APP.clients.find(c => c.clientCode === cc);
-  
-  // Auto-fill budget if available
-  const budgetField = document.getElementById('dsr-budget');
-  if (budgetField && client?.sellerBudget) budgetField.value = client.sellerBudget;
-
-  const data = await api('GET', '/dsr/trend/' + cc);
-  if (!data || !data.length) return;
-  
-  document.getElementById('dsr-trend-card').style.display = '';
-  document.getElementById('dsr-trend-title').textContent = `📈 ${client?.busyName||cc} — Last 7 Days`;
-  
-  document.getElementById('dsr-trend-body').innerHTML = data.map((d, i) => {
-    const prev = data[i-1];
-    const salesTrend = prev ? (d.sales_amount > prev.sales_amount ? '📈' : d.sales_amount < prev.sales_amount ? '📉' : '➡️') : '—';
-    const alerts = [];
-    if(d.alert_overspend) alerts.push('<span class="badge badge-red">Over Budget</span>');
-    if(d.alert_budget_80) alerts.push('<span class="badge badge-amber">80% Used</span>');
-    if(d.alert_high_returns) alerts.push('<span class="badge badge-red">High Returns</span>');
-    if(d.alert_sales_drop) alerts.push('<span class="badge badge-amber">Sales Drop</span>');
+  if(!cc) return;
+  const client=APP.clients.find(c=>c.clientCode===cc);
+  const budgetField=document.getElementById('dsr-budget');
+  if(budgetField&&client?.sellerBudget) budgetField.value=client.sellerBudget;
+  const data=await api('GET','/dsr/trend/'+cc);
+  if(!data||!data.length) return;
+  document.getElementById('dsr-trend-card').style.display='';
+  document.getElementById('dsr-trend-title').textContent=`📈 ${client?.busyName||cc} — Last 7 Days`;
+  document.getElementById('dsr-trend-body').innerHTML=data.map((d,i)=>{
+    const prev=data[i-1];
+    const st=prev?(d.sales_amount>prev.sales_amount?'📈':d.sales_amount<prev.sales_amount?'📉':'➡️'):'—';
+    const al=[];
+    if(d.alert_overspend) al.push('<span class="badge badge-red">Over Budget</span>');
+    if(d.alert_budget_80) al.push('<span class="badge badge-amber">80% Used</span>');
+    if(d.alert_high_returns) al.push('<span class="badge badge-red">High Returns</span>');
+    if(d.alert_sales_drop) al.push('<span class="badge badge-amber">Sales Drop</span>');
     return `<tr>
-      <td>${d.report_date}</td>
-      <td>${d.orders_count||0}</td>
-      <td>${salesTrend} ₹${(d.sales_amount||0).toLocaleString('en-IN')}</td>
+      <td>${d.report_date}</td><td>${d.orders_count||0}</td>
+      <td>${st} ₹${(d.sales_amount||0).toLocaleString('en-IN')}</td>
       <td>${d.returns_count||0}</td>
       <td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td>
       <td>₹${(d.ad_spend||0).toLocaleString('en-IN')}</td>
       <td>₹${(d.seller_budget||0).toLocaleString('en-IN')}</td>
       <td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td>
-      <td>${alerts.length ? alerts.join(' ') : '<span class="badge badge-green">✅ OK</span>'}</td>
+      <td>${al.length?al.join(' '):'<span class="badge badge-green">✅ OK</span>'}</td>
     </tr>`;
   }).join('');
 }
 
 async function saveDSR() {
-  const sel = document.getElementById('dsr-client');
-  const cc = sel?.value;
-  const cn = sel?.options[sel.selectedIndex]?.dataset?.name || '';
-  if (!cc) { showToast('Seller select karo', 'error'); return; }
-  
-  const date = document.getElementById('dsr-date')?.value;
-  if (!date) { showToast('Date select karo', 'error'); return; }
-
-  const r = await api('POST', '/dsr', {
-    clientCode: cc, clientName: cn,
-    reportDate: date,
-    ordersCount: document.getElementById('dsr-orders')?.value||0,
-    salesAmount: document.getElementById('dsr-sales')?.value||0,
-    returnsCount: document.getElementById('dsr-ret-count')?.value||0,
-    returnsAmount: document.getElementById('dsr-ret-amount')?.value||0,
-    adSpend: document.getElementById('dsr-spend')?.value||0,
-    sellerBudget: document.getElementById('dsr-budget')?.value||0,
-    notes: document.getElementById('dsr-notes')?.value||'',
-  });
-
-  if (r?.success) {
-    let msg = '✅ DSR saved!';
-    if (r.alerts?.alertOverspend) msg = '⚠️ Saved! Ad spend budget se zyada!';
-    else if (r.alerts?.alertHighReturns) msg = '⚠️ Saved! Returns ' + r.returnRate + '% — zyada hain!';
-    else if (r.alerts?.alertBudget80) msg = '⚠️ Saved! Budget 80% use ho gaya!';
-    showToast(msg, r.alerts?.alertOverspend || r.alerts?.alertHighReturns ? 'error' : 'success');
-    
-    // Clear form
-    ['dsr-orders','dsr-sales','dsr-ret-count','dsr-ret-amount','dsr-spend','dsr-notes'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.value = '';
-    });
-    loadDSRTrend(cc);
-    renderDSR();
+  const sel=document.getElementById('dsr-client');
+  const cc=sel?.value,cn=sel?.options[sel.selectedIndex]?.dataset?.name||'';
+  if(!cc){showToast('Seller select karo','error');return;}
+  const date=document.getElementById('dsr-date')?.value;
+  if(!date){showToast('Date select karo','error');return;}
+  const r=await api('POST','/dsr',{clientCode:cc,clientName:cn,reportDate:date,ordersCount:document.getElementById('dsr-orders')?.value||0,salesAmount:document.getElementById('dsr-sales')?.value||0,returnsCount:document.getElementById('dsr-ret-count')?.value||0,returnsAmount:document.getElementById('dsr-ret-amount')?.value||0,adSpend:document.getElementById('dsr-spend')?.value||0,sellerBudget:document.getElementById('dsr-budget')?.value||0,notes:document.getElementById('dsr-notes')?.value||''});
+  if(r?.success){
+    let msg='✅ DSR saved!';
+    if(r.alerts?.alertOverspend) msg='⚠️ Saved! Ad spend budget se zyada!';
+    else if(r.alerts?.alertHighReturns) msg='⚠️ Saved! Returns '+r.returnRate+'% — zyada hain!';
+    else if(r.alerts?.alertBudget80) msg='⚠️ Saved! Budget 80% use ho gaya!';
+    showToast(msg,r.alerts?.alertOverspend||r.alerts?.alertHighReturns?'error':'success');
+    ['dsr-orders','dsr-sales','dsr-ret-count','dsr-ret-amount','dsr-spend','dsr-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    loadDSRTrend(cc); renderDSR();
   }
 }
 
-
-// ── SELLER 360 VIEW ──────────────────────────────────────────
+// ── SELLER 360 ───────────────────────────────────────────────
 async function renderSeller360() {
-  const clients = await api('GET', '/clients');
-  if (clients) APP.clients = clients;
-  document.getElementById('page-content').innerHTML = `
+  const clients=await api('GET','/clients');
+  if(clients) APP.clients=clients;
+  document.getElementById('page-content').innerHTML=`
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">🔍 Seller 360° View — Sab Ek Jagah</span>
-      </div>
+      <div class="card-header"><span class="card-title">🔍 Seller 360° View — Sab Ek Jagah</span></div>
       <div class="card-body">
         <div class="form-row">
-          <div class="form-group">
-            <label>Seller Select Karo</label>
+          <div class="form-group"><label>Seller Select Karo</label>
             <select class="form-control" id="s360-client" onchange="load360(this.value)">
               <option value="">-- Seller Choose Karo --</option>
               ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.marketplace})</option>`).join('')}
@@ -789,40 +693,25 @@ async function renderSeller360() {
         </div>
       </div>
     </div>
-    <div id="s360-content"></div>
-  `;
+    <div id="s360-content"></div>`;
 }
 
-// Chart instances store
-let _charts = {};
-
-function destroyCharts() {
-  Object.values(_charts).forEach(c => { try { c.destroy(); } catch(e){} });
-  _charts = {};
-}
+let _charts={};
+function destroyCharts(){Object.values(_charts).forEach(c=>{try{c.destroy();}catch(e){}});_charts={};}
 
 async function load360(cc) {
-  if (!cc) return;
-  const client = APP.clients.find(c => c.clientCode === cc);
-  if (!client) return;
-  
+  if(!cc) return;
+  const client=APP.clients.find(c=>c.clientCode===cc);
+  if(!client) return;
   destroyCharts();
-  
-  const hColor = client.healthStatus === 'Healthy' ? '#27ae60' : client.healthStatus === 'Warning' ? '#f39c12' : '#e74c3c';
-  document.getElementById('s360-health-badge').textContent = '🩺 ' + (client.healthStatus || 'Unknown');
-  document.getElementById('s360-health-badge').style.background = hColor;
-  document.getElementById('s360-health-badge').style.color = '#fff';
-
-  document.getElementById('s360-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
-  
-  const [data, dsrData] = await Promise.all([
-    api('GET', '/clients/' + cc + '/timeline'),
-    api('GET', '/dsr/trend/' + cc),
-  ]);
-  if (!data) return;
-  
-  document.getElementById('s360-content').innerHTML = `
-    <!-- Client Info -->
+  const hColor=client.healthStatus==='Healthy'?'#27ae60':client.healthStatus==='Warning'?'#f39c12':'#e74c3c';
+  document.getElementById('s360-health-badge').textContent='🩺 '+(client.healthStatus||'Unknown');
+  document.getElementById('s360-health-badge').style.background=hColor;
+  document.getElementById('s360-health-badge').style.color='#fff';
+  document.getElementById('s360-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
+  const [data,dsrData]=await Promise.all([api('GET','/clients/'+cc+'/timeline'),api('GET','/dsr/trend/'+cc)]);
+  if(!data) return;
+  document.getElementById('s360-content').innerHTML=`
     <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));">
       <div class="kpi-card blue"><div class="kpi-label">Marketplace</div><div class="kpi-value" style="font-size:18px;">${client.marketplace||'—'}</div></div>
       <div class="kpi-card"><div class="kpi-label">Plan</div><div class="kpi-value" style="font-size:18px;">${client.servicePlan||'—'}</div></div>
@@ -831,221 +720,70 @@ async function load360(cc) {
       <div class="kpi-card teal"><div class="kpi-label">CRM Executive</div><div class="kpi-value" style="font-size:16px;">${client.crmExecutive||'—'}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">Renewal</div><div class="kpi-value" style="font-size:16px;">${client.renewalDate||'—'}</div></div>
     </div>
-
-    <!-- CRM Calls -->
     <div class="card">
-      <div class="card-header" style="background:#e8f4fd;">
-        <span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span>
-        <button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button>
-      </div>
+      <div class="card-header" style="background:#e8f4fd;"><span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button></div>
       <div class="card-body" style="padding:0;">
-        ${!data.crmCalls.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>' :
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
-          <tbody>${data.crmCalls.map(c=>`<tr>
-            <td>${c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—'}</td>
-            <td>${c.crm_executive||'—'}</td>
-            <td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td>
-            <td style="max-width:200px;font-size:12px;">${c.seller_comment||'—'}</td>
-            <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
+        ${!data.crmCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${data.crmCalls.map(c=>`<tr><td>${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</td><td>${c.crm_executive||'—'}</td><td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td><td style="max-width:200px;font-size:12px;">${c.seller_comment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
-
-    <!-- Tickets -->
     <div class="card">
-      <div class="card-header" style="background:#fef9e7;">
-        <span class="card-title">🎫 Tickets (${data.tickets.length})</span>
-        <button class="btn btn-primary" style="font-size:12px;" onclick="openRaiseTicket()">+ Raise Ticket</button>
-      </div>
+      <div class="card-header" style="background:#fef9e7;"><span class="card-title">🎫 Tickets (${data.tickets.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="openRaiseTicket()">+ Raise Ticket</button></div>
       <div class="card-body" style="padding:0;">
-        ${!data.tickets.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>' :
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
-          <tbody>${data.tickets.map(t=>`<tr>
-            <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : '—'}</td>
-            <td>${t.subject||'—'}</td>
-            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
-            <td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Resolved'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td>
-            <td>${t.assigned_to||'—'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
+        ${!data.tickets.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+        <tbody>${data.tickets.map(t=>`<tr><td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'—'}</td><td>${t.subject||'—'}</td><td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td><td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Resolved'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td><td>${t.assigned_to||'—'}</td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
-
-    <!-- CSI Data -->
     <div class="card">
-      <div class="card-header" style="background:#eafaf1;">
-        <span class="card-title">📊 CSI Reviews (${data.csiData.length})</span>
-      </div>
+      <div class="card-header" style="background:#eafaf1;"><span class="card-title">📊 CSI Reviews (${data.csiData.length})</span></div>
       <div class="card-body" style="padding:0;">
-        ${!data.csiData.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>No CSI reviews yet</h3></div>' :
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Reviewer</th><th>Notes</th></tr></thead>
-          <tbody>${data.csiData.map(c=>`<tr>
-            <td>${c.review_date||'—'}</td>
-            <td><strong>${c.total_score||0}/25</strong> (${Math.round((c.total_score||0)/25*100)}%)</td>
-            <td><span class="badge ${c.health_status==='Healthy'?'badge-green':c.health_status==='Warning'?'badge-amber':'badge-red'}">${c.health_status||'—'}</span></td>
-            <td>${c.reviewed_by||'—'}</td>
-            <td style="font-size:12px;">${c.notes||'—'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
+        ${!data.csiData.length?'<div class="empty-state"><div class="emoji">📝</div><h3>No CSI reviews yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Reviewer</th><th>Notes</th></tr></thead>
+        <tbody>${data.csiData.map(c=>`<tr><td>${c.review_date||'—'}</td><td><strong>${c.total_score||0}/25</strong> (${Math.round((c.total_score||0)/25*100)}%)</td><td><span class="badge ${c.health_status==='Healthy'?'badge-green':c.health_status==='Warning'?'badge-amber':'badge-red'}">${c.health_status||'—'}</span></td><td>${c.reviewed_by||'—'}</td><td style="font-size:12px;">${c.notes||'—'}</td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
-
-    <!-- Tasks -->
     <div class="card">
-      <div class="card-header" style="background:#f4f0fb;">
-        <span class="card-title">📝 Tasks (${data.tasks.length})</span>
-      </div>
+      <div class="card-header" style="background:#f4f0fb;"><span class="card-title">📝 Tasks (${data.tasks.length})</span></div>
       <div class="card-body" style="padding:0;">
-        ${!data.tasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>' :
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
-          <tbody>${data.tasks.map(t=>`<tr>
-            <td>${t.title||'—'}</td>
-            <td>${t.assigned_to||'—'}</td>
-            <td>${t.due_date||'—'}</td>
-            <td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
+        ${!data.tasks.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${data.tasks.map(t=>`<tr><td>${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td>${t.due_date||'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
-
-    <!-- DSR CHARTS -->
-    ${dsrData && dsrData.length ? `
+    ${dsrData&&dsrData.length?`
     <div class="card">
-      <div class="card-header" style="background:#f0f4ff;">
-        <span class="card-title">📈 Sales & Ads Performance (Last ${dsrData.length} Days)</span>
-      </div>
+      <div class="card-header" style="background:#f0f4ff;"><span class="card-title">📈 Sales & Ads Performance (Last ${dsrData.length} Days)</span></div>
       <div class="card-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📦 Daily Orders & Sales (₹)</div>
-            <canvas id="chart-sales" height="180"></canvas>
-          </div>
-          <div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">💰 Ad Spend vs Budget (₹)</div>
-            <canvas id="chart-spend" height="180"></canvas>
-          </div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📦 Daily Orders & Sales (₹)</div><canvas id="chart-sales" height="180"></canvas></div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">💰 Ad Spend vs Budget (₹)</div><canvas id="chart-spend" height="180"></canvas></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
-          <div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">🔄 Returns Count & Rate (%)</div>
-            <canvas id="chart-returns" height="180"></canvas>
-          </div>
-          <div>
-            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📊 Orders Count Trend</div>
-            <canvas id="chart-orders" height="180"></canvas>
-          </div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">🔄 Returns Count & Rate (%)</div><canvas id="chart-returns" height="180"></canvas></div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📊 Orders Count Trend</div><canvas id="chart-orders" height="180"></canvas></div>
         </div>
-        <!-- 0 Sale Alert -->
-        ${dsrData.some(d=>d.sales_amount===0||d.orders_count===0) ? `
+        ${dsrData.some(d=>d.sales_amount===0||d.orders_count===0)?`
         <div style="background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:12px;margin-top:12px;">
           <strong style="color:#e74c3c;">⚠️ Zero Sale Days:</strong>
           ${dsrData.filter(d=>d.sales_amount===0||d.orders_count===0).map(d=>`<span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;margin:2px;font-size:12px;">${d.report_date}</span>`).join('')}
-        </div>` : ''}
+        </div>`:''}
       </div>
-    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}
-  `;
-
-  // Draw charts after DOM update
-  if (dsrData && dsrData.length) {
-    setTimeout(() => draw360Charts(dsrData), 100);
-  }
+    </div>`:'<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}`;
+  if(dsrData&&dsrData.length) setTimeout(()=>draw360Charts(dsrData),100);
 }
 
 function draw360Charts(dsrData) {
-  const labels = dsrData.map(d => d.report_date);
-  const sales = dsrData.map(d => d.sales_amount || 0);
-  const orders = dsrData.map(d => d.orders_count || 0);
-  const spend = dsrData.map(d => d.ad_spend || 0);
-  const budget = dsrData.map(d => d.seller_budget || 0);
-  const returns = dsrData.map(d => d.returns_count || 0);
-  const returnRate = dsrData.map(d => d.return_rate || 0);
-
-  // Sales Chart
-  const salesCtx = document.getElementById('chart-sales');
-  if (salesCtx) {
-    _charts.sales = new Chart(salesCtx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Sales (₹)', data: sales,
-          backgroundColor: sales.map(s => s === 0 ? '#e74c3c' : '#2E75B6'),
-          borderRadius: 4,
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
-  }
-
-  // Spend vs Budget Chart
-  const spendCtx = document.getElementById('chart-spend');
-  if (spendCtx) {
-    _charts.spend = new Chart(spendCtx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Ad Spend (₹)', data: spend, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true, tension: 0.3 },
-          { label: 'Budget (₹)', data: budget, borderColor: '#27ae60', borderDash: [5,5], backgroundColor: 'transparent', tension: 0.3 }
-        ]
-      },
-      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
-    });
-  }
-
-  // Returns Chart
-  const retCtx = document.getElementById('chart-returns');
-  if (retCtx) {
-    _charts.returns = new Chart(retCtx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Returns Count', data: returns, backgroundColor: '#f39c12', borderRadius: 4, yAxisID: 'y' },
-          { label: 'Return Rate %', data: returnRate, type: 'line', borderColor: '#e74c3c', yAxisID: 'y1', tension: 0.3 }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'bottom' } },
-        scales: {
-          y: { beginAtZero: true, position: 'left' },
-          y1: { beginAtZero: true, position: 'right', max: 100, grid: { drawOnChartArea: false } }
-        }
-      }
-    });
-  }
-
-  // Orders Chart
-  const ordCtx = document.getElementById('chart-orders');
-  if (ordCtx) {
-    _charts.orders = new Chart(ordCtx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Orders', data: orders,
-          borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.1)',
-          fill: true, tension: 0.3,
-          pointBackgroundColor: orders.map(o => o === 0 ? '#e74c3c' : '#8e44ad'),
-          pointRadius: orders.map(o => o === 0 ? 8 : 4),
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
-  }
+  const labels=dsrData.map(d=>d.report_date),sales=dsrData.map(d=>d.sales_amount||0),orders=dsrData.map(d=>d.orders_count||0),spend=dsrData.map(d=>d.ad_spend||0),budget=dsrData.map(d=>d.seller_budget||0),returns=dsrData.map(d=>d.returns_count||0),returnRate=dsrData.map(d=>d.return_rate||0);
+  const sc=document.getElementById('chart-sales');if(sc)_charts.sales=new Chart(sc,{type:'bar',data:{labels,datasets:[{label:'Sales (₹)',data:sales,backgroundColor:sales.map(s=>s===0?'#e74c3c':'#2E75B6'),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  const spc=document.getElementById('chart-spend');if(spc)_charts.spend=new Chart(spc,{type:'line',data:{labels,datasets:[{label:'Ad Spend (₹)',data:spend,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.1)',fill:true,tension:0.3},{label:'Budget (₹)',data:budget,borderColor:'#27ae60',borderDash:[5,5],backgroundColor:'transparent',tension:0.3}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}});
+  const rc=document.getElementById('chart-returns');if(rc)_charts.returns=new Chart(rc,{type:'bar',data:{labels,datasets:[{label:'Returns Count',data:returns,backgroundColor:'#f39c12',borderRadius:4,yAxisID:'y'},{label:'Return Rate %',data:returnRate,type:'line',borderColor:'#e74c3c',yAxisID:'y1',tension:0.3}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,position:'left'},y1:{beginAtZero:true,position:'right',max:100,grid:{drawOnChartArea:false}}}}});
+  const oc=document.getElementById('chart-orders');if(oc)_charts.orders=new Chart(oc,{type:'line',data:{labels,datasets:[{label:'Orders',data:orders,borderColor:'#8e44ad',backgroundColor:'rgba(142,68,173,0.1)',fill:true,tension:0.3,pointBackgroundColor:orders.map(o=>o===0?'#e74c3c':'#8e44ad'),pointRadius:orders.map(o=>o===0?8:4)}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 }
 
+// ── DASHBOARD ────────────────────────────────────────────────
 async function renderDashboard() {
-  const [dash, team] = await Promise.all([api('GET','/dashboard'), api('GET','/dashboard/team')]);
-  if (!dash) return;
-  const u = APP.user; const isLead = ['Admin','Ops Lead','CSI Lead'].includes(u.role);
-  document.getElementById('page-content').innerHTML = `
+  const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
+  if(!dash) return;
+  const u=APP.user,isLead=['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash.totalClients}</div><div class="kpi-sub">${dash.active} Active</div></div>
       <div class="kpi-card green"><div class="kpi-label">🟢 Healthy</div><div class="kpi-value">${dash.healthy}</div></div>
@@ -1054,20 +792,14 @@ async function renderDashboard() {
       <div class="kpi-card orange"><div class="kpi-label">Open Tickets</div><div class="kpi-value">${dash.openTickets}</div></div>
       <div class="kpi-card purple"><div class="kpi-label">Renewals Due</div><div class="kpi-value">${dash.renewalsDue}</div><div class="kpi-sub">≤15 days</div></div>
     </div>
-    ${isLead && team?.length ? `
+    ${isLead&&team?.length?`
     <div class="card">
       <div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
-        <tbody>${team.map(e=>`<tr>
-          <td><strong>${e.name}</strong></td>
-          <td><span class="badge badge-blue">${e.role}</span></td>
-          <td><strong>${e.todayActivity}</strong></td>
-          <td>${e.ticketsClosed}</td>
-          <td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>'}</td>
-        </tr>`).join('')}</tbody>
+        <tbody>${team.map(e=>`<tr><td><strong>${e.name}</strong></td><td><span class="badge badge-blue">${e.role}</span></td><td><strong>${e.todayActivity}</strong></td><td>${e.ticketsClosed}</td><td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>'}</td></tr>`).join('')}</tbody>
       </table></div></div>
-    </div>` : `
+    </div>`:`
     <div class="card">
       <div class="card-header"><span class="card-title">⚡ Quick Start</span></div>
       <div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1081,26 +813,19 @@ async function renderDashboard() {
 
 // ── CLIENTS ──────────────────────────────────────────────────
 async function renderClients() {
-  const clients = await api('GET', '/clients');
-  if (!clients) return;
-  APP.clients = clients;
-  renderClientsUI(clients);
+  const clients=await api('GET','/clients');if(!clients) return;
+  APP.clients=clients; renderClientsUI(clients);
 }
 
 function renderClientsUI(clients) {
-  const u = APP.user; const qa = QUICK_ACTIONS[u.role]||[];
-  const canAdd = ['Admin','Ops Lead'].includes(u.role);
-  document.getElementById('page-content').innerHTML = `
+  const u=APP.user,qa=QUICK_ACTIONS[u.role]||[],canAdd=['Admin','Ops Lead'].includes(u.role);
+  document.getElementById('page-content').innerHTML=`
     <div class="card">
       <div class="card-header">
         <span class="card-title">👥 Clients (${clients.length})</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)">
-            <option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option>
-          </select>
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)">
-            <option value="">All Markets</option><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option>
-          </select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)"><option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option></select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)"><option value="">All Markets</option><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option></select>
           ${canAdd?'<button class="btn btn-primary btn-sm" onclick="openAddClient()">➕ Add Client</button>':''}
         </div>
       </div>
@@ -1111,8 +836,8 @@ function renderClientsUI(clients) {
     </div>`;
 }
 
-function clientTableRows(clients, qa) {
-  if (!clients.length) return '<div class="empty-state"><div class="emoji">👥</div><h3>No clients</h3></div>';
+function clientTableRows(clients,qa) {
+  if(!clients.length) return '<div class="empty-state"><div class="emoji">👥</div><h3>No clients</h3></div>';
   return `<table><thead><tr><th>#</th><th>Code</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Status</th><th>Health</th><th>Renewal</th><th>Quick Actions</th><th>More</th></tr></thead>
   <tbody>${clients.map((c,i)=>`<tr>
     <td>${i+1}</td><td><strong>${c.clientCode}</strong></td><td><strong>${c.busyName}</strong></td>
@@ -1140,7 +865,7 @@ function clientCards(clients) {
     </div>`).join('');
 }
 
-let _cf = {health:'',market:''};
+let _cf={health:'',market:''};
 function filterClientsByHealth(v){_cf.health=v;applyClientFilters();}
 function filterClientsByMarket(v){_cf.market=v;applyClientFilters();}
 function applyClientFilters(){
@@ -1155,69 +880,43 @@ function globalSearch(q){
   if(!q.trim()||APP.page!=='clients') return;
   const f=APP.clients.filter(c=>c.busyName.toLowerCase().includes(q.toLowerCase())||c.clientCode.toLowerCase().includes(q.toLowerCase()));
   const qa=QUICK_ACTIONS[APP.user.role]||[];
-  document.getElementById('clients-table')?.innerHTML && (document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
+  document.getElementById('clients-table')?.innerHTML&&(document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
 }
-
-async function quickAction(cc,cn,action){
-  await api('POST','/clients/quickaction',{clientCode:cc,clientName:cn,action});
-  showToast('✅ '+action+' — '+cn,'success');
-}
-
+async function quickAction(cc,cn,action){await api('POST','/clients/quickaction',{clientCode:cc,clientName:cn,action});showToast('✅ '+action+' — '+cn,'success');}
 async function viewTimeline(cc,cn){
   openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
-  const logs = await api('GET',`/clients/${cc}/activity`);
-  document.getElementById('panel-body').innerHTML = !logs?.length
-    ?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>'
-    :logs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid var(--secondary);">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType}</span>
-          <span style="font-size:11px;color:var(--text-muted);">${l.timestamp}</span>
-        </div>
-        <div style="font-size:13px;">${l.actionDetail||''}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName}</div>
-      </div>`).join('');
+  const logs=await api('GET',`/clients/${cc}/activity`);
+  document.getElementById('panel-body').innerHTML=!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
+    logs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid var(--secondary);"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType}</span><span style="font-size:11px;color:var(--text-muted);">${l.timestamp}</span></div><div style="font-size:13px;">${l.actionDetail||''}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName}</div></div>`).join('');
 }
 
 function openAddClient(){
   openPanel('➕ Add Client',`
     <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
-    <div class="form-group"><label>Marketplace</label>
-      <select class="form-control" id="nc-market"><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select>
-    </div>
+    <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
     <div class="form-row">
       <div class="form-group"><label>Account Manager</label><input type="text" class="form-control" id="nc-am"></div>
       <div class="form-group"><label>Ads Manager</label><input type="text" class="form-control" id="nc-ads"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>CRM Executive</label><input type="text" class="form-control" id="nc-crm"></div>
-      <div class="form-group"><label>Plan</label>
-        <select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select>
-      </div>
+      <div class="form-group"><label>Plan</label><select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
     </div>
     <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
     <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
 }
-
 async function submitAddClient(){
-  const name=document.getElementById('nc-name').value.trim();
-  if(!name){showToast('Name required','error');return;}
-  const r = await api('POST','/clients',{
-    busyName:name, marketplace:document.getElementById('nc-market').value,
-    amName:document.getElementById('nc-am').value, adsManager:document.getElementById('nc-ads').value,
-    crmExecutive:document.getElementById('nc-crm').value, servicePlan:document.getElementById('nc-plan').value,
-    renewalDate:document.getElementById('nc-renewal').value||null,
-  });
+  const name=document.getElementById('nc-name').value.trim();if(!name){showToast('Name required','error');return;}
+  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:document.getElementById('nc-am').value,adsManager:document.getElementById('nc-ads').value,crmExecutive:document.getElementById('nc-crm').value,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null});
   if(r?.success){showToast('✅ '+r.clientCode+' added!','success');closePanel();renderClients();}
 }
 
 // ── TICKETS ──────────────────────────────────────────────────
 async function renderTickets(){
-  const tickets = await api('GET','/tickets');
-  if(!tickets) return;
-  APP.tickets = tickets;
-  const open = tickets.filter(t=>t.status!=='Done').length;
-  const b = document.getElementById('badge-tickets');
-  if(b){b.textContent=open;b.style.display=open?'':'none';}
+  const tickets=await api('GET','/tickets');if(!tickets) return;
+  APP.tickets=tickets;
+  const open=tickets.filter(t=>t.status!=='Done').length;
+  const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
@@ -1228,9 +927,7 @@ async function renderTickets(){
     <div class="card">
       <div class="card-header"><span class="card-title">🎫 Tickets</span>
         <div style="display:flex;gap:8px;">
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)">
-            <option value="">All</option><option>Open</option><option>In Progress</option><option>Done</option>
-          </select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)"><option value="">All</option><option>Open</option><option>In Progress</option><option>Done</option></select>
           <button class="btn btn-danger btn-sm" onclick="openRaiseTicket()">🎫 Raise</button>
         </div>
       </div>
@@ -1251,57 +948,39 @@ function ticketCards(tickets){
       </div>
       <div class="ticket-desc">${t.category} — ${t.description.slice(0,80)}</div>
       <div class="ticket-footer">
-        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">
-          ${t.status==='Done'?'✅ Resolved':t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}
-        </span>
+        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">${t.status==='Done'?'✅ Resolved':t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}</span>
         <span style="font-size:11px;color:var(--text-muted);">→ ${t.assignedTo}</span>
-        ${t.status!=='Done'?`<div style="margin-left:auto;display:flex;gap:4px;">
-          ${t.status==='Open'?`<button class="btn btn-sm btn-outline" onclick="updateTicket('${t.ticketId}','In Progress')">▶ Accept</button>`:''}
-          ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCloseTicket('${t.ticketId}','${t.clientName}')">✅ Done</button>`:''}
-        </div>`:''}
+        ${t.status!=='Done'?`<div style="margin-left:auto;display:flex;gap:4px;">${t.status==='Open'?`<button class="btn btn-sm btn-outline" onclick="updateTicket('${t.ticketId}','In Progress')">▶ Accept</button>`:''}${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCloseTicket('${t.ticketId}','${t.clientName}')">✅ Done</button>`:''}</div>`:''}
       </div>
     </div>`).join('');
 }
 
 function filterTickets(s){const f=s?APP.tickets.filter(t=>t.status===s):APP.tickets;document.getElementById('tickets-body').innerHTML=ticketCards(f);}
-
-async function updateTicket(id,status,note){
-  const r = await api('PATCH',`/tickets/${id}`,{status,resolutionNote:note||''});
-  if(r?.success){showToast('Ticket: '+status,'success');renderTickets();}
-}
+async function updateTicket(id,status,note){const r=await api('PATCH',`/tickets/${id}`,{status,resolutionNote:note||''});if(r?.success){showToast('Ticket: '+status,'success');renderTickets();}}
 function promptCloseTicket(id,cn){const n=prompt(`Close ticket for ${cn}\nResolution note:`);if(n!==null)updateTicket(id,'Done',n);}
 
 function openRaiseTicket(){
   if(!APP.clients.length){api('GET','/clients').then(c=>{if(c){APP.clients=c;openRaiseTicket();}});return;}
   openPanel('🎫 Raise Ticket',`
     <div class="form-group"><label>Client *</label>
-      <select class="form-control" id="tk-client">
-        <option value="">Select client...</option>
-        ${APP.clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
-      </select>
+      <select class="form-control" id="tk-client"><option value="">Select client...</option>${APP.clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}</select>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Category</label>
-        <select class="form-control" id="tk-cat">
-          <option>Account Health</option><option>Listing Issue</option><option>Order Issue</option>
-          <option>Fulfillment Issue</option><option>Ads / Campaign</option><option>Seller Complaint</option>
-          <option>Escalation</option><option>Renewal Follow-up</option><option>CSI Review Due</option><option>General</option>
-        </select>
+        <select class="form-control" id="tk-cat"><option>Account Health</option><option>Listing Issue</option><option>Order Issue</option><option>Fulfillment Issue</option><option>Ads / Campaign</option><option>Seller Complaint</option><option>Escalation</option><option>Renewal Follow-up</option><option>CSI Review Due</option><option>General</option></select>
       </div>
       <div class="form-group"><label>Priority</label>
         <select class="form-control" id="tk-pri"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
       </div>
     </div>
-    <div class="form-group"><label>Description *</label>
-      <textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea>
-    </div>
+    <div class="form-group"><label>Description *</label><textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea></div>
     <button class="btn btn-danger btn-full" onclick="submitTicket()">🎫 Raise Ticket</button>`);
 }
 function openRaiseTicketFor(cc,cn){openRaiseTicket();setTimeout(()=>{const s=document.getElementById('tk-client');if(s)s.value=cc;},150);}
 async function submitTicket(){
   const sel=document.getElementById('tk-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.dataset?.name||'';
   const desc=document.getElementById('tk-desc').value.trim();
-  if(!cc){showToast('Select client','error');return;} if(!desc){showToast('Add description','error');return;}
+  if(!cc){showToast('Select client','error');return;}if(!desc){showToast('Add description','error');return;}
   const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,description:desc});
   if(r?.success){showToast(`✅ ${r.ticketId} → ${r.assignedTo}`,'success');closePanel();if(APP.page==='tickets')renderTickets();}
 }
@@ -1309,16 +988,13 @@ async function submitTicket(){
 // ── CRM ──────────────────────────────────────────────────────
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
-  const [clients, todayCalls] = await Promise.all([api('GET','/clients'), api('GET','/crm/today')]);
-  if(clients && clients.length) APP.clients=clients;
-  else if(!APP.clients.length) {
-    const c2 = await api('GET','/clients');
-    if(c2) APP.clients=c2;
-  }
-  renderCRMPage(APP.clients, todayCalls||[]);
+  const [clients,todayCalls]=await Promise.all([api('GET','/clients'),api('GET','/crm/today')]);
+  if(clients&&clients.length) APP.clients=clients;
+  else if(!APP.clients.length){const c2=await api('GET','/clients');if(c2) APP.clients=c2;}
+  renderCRMPage(APP.clients,todayCalls||[]);
 }
 
-function renderCRMPage(clients, todayCalls){
+function renderCRMPage(clients,todayCalls){
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">My Clients</div><div class="kpi-value">${clients.length}</div></div>
@@ -1337,39 +1013,27 @@ function renderCRMPage(clients, todayCalls){
             </select>
           </div>
           <div class="form-group"><label>Call Outcome</label>
-            <select class="form-control" id="crm-outcome">
-              <option>Called — Connected</option><option>Called — No Response</option>
-              <option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option>
-            </select>
+            <select class="form-control" id="crm-outcome"><option>Called — Connected</option><option>Called — No Response</option><option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option></select>
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Seller Feedback</label>
-            <textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea>
-          </div>
-          <div class="form-group"><label>Severity</label>
-            <select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
-          </div>
+          <div class="form-group"><label>Seller Feedback</label><textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea></div>
+          <div class="form-group"><label>Severity</label><select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
         </div>
         <div class="form-group"><label>Next Follow-up</label><input type="date" class="form-control" id="crm-followup"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-success" onclick="saveCRMCall()">📞 Save Call</button>
           <button class="btn btn-danger" onclick="saveCRMCall(true)">📞 + 🎫 Save & Raise Ticket</button>
           <button class="btn btn-secondary" onclick="openCSIForClient()">📝 Fill CSI</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;" onclick="openCloseRequestForm()">🔴 Close Request</button>
         </div>
       </div>
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
       <div class="card-body" style="padding:0;">
-        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':
-        `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
-        <tbody>${todayCalls.map(c=>`<tr>
-          <td><strong>${c.clientName}</strong></td>
-          <td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td>
-          <td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td>
-          <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td>
-        </tr>`).join('')}</tbody></table></div>`}
+        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${todayCalls.map(c=>`<tr><td><strong>${c.clientName}</strong></td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
     <div class="card" id="crm-history-card" style="display:none;">
@@ -1382,13 +1046,7 @@ async function saveCRMCall(andTicket){
   const sel=document.getElementById('crm-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
   if(!cc){showToast('Select a client','error');return;}
   const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
-  if(r?.success){
-    showToast('✅ Call logged!','success');
-    document.getElementById('crm-comment').value='';
-    document.getElementById('crm-followup').value='';
-    loadCRMHistory(cc);
-    if(andTicket) openRaiseTicketFor(cc,cn);
-  }
+  if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
 }
 
 async function loadCRMHistory(cc){
@@ -1398,27 +1056,18 @@ async function loadCRMHistory(cc){
   if(client) document.getElementById('crm-hist-title').textContent=`📋 Call History — ${client.busyName}`;
   document.getElementById('crm-history').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   const calls=await api('GET',`/crm/client/${cc}`);
-  document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':
-    `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
-    <tbody>${calls.map(c=>`<tr>
-      <td style="font-size:12px;">${c.callDate}</td>
-      <td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td>
-      <td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td>
-      <td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td>
-      <td style="font-size:12px;">${c.nextFollowUp||'—'}</td>
-      <td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td>
-    </tr>`).join('')}</tbody></table></div>`;
+  document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
+  <tbody>${calls.map(c=>`<tr><td style="font-size:12px;">${c.callDate}</td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td><td style="font-size:12px;">${c.nextFollowUp||'—'}</td><td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function openCSIForClient(){const sel=document.getElementById('crm-client');openCSIForm(sel.value,sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'');}
 
 // ── CSI ───────────────────────────────────────────────────────
 async function renderCSI(){
-  const [clients, csiData]=await Promise.all([api('GET','/clients'),api('GET','/csi')]);
+  const [clients,csiData]=await Promise.all([api('GET','/clients'),api('GET','/csi')]);
   if(clients) APP.clients=clients;
   const csiMap={};(csiData||[]).forEach(r=>{if(!csiMap[r.clientCode])csiMap[r.clientCode]=r;});
   const canFill=['CRM Executive','Admin','CSI Lead'].includes(APP.user.role);
-  const reviewed=Object.keys(csiMap).length;
-  const lowScore=(csiData||[]).filter(r=>r.csiPercent<50).length;
+  const reviewed=Object.keys(csiMap).length,lowScore=(csiData||[]).filter(r=>r.csiPercent<50).length;
   const dueSoon=(clients||[]).filter(c=>{const last=csiMap[c.clientCode];if(!last||!last.reviewDate)return true;return Math.ceil((new Date()-new Date(last.reviewDate))/86400000)>=13;}).length;
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
@@ -1428,24 +1077,17 @@ async function renderCSI(){
       <div class="kpi-card red"><div class="kpi-label">Low Score</div><div class="kpi-value">${lowScore}</div></div>
     </div>
     <div class="card">
-      <div class="card-header"><span class="card-title">📊 CSI Health Index</span>
-        ${canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI Form</button>':''}
-      </div>
+      <div class="card-header"><span class="card-title">📊 CSI Health Index</span>${canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI Form</button>':''}</div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>Client</th><th>Market</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Q5</th><th>CSI %</th><th>Health</th><th>Last Review</th>${canFill?'<th>Action</th>':''}</tr></thead>
         <tbody>${(clients||[]).map(c=>{
-          const csi=csiMap[c.clientCode];const score=csi?csi.csiPercent:null;
+          const csi=csiMap[c.clientCode],score=csi?csi.csiPercent:null;
           const health=score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
-          return `<tr>
-            <td><strong>${c.busyName}</strong><div style="font-size:11px;color:var(--text-muted);">${c.clientCode}</div></td>
-            <td><span class="badge badge-blue">${c.marketplace}</span></td>
-            <td>${csi?starRating(csi.q1):'—'}</td><td>${csi?starRating(csi.q2):'—'}</td>
-            <td>${csi?starRating(csi.q3):'—'}</td><td>${csi?starRating(csi.q4):'—'}</td><td>${csi?starRating(csi.q5):'—'}</td>
-            <td>${score!==null?`<div style="font-weight:700;font-size:14px;color:${score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)'};">${score}%</div>
-              <div class="progress" style="width:70px;"><div class="progress-fill ${score>=80?'green':score>=50?'amber':'red'}" style="width:${score}%;"></div></div>`:'<span style="font-size:12px;color:var(--text-muted);">—</span>'}</td>
-            <td>${healthBadge(health)}</td>
-            <td style="font-size:11px;color:var(--text-muted);">${csi?csi.reviewDate:'—'}</td>
-            ${canFill?`<td><button class="btn btn-sm btn-secondary" onclick="openCSIForm('${c.clientCode}','${c.busyName}')">📝</button></td>`:''}
+          return `<tr><td><strong>${c.busyName}</strong><div style="font-size:11px;color:var(--text-muted);">${c.clientCode}</div></td><td><span class="badge badge-blue">${c.marketplace}</span></td>
+          <td>${csi?starRating(csi.q1):'—'}</td><td>${csi?starRating(csi.q2):'—'}</td><td>${csi?starRating(csi.q3):'—'}</td><td>${csi?starRating(csi.q4):'—'}</td><td>${csi?starRating(csi.q5):'—'}</td>
+          <td>${score!==null?`<div style="font-weight:700;font-size:14px;color:${score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)'};">${score}%</div><div class="progress" style="width:70px;"><div class="progress-fill ${score>=80?'green':score>=50?'amber':'red'}" style="width:${score}%;"></div></div>`:'<span style="font-size:12px;color:var(--text-muted);">—</span>'}</td>
+          <td>${healthBadge(health)}</td><td style="font-size:11px;color:var(--text-muted);">${csi?csi.reviewDate:'—'}</td>
+          ${canFill?`<td><button class="btn btn-sm btn-secondary" onclick="openCSIForm('${c.clientCode}','${c.busyName}')">📝</button></td>`:''}
           </tr>`;
         }).join('')}</tbody>
       </table></div></div>
@@ -1458,35 +1100,20 @@ function openCSIForm(cc,cn){
   const opts=(APP.clients||[]).map(c=>`<option value="${c.clientCode}" ${cc===c.clientCode?'selected':''}>${c.busyName} (${c.clientCode})</option>`).join('');
   openPanel('📝 CSI Review Form',`
     <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1 (Poor) to 5 (Excellent)</div>
-    <div class="form-group"><label>Select Client *</label>
-      <select class="form-control" id="csi-client"><option value="">Select...</option>${opts}</select>
-    </div>
+    <div class="form-group"><label>Select Client *</label><select class="form-control" id="csi-client"><option value="">Select...</option>${opts}</select></div>
     ${CSI_QUESTIONS.map(q=>`
-      <div class="form-group">
-        <label>${q.label}</label>
+      <div class="form-group"><label>${q.label}</label>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">${q.desc}</div>
-        <div style="display:flex;gap:8px;">
-          ${[1,2,3,4,5].map(n=>`
-            <div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar('${q.id}',${n})">
-              <div id="star-${q.id}-${n}" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">${n}</span></div>
-            </div>`).join('')}
-        </div>
+        <div style="display:flex;gap:8px;">${[1,2,3,4,5].map(n=>`<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar('${q.id}',${n})"><div id="star-${q.id}-${n}" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">${n}</span></div></div>`).join('')}</div>
         <input type="hidden" id="val-${q.id}" value="0">
       </div>`).join('')}
-    <div class="form-group"><label>Seller Remarks</label>
-      <textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea>
-    </div>
-    <div class="form-group"><label>Next Review Date</label>
-      <input type="date" class="form-control" id="csi-next" value="${dateAfterDays(15)}">
-    </div>
+    <div class="form-group"><label>Seller Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>
+    <div class="form-group"><label>Next Review Date</label><input type="date" class="form-control" id="csi-next" value="${dateAfterDays(15)}"></div>
     <button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>`);
 }
 
 function selectStar(qId,val){
-  for(let i=1;i<=5;i++){
-    const el=document.getElementById(`star-${qId}-${i}`);
-    if(el){el.style.background=i<=val?'var(--amber)':'white';el.style.borderColor=i<=val?'var(--amber)':'var(--border)';el.style.color=i<=val?'white':'var(--text)';el.innerHTML=(i<=val?'⭐':'☆')+`<br><span style="font-size:11px;font-weight:600;">${i}</span>`;}
-  }
+  for(let i=1;i<=5;i++){const el=document.getElementById(`star-${qId}-${i}`);if(el){el.style.background=i<=val?'var(--amber)':'white';el.style.borderColor=i<=val?'var(--amber)':'var(--border)';el.style.color=i<=val?'white':'var(--text)';el.innerHTML=(i<=val?'⭐':'☆')+`<br><span style="font-size:11px;font-weight:600;">${i}</span>`;}}
   document.getElementById('val-'+qId).value=val;
 }
 
@@ -1496,24 +1123,19 @@ async function submitCSI(){
   const scores={};let allFilled=true;
   CSI_QUESTIONS.forEach(q=>{const v=parseInt(document.getElementById('val-'+q.id).value);if(!v||v<1)allFilled=false;else scores[q.id]=v;});
   if(!allFilled){showToast('Please rate all 5 questions','error');return;}
-  const total=Object.values(scores).reduce((a,b)=>a+b,0);
-  const percent=Math.round((total/25)*100);
+  const total=Object.values(scores).reduce((a,b)=>a+b,0),percent=Math.round((total/25)*100);
   const r=await api('POST','/csi',{clientCode:cc,clientName:cn,...scores,csiScore:total,csiPercent:percent,remarks:document.getElementById('csi-remarks').value,nextReviewDate:document.getElementById('csi-next').value,healthStatus:percent>=80?'Healthy':percent>=50?'Warning':'At Risk'});
   if(r?.success){showToast(`✅ CSI Saved! ${percent}% — ${percent>=80?'Healthy':percent>=50?'Warning':'At Risk'}`,'success');closePanel();renderCSI();}
 }
 
 // ── TASKS ────────────────────────────────────────────────────
 async function renderTasks(){
-  const tasks=await api('GET','/tasks');
-  if(!tasks) return;
+  const tasks=await api('GET','/tasks');if(!tasks) return;
   APP.tasks=tasks;
   const isLead=['Admin','Ops Lead','CSI Lead'].includes(APP.user.role);
-  const pending=tasks.filter(t=>t.status==='Pending');
-  const inprog=tasks.filter(t=>t.status==='In Progress');
-  const done=tasks.filter(t=>t.status==='Completed'&&isToday(t.completedAt));
-  const overdue=tasks.filter(t=>t.isOverdue&&t.status!=='Completed');
-  const b=document.getElementById('badge-tasks');
-  if(b){const c=pending.length+inprog.length;b.textContent=c;b.style.display=c?'':'none';}
+  const pending=tasks.filter(t=>t.status==='Pending'),inprog=tasks.filter(t=>t.status==='In Progress');
+  const done=tasks.filter(t=>t.status==='Completed'&&isToday(t.completedAt)),overdue=tasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  const b=document.getElementById('badge-tasks');if(b){const c=pending.length+inprog.length;b.textContent=c;b.style.display=c?'':'none';}
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value">${overdue.length}</div></div>
@@ -1524,9 +1146,7 @@ async function renderTasks(){
     <div class="card">
       <div class="card-header"><span class="card-title">📝 Tasks</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTasks(this.value)">
-            <option value="">All</option><option>Pending</option><option>In Progress</option><option>Completed</option><option value="overdue">Overdue</option>
-          </select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTasks(this.value)"><option value="">All</option><option>Pending</option><option>In Progress</option><option>Completed</option><option value="overdue">Overdue</option></select>
           <button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>
           ${isLead?'<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>':''}
         </div>
@@ -1540,84 +1160,42 @@ function taskCards(tasks){
   return [...tasks].sort((a,b)=>({'Pending':0,'In Progress':1,'Completed':2}[a.status]||0)-({'Pending':0,'In Progress':1,'Completed':2}[b.status]||0)).map(t=>`
     <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.isOverdue?'breached':''}">
       <div class="ticket-header">
-        <div>
-          <div class="ticket-id">${t.taskId}</div>
-          <div style="font-size:14px;font-weight:700;color:var(--primary);">${t.title}</div>
-          ${t.clientName?`<div class="ticket-client">👥 ${t.clientName}</div>`:''}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-          <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
-          <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-gray'}">${t.status}</span>
-        </div>
+        <div><div class="ticket-id">${t.taskId}</div><div style="font-size:14px;font-weight:700;color:var(--primary);">${t.title}</div>${t.clientName?`<div class="ticket-client">👥 ${t.clientName}</div>`:''}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span><span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-gray'}">${t.status}</span></div>
       </div>
       ${t.description?`<div class="ticket-desc">${t.description}</div>`:''}
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--text-muted);">
-        ${t.assignedBy!==t.assignedTo?`<span>📤 From: <strong>${t.assignedBy}</strong></span>`:''}
-        <span>👤 <strong>${t.assignedTo}</strong></span>
-        ${t.deadline?`<span style="color:${t.isOverdue?'var(--red)':''};">📅 ${t.deadline}${t.isOverdue?' 🔴':''}</span>`:''}
-      </div>
-      ${t.status!=='Completed'?`
-      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-        ${t.status==='Pending'?`<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')">▶ Start</button>`:''}
-        ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${t.title}')">✅ Complete</button>`:''}
-        <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${t.clientName||''}')">📓 Log Work</button>
-      </div>`:`<div style="margin-top:6px;font-size:12px;color:var(--green);">✅ Completed: ${t.completedAt}${t.workLog?' — "'+t.workLog+'"':''}</div>`}
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--text-muted);">${t.assignedBy!==t.assignedTo?`<span>📤 From: <strong>${t.assignedBy}</strong></span>`:''}<span>👤 <strong>${t.assignedTo}</strong></span>${t.deadline?`<span style="color:${t.isOverdue?'var(--red)':''};">📅 ${t.deadline}${t.isOverdue?' 🔴':''}</span>`:''}</div>
+      ${t.status!=='Completed'?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">${t.status==='Pending'?`<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')">▶ Start</button>`:''}${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${t.title}')">✅ Complete</button>`:''}<button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${t.clientName||''}')">📓 Log Work</button></div>`:`<div style="margin-top:6px;font-size:12px;color:var(--green);">✅ Completed: ${t.completedAt}${t.workLog?' — "'+t.workLog+'"':''}</div>`}
     </div>`).join('');
 }
 
 function filterTasks(val){let f=APP.tasks;if(val==='overdue')f=f.filter(t=>t.isOverdue&&t.status!=='Completed');else if(val)f=f.filter(t=>t.status===val);document.getElementById('tasks-body').innerHTML=taskCards(f);}
 
 async function openCreateTask(){
-  showToast('Loading...','info');
-  const clients=await api('GET','/clients');
-  if(clients) APP.clients=clients;
+  showToast('Loading...','info');const clients=await api('GET','/clients');if(clients) APP.clients=clients;
   openPanel('📝 Create Task',`
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="tsk-title" placeholder="e.g. Review seller listings"></div>
     <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..."></textarea></div>
-    <div class="form-group"><label>Related Client (optional)</label>
-      <select class="form-control" id="tsk-client">
-        <option value="">No specific client</option>
-        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>Related Client (optional)</label><select class="form-control" id="tsk-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
     <div class="form-row">
-      <div class="form-group"><label>Category</label>
-        <select class="form-control" id="tsk-cat"><option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option><option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option></select>
-      </div>
-      <div class="form-group"><label>Priority</label>
-        <select class="form-control" id="tsk-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
-      </div>
+      <div class="form-group"><label>Category</label><select class="form-control" id="tsk-cat"><option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option><option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option></select></div>
+      <div class="form-group"><label>Priority</label><select class="form-control" id="tsk-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
     </div>
     <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="tsk-deadline"></div>
     <button class="btn btn-primary btn-full" onclick="submitCreateTask()">📝 Create Task</button>`);
 }
 
 async function openAssignTask(){
-  const [users, clients]=await Promise.all([api('GET','/users'),api('GET','/clients')]);
-  if(clients) APP.clients=clients;
+  const [users,clients]=await Promise.all([api('GET','/users'),api('GET','/clients')]);if(clients) APP.clients=clients;
   const execs=(users||[]).filter(u=>['Account Manager','Ads Executive','CRM Executive'].includes(u.role)&&u.isActive);
   openPanel('📤 Assign Task',`
-    <div class="form-group"><label>Assign To *</label>
-      <select class="form-control" id="at-exec">
-        <option value="">Select executive...</option>
-        ${execs.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>Assign To *</label><select class="form-control" id="at-exec"><option value="">Select executive...</option>${execs.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}</select></div>
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
     <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc"></textarea></div>
-    <div class="form-group"><label>Client (optional)</label>
-      <select class="form-control" id="at-client">
-        <option value="">No specific client</option>
-        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="at-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
     <div class="form-row">
-      <div class="form-group"><label>Category</label>
-        <select class="form-control" id="at-cat"><option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option><option>Ads Campaign</option><option>General</option></select>
-      </div>
-      <div class="form-group"><label>Priority</label>
-        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
-      </div>
+      <div class="form-group"><label>Category</label><select class="form-control" id="at-cat"><option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option><option>Ads Campaign</option><option>General</option></select></div>
+      <div class="form-group"><label>Priority</label><select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
     </div>
     <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
     <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
@@ -1633,25 +1211,20 @@ async function submitCreateTask(){
 async function submitAssignTask(){
   const esel=document.getElementById('at-exec'),to=esel.value,toRole=esel.options[esel.selectedIndex]?.dataset?.role||'';
   const title=document.getElementById('at-title').value.trim(),deadline=document.getElementById('at-deadline').value;
-  if(!to){showToast('Select executive','error');return;} if(!title){showToast('Title required','error');return;} if(!deadline){showToast('Deadline required','error');return;}
+  if(!to){showToast('Select executive','error');return;}if(!title){showToast('Title required','error');return;}if(!deadline){showToast('Deadline required','error');return;}
   const csel=document.getElementById('at-client');
   const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
   if(r?.success){showToast('✅ Task assigned to '+to,'success');closePanel();renderTasks();}
 }
 
-async function updateTask(id,status,workLog){
-  const r=await api('PATCH',`/tasks/${id}`,{status,workLog:workLog||''});
-  if(r?.success){showToast('Task: '+status,'success');renderTasks();}
-}
+async function updateTask(id,status,workLog){const r=await api('PATCH',`/tasks/${id}`,{status,workLog:workLog||''});if(r?.success){showToast('Task: '+status,'success');renderTasks();}}
 function promptCompleteTask(id,title){const n=prompt(`Complete: "${title}"\nWork log (optional):`);if(n!==null)updateTask(id,'Completed',n||'Done');}
 
 function openWorkLogEntry(taskId,cc,cn){
   openPanel('📓 Log Work',`
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label>
-        <select class="form-control" id="wl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Other</option></select>
-      </div>
+      <div class="form-group"><label>Work Type</label><select class="form-control" id="wl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Other</option></select></div>
       <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
@@ -1666,41 +1239,23 @@ async function submitWorkLog(taskId,cc,cn){
 
 // ── WORK LOG ─────────────────────────────────────────────────
 async function renderWorkLog(){
-  const [logs, clients]=await Promise.all([api('GET','/tasks/worklog'),api('GET','/clients')]);
+  const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),api('GET','/clients')]);
   if(clients) APP.clients=clients;
   document.getElementById('page-content').innerHTML=`
     <div class="card">
-      <div class="card-header"><span class="card-title">📓 Work Log</span>
-        <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
-      </div>
+      <div class="card-header"><span class="card-title">📓 Work Log</span><button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button></div>
       <div class="card-body" style="padding:0;">
-        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':
-        `<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
-        <tbody>${logs.map(l=>`<tr>
-          <td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td>
-          <td><strong>${l.executiveName}</strong></td>
-          <td>${l.clientName||'—'}</td>
-          <td><span class="badge badge-blue">${l.workType}</span></td>
-          <td style="font-size:12px;max-width:200px;">${l.description}</td>
-          <td style="font-size:12px;">${l.outcome||'—'}</td>
-          <td>${l.timeSpent||'—'}</td>
-        </tr>`).join('')}</tbody></table></div>`}
+        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+        <tbody>${logs.map(l=>`<tr><td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td><td><strong>${l.executiveName}</strong></td><td>${l.clientName||'—'}</td><td><span class="badge badge-blue">${l.workType}</span></td><td style="font-size:12px;max-width:200px;">${l.description}</td><td style="font-size:12px;">${l.outcome||'—'}</td><td>${l.timeSpent||'—'}</td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>`;
 }
 
 function openQuickWorkLog(){
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client (optional)</label>
-      <select class="form-control" id="qwl-client">
-        <option value="">No specific client</option>
-        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="qwl-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label>
-        <select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select>
-      </div>
+      <div class="form-group"><label>Work Type</label><select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select></div>
       <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
@@ -1729,17 +1284,8 @@ async function renderRenewals(){
       <div class="card-header"><span class="card-title">🔄 Renewal Pipeline</span></div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>${renewals.map(r=>`<tr>
-          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-          <td>${r.amount?'₹'+Number(r.amount).toLocaleString():'—'}</td>
-          <td>${r.renewalDate||'—'}</td>
-          <td>${r.daysLeft!==null?`<strong style="color:${r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.daysLeft}d</strong>`:'—'}</td>
-          <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-          <td><div style="display:flex;gap:4px;">
-            <button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>
-            <button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>
-          </div></td>
-        </tr>`).join('')}</tbody>
+        <tbody>${renewals.map(r=>`<tr><td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td><td>${r.amount?'₹'+Number(r.amount).toLocaleString():'—'}</td><td>${r.renewalDate||'—'}</td><td>${r.daysLeft!==null?`<strong style="color:${r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.daysLeft}d</strong>`:'—'}</td><td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
+        <td><div style="display:flex;gap:4px;"><button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button><button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button></div></td></tr>`).join('')}</tbody>
       </table></div></div>
     </div>`;
 }
@@ -1753,29 +1299,18 @@ async function renderAds(){
       <div class="card-header"><span class="card-title">📢 Ads Manager</span></div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>Client</th><th>Market</th><th>Budget</th><th>Spent</th><th>Used%</th><th>ACOS</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>${ads.map(a=>`<tr>
-          <td><strong>${a.clientName}</strong></td>
-          <td><span class="badge badge-blue">${a.marketplace||'—'}</span></td>
-          <td>₹${Number(a.budgetAllocated||0).toLocaleString()}</td>
-          <td>₹${Number(a.budgetSpent||0).toLocaleString()}</td>
-          <td><div style="min-width:70px;">
-            <div style="font-size:12px;font-weight:700;color:${(a.budgetPercent||0)>=95?'var(--red)':(a.budgetPercent||0)>=80?'var(--amber)':'var(--green)'};">${a.budgetPercent||0}%</div>
-            <div class="progress"><div class="progress-fill ${(a.budgetPercent||0)>=95?'red':(a.budgetPercent||0)>=80?'amber':'green'}" style="width:${Math.min(a.budgetPercent||0,100)}%;"></div></div>
-          </div></td>
-          <td>${a.acos?a.acos+'%':'—'}</td>
-          <td><span class="badge ${a.campaignStatus==='Active'?'badge-green':'badge-amber'}">${a.campaignStatus||'—'}</span></td>
-          <td><div class="quick-actions">${(QUICK_ACTIONS['Ads Executive']||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${a.clientCode}','${a.clientName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
-        </tr>`).join('')}</tbody>
+        <tbody>${ads.map(a=>`<tr><td><strong>${a.clientName}</strong></td><td><span class="badge badge-blue">${a.marketplace||'—'}</span></td><td>₹${Number(a.budgetAllocated||0).toLocaleString()}</td><td>₹${Number(a.budgetSpent||0).toLocaleString()}</td>
+        <td><div style="min-width:70px;"><div style="font-size:12px;font-weight:700;color:${(a.budgetPercent||0)>=95?'var(--red)':(a.budgetPercent||0)>=80?'var(--amber)':'var(--green)'};">${a.budgetPercent||0}%</div><div class="progress"><div class="progress-fill ${(a.budgetPercent||0)>=95?'red':(a.budgetPercent||0)>=80?'amber':'green'}" style="width:${Math.min(a.budgetPercent||0,100)}%;"></div></div></div></td>
+        <td>${a.acos?a.acos+'%':'—'}</td><td><span class="badge ${a.campaignStatus==='Active'?'badge-green':'badge-amber'}">${a.campaignStatus||'—'}</span></td>
+        <td><div class="quick-actions">${(QUICK_ACTIONS['Ads Executive']||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${a.clientCode}','${a.clientName}','${q.action}')">${q.label}</button>`).join('')}</div></td></tr>`).join('')}</tbody>
       </table></div></div>
     </div>`;
 }
 
 // ── REPORTS ──────────────────────────────────────────────────
 async function renderReports(){
-  const clients=await api('GET','/clients');
-  if(clients) APP.clients=clients;
-  const today=new Date().toISOString().split('T')[0];
-  const monthStart=today.slice(0,7)+'-01';
+  const clients=await api('GET','/clients');if(clients) APP.clients=clients;
+  const today=new Date().toISOString().split('T')[0],monthStart=today.slice(0,7)+'-01';
   window._currentReport='dsr';
   document.getElementById('page-content').innerHTML=`
     <div class="card">
@@ -1791,12 +1326,7 @@ async function renderReports(){
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
           <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="rpt-to" value="${today}"></div>
-          <div class="form-group"><label>Seller</label>
-            <select class="form-control" id="rpt-client">
-              <option value="">-- All Sellers --</option>
-              ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}
-            </select>
-          </div>
+          <div class="form-group"><label>Seller</label><select class="form-control" id="rpt-client"><option value="">-- All Sellers --</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}</select></div>
           <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
             <button class="btn btn-primary" onclick="generateReport()">🔍 Generate</button>
             <button class="btn btn-success" onclick="exportExcel()">📥 Excel</button>
@@ -1810,390 +1340,168 @@ async function renderReports(){
 }
 
 async function generateReport(){
-  const type=window._currentReport||'dsr';
-  const from=document.getElementById('rpt-from')?.value;
-  const to=document.getElementById('rpt-to')?.value;
-  const cc=document.getElementById('rpt-client')?.value;
-  const el=document.getElementById('report-output');
+  const type=window._currentReport||'dsr',from=document.getElementById('rpt-from')?.value,to=document.getElementById('rpt-to')?.value,cc=document.getElementById('rpt-client')?.value,el=document.getElementById('report-output');
   if(!el) return;
   el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
-
   if(type==='dsr'){
-    let url='/dsr?x=1';
-    if(from) url+=`&from=${from}`;
-    if(to) url+=`&to=${to}`;
-    if(cc) url+=`&client=${cc}`;
-    const data=await api('GET',url)||[];
-    window._reportData=data; window._reportType='dsr';
+    let url='/dsr?x=1';if(from)url+=`&from=${from}`;if(to)url+=`&to=${to}`;if(cc)url+=`&client=${cc}`;
+    const data=await api('GET',url)||[];window._reportData=data;window._reportType='dsr';
     const zeros=data.filter(d=>!d.sales_amount||!d.orders_count);
-    el.innerHTML=`<div class="card">
-      <div class="card-header">
-        <span class="card-title">📊 DSR Report (${data.length} records)</span>
-        ${zeros.length?`<span class="badge badge-red">⚠️ ${zeros.length} Zero Sale Days</span>`:''}
-      </div>
-      <div class="card-body" style="padding:0;">
-        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>Koi data nahi — pehle DSR enter karo</h3></div>':
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Seller</th><th>Orders</th><th>Sales(Rs)</th><th>Returns</th><th>Return%</th><th>Ad Spend</th><th>Budget</th><th>Used%</th><th>Alert</th><th>By</th></tr></thead>
-          <tbody>${data.map(d=>{
-            const z=!d.sales_amount||!d.orders_count;
-            const al=[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':'',d.alert_budget_80?'80%Budget':''].filter(Boolean).join(' ')||'OK';
-            return `<tr style="${z?'background:#fdf2f2;':''}">
-              <td>${d.report_date}</td>
-              <td><strong>${d.client_name||d.client_code}</strong></td>
-              <td>${z&&!d.orders_count?'<b style="color:red">0</b>':d.orders_count||0}</td>
-              <td>${z&&!d.sales_amount?'<b style="color:red">Rs 0</b>':`Rs ${(d.sales_amount||0).toLocaleString('en-IN')}`}</td>
-              <td>${d.returns_count||0}</td>
-              <td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td>
-              <td>Rs ${(d.ad_spend||0).toLocaleString('en-IN')}</td>
-              <td>Rs ${(d.seller_budget||0).toLocaleString('en-IN')}</td>
-              <td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td>
-              <td style="font-size:11px;">${al}</td>
-              <td style="font-size:11px;">${d.entered_by||'—'}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table></div>`}
-      </div></div>`;
-
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📊 DSR Report (${data.length} records)</span>${zeros.length?`<span class="badge badge-red">⚠️ ${zeros.length} Zero Sale Days</span>`:''}</div>
+    <div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>Koi data nahi</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Orders</th><th>Sales(Rs)</th><th>Returns</th><th>Return%</th><th>Ad Spend</th><th>Budget</th><th>Used%</th><th>Alert</th><th>By</th></tr></thead>
+    <tbody>${data.map(d=>{const z=!d.sales_amount||!d.orders_count;const al=[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':'',d.alert_budget_80?'80%Budget':''].filter(Boolean).join(' ')||'OK';return `<tr style="${z?'background:#fdf2f2;':''}"><td>${d.report_date}</td><td><strong>${d.client_name||d.client_code}</strong></td><td>${z&&!d.orders_count?'<b style="color:red">0</b>':d.orders_count||0}</td><td>${z&&!d.sales_amount?'<b style="color:red">Rs 0</b>':`Rs ${(d.sales_amount||0).toLocaleString('en-IN')}`}</td><td>${d.returns_count||0}</td><td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td><td>Rs ${(d.ad_spend||0).toLocaleString('en-IN')}</td><td>Rs ${(d.seller_budget||0).toLocaleString('en-IN')}</td><td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td><td style="font-size:11px;">${al}</td><td style="font-size:11px;">${d.entered_by||'—'}</td></tr>`;}).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='crm'){
-    let url='/crm?x=1'; if(cc) url+=`&client=${cc}`;
-    const data=await api('GET',url)||[];
-    window._reportData=data; window._reportType='crm';
-    el.innerHTML=`<div class="card">
-      <div class="card-header"><span class="card-title">📞 CRM Report (${data.length} calls)</span></div>
-      <div class="card-body" style="padding:0;">
-        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls</h3></div>':
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Date</th><th>Seller</th><th>Executive</th><th>Outcome</th><th>Severity</th><th>Follow Up</th><th>Feedback</th></tr></thead>
-          <tbody>${data.map(d=>`<tr>
-            <td>${d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'—'}</td>
-            <td><strong>${d.client_name||d.client_code||'—'}</strong></td>
-            <td>${d.crm_executive||d.entered_by||'—'}</td>
-            <td><span class="badge ${d.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${d.call_outcome||'—'}</span></td>
-            <td><span class="badge ${d.severity==='Critical'?'badge-red':d.severity==='High'?'badge-amber':'badge-blue'}">${d.severity||'Low'}</span></td>
-            <td>${d.next_follow_up||'—'}</td>
-            <td style="font-size:12px;max-width:160px;">${d.seller_comment||'—'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
-      </div></div>`;
-
+    let url='/crm?x=1';if(cc)url+=`&client=${cc}`;const data=await api('GET',url)||[];window._reportData=data;window._reportType='crm';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📞 CRM Report (${data.length} calls)</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Executive</th><th>Outcome</th><th>Severity</th><th>Follow Up</th><th>Feedback</th></tr></thead><tbody>${data.map(d=>`<tr><td>${d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.client_name||d.client_code||'—'}</strong></td><td>${d.crm_executive||d.entered_by||'—'}</td><td><span class="badge ${d.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${d.call_outcome||'—'}</span></td><td><span class="badge ${d.severity==='Critical'?'badge-red':d.severity==='High'?'badge-amber':'badge-blue'}">${d.severity||'Low'}</span></td><td>${d.next_follow_up||'—'}</td><td style="font-size:12px;max-width:160px;">${d.seller_comment||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='renewal'){
-    const data=await api('GET','/renewals')||[];
-    window._reportData=data; window._reportType='renewal';
-    el.innerHTML=`<div class="card">
-      <div class="card-header"><span class="card-title">🔄 Renewal Report (${data.length})</span></div>
-      <div class="card-body" style="padding:0;">
-        ${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No renewals</h3></div>':
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Client</th><th>Plan</th><th>Amount(Rs)</th><th>Renewal Date</th><th>Days Left</th><th>Status</th><th>Owner</th></tr></thead>
-          <tbody>${data.map(d=>`<tr>
-            <td><strong>${d.clientName||d.clientCode}</strong></td>
-            <td>${d.servicePlan||'—'}</td>
-            <td>Rs ${(d.amount||0).toLocaleString('en-IN')}</td>
-            <td>${d.renewalDate||'—'}</td>
-            <td><span class="badge ${(d.daysLeft||99)<=7?'badge-red':(d.daysLeft||99)<=15?'badge-amber':'badge-green'}">${d.daysLeft!=null?d.daysLeft+' days':'—'}</span></td>
-            <td>${d.status||'—'}</td>
-            <td>${d.owner||'—'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
-      </div></div>`;
-
+    const data=await api('GET','/renewals')||[];window._reportData=data;window._reportType='renewal';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🔄 Renewal Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No renewals</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Plan</th><th>Amount(Rs)</th><th>Renewal Date</th><th>Days Left</th><th>Status</th><th>Owner</th></tr></thead><tbody>${data.map(d=>`<tr><td><strong>${d.clientName||d.clientCode}</strong></td><td>${d.servicePlan||'—'}</td><td>Rs ${(d.amount||0).toLocaleString('en-IN')}</td><td>${d.renewalDate||'—'}</td><td><span class="badge ${(d.daysLeft||99)<=7?'badge-red':(d.daysLeft||99)<=15?'badge-amber':'badge-green'}">${d.daysLeft!=null?d.daysLeft+' days':'—'}</span></td><td>${d.status||'—'}</td><td>${d.owner||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='ticket'){
-    const data=await api('GET','/tickets')||[];
-    window._reportData=data; window._reportType='ticket';
-    el.innerHTML=`<div class="card">
-      <div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div>
-      <div class="card-body" style="padding:0;">
-        ${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':
-        `<div class="table-wrap"><table>
-          <thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead>
-          <tbody>${data.map(d=>`<tr>
-            <td style="font-size:11px;">${d.ticketId||'—'}</td>
-            <td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td>
-            <td><strong>${d.clientName||'—'}</strong></td>
-            <td>${d.subject||'—'}</td>
-            <td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td>
-            <td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td>
-            <td>${d.assignedTo||'—'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
-      </div></div>`;
-
+    const data=await api('GET','/tickets')||[];window._reportData=data;window._reportType='ticket';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-size:11px;">${d.ticketId||'—'}</td><td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.clientName||'—'}</strong></td><td>${d.subject||'—'}</td><td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td><td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td><td>${d.assignedTo||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='team'){
-    const data=await api('GET','/dashboard/team')||[];
-    window._reportData=data; window._reportType='team';
-    el.innerHTML=`<div class="card">
-      <div class="card-header"><span class="card-title">👥 Team Performance</span></div>
-      <div class="card-body" style="padding:0;">
-        ${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':
-        `<div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
-          <tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}">
-            <td><strong>${d.name}</strong></td>
-            <td><span class="badge badge-blue">${d.role}</span></td>
-            <td>${d.todayActivity||0}</td>
-            <td>${d.ticketsClosed||0}</td>
-            <td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>`}
-      </div></div>`;
+    const data=await api('GET','/dashboard/team')||[];window._reportData=data;window._reportType='team';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   }
 }
 
 function exportExcel(){
-  const data=window._reportData||[]; const type=window._reportType||'report';
+  const data=window._reportData||[],type=window._reportType||'report';
   if(!data.length){showToast('Pehle report generate karo','error');return;}
   let csv='';
-  if(type==='dsr'){
-    csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';
-    csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');
-  } else if(type==='crm'){
-    csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';
-    csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');
-  } else if(type==='renewal'){
-    csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';
-    csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');
-  } else if(type==='ticket'){
-    csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';
-    csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');
-  } else if(type==='team'){
-    csv='Name,Role,ActionsToday,TicketsClosed,Status\n';
-    csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');
-  }
+  if(type==='dsr'){csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');}
+  else if(type==='crm'){csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');}
+  else if(type==='renewal'){csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');}
+  else if(type==='ticket'){csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');}
+  else if(type==='team'){csv='Name,Role,ActionsToday,TicketsClosed,Status\n';csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');}
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
   showToast('Excel download ho raha hai!','success');
 }
 
-
 // ── ADMIN ────────────────────────────────────────────────────
 async function renderAdmin(){
-  const [users, hierarchy] = await Promise.all([api('GET','/users'), api('GET','/users/hierarchy')]);
+  const [users,hierarchy]=await Promise.all([api('GET','/users'),api('GET','/users/hierarchy')]);
   if(!users) return;
-  
-  const depts = [...new Set(users.map(u=>u.department).filter(Boolean))];
-  
+  const depts=[...new Set(users.map(u=>u.department).filter(Boolean))];
   document.getElementById('page-content').innerHTML=`
-    <!-- KPIs -->
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Users</div><div class="kpi-value">${users.length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Active</div><div class="kpi-value">${users.filter(u=>u.isActive).length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">Departments</div><div class="kpi-value">${depts.length||'—'}</div></div>
       <div class="kpi-card red"><div class="kpi-label">Inactive</div><div class="kpi-value">${users.filter(u=>!u.isActive).length}</div></div>
     </div>
-
-    <!-- Actions -->
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">👥 Team Management</span>
+      <div class="card-header"><span class="card-title">👥 Team Management</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="openAddUser()">➕ Add User</button>
           <button class="btn btn-outline btn-sm" onclick="openResetPassword()">🔑 Reset Password</button>
           <button class="btn btn-secondary btn-sm" onclick="showHierarchy()">🏢 Hierarchy View</button>
         </div>
       </div>
-      <div class="card-body" style="padding:0;">
-        <div class="table-wrap"><table>
-          <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
-          <tbody>${users.map((u,i)=>{
-            const manager = users.find(m=>m.id===u.reportingTo);
-            return `<tr>
-              <td>${i+1}</td>
-              <td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td>
-              <td>${u.department||'<span style="color:#ccc;">—</span>'}</td>
-              <td>${u.department||'<span style="color:#ccc;">—</span>'}</td>
-              <td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td>
-              <td style="font-size:12px;">${u.email}</td>
-              <td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
-              <td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table></div>
-      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${users.map((u,i)=>{const manager=users.find(m=>m.id===u.reportingTo);return `<tr><td>${i+1}</td><td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td><td style="font-size:12px;">${u.email}</td><td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td><td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td></tr>`;}).join('')}</tbody>
+      </table></div></div>
     </div>
-
-    <!-- Hierarchy Visual -->
     <div class="card" id="hierarchy-card" style="display:none;">
       <div class="card-header"><span class="card-title">🏢 Reporting Hierarchy</span></div>
       <div class="card-body" id="hierarchy-body"></div>
     </div>
-  `;
-  
-  // Store users globally for forms
-  window._adminUsers = users;
+
+    <!-- ✅ SELLER CLOSE REQUESTS SECTION -->
+    <div class="card" style="border-left:4px solid #dc2626;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">🔴 Seller Close Requests</span>
+        <button class="btn btn-sm btn-outline" onclick="loadCloseRequests()">🔄 Refresh</button>
+      </div>
+      <div class="card-body" id="close-requests-list">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>`;
+
+  window._adminUsers=users;
+  loadCloseRequests();
 }
 
-function showHierarchy() {
-  const card = document.getElementById('hierarchy-card');
-  card.style.display = card.style.display==='none' ? '' : 'none';
+function showHierarchy(){
+  const card=document.getElementById('hierarchy-card');
+  card.style.display=card.style.display==='none'?'':'none';
   if(card.style.display==='') buildHierarchyView();
 }
 
-function buildHierarchyView() {
-  const users = window._adminUsers || [];
-  const topLevel = users.filter(u => !u.reportingTo && u.isActive);
-  
-  function renderUser(u, depth=0) {
-    const reports = users.filter(r => r.reportingTo === u.id);
-    return `<div style="margin-left:${depth*24}px;margin-bottom:8px;">
-      <div style="display:inline-flex;align-items:center;gap:8px;background:${depth===0?'#1F3864':depth===1?'#2E75B6':'#e8f4fd'};color:${depth<2?'#fff':'#333'};padding:6px 14px;border-radius:20px;font-size:13px;">
-        ${depth===0?'👑':depth===1?'⭐':'👤'} <strong>${u.name}</strong> ${u.designation?`<span style="opacity:0.8;font-size:11px;">(${u.designation})</span>`:''}
-        ${u.department?`<span style="opacity:0.7;font-size:11px;">[${u.department}]</span>`:''}
-      </div>
-      ${reports.map(r=>renderUser(r, depth+1)).join('')}
-    </div>`;
+function buildHierarchyView(){
+  const users=window._adminUsers||[],topLevel=users.filter(u=>!u.reportingTo&&u.isActive);
+  function renderUser(u,depth=0){
+    const reports=users.filter(r=>r.reportingTo===u.id);
+    return `<div style="margin-left:${depth*24}px;margin-bottom:8px;"><div style="display:inline-flex;align-items:center;gap:8px;background:${depth===0?'#1F3864':depth===1?'#2E75B6':'#e8f4fd'};color:${depth<2?'#fff':'#333'};padding:6px 14px;border-radius:20px;font-size:13px;">${depth===0?'👑':depth===1?'⭐':'👤'} <strong>${u.name}</strong> ${u.designation?`<span style="opacity:0.8;font-size:11px;">(${u.designation})</span>`:''} ${u.department?`<span style="opacity:0.7;font-size:11px;">[${u.department}]</span>`:''}</div>${reports.map(r=>renderUser(r,depth+1)).join('')}</div>`;
   }
-  
-  document.getElementById('hierarchy-body').innerHTML = 
-    topLevel.length ? topLevel.map(u=>renderUser(u)).join('') : '<p style="color:#999;">No hierarchy set yet — edit users to set reporting managers!</p>';
+  document.getElementById('hierarchy-body').innerHTML=topLevel.length?topLevel.map(u=>renderUser(u)).join(''):'<p style="color:#999;">No hierarchy set yet!</p>';
 }
 
 function openAddUser(){
-  const users = window._adminUsers || [];
+  const users=window._adminUsers||[];
   openPanel('➕ Add New User',`
+    <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div><div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div></div>
+    <div class="form-row"><div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div></div>
     <div class="form-row">
-      <div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div>
-      <div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div>
+      <div class="form-group"><label>Department</label><select class="form-control" id="nu-dept"><option value="">-- Select --</option><option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option></select></div>
+      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="CSI Lead">CSI Lead</option><option value="Admin">Admin</option></select></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div>
-      <div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Department</label>
-        <select class="form-control" id="nu-dept">
-          <option value="">-- Select --</option>
-          <option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option>
-        </select>
-      </div>
-      <div class="form-group"><label>Role (Permission Level)</label>
-        <select class="form-control" id="nu-role">
-          <option value="Executive">Executive</option>
-          <option value="Senior Executive">Senior Executive</option>
-          <option value="SME">SME</option>
-          <option value="Team Lead">Team Lead</option>
-          <option value="Ops Lead">Ops Lead</option>
-          <option value="CSI Lead">CSI Lead</option>
-          <option value="Admin">Admin</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-group"><label>Reports To (Manager)</label>
-      <select class="form-control" id="nu-manager">
-        <option value="">-- Top Level / No Manager --</option>
-        ${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
     <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
 }
 
 async function submitAddUser(){
-  const name=document.getElementById('nu-name').value.trim();
-  const email=document.getElementById('nu-email').value.trim();
-  const pass=document.getElementById('nu-pass').value;
-  const role=document.getElementById('nu-role').value;
-  const designation=document.getElementById('nu-designation').value.trim();
-  const department=document.getElementById('nu-dept').value;
-  const reportingTo=document.getElementById('nu-manager').value;
+  const name=document.getElementById('nu-name').value.trim(),email=document.getElementById('nu-email').value.trim(),pass=document.getElementById('nu-pass').value,role=document.getElementById('nu-role').value,designation=document.getElementById('nu-designation').value.trim(),department=document.getElementById('nu-dept').value,reportingTo=document.getElementById('nu-manager').value;
   if(!name||!email||!pass){showToast('Name, email, password required','error');return;}
   const r=await api('POST','/users',{name,email,password:pass,role,designation,department,reportingTo});
-  if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}
-  else showToast(r?.error||'Failed','error');
+  if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
 }
 
 function openEditUser(userId){
-  const users = window._adminUsers || [];
-  const u = users.find(x=>x.userId===userId);
-  if(!u) return;
+  const users=window._adminUsers||[],u=users.find(x=>x.userId===userId);if(!u) return;
   openPanel(`✏️ Edit — ${u.name}`,`
+    <div class="form-row"><div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div></div>
     <div class="form-row">
-      <div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div>
-      <div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div>
+      <div class="form-group"><label>Department</label><select class="form-control" id="eu-dept"><option value="">-- Select --</option>${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Department</label>
-        <select class="form-control" id="eu-dept">
-          <option value="">-- Select --</option>
-          ${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group"><label>Role</label>
-        <select class="form-control" id="eu-role">
-          ${['Executive','Senior Executive','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="form-group"><label>Reports To</label>
-      <select class="form-control" id="eu-manager">
-        <option value="">-- Top Level --</option>
-        ${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group"><label>Status</label>
-      <select class="form-control" id="eu-active">
-        <option value="true" ${u.isActive?'selected':''}>Active</option>
-        <option value="false" ${!u.isActive?'selected':''}>Inactive</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary btn-full" onclick="submitEditUser('${userId}')">💾 Save Changes</button>
-    </div>`);
+    <div class="form-group"><label>Reports To</label><select class="form-control" id="eu-manager"><option value="">-- Top Level --</option>${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="eu-active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
+    <button class="btn btn-primary btn-full" onclick="submitEditUser('${userId}')">💾 Save Changes</button>`);
 }
 
 async function submitEditUser(userId){
-  const name=document.getElementById('eu-name').value.trim();
-  const designation=document.getElementById('eu-designation').value.trim();
-  const department=document.getElementById('eu-dept').value;
-  const role=document.getElementById('eu-role').value;
-  const reportingTo=document.getElementById('eu-manager').value;
-  const isActive=document.getElementById('eu-active').value==='true';
+  const name=document.getElementById('eu-name').value.trim(),designation=document.getElementById('eu-designation').value.trim(),department=document.getElementById('eu-dept').value,role=document.getElementById('eu-role').value,reportingTo=document.getElementById('eu-manager').value,isActive=document.getElementById('eu-active').value==='true';
   const r=await api('PATCH',`/users/${userId}`,{name,designation,department,role,reportingTo,isActive});
-  if(r?.success){showToast('✅ User updated!','success');closePanel();renderAdmin();}
-  else showToast(r?.error||'Failed','error');
+  if(r?.success){showToast('✅ User updated!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
 }
 
 function openResetPassword(){
-  const users = window._adminUsers || [];
+  const users=window._adminUsers||[];
   openPanel('🔑 Reset Password',`
-    <div class="form-group"><label>User Select Karo</label>
-      <select class="form-control" id="rp-code">
-        <option value="">-- Select User --</option>
-        ${users.map(u=>`<option value="${u.userId}">${u.name} (${u.userId})</option>`).join('')}
-      </select>
-    </div>
+    <div class="form-group"><label>User Select Karo</label><select class="form-control" id="rp-code"><option value="">-- Select User --</option>${users.map(u=>`<option value="${u.userId}">${u.name} (${u.userId})</option>`).join('')}</select></div>
     <div class="form-group"><label>New Password *</label><input type="password" class="form-control" id="rp-pass"></div>
     <button class="btn btn-warning btn-full" onclick="submitResetPassword()">🔑 Reset Password</button>`);
 }
 async function submitResetPassword(){
-  const code=document.getElementById('rp-code').value.trim();
-  const pass=document.getElementById('rp-pass').value;
+  const code=document.getElementById('rp-code').value.trim(),pass=document.getElementById('rp-pass').value;
   if(!code||!pass){showToast('User aur password required','error');return;}
   const r=await api('PATCH',`/users/${code}/password`,{password:pass});
-  if(r?.success){showToast('✅ Password reset!','success');closePanel();}
-  else showToast('Failed','error');
+  if(r?.success){showToast('✅ Password reset!','success');closePanel();}else showToast('Failed','error');
 }
 
 // ── NOTIFICATIONS ─────────────────────────────────────────────
 async function loadNotifications(){
-  const notifs=await api('GET','/notifications');
-  if(!notifs) return;
+  const notifs=await api('GET','/notifications');if(!notifs) return;
   const badge=document.getElementById('notif-count');
   if(notifs.length){badge.textContent=notifs.length;badge.style.display='flex';}else{badge.style.display='none';}
   const el=document.getElementById('notif-list');if(!el) return;
-  el.innerHTML=!notifs.length?'<div class="empty-state" style="padding:24px;"><div class="emoji">🔕</div><h3>All clear!</h3></div>':
-    notifs.map(n=>`<div class="notif-item" onclick="handleNotif('${n.notifId}','${n.type}')">
-      <div class="notif-type">${n.type.replace(/_/g,' ')}</div>
-      <div class="notif-msg">${n.message}</div>
-      <div class="notif-time">${n.createdAt}</div>
-    </div>`).join('');
+  el.innerHTML=!notifs.length?'<div class="empty-state" style="padding:24px;"><div class="emoji">🔕</div><h3>All clear!</h3></div>':notifs.map(n=>`<div class="notif-item" onclick="handleNotif('${n.notifId}','${n.type}')"><div class="notif-type">${n.type.replace(/_/g,' ')}</div><div class="notif-msg">${n.message}</div><div class="notif-time">${n.createdAt}</div></div>`).join('');
 }
 function toggleNotifications(){document.getElementById('notif-dropdown').classList.toggle('show');}
 async function markAllRead(){
-  const notifs=document.querySelectorAll('.notif-item');
-  notifs.forEach((_,i)=>{});
   await api('GET','/notifications').then(ns=>(ns||[]).forEach(n=>api('PATCH',`/notifications/${n.notifId}/read`,{})));
   document.getElementById('notif-count').style.display='none';
   document.getElementById('notif-list').innerHTML='<div class="empty-state" style="padding:24px;"><div class="emoji">✅</div><h3>All read!</h3></div>';
@@ -2206,6 +1514,118 @@ async function handleNotif(id,type){
   else if(type==='RENEWAL_ALERT') navigate('renewals');
   else if(type==='CSI_DUE') navigate('csi');
   else if(type==='NEW_TASK') navigate('tasks');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ✅ SELLER CLOSE REQUEST WORKFLOW
+// ═══════════════════════════════════════════════════════════
+
+function openCloseRequestForm() {
+  const sel = document.getElementById('crm-client');
+  const cc = sel?.value;
+  const cn = sel?.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+  if (!cc) { showToast('Pehle client select karo', 'error'); return; }
+
+  openPanel('🔴 Seller Close Request — ' + cn, `
+    <div style="background:#fdf2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;margin-bottom:16px;">
+      <strong style="color:#dc2626;">⚠️ Dhyan Se!</strong>
+      <p style="font-size:13px;color:#7f1d1d;margin-top:6px;">Yeh request Admin ko bhejegi. Approve hone par seller <strong>Inactive</strong> ho jayega.</p>
+    </div>
+    <div class="form-group">
+      <label>Seller</label>
+      <input type="text" class="form-control" value="${cn}" disabled style="background:#f9f9f9;">
+    </div>
+    <div class="form-group">
+      <label>Close Karne Ki Wajah *</label>
+      <select class="form-control" id="cr-reason-type" onchange="toggleCustomReason()">
+        <option value="">-- Select Reason --</option>
+        <option>Seller ne services band ki</option>
+        <option>Payment nahi aaya</option>
+        <option>Seller ne contract khatam kiya</option>
+        <option>Duplicate account</option>
+        <option>Business band ho gaya</option>
+        <option value="other">Other (specify)</option>
+      </select>
+    </div>
+    <div class="form-group" id="cr-custom-reason" style="display:none;">
+      <label>Custom Reason</label>
+      <textarea class="form-control" id="cr-reason-text" placeholder="Detail mein likho..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Additional Notes</label>
+      <textarea class="form-control" id="cr-notes" placeholder="Koi aur detail..."></textarea>
+    </div>
+    <button class="btn btn-full" style="background:#dc2626;color:#fff;margin-top:8px;" onclick="submitCloseRequest('${cc}','${cn}')">
+      🔴 Close Request Bhejo Admin Ko
+    </button>`);
+}
+
+function toggleCustomReason() {
+  const val = document.getElementById('cr-reason-type')?.value;
+  const div = document.getElementById('cr-custom-reason');
+  if (div) div.style.display = val === 'other' ? '' : 'none';
+}
+
+async function submitCloseRequest(clientId, clientName) {
+  const reasonType = document.getElementById('cr-reason-type')?.value;
+  if (!reasonType) { showToast('Reason select karo', 'error'); return; }
+  const customReason = document.getElementById('cr-reason-text')?.value || '';
+  const notes = document.getElementById('cr-notes')?.value || '';
+  const reason = reasonType === 'other' ? (customReason || 'Other') : reasonType + (notes ? ' — ' + notes : '');
+  const r = await api('POST', '/close-requests', {
+    client_id: clientId,
+    client_name: clientName,
+    requested_by: APP.user.name,
+    reason: reason
+  });
+  if (r?.error) { showToast('❌ ' + r.error, 'error'); }
+  else if (r?.success) {
+    showToast('✅ Close request Admin ko bhej diya gaya!', 'success');
+    document.getElementById('overlay').classList.remove('show');
+  }
+}
+
+async function loadCloseRequests() {
+  const container = document.getElementById('close-requests-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const requests = await api('GET', '/close-requests/pending');
+  if (!requests || requests.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">✅</div><h3>Koi pending request nahi!</h3></div>';
+    return;
+  }
+  container.innerHTML = requests.map(r => `
+    <div style="background:#fff;border:1px solid #fca5a5;border-radius:10px;padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h4 style="margin:0 0 4px;color:#111827;font-size:15px;">🏢 ${r.client_name}</h4>
+          <p style="margin:0;font-size:13px;color:#6b7280;">Requested by: <strong>${r.requested_by}</strong></p>
+          <p style="margin:6px 0 0;font-size:13px;color:#374151;">📋 Reason: ${r.reason}</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">🕐 ${new Date(r.requested_at).toLocaleString('en-IN')}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="resolveCloseRequest('${r.id}','approved','${r.client_id}')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve</button>
+          <button onclick="resolveCloseRequest('${r.id}','rejected','${r.client_id}')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function resolveCloseRequest(requestId, status, clientId) {
+  let remark = '';
+  if (status === 'approved') {
+    remark = prompt('Approval remark (optional):') || 'Approved';
+  } else {
+    remark = prompt('Rejection reason batao:');
+    if (remark === null) return;
+    if (!remark) { showToast('Rejection reason required', 'error'); return; }
+  }
+  const r = await api('PATCH', '/close-requests/' + requestId, { status, admin_remark: remark, client_id: clientId });
+  if (r?.error) { showToast('❌ ' + r.error, 'error'); }
+  else if (r?.success) {
+    showToast(status === 'approved' ? '✅ Seller inactive kar diya gaya!' : '✅ Request reject kar diya gaya!', 'success');
+    loadCloseRequests();
+  }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
@@ -2224,48 +1644,26 @@ document.addEventListener('click',e=>{const dd=document.getElementById('notif-dr
 window.addEventListener('resize',()=>{const h=document.querySelector('.hamburger');if(h)h.style.display=window.innerWidth<768?'flex':'none';});
 
 // ── THEME SYSTEM ─────────────────────────────────────────────
-const THEMES = [
-  {name:'Navy Blue', primary:'#1F3864', secondary:'#2E75B6'},
-  {name:'Dark Green', primary:'#1a5c38', secondary:'#27ae60'},
-  {name:'Purple', primary:'#4a235a', secondary:'#8e44ad'},
-  {name:'Dark Red', primary:'#6E2C2C', secondary:'#e74c3c'},
-  {name:'Teal', primary:'#0d4f4f', secondary:'#16a085'},
-  {name:'Charcoal', primary:'#2c3e50', secondary:'#34495e'},
-  {name:'Orange', primary:'#6E3A1A', secondary:'#d35400'},
-  {name:'Indigo', primary:'#1a1a6e', secondary:'#3498db'},
+const THEMES=[
+  {name:'Navy Blue',primary:'#1F3864',secondary:'#2E75B6'},
+  {name:'Dark Green',primary:'#1a5c38',secondary:'#27ae60'},
+  {name:'Purple',primary:'#4a235a',secondary:'#8e44ad'},
+  {name:'Dark Red',primary:'#6E2C2C',secondary:'#e74c3c'},
+  {name:'Teal',primary:'#0d4f4f',secondary:'#16a085'},
+  {name:'Charcoal',primary:'#2c3e50',secondary:'#34495e'},
+  {name:'Orange',primary:'#6E3A1A',secondary:'#d35400'},
+  {name:'Indigo',primary:'#1a1a6e',secondary:'#3498db'},
 ];
 
-function initTheme() {
-  const saved = localStorage.getItem('en_theme');
-  if (saved) {
-    const t = JSON.parse(saved);
-    applyTheme(t.primary, t.secondary);
-  }
-  const tc = document.getElementById('theme-colors');
-  if (tc) {
-    tc.innerHTML = THEMES.map(t => `
-      <div class="theme-btn" style="background:${t.primary};" title="${t.name}" onclick="applyTheme('${t.primary}','${t.secondary}')"></div>
-    `).join('');
-  }
+function initTheme(){
+  const saved=localStorage.getItem('en_theme');
+  if(saved){const t=JSON.parse(saved);applyTheme(t.primary,t.secondary);}
+  const tc=document.getElementById('theme-colors');
+  if(tc){tc.innerHTML=THEMES.map(t=>`<div class="theme-btn" style="background:${t.primary};" title="${t.name}" onclick="applyTheme('${t.primary}','${t.secondary}')"></div>`).join('');}
 }
-
-function applyTheme(primary, secondary) {
-  document.documentElement.style.setProperty('--primary', primary);
-  document.documentElement.style.setProperty('--secondary', secondary);
-  localStorage.setItem('en_theme', JSON.stringify({primary, secondary}));
-}
-
-function toggleThemePanel() {
-  document.getElementById('theme-panel').classList.toggle('show');
-}
-
-document.addEventListener('click', (e) => {
-  const panel = document.getElementById('theme-panel');
-  if (panel && !panel.contains(e.target) && !e.target.closest('[onclick="toggleThemePanel()"]')) {
-    panel.classList.remove('show');
-  }
-});
-
+function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
+function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
+document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
 </script>
 </body>
 </html>

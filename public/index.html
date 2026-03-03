@@ -1727,7 +1727,7 @@ function openAddUser(){
       <div class="form-group"><label>Department</label>
         <select class="form-control" id="nu-dept">
           <option value="">-- Select --</option>
-          <option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Operations</option><option>Admin</option>
+          <option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option>
         </select>
       </div>
       <div class="form-group"><label>Role (Permission Level)</label>
@@ -1778,7 +1778,7 @@ function openEditUser(userId){
       <div class="form-group"><label>Department</label>
         <select class="form-control" id="eu-dept">
           <option value="">-- Select --</option>
-          ${['CRM','Ads','Account Management','CSI','Operations','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}
+          ${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Role</label>

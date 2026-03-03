@@ -365,21 +365,6 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'clients',icon:'👥',label:'My Clients'},
-    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
-  ],
-  'Ads Executive': [
-    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
-    {id:'worklog',icon:'📓',label:'Work Log'},
-    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
-    {id:'ads',icon:'📢',label:'Ads Manager'},
-    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
-  ],
-  'CRM Executive': [
-    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
-    {id:'worklog',icon:'📓',label:'Work Log'},
-    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
-    {id:'crm',icon:'📞',label:'CRM Log'},
-    {id:'csi',icon:'📊',label:'CSI Forms'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
@@ -388,6 +373,15 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+  ],
+  'CRM Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Forms'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
@@ -418,6 +412,11 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+  ],
+  'Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
 };
 
@@ -555,7 +554,7 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {worklog:'📓 Work Log',dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
@@ -816,10 +815,9 @@ async function load360(cc) {
 
   document.getElementById('s360-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
   
-  const [data, dsrData, wlData] = await Promise.all([
+  const [data, dsrData] = await Promise.all([
     api('GET', '/clients/' + cc + '/timeline'),
     api('GET', '/dsr/trend/' + cc),
-    api('GET', '/worklog?client=' + cc),
   ]);
   if (!data) return;
   
@@ -912,32 +910,6 @@ async function load360(cc) {
             <td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
           </tr>`).join('')}</tbody>
         </table></div>`}
-      </div>
-    </div>
-
-    <!-- WORK LOG -->
-    <div class="card">
-      <div class="card-header" style="background:#f0f4ff;">
-        <span class="card-title">📓 Team Work Log (Last 10 entries)</span>
-        <button class="btn btn-primary" style="font-size:12px;" onclick="navigate('worklog')">+ Add Work</button>
-      </div>
-      <div class="card-body" style="padding:0;">
-        \${!wlData?.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>Koi work log nahi — team ne abhi enter nahi kiya</h3></div>' :
-        wlData.slice(0,10).map(e => {
-          const deptColor = e.department==='Ads'?'#e74c3c':e.department==='CRM'?'#2E75B6':e.department==='Account Management'?'#27ae60':'#8e44ad';
-          return `<div style="border-bottom:1px solid #eee;padding:10px 16px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span style="background:\${deptColor};color:#fff;padding:1px 8px;border-radius:10px;font-size:11px;">\${e.department||'General'}</span>
-              <span style="font-size:11px;color:#999;">\${e.work_date} — \${e.entered_by}</span>
-            </div>
-            \${e.campaign_name?`<div style="font-size:12px;"><b>Campaign:</b> \${e.campaign_name}</div>`:''}
-            \${e.description?`<div style="font-size:12px;"><b>Kaam:</b> \${e.description}</div>`:''}
-            \${e.budget_change?`<div style="font-size:12px;"><b>Budget:</b> \${e.budget_change}</div>`:''}
-            \${e.suggestion?`<div style="font-size:12px;background:#fff9e6;padding:3px 8px;border-radius:4px;margin-top:3px;"><b>💡 Suggestion:</b> \${e.suggestion}</div>`:''}
-            \${e.issue_raised?`<div style="font-size:12px;background:#fdf2f2;padding:3px 8px;border-radius:4px;margin-top:3px;"><b>⚠️ Issue:</b> \${e.issue_raised}</div>`:''}
-            \${e.next_action?`<div style="font-size:12px;background:#eafaf1;padding:3px 8px;border-radius:4px;margin-top:3px;"><b>➡️ Next:</b> \${e.next_action}</div>`:''}
-          </div>`;
-        }).join('')}
       </div>
     </div>
 
@@ -1694,192 +1666,56 @@ async function submitWorkLog(taskId,cc,cn){
 
 // ── WORK LOG ─────────────────────────────────────────────────
 async function renderWorkLog(){
-  const clients = await api('GET','/clients');
+  const [logs, clients]=await Promise.all([api('GET','/tasks/worklog'),api('GET','/clients')]);
   if(clients) APP.clients=clients;
-  const today = new Date().toISOString().split('T')[0];
-  const role = APP.user?.role||'';
-  const isAds = role==='Ads Executive';
-  const isCRM = role==='CRM Executive';
-  const isAM = role==='Account Manager';
-  
   document.getElementById('page-content').innerHTML=`
     <div class="card">
-      <div class="card-header"><span class="card-title">📓 Seller Work Log — Aaj Ka Kaam</span></div>
-      <div class="card-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Seller Select Karo *</label>
-            <select class="form-control" id="wl-client" onchange="loadSellerWorklog(this.value)">
-              <option value="">-- Seller Choose Karo --</option>
-              ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.marketplace||''})</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Date</label>
-            <input type="date" class="form-control" id="wl-date" value="${today}">
-          </div>
-        </div>
-
-        <!-- Work Type Tabs -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          ${isAds||['SME','Senior Executive','Team Lead','Admin','Ops Lead'].includes(role)?'<button class="btn btn-secondary btn-sm wl-type-btn" onclick="selectWorkType(this,\'Ads\')" id="wt-ads">📢 Ads Work</button>':''}
-          ${isAM||['SME','Senior Executive','Team Lead','Admin','Ops Lead'].includes(role)?'<button class="btn btn-secondary btn-sm wl-type-btn" onclick="selectWorkType(this,\'Account Management\')" id="wt-am">👥 AM Work</button>':''}
-          ${isCRM||['SME','Senior Executive','Team Lead','Admin','Ops Lead'].includes(role)?'<button class="btn btn-secondary btn-sm wl-type-btn" onclick="selectWorkType(this,\'CRM\')" id="wt-crm">📞 CRM Work</button>':''}
-        </div>
-
-        <!-- Ads Fields -->
-        <div id="wl-ads-fields" style="display:none;">
-          <div class="form-row">
-            <div class="form-group"><label>Campaign Name</label><input type="text" class="form-control" id="wl-campaign" placeholder="e.g. SP_Brand_Keywords_March"></div>
-            <div class="form-group"><label>Changes Made</label><input type="text" class="form-control" id="wl-changes" placeholder="e.g. Bid +20%, Added negative keywords"></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>Budget Change</label><input type="text" class="form-control" id="wl-budget" placeholder="e.g. Rs 500 se Rs 700 kiya"></div>
-            <div class="form-group"><label>Suggestion for AM/Store</label><textarea class="form-control" id="wl-suggestion" placeholder="e.g. Listing mein main image update karo — conversion badhega" style="height:60px;"></textarea></div>
-          </div>
-        </div>
-
-        <!-- AM Fields -->
-        <div id="wl-am-fields" style="display:none;">
-          <div class="form-row">
-            <div class="form-group"><label>ASIN / Category</label><input type="text" class="form-control" id="wl-asin" placeholder="e.g. B08XYZ123 ya Kitchen Category"></div>
-            <div class="form-group"><label>Kaam Kiya</label><input type="text" class="form-control" id="wl-work-done" placeholder="e.g. Images update ki, keywords add kiye"></div>
-          </div>
-          <div class="form-group"><label>Suggestion for Ads Team</label><textarea class="form-control" id="wl-am-suggestion" placeholder="e.g. Yeh ASIN pe zyada spend karo — organic rank badh rahi hai" style="height:60px;"></textarea></div>
-        </div>
-
-        <!-- CRM Fields -->
-        <div id="wl-crm-fields" style="display:none;">
-          <div class="form-group"><label>Call Summary</label><textarea class="form-control" id="wl-crm-summary" placeholder="e.g. Seller ne bola sales slow hai, concerned about returns..." style="height:60px;"></textarea></div>
-        </div>
-
-        <!-- Common Fields -->
-        <div id="wl-common-fields" style="display:none;">
-          <div class="form-row">
-            <div class="form-group"><label>Issue / Problem</label><textarea class="form-control" id="wl-issue" placeholder="Koi problem hai?" style="height:60px;"></textarea></div>
-            <div class="form-group"><label>Next Action Plan</label><textarea class="form-control" id="wl-next" placeholder="Kal kya karna hai?" style="height:60px;"></textarea></div>
-          </div>
-          <button class="btn btn-primary" onclick="saveWorklog()">💾 Save Work Log</button>
-        </div>
+      <div class="card-header"><span class="card-title">📓 Work Log</span>
+        <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
       </div>
-    </div>
-
-    <!-- Seller Work Log History -->
-    <div class="card" id="wl-history-card" style="display:none;">
-      <div class="card-header">
-        <span class="card-title" id="wl-history-title">📋 Work History</span>
+      <div class="card-body" style="padding:0;">
+        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':
+        `<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+        <tbody>${logs.map(l=>`<tr>
+          <td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td>
+          <td><strong>${l.executiveName}</strong></td>
+          <td>${l.clientName||'—'}</td>
+          <td><span class="badge badge-blue">${l.workType}</span></td>
+          <td style="font-size:12px;max-width:200px;">${l.description}</td>
+          <td style="font-size:12px;">${l.outcome||'—'}</td>
+          <td>${l.timeSpent||'—'}</td>
+        </tr>`).join('')}</tbody></table></div>`}
       </div>
-      <div class="card-body" id="wl-history-body" style="padding:0;"></div>
+    </div>`;
+}
+
+function openQuickWorkLog(){
+  openPanel('📓 Quick Work Log',`
+    <div class="form-group"><label>Client (optional)</label>
+      <select class="form-control" id="qwl-client">
+        <option value="">No specific client</option>
+        ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}
+      </select>
     </div>
-  `;
-
-  // Auto-select work type based on role
-  if(isAds) selectWorkType(document.getElementById('wt-ads'),'Ads');
-  else if(isAM) selectWorkType(document.getElementById('wt-am'),'Account Management');
-  else if(isCRM) selectWorkType(document.getElementById('wt-crm'),'CRM');
-}
-
-let _selectedWorkType = '';
-function selectWorkType(btn, type) {
-  _selectedWorkType = type;
-  document.querySelectorAll('.wl-type-btn').forEach(b=>b.classList.remove('btn-primary'));
-  document.querySelectorAll('.wl-type-btn').forEach(b=>b.classList.add('btn-secondary'));
-  if(btn) { btn.classList.remove('btn-secondary'); btn.classList.add('btn-primary'); }
-  document.getElementById('wl-ads-fields').style.display = type==='Ads' ? '' : 'none';
-  document.getElementById('wl-am-fields').style.display = type==='Account Management' ? '' : 'none';
-  document.getElementById('wl-crm-fields').style.display = type==='CRM' ? '' : 'none';
-  document.getElementById('wl-common-fields').style.display = '';
-}
-
-async function loadSellerWorklog(cc) {
-  if(!cc) return;
-  const client = APP.clients.find(c=>c.clientCode===cc);
-  const data = await api('GET', `/worklog?client=${cc}`);
-  
-  document.getElementById('wl-history-card').style.display = '';
-  document.getElementById('wl-history-title').textContent = `📋 ${client?.busyName||cc} — Work History`;
-  
-  if(!data||!data.length) {
-    document.getElementById('wl-history-body').innerHTML = '<div class="empty-state"><div class="emoji">📭</div><h3>Koi entry nahi hai abhi</h3></div>';
-    return;
-  }
-
-  // Group by date
-  const byDate = {};
-  data.forEach(d => { if(!byDate[d.work_date]) byDate[d.work_date]=[];  byDate[d.work_date].push(d); });
-
-  document.getElementById('wl-history-body').innerHTML = Object.entries(byDate).map(([date, entries]) => `
-    <div style="border-bottom:2px solid #e0e6ed;padding:12px 16px;">
-      <div style="font-weight:700;font-size:13px;color:#1F3864;margin-bottom:8px;">📅 ${date}</div>
-      ${entries.map(e => {
-        const deptColor = e.department==='Ads'?'#e74c3c':e.department==='CRM'?'#2E75B6':e.department==='Account Management'?'#27ae60':'#8e44ad';
-        return `<div style="background:#f8fafc;border-left:3px solid ${deptColor};padding:10px 12px;margin-bottom:8px;border-radius:0 8px 8px 0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="background:${deptColor};color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${e.department||'General'}</span>
-            <span style="font-size:11px;color:#999;">${e.entered_by} (${e.entered_by_role})</span>
-          </div>
-          ${e.campaign_name?`<div style="font-size:12px;margin-bottom:4px;"><strong>Campaign:</strong> ${e.campaign_name}</div>`:''}
-          ${e.description?`<div style="font-size:12px;margin-bottom:4px;"><strong>Kaam:</strong> ${e.description}</div>`:''}
-          ${e.budget_change?`<div style="font-size:12px;margin-bottom:4px;"><strong>Budget Change:</strong> ${e.budget_change}</div>`:''}
-          ${e.suggestion?`<div style="font-size:12px;margin-bottom:4px;background:#fff9e6;padding:4px 8px;border-radius:4px;"><strong>💡 Suggestion:</strong> ${e.suggestion}</div>`:''}
-          ${e.issue_raised?`<div style="font-size:12px;margin-bottom:4px;background:#fdf2f2;padding:4px 8px;border-radius:4px;"><strong>⚠️ Issue:</strong> ${e.issue_raised}</div>`:''}
-          ${e.next_action?`<div style="font-size:12px;background:#eafaf1;padding:4px 8px;border-radius:4px;"><strong>➡️ Next:</strong> ${e.next_action}</div>`:''}
-        </div>`;
-      }).join('')}
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
     </div>
-  `).join('');
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
+    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save</button>`);
 }
 
-async function saveWorklog() {
-  const sel = document.getElementById('wl-client');
-  const cc = sel?.value;
-  const cn = sel?.options[sel.selectedIndex]?.dataset?.name||'';
-  if(!cc) { showToast('Seller select karo','error'); return; }
-  if(!_selectedWorkType) { showToast('Work type select karo (Ads/AM/CRM)','error'); return; }
-
-  const date = document.getElementById('wl-date')?.value;
-  
-  let description = '';
-  let campaignName = '', budgetChange = '', suggestion = '', issueRaised = '', nextAction = '';
-
-  if(_selectedWorkType==='Ads') {
-    campaignName = document.getElementById('wl-campaign')?.value||'';
-    description = document.getElementById('wl-changes')?.value||'';
-    budgetChange = document.getElementById('wl-budget')?.value||'';
-    suggestion = document.getElementById('wl-suggestion')?.value||'';
-  } else if(_selectedWorkType==='Account Management') {
-    const asin = document.getElementById('wl-asin')?.value||'';
-    description = (asin?`[${asin}] `:'') + (document.getElementById('wl-work-done')?.value||'');
-    suggestion = document.getElementById('wl-am-suggestion')?.value||'';
-  } else if(_selectedWorkType==='CRM') {
-    description = document.getElementById('wl-crm-summary')?.value||'';
-  }
-
-  issueRaised = document.getElementById('wl-issue')?.value||'';
-  nextAction = document.getElementById('wl-next')?.value||'';
-
-  if(!description && !campaignName && !issueRaised) {
-    showToast('Kuch to likho — kya kiya aaj?','error'); return;
-  }
-
-  const r = await api('POST','/worklog',{
-    clientCode:cc, clientName:cn, workDate:date,
-    department:_selectedWorkType, workType:_selectedWorkType,
-    description, campaignName, budgetChange, suggestion, issueRaised, nextAction
-  });
-
-  if(r?.success) {
-    showToast('✅ Work log saved!','success');
-    // Clear fields
-    ['wl-campaign','wl-changes','wl-budget','wl-suggestion','wl-asin','wl-work-done','wl-am-suggestion','wl-crm-summary','wl-issue','wl-next'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.value='';
-    });
-    loadSellerWorklog(cc);
-  } else {
-    showToast(r?.error||'Failed','error');
-  }
+async function submitQuickWorkLog(){
+  const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const csel=document.getElementById('qwl-client');
+  const r=await api('POST','/tasks/worklog',{clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
+  if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
 }
 
+// ── RENEWALS ─────────────────────────────────────────────────
 async function renderRenewals(){
   const renewals=await api('GET','/renewals');if(!renewals) return;
   document.getElementById('page-content').innerHTML=`

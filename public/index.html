@@ -526,11 +526,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -1272,24 +1272,120 @@ async function submitQuickWorkLog(){
 
 // ── RENEWALS ─────────────────────────────────────────────────
 async function renderRenewals(){
-  const renewals=await api('GET','/renewals');if(!renewals) return;
+  const [renewals, stats] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats')]);
+  if(!renewals) return;
+  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(APP.user.role);
+  const urgent = renewals.filter(r=>r.daysLeft!==null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed');
+  const overdue = renewals.filter(r=>r.isOverdue&&r.status!=='Confirmed');
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
-      <div class="kpi-card red"><div class="kpi-label">Due ≤15 Days</div><div class="kpi-value">${renewals.filter(r=>r.daysLeft!==null&&r.daysLeft<=15&&r.status==='Pending').length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Pending</div><div class="kpi-value">${renewals.filter(r=>r.status==='Pending').length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">${overdue.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">${urgent.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">📅 Due ≤15 Days</div><div class="kpi-value">${renewals.filter(r=>r.isDueSoon&&r.status!=='Confirmed').length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
       <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${renewals.length}</div></div>
+      ${stats?.totalValue?`<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹${Number(stats.totalValue).toLocaleString('en-IN')}</div></div>`:''}
     </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">🔄 Renewal Pipeline</span></div>
+    ${overdue.length||urgent.length?`
+    <div class="card" style="border-left:4px solid var(--red);">
+      <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Urgent Renewals (${overdue.length+urgent.length})</span>
+        ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Send Reminders</button>`:''}
+      </div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>${renewals.map(r=>`<tr><td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td><td>${r.amount?'₹'+Number(r.amount).toLocaleString():'—'}</td><td>${r.renewalDate||'—'}</td><td>${r.daysLeft!==null?`<strong style="color:${r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.daysLeft}d</strong>`:'—'}</td><td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-        <td><div style="display:flex;gap:4px;"><button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button><button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button></div></td></tr>`).join('')}</tbody>
+        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Action</th></tr></thead>
+        <tbody>${[...overdue,...urgent].map(r=>`<tr style="background:${r.isOverdue?'#fff8f8':''};">
+          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
+          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
+          <td>${r.renewalDate||'—'}</td>
+          <td><strong style="color:${r.isOverdue?'var(--red)':'var(--amber)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d left'}</strong></td>
+          <td>${r.owner||'—'}</td>
+          <td><div style="display:flex;gap:4px;">
+            <button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅ Confirm</button>
+            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>`:''}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔄 All Renewals (${renewals.length})</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">
+            <option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option>
+          </select>
+          ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>`:''}
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;" id="renewals-table-wrap"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="renewals-tbody">${renewals.map(r=>`<tr>
+          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
+          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
+          <td>${r.renewalDate||'—'}</td>
+          <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
+          <td>${r.owner||'—'}</td>
+          <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
+          <td><div style="display:flex;gap:4px;">
+            ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
+            ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
+            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
       </table></div></div>
     </div>`;
+  window._allRenewals = renewals;
 }
-async function updateRenewal(id,status){const r=await api('PATCH',`/renewals/${id}`,{status});if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}}
+
+function filterRenewals(status){
+  const data = status ? (window._allRenewals||[]).filter(r=>r.status===status) : (window._allRenewals||[]);
+  document.getElementById('renewals-tbody').innerHTML = data.map(r=>`<tr>
+    <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
+    <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
+    <td>${r.renewalDate||'—'}</td>
+    <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
+    <td>${r.owner||'—'}</td>
+    <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
+    <td><div style="display:flex;gap:4px;">
+      ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
+      ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
+      <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+function openEditRenewal(id, name) {
+  openPanel(`✏️ Renewal Update — ${name}`, `
+    <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="er-date"></div>
+    <div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" placeholder="0"></div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="er-status"><option>Pending</option><option>Confirmed</option><option>Lost</option></select>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea class="form-control" id="er-notes" placeholder="Koi update..."></textarea></div>
+    <button class="btn btn-primary btn-full" onclick="submitEditRenewal('${id}')">💾 Save Update</button>`);
+}
+
+async function submitEditRenewal(id) {
+  const r = await api('PATCH', `/renewals/${id}`, {
+    status: document.getElementById('er-status').value,
+    amount: document.getElementById('er-amount').value || undefined,
+    renewalDate: document.getElementById('er-date').value || undefined,
+    notes: document.getElementById('er-notes').value,
+  });
+  if (r?.success) { showToast('✅ Renewal updated!', 'success'); closePanel(); renderRenewals(); }
+}
+
+async function updateRenewal(id,status){
+  const r=await api('PATCH',`/renewals/${id}`,{status});
+  if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}
+}
+
+async function triggerRenewalReminders() {
+  const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Sending...';
+  const r = await api('POST', '/renewals/trigger-reminders', {});
+  btn.disabled = false; btn.textContent = '📨 Reminders';
+  if (r?.success) showToast(`✅ ${r.reminders_sent} reminders bheje gaye!`, 'success');
+  else showToast('Error sending reminders', 'error');
+}
 
 // ── ADS ───────────────────────────────────────────────────────
 async function renderAds(){
@@ -1397,11 +1493,12 @@ async function renderAdmin(){
           <button class="btn btn-primary btn-sm" onclick="openAddUser()">➕ Add User</button>
           <button class="btn btn-outline btn-sm" onclick="openResetPassword()">🔑 Reset Password</button>
           <button class="btn btn-secondary btn-sm" onclick="showHierarchy()">🏢 Hierarchy View</button>
+          <button class="btn btn-warning btn-sm" onclick="navigate('stafftransfer')">🔁 Staff Transfer</button>
         </div>
       </div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>${users.map((u,i)=>{const manager=users.find(m=>m.id===u.reportingTo);return `<tr><td>${i+1}</td><td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td><td style="font-size:12px;">${u.email}</td><td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td><td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td></tr>`;}).join('')}</tbody>
+        <tbody>${users.map((u,i)=>{const manager=users.find(m=>m.id===u.reportingTo);return `<tr><td>${i+1}</td><td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td><td>${u.designation||'<span style="color:#ccc;">—</span>'}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td><td style="font-size:12px;">${u.email}</td><td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td><td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td></tr>`;}).join('')}</tbody>
       </table></div></div>
     </div>
     <div class="card" id="hierarchy-card" style="display:none;">
@@ -1626,6 +1723,147 @@ async function resolveCloseRequest(requestId, status, clientId) {
     showToast(status === 'approved' ? '✅ Seller inactive kar diya gaya!' : '✅ Request reject kar diya gaya!', 'success');
     loadCloseRequests();
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🔁 STAFF TRANSFER WORKFLOW
+// ═══════════════════════════════════════════════════════════
+
+async function renderStaffTransfer() {
+  const [users, pending] = await Promise.all([api('GET','/users'), api('GET','/staff-transfer/pending')]);
+  const activeUsers = (users||[]).filter(u=>u.isActive);
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card amber"><div class="kpi-label">Pending Transfers</div><div class="kpi-value">${(pending||[]).length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">Active Staff</div><div class="kpi-value">${activeUsers.length}</div></div>
+    </div>
+
+    <!-- New Transfer Form -->
+    <div class="card" style="border-left:4px solid var(--amber);">
+      <div class="card-header" style="background:#fef9e7;"><span class="card-title">🔁 New Staff Transfer / Exit</span></div>
+      <div class="card-body">
+        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#92400e;">
+          ⚠️ Jab koi employee exit kare ya transfer ho — uske sellers naye person ko assign ho jayenge.
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Exiting / Transferring Staff *</label>
+            <select class="form-control" id="st-from" onchange="loadTransferPreview(this.value)">
+              <option value="">-- Select Staff --</option>
+              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Transfer Sellers To *</label>
+            <select class="form-control" id="st-to">
+              <option value="">-- Select New Person --</option>
+              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div id="st-preview" style="display:none;background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--primary);">📋 Transfer Preview</div>
+          <div id="st-preview-body"></div>
+        </div>
+        <div class="form-group"><label>Transfer Type</label>
+          <select class="form-control" id="st-type">
+            <option value="Full Transfer">Full Transfer (sab kuch)</option>
+            <option value="AM Only">Account Manager only</option>
+            <option value="Ads Only">Ads Manager only</option>
+            <option value="CRM Only">CRM Executive only</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fields to Transfer</label>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-am" checked> Account Manager</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-ads" checked> Ads Manager</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-crm" checked> CRM Executive</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Reason</label><textarea class="form-control" id="st-reason" placeholder="Exit reason ya transfer reason..." rows="2"></textarea></div>
+          <div class="form-group"><label>Effective Date</label><input type="date" class="form-control" id="st-date" value="${new Date().toISOString().split('T')[0]}"></div>
+        </div>
+        <button class="btn btn-warning btn-full" onclick="submitStaffTransfer()">🔁 Transfer Request Submit Karo</button>
+      </div>
+    </div>
+
+    <!-- Pending Transfers -->
+    <div class="card" style="border-left:4px solid var(--orange);">
+      <div class="card-header" style="background:#fef3e7;">
+        <span class="card-title">⏳ Pending Approvals (${(pending||[]).length})</span>
+        <button class="btn btn-sm btn-outline" onclick="renderStaffTransfer()">🔄 Refresh</button>
+      </div>
+      <div class="card-body">
+        ${!(pending||[]).length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi pending transfer nahi</h3></div>' :
+        (pending||[]).map(r => `
+          <div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+              <div>
+                <h4 style="margin:0 0 4px;font-size:15px;">🔁 ${r.exiting_user} → ${r.transfer_to}</h4>
+                <p style="margin:0;font-size:13px;color:#666;">Type: <strong>${r.transfer_type}</strong> | Requested by: ${r.requested_by}</p>
+                <p style="margin:4px 0 0;font-size:13px;">📋 Reason: ${r.reason||'—'}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#999;">📅 ${r.effective_date} | ${new Date(r.created_at).toLocaleDateString('en-IN')}</p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button onclick="resolveTransfer('${r.id}','approved')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve & Execute</button>
+                <button onclick="resolveTransfer('${r.id}','rejected')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+  window._staffUsers = activeUsers;
+}
+
+async function loadTransferPreview(name) {
+  if (!name) return;
+  document.getElementById('st-preview').style.display = '';
+  document.getElementById('st-preview-body').innerHTML = '<div class="loading" style="padding:10px;"><div class="spinner"></div></div>';
+  const data = await api('GET', '/staff-transfer/preview/' + encodeURIComponent(name));
+  if (!data) return;
+  document.getElementById('st-preview-body').innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
+      <div><strong style="color:var(--green);">👤 AM Sellers:</strong> ${data.am_clients.length} ${data.am_clients.map(c=>`<span class="badge badge-blue" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+      <div><strong style="color:var(--orange);">📢 Ads Sellers:</strong> ${data.ads_clients.length} ${data.ads_clients.map(c=>`<span class="badge badge-orange" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+      <div><strong style="color:var(--teal);">📞 CRM Sellers:</strong> ${data.crm_clients.length} ${data.crm_clients.map(c=>`<span class="badge badge-gray" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+    </div>
+    <div style="margin-top:8px;font-weight:700;color:var(--primary);">Total: ${data.total} sellers will be transferred</div>`;
+}
+
+async function submitStaffTransfer() {
+  const from = document.getElementById('st-from').value;
+  const to = document.getElementById('st-to').value;
+  if (!from || !to) { showToast('From aur To dono select karo', 'error'); return; }
+  if (from === to) { showToast('Same person select nahi kar sakte', 'error'); return; }
+  const fields = [];
+  if (document.getElementById('st-f-am').checked) fields.push('am_name');
+  if (document.getElementById('st-f-ads').checked) fields.push('ads_manager');
+  if (document.getElementById('st-f-crm').checked) fields.push('crm_executive');
+  if (!fields.length) { showToast('Kam se kam ek field select karo', 'error'); return; }
+  const r = await api('POST', '/staff-transfer', {
+    exiting_user: from, transfer_to: to,
+    transfer_type: document.getElementById('st-type').value,
+    fields_to_transfer: fields,
+    reason: document.getElementById('st-reason').value,
+    effective_date: document.getElementById('st-date').value,
+  });
+  if (r?.success) { showToast('✅ Transfer request submit ho gayi!', 'success'); renderStaffTransfer(); }
+  else showToast(r?.error || 'Error', 'error');
+}
+
+async function resolveTransfer(id, status) {
+  let remark = '';
+  if (status === 'approved') {
+    remark = prompt('Approval note (optional):') || 'Approved';
+  } else {
+    remark = prompt('Rejection reason:');
+    if (remark === null) return;
+  }
+  const r = await api('PATCH', '/staff-transfer/' + id, { status, admin_remark: remark });
+  if (r?.success) {
+    showToast(status === 'approved' ? '✅ Transfer execute ho gaya! Sellers reassigned!' : '❌ Transfer rejected', status === 'approved' ? 'success' : 'info');
+    renderStaffTransfer();
+  } else showToast(r?.error || 'Error', 'error');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────

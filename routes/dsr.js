@@ -1,132 +1,244 @@
-const router = require('express').Router();
-const supabase = require('../db');
-const { authMiddleware } = require('../middleware/auth');
+// routes/dsr.js — REPLACE existing file with this
+// NEW: Zero sale day auto-ticket + DSR alert notifications
 
-// GET /api/dsr?date=2026-03-03&client=CLT001&from=2026-03-01&to=2026-03-31
-router.get('/', authMiddleware, async (req, res) => {
-  const { date, client, from, to } = req.query;
-  let query = supabase.from('dsr_data').select('*').order('report_date', { ascending: false });
-  if (date) query = query.eq('report_date', date);
-  if (client) query = query.eq('client_code', client);
-  if (from) query = query.gte('report_date', from);
-  if (to) query = query.lte('report_date', to);
-  const { data, error } = await query.limit(500);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
-});
+const express = require('express');
+const router = express.Router();
+const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-// GET /api/dsr/today-status — which clients have DSR entered today
-router.get('/today-status', authMiddleware, async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const { data: clients } = await supabase.from('clients').select('client_code,busy_name,marketplace,ads_manager,seller_budget').eq('status','Active');
-  const { data: todayDsr } = await supabase.from('dsr_data').select('client_code').eq('report_date', today);
-  const doneSet = new Set((todayDsr||[]).map(d => d.client_code));
-  res.json({
-    total: (clients||[]).length,
-    done: doneSet.size,
-    pending: (clients||[]).filter(c => !doneSet.has(c.client_code)),
-    completed: (clients||[]).filter(c => doneSet.has(c.client_code)),
-  });
-});
+function auth(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token' });
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
 
-// GET /api/dsr/alerts — all active alerts
-router.get('/alerts', authMiddleware, async (req, res) => {
-  const { data, error } = await supabase.from('dsr_data')
-    .select('*')
-    .or('alert_overspend.eq.true,alert_sales_drop.eq.true,alert_high_returns.eq.true,alert_budget_80.eq.true')
-    .order('report_date', { ascending: false })
-    .limit(50);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
-});
-
-// GET /api/dsr/trend/:clientCode — last 7 days trend
-router.get('/trend/:clientCode', authMiddleware, async (req, res) => {
-  const { data, error } = await supabase.from('dsr_data')
-    .select('*')
-    .eq('client_code', req.params.clientCode)
-    .order('report_date', { ascending: false })
-    .limit(7);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json((data||[]).reverse());
-});
-
-// POST /api/dsr — add/update daily report
-router.post('/', authMiddleware, async (req, res) => {
-  const { clientCode, clientName, reportDate, ordersCount, salesAmount, returnsCount, returnsAmount, adSpend, sellerBudget, notes } = req.body;
-  
-  if (!clientCode || !reportDate) return res.status(400).json({ error: 'clientCode and reportDate required' });
-
-  const orders = parseFloat(ordersCount)||0;
-  const sales = parseFloat(salesAmount)||0;
-  const retCnt = parseFloat(returnsCount)||0;
-  const retAmt = parseFloat(returnsAmount)||0;
-  const spend = parseFloat(adSpend)||0;
-  const budget = parseFloat(sellerBudget)||0;
-
-  // Calculate rates
-  const returnRate = orders > 0 ? (retCnt / orders * 100) : 0;
-  const budgetUsedPct = budget > 0 ? (spend / budget * 100) : 0;
-
-  // Check alerts
-  const alertOverspend = budget > 0 && spend > budget;
-  const alertBudget80 = budget > 0 && budgetUsedPct >= 80 && !alertOverspend;
-  const alertHighReturns = returnRate > 10;
-
-  // Check sales drop (last 3 days)
-  const { data: recent } = await supabase.from('dsr_data')
-    .select('sales_amount,report_date')
-    .eq('client_code', clientCode)
-    .order('report_date', { ascending: false })
-    .limit(3);
-  
-  let alertSalesDrop = false;
-  if (recent && recent.length >= 2) {
-    const dropping = recent.every((r, i) => i === 0 || r.sales_amount >= (recent[i-1]?.sales_amount || 0));
-    alertSalesDrop = dropping && sales < (recent[0]?.sales_amount || 0);
+// Role-based seller filter helper
+async function getSellerCodes(user) {
+  const { role, name } = user;
+  if (['Admin', 'Ops Lead', 'CSI Lead', 'Senior Executive'].includes(role)) return null; // all sellers
+  if (role === 'Account Manager') {
+    const { data } = await supabase.from('clients').select('client_code').ilike('am_name', `%${name}%`);
+    return (data || []).map(c => c.client_code);
   }
+  if (role === 'CRM Executive') {
+    const { data } = await supabase.from('clients').select('client_code').ilike('crm_executive', `%${name}%`);
+    return (data || []).map(c => c.client_code);
+  }
+  if (role === 'Ads Executive') {
+    const { data } = await supabase.from('ads_data').select('client_code').ilike('ads_manager', `%${name}%`);
+    return [...new Set((data || []).map(d => d.client_code))];
+  }
+  if (['SME', 'Team Lead'].includes(role)) {
+    const { data: team } = await supabase.from('users').select('name').ilike('reporting_to_name', `%${name}%`);
+    const teamNames = [...(team || []).map(m => m.name), name];
+    const orParts = teamNames.map(n => `am_name.ilike.%${n}%`).join(',');
+    const { data } = await supabase.from('clients').select('client_code').or(orParts);
+    return (data || []).map(c => c.client_code);
+  }
+  return null;
+}
 
-  const record = {
-    client_code: clientCode,
-    client_name: clientName,
-    report_date: reportDate,
-    orders_count: orders,
-    sales_amount: sales,
-    returns_count: retCnt,
-    returns_amount: retAmt,
-    ad_spend: spend,
-    seller_budget: budget,
-    return_rate: Math.round(returnRate * 100) / 100,
-    budget_used_pct: Math.round(budgetUsedPct * 100) / 100,
-    alert_overspend: alertOverspend,
-    alert_sales_drop: alertSalesDrop,
-    alert_high_returns: alertHighReturns,
-    alert_budget_80: alertBudget80,
-    entered_by: req.user.name,
-    notes: notes || null,
-  };
+// GET /api/dsr — All DSR records (for reports)
+router.get('/', auth, async (req, res) => {
+  try {
+    const { from, to, client } = req.query;
+    let query = supabase.from('dsr_reports')
+      .select('*')
+      .order('report_date', { ascending: false })
+      .limit(500);
+    if (from) query = query.gte('report_date', from);
+    if (to)   query = query.lte('report_date', to);
+    if (client) query = query.eq('client_code', client);
 
-  // Upsert (update if exists for same date)
-  const { error } = await supabase.from('dsr_data').upsert(record, { onConflict: 'client_code,report_date' });
-  if (error) return res.status(500).json({ error: error.message });
+    const codes = await getSellerCodes(req.user);
+    if (codes !== null) {
+      if (!codes.length) return res.json([]);
+      query = query.in('client_code', codes);
+    }
 
-  // Create notification if alert
-  if (alertOverspend || alertHighReturns) {
-    const msg = alertOverspend 
-      ? `⚠️ ${clientName}: Ad spend ₹${spend} budget ₹${budget} se zyada!`
-      : `⚠️ ${clientName}: Returns ${returnRate.toFixed(1)}% — 10% se zyada!`;
-    await supabase.from('notifications').insert({
-      type: 'Alert', message: msg, client_code: clientCode, client_name: clientName,
-      created_by: req.user.name,
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/dsr/today-status
+router.get('/today-status', auth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const codes = await getSellerCodes(req.user);
+
+    let clientQuery = supabase.from('clients')
+      .select('client_code, busy_name, marketplace, ads_manager')
+      .eq('status', 'Active');
+    if (codes !== null) {
+      if (!codes.length) return res.json({ total: 0, done: 0, pending: [] });
+      clientQuery = clientQuery.in('client_code', codes);
+    }
+    const { data: allClients } = await clientQuery;
+
+    const { data: todayDSR } = await supabase.from('dsr_reports')
+      .select('client_code').eq('report_date', today);
+    const doneCodes = new Set((todayDSR || []).map(d => d.client_code));
+
+    const pending = (allClients || []).filter(c => !doneCodes.has(c.client_code));
+    res.json({
+      total: (allClients || []).length,
+      done: doneCodes.size,
+      pending: pending.map(c => ({
+        client_code: c.client_code,
+        busy_name: c.busy_name,
+        marketplace: c.marketplace,
+        ads_manager: c.ads_manager,
+      })),
     });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-  res.json({ 
-    success: true, 
-    alerts: { alertOverspend, alertSalesDrop, alertHighReturns, alertBudget80 },
-    returnRate: returnRate.toFixed(1),
-    budgetUsedPct: budgetUsedPct.toFixed(1),
-  });
+// GET /api/dsr/alerts — Active alerts
+router.get('/alerts', auth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('dsr_reports')
+      .select('*')
+      .or('alert_overspend.eq.true,alert_budget_80.eq.true,alert_high_returns.eq.true,alert_sales_drop.eq.true')
+      .order('report_date', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/dsr/trend/:clientCode — Last 7 days
+router.get('/trend/:clientCode', auth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('dsr_reports')
+      .select('*')
+      .eq('client_code', req.params.clientCode)
+      .order('report_date', { ascending: false })
+      .limit(14);
+    if (error) throw error;
+    res.json((data || []).reverse());
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/dsr — Save daily report
+router.post('/', auth, async (req, res) => {
+  try {
+    const {
+      clientCode, clientName, reportDate,
+      ordersCount, salesAmount, returnsCount, returnsAmount,
+      adSpend, sellerBudget, notes,
+    } = req.body;
+
+    if (!clientCode || !reportDate) return res.status(400).json({ error: 'clientCode and reportDate required' });
+
+    const orders = Number(ordersCount) || 0;
+    const sales  = Number(salesAmount) || 0;
+    const retCnt = Number(returnsCount) || 0;
+    const retAmt = Number(returnsAmount) || 0;
+    const spend  = Number(adSpend) || 0;
+    const budget = Number(sellerBudget) || 0;
+
+    // Calculate derived fields
+    const returnRate   = sales > 0 ? Math.round((retAmt / sales) * 100) : 0;
+    const budgetUsed   = budget > 0 ? Math.round((spend / budget) * 100) : 0;
+    const alertOverspend    = budget > 0 && spend > budget;
+    const alertBudget80     = budget > 0 && budgetUsed >= 80 && !alertOverspend;
+    const alertHighReturns  = returnRate > 15;
+
+    // Sales drop: compare with previous day
+    const { data: prevData } = await supabase.from('dsr_reports')
+      .select('sales_amount').eq('client_code', clientCode)
+      .lt('report_date', reportDate)
+      .order('report_date', { ascending: false }).limit(1);
+    const prevSales    = prevData?.[0]?.sales_amount || 0;
+    const alertSalesDrop = prevSales > 0 && sales < prevSales * 0.5;
+
+    // Upsert
+    const { data, error } = await supabase.from('dsr_reports').upsert({
+      client_code: clientCode, client_name: clientName, report_date: reportDate,
+      orders_count: orders, sales_amount: sales,
+      returns_count: retCnt, returns_amount: retAmt,
+      return_rate: returnRate, ad_spend: spend,
+      seller_budget: budget, budget_used_pct: budgetUsed,
+      alert_overspend: alertOverspend, alert_budget_80: alertBudget80,
+      alert_high_returns: alertHighReturns, alert_sales_drop: alertSalesDrop,
+      notes: notes || '', entered_by: req.user.name,
+    }, { onConflict: 'client_code,report_date' }).select().single();
+
+    if (error) throw error;
+
+    // ── AUTO-TICKET: Zero sales for 2+ consecutive days ──────
+    if (orders === 0 || sales === 0) {
+      const { data: recentZero } = await supabase.from('dsr_reports')
+        .select('report_date, orders_count, sales_amount')
+        .eq('client_code', clientCode)
+        .lt('report_date', reportDate)
+        .or('orders_count.eq.0,sales_amount.eq.0')
+        .order('report_date', { ascending: false }).limit(1);
+
+      if (recentZero?.length) {
+        // Check no existing open ticket for this
+        const { data: existingTicket } = await supabase.from('tickets')
+          .select('id').eq('client_code', clientCode)
+          .ilike('category', '%Zero Sales%').eq('status', 'Open').limit(1);
+
+        if (!existingTicket?.length) {
+          // Get ticket counter
+          const { count } = await supabase.from('tickets').select('*', { count: 'exact', head: true });
+          const ticketId = 'TKT' + String((count || 0) + 1001).padStart(4, '0');
+
+          await supabase.from('tickets').insert({
+            ticket_id: ticketId,
+            client_code: clientCode,
+            client_name: clientName,
+            subject: `🚨 Zero Sales Alert — ${clientName}`,
+            category: 'Zero Sales Alert',
+            priority: 'High',
+            description: `${clientName} ke 2+ consecutive days mein zero sales/orders. Immediate attention required. Report date: ${reportDate}`,
+            status: 'Open',
+            assigned_to: req.user.name,
+            raised_by: 'System (Auto)',
+          });
+
+          // Notification
+          await supabase.from('notifications').insert({
+            type: 'ZERO_SALES_ALERT',
+            message: `🚨 Zero Sales 2+ days: ${clientName} — Auto ticket ${ticketId} created`,
+            for_roles: JSON.stringify(['Admin', 'Ops Lead']),
+            is_read: false,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // ── ALERT NOTIFICATIONS ───────────────────────────────────
+    if (alertOverspend || alertHighReturns) {
+      const msg = alertOverspend
+        ? `⚠️ Budget overspent: ${clientName} — Spend ₹${spend} vs Budget ₹${budget}`
+        : `⚠️ High returns (${returnRate}%): ${clientName}`;
+      await supabase.from('notifications').insert({
+        type: 'DSR_ALERT',
+        message: msg,
+        for_roles: JSON.stringify(['Admin', 'Ops Lead']),
+        is_read: false,
+        related_client: clientCode,
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      returnRate, budgetUsed,
+      alerts: { alertOverspend, alertBudget80, alertHighReturns, alertSalesDrop },
+    });
+  } catch (e) {
+    console.error('DSR POST error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

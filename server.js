@@ -17,17 +17,20 @@ const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 500 });
 app.use('/api/', limiter);
 
 // ── ROUTES ────────────────────────────────────────────────────
-app.use('/api/auth',         require('./routes/auth'));
-app.use('/api/clients',      require('./routes/clients'));
-app.use('/api/tickets',      require('./routes/tickets'));
-app.use('/api/crm',          require('./routes/crm'));
-app.use('/api/csi',          require('./routes/csi'));
-app.use('/api/tasks',        require('./routes/tasks'));
-app.use('/api/renewals',     require('./routes/renewals'));
-app.use('/api/ads',          require('./routes/ads'));
-app.use('/api/dashboard',    require('./routes/dashboard'));
-app.use('/api/notifications',require('./routes/notifications'));
-app.use('/api/users',        require('./routes/users'));
+app.use('/api/auth',            require('./routes/auth'));
+app.use('/api/clients',         require('./routes/clients'));       // ✅ Updated: role-based visibility
+app.use('/api/tickets',         require('./routes/tickets'));
+app.use('/api/crm',             require('./routes/crm'));
+app.use('/api/csi',             require('./routes/csi'));
+app.use('/api/tasks',           require('./routes/tasks'));
+app.use('/api/renewals',        require('./routes/renewals'));      // ✅ Updated: hierarchy filter + reminders
+app.use('/api/ads',             require('./routes/ads'));
+app.use('/api/dashboard',       require('./routes/dashboard'));
+app.use('/api/notifications',   require('./routes/notifications'));
+app.use('/api/users',           require('./routes/users'));
+app.use('/api/dsr',             require('./routes/dsr'));           // ✅ Updated: zero-sale auto ticket
+app.use('/api/close-requests',  require('./routes/close_requests'));
+app.use('/api/staff-transfer',  require('./routes/staff_transfer')); // ✅ NEW: Staff exit & seller transfer
 
 // ── SERVE FRONTEND ────────────────────────────────────────────
 app.get('*', (req, res) => {

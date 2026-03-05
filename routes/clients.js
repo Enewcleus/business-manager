@@ -7,19 +7,27 @@ router.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('clients').select('*').order('busy_name');
 
-  // Only Account Manager and Ads Executive see filtered clients
-  // CRM Executive, CSI Lead, Admin, Ops Lead see ALL clients
   if (role === 'Account Manager') query = query.eq('am_name', name);
   else if (role === 'Ads Executive') query = query.eq('ads_manager', name);
+  else if (role === 'CRM Executive') query = query.eq('crm_executive', name);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
   res.json(data.map(c => ({
-    clientCode: c.client_code, busyName: c.busy_name, marketplace: c.marketplace,
-    amName: c.am_name, adsManager: c.ads_manager, crmExecutive: c.crm_executive,
-    status: c.status, servicePlan: c.service_plan,
-    renewalDate: c.renewal_date, healthStatus: c.health_status, healthIndex: c.health_index,
+    id: c.id,                          // ✅ Added — required for close requests, CSI, staff transfer
+    clientCode: c.client_code,
+    busyName: c.busy_name,
+    marketplace: c.marketplace,
+    amName: c.am_name,
+    adsManager: c.ads_manager,
+    crmExecutive: c.crm_executive,
+    status: c.status,
+    servicePlan: c.service_plan,
+    renewalDate: c.renewal_date,
+    healthStatus: c.health_status,
+    healthIndex: c.health_index,
+    sellerBudget: c.seller_budget,
     lastUpdated: c.last_updated ? new Date(c.last_updated).toLocaleString('en-IN') : '',
     notes: c.notes,
   })));

@@ -16,7 +16,7 @@ async function getFilteredClients(user) {
   // Account Manager → sirf apne sellers (am_name field)
   if (role === 'Account Manager') {
     const { data, error } = await supabase.from('clients').select('*')
-      .eq('am_name', name).order('busy_name');
+      .ilike('am_name', name).order('busy_name');
     if (error) throw error;
     return data || [];
   }
@@ -24,7 +24,7 @@ async function getFilteredClients(user) {
   // CRM Executive → sirf apne sellers (crm_executive field)
   if (role === 'CRM Executive') {
     const { data, error } = await supabase.from('clients').select('*')
-      .eq('crm_executive', name).order('busy_name');
+      .ilike('crm_executive', name).order('busy_name');
     if (error) throw error;
     return data || [];
   }
@@ -32,7 +32,7 @@ async function getFilteredClients(user) {
   // Ads Executive → sirf apne sellers (ads_manager field)
   if (role === 'Ads Executive') {
     const { data, error } = await supabase.from('clients').select('*')
-      .eq('ads_manager', name).order('busy_name');
+      .ilike('ads_manager', name).order('busy_name');
     if (error) throw error;
     return data || [];
   }
@@ -52,7 +52,7 @@ async function getFilteredClients(user) {
 
     // Step 2: un sab ka naam kisi bhi field mein ho wo sellers
     const orFilter = teamNames.map(n =>
-      `am_name.eq.${n},ads_manager.eq.${n},crm_executive.eq.${n}`
+      `am_name.ilike.%${n}%,ads_manager.ilike.%${n}%,crm_executive.ilike.%${n}%`
     ).join(',');
 
     const { data, error } = await supabase.from('clients').select('*')
@@ -64,7 +64,7 @@ async function getFilteredClients(user) {
   // Executive → sirf apne allocated sellers (kisi bhi field mein naam ho)
   if (role === 'Executive') {
     const { data, error } = await supabase.from('clients').select('*')
-      .or(`am_name.eq.${name},ads_manager.eq.${name},crm_executive.eq.${name}`)
+      .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
       .order('busy_name');
     if (error) throw error;
     return data || [];
@@ -72,7 +72,7 @@ async function getFilteredClients(user) {
 
   // Default → apne allocated sellers
   const { data, error } = await supabase.from('clients').select('*')
-    .or(`am_name.eq.${name},ads_manager.eq.${name},crm_executive.eq.${name}`)
+    .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
     .order('busy_name');
   if (error) throw error;
   return data || [];

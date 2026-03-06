@@ -2,20 +2,85 @@ const router = require('express').Router();
 const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
-// GET /api/clients
-router.get('/', authMiddleware, async (req, res) => {
-  const { role, name } = req.user;
-  let query = supabase.from('clients').select('*').order('busy_name');
+// ── Role-based client filtering ───────────────────────────────
+async function getFilteredClients(user) {
+  const { role, name } = user;
 
-  if (role === 'Account Manager') query = query.eq('am_name', name);
-  else if (role === 'Ads Executive') query = query.eq('ads_manager', name);
-  else if (role === 'CRM Executive') query = query.eq('crm_executive', name);
+  // Admin, Ops Lead, CSI Lead → see ALL
+  if (['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+    const { data, error } = await supabase.from('clients').select('*').order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
 
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
+  // Account Manager → sirf apne sellers (am_name field)
+  if (role === 'Account Manager') {
+    const { data, error } = await supabase.from('clients').select('*')
+      .ilike('am_name', name).order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
 
-  res.json(data.map(c => ({
-    id: c.id,                          // ✅ Added — required for close requests, CSI, staff transfer
+  // CRM Executive → sirf apne sellers (crm_executive field)
+  if (role === 'CRM Executive') {
+    const { data, error } = await supabase.from('clients').select('*')
+      .ilike('crm_executive', name).order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Ads Executive → sirf apne sellers (ads_manager field)
+  if (role === 'Ads Executive') {
+    const { data, error } = await supabase.from('clients').select('*')
+      .ilike('ads_manager', name).order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  // SME, Team Lead, Senior Executive →
+  // Apne allocated sellers (am_name/ads_manager/crm_executive mein naam) 
+  // + Direct reports ke sellers
+  if (['SME', 'Team Lead', 'Senior Executive'].includes(role)) {
+    // Step 1: apni direct team ke members
+    const { data: teamMembers } = await supabase
+      .from('users')
+      .select('name, role')
+      .ilike('reporting_to_name', `%${name}%`)
+      .eq('is_active', true);
+
+    const teamNames = [name, ...(teamMembers || []).map(m => m.name)];
+
+    // Step 2: un sab ka naam kisi bhi field mein ho wo sellers
+    const orFilter = teamNames.map(n =>
+      `am_name.ilike.%${n}%,ads_manager.ilike.%${n}%,crm_executive.ilike.%${n}%`
+    ).join(',');
+
+    const { data, error } = await supabase.from('clients').select('*')
+      .or(orFilter).order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Executive → sirf apne allocated sellers (kisi bhi field mein naam ho)
+  if (role === 'Executive') {
+    const { data, error } = await supabase.from('clients').select('*')
+      .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
+      .order('busy_name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Default → apne allocated sellers
+  const { data, error } = await supabase.from('clients').select('*')
+    .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
+    .order('busy_name');
+  if (error) throw error;
+  return data || [];
+}
+
+function formatClient(c) {
+  return {
+    id: c.id,
     clientCode: c.client_code,
     busyName: c.busy_name,
     marketplace: c.marketplace,
@@ -30,7 +95,17 @@ router.get('/', authMiddleware, async (req, res) => {
     sellerBudget: c.seller_budget,
     lastUpdated: c.last_updated ? new Date(c.last_updated).toLocaleString('en-IN') : '',
     notes: c.notes,
-  })));
+  };
+}
+
+// GET /api/clients
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const data = await getFilteredClients(req.user);
+    res.json(data.map(formatClient));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/clients
@@ -79,7 +154,7 @@ router.get('/:code/timeline', authMiddleware, async (req, res) => {
   });
 });
 
-// Quick actions
+// POST /api/clients/:code/quick-action
 router.post('/:code/quick-action', authMiddleware, async (req, res) => {
   const { action } = req.body;
   const updates = {};
@@ -94,3 +169,14 @@ router.post('/:code/quick-action', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
+// POST /api/clients/quickaction — legacy route (backward compat)
+router.post('/quickaction', authMiddleware, async (req, res) => {
+  const { clientCode, clientName, action } = req.body;
+  await supabase.from('activity_log').insert({
+    client_code: clientCode, client_name: clientName,
+    user_name: req.user.name, user_role: req.user.role,
+    action_type: action, action_detail: action,
+  }).catch(() => {});
+  res.json({ success: true });
+});

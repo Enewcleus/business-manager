@@ -312,6 +312,7 @@ const NAV_CONFIG = {
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'adstasks',icon:'📋',label:'Ads Tasks'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
   ],
@@ -342,11 +343,11 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
   'Ads Executive': [
-    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
-    {id:'worklog',icon:'📓',label:'Work Log'},
-    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'adstasks',icon:'📋',label:'Ads Tasks',badge:'tasks'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
   'CRM Executive': [
@@ -388,6 +389,7 @@ const NAV_CONFIG = {
   ],
   'Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'mycalls',icon:'📞',label:'My Call Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
   ],
@@ -536,11 +538,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -752,10 +754,17 @@ async function load360(cc) {
       </div>
     </div>
     <div class="card">
-      <div class="card-header" style="background:#f4f0fb;"><span class="card-title">📝 Tasks (${data.tasks.length})</span></div>
+      <div class="card-header" style="background:#f4f0fb;"><span class="card-title">📝 Tasks (${data.tasks.filter(t=>t.task_type!=='ads'&&t.category!=='Campaign Optimization'&&t.category!=='New Campaign Live'&&t.category!=='Campaign Paused'&&t.category!=='Keyword Research'&&t.category!=='A/B Testing'&&t.category!=='Report Review'&&t.category!=='Client Approval Pending').length})</span></div>
       <div class="card-body" style="padding:0;">
-        ${!data.tasks.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
-        <tbody>${data.tasks.map(t=>`<tr><td>${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td>${t.due_date||'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
+        ${!data.tasks.filter(t=>!['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${data.tasks.filter(t=>!['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).map(t=>`<tr><td>${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td>${t.due_date||'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#fff3cd;"><span class="card-title">📢 Ads Tasks (${data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length})</span><button class="btn btn-sm" style="background:#D4A03D;color:#fff;font-size:12px;" onclick="navigate('adstasks')">View All</button></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length?'<div class="empty-state"><div class="emoji">📢</div><h3>No ads tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Category</th><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).map(t=>`<tr><td><span class="badge badge-blue" style="font-size:11px;">${t.category||'—'}</span></td><td style="max-width:160px;font-size:13px;">${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td style="font-size:12px;">${t.due_date?new Date(t.due_date).toLocaleDateString('en-IN'):'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':t.status==='Blocked'?'badge-red':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
     ${dsrData&&dsrData.length?`
@@ -892,7 +901,11 @@ function globalSearch(q){
   const qa=QUICK_ACTIONS[APP.user.role]||[];
   document.getElementById('clients-table')?.innerHTML&&(document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
 }
-async function quickAction(cc,cn,action){await api('POST','/clients/quickaction',{clientCode:cc,clientName:cn,action});showToast('✅ '+action+' — '+cn,'success');}
+async function quickAction(cc,cn,action){
+  const r=await api('POST',`/clients/${cc}/quick-action`,{action,clientName:cn});
+  if(r?.success||r){showToast('✅ '+action+' — '+cn,'success');}
+  else showToast('Error — try again','error');
+}
 async function viewTimeline(cc,cn){
   openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
   const logs=await api('GET',`/clients/${cc}/activity`);
@@ -998,7 +1011,7 @@ async function submitTicket(){
 // ── CRM ──────────────────────────────────────────────────────
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
-  const [clients,todayCalls]=await Promise.all([getClients(),api('GET','/crm/today')]);
+  const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
   renderCRMPage(APP.clients,todayCalls||[]);
 }
@@ -1552,7 +1565,7 @@ function openAddUser(){
     <div class="form-row"><div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="nu-dept"><option value="">-- Select --</option><option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option></select></div>
-      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="CSI Lead">CSI Lead</option><option value="Admin">Admin</option></select></div>
+      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="CSI Lead">CSI Lead</option><option value="Admin">Admin</option></select></div>
     </div>
     <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
     <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
@@ -1571,7 +1584,7 @@ function openEditUser(userId){
     <div class="form-row"><div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="eu-dept"><option value="">-- Select --</option>${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>
     <div class="form-group"><label>Reports To</label><select class="form-control" id="eu-manager"><option value="">-- Top Level --</option>${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}</select></div>
     <div class="form-group"><label>Status</label><select class="form-control" id="eu-active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
@@ -1873,6 +1886,309 @@ async function resolveTransfer(id, status) {
     showToast(status === 'approved' ? '✅ Transfer execute ho gaya! Sellers reassigned!' : '❌ Transfer rejected', status === 'approved' ? 'success' : 'info');
     renderStaffTransfer();
   } else showToast(r?.error || 'Error', 'error');
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// 📋 ADS TASKS — Advertising Department Task Tracker
+// ═══════════════════════════════════════════════════════════
+
+const ADS_TASK_CATEGORIES = [
+  'Campaign Optimization',
+  'New Campaign Live',
+  'Campaign Paused',
+  'Keyword Research',
+  'A/B Testing',
+  'Report Review',
+  'Client Approval Pending',
+];
+
+const ADS_TASK_STATUS_COLORS = {
+  'Pending': 'badge-amber',
+  'In Progress': 'badge-blue',
+  'Done': 'badge-green',
+  'Blocked': 'badge-red',
+};
+
+async function renderAdsTasks() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Ads Tasks...</div>';
+  const [tasks, clients] = await Promise.all([
+    api('GET', '/tasks/ads'),
+    getClients(true)
+  ]);
+  if (clients) APP.clients = clients;
+  const allTasks = tasks || [];
+
+  // KPI counts
+  const pending   = allTasks.filter(t => t.status === 'Pending').length;
+  const inprog    = allTasks.filter(t => t.status === 'In Progress').length;
+  const done      = allTasks.filter(t => t.status === 'Done').length;
+  const overdue   = allTasks.filter(t => t.isOverdue).length;
+
+  // Category breakdown
+  const catCounts = {};
+  ADS_TASK_CATEGORIES.forEach(c => { catCounts[c] = allTasks.filter(t => t.category === c).length; });
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card amber"><div class="kpi-label">Pending</div><div class="kpi-value">${pending}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">In Progress</div><div class="kpi-value">${inprog}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Done</div><div class="kpi-value">${done}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value">${overdue}</div></div>
+    </div>
+
+    <!-- Category pills -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="btn btn-primary btn-sm" onclick="filterAdsTasks('all')" id="atf-all">All (${allTasks.length})</button>
+      ${ADS_TASK_CATEGORIES.map(c => `<button class="btn btn-outline btn-sm" onclick="filterAdsTasks('${c}')" id="atf-${c.replace(/\s/g,'_')}">${c} (${catCounts[c]||0})</button>`).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Ads Tasks</span>
+        <button class="btn btn-primary btn-sm" onclick="openNewAdsTask()">➕ New Ads Task</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="ads-task-list">
+        ${renderAdsTaskTable(allTasks)}
+      </div>
+    </div>`;
+
+  window._allAdsTasks = allTasks;
+}
+
+function renderAdsTaskTable(tasks) {
+  if (!tasks.length) return '<div class="empty-state"><div class="emoji">📋</div><h3>Koi ads task nahi</h3><p>New task banao!</p></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Seller</th><th>Category</th><th>Task</th><th>Priority</th><th>Due Date</th><th>Assigned To</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>${tasks.map(t => `<tr style="${t.isOverdue ? 'background:#fdf2f2;' : ''}">
+      <td><strong>${t.clientName || '—'}</strong></td>
+      <td><span class="badge badge-blue" style="font-size:11px;">${t.category || '—'}</span></td>
+      <td style="max-width:180px;font-size:13px;">${t.title || '—'}</td>
+      <td><span class="badge ${t.priority === 'High' ? 'badge-red' : t.priority === 'Medium' ? 'badge-amber' : 'badge-gray'}">${t.priority || '—'}</span></td>
+      <td style="font-size:12px;${t.isOverdue ? 'color:red;font-weight:700;' : ''}">${t.deadline ? new Date(t.deadline).toLocaleDateString('en-IN') : '—'}${t.isOverdue ? ' ⚠️' : ''}</td>
+      <td style="font-size:12px;">${t.assignedTo || '—'}</td>
+      <td><span class="badge ${ADS_TASK_STATUS_COLORS[t.status] || 'badge-gray'}">${t.status || '—'}</span></td>
+      <td>
+        <select class="form-control" style="width:120px;font-size:12px;padding:4px;" onchange="updateAdsTaskStatus('${t.taskId}', this.value, this)">
+          <option value="">Update...</option>
+          <option value="Pending" ${t.status==='Pending'?'selected':''}>Pending</option>
+          <option value="In Progress" ${t.status==='In Progress'?'selected':''}>In Progress</option>
+          <option value="Done" ${t.status==='Done'?'selected':''}>✅ Done</option>
+          <option value="Blocked" ${t.status==='Blocked'?'selected':''}>🚫 Blocked</option>
+        </select>
+      </td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function filterAdsTasks(cat) {
+  const all = window._allAdsTasks || [];
+  const filtered = cat === 'all' ? all : all.filter(t => t.category === cat);
+  document.getElementById('ads-task-list').innerHTML = renderAdsTaskTable(filtered);
+  // highlight active filter
+  document.querySelectorAll('[id^="atf-"]').forEach(b => b.classList.remove('btn-primary'));
+  const activeId = cat === 'all' ? 'atf-all' : 'atf-' + cat.replace(/\s/g, '_');
+  const el = document.getElementById(activeId);
+  if (el) { el.classList.remove('btn-outline'); el.classList.add('btn-primary'); }
+}
+
+function openNewAdsTask() {
+  const clients = APP.clients || [];
+  const users = APP.users || [];
+  const adsTeam = users.filter(u => ['Ads Executive', 'SME', 'Admin', 'Ops Lead'].includes(u.role) && u.isActive);
+  openPanel('📋 New Ads Task', `
+    <div class="form-group"><label>Seller / Client *</label>
+      <select class="form-control" id="at-client">
+        <option value="">-- Select Seller --</option>
+        ${clients.map(c => `<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Category *</label>
+      <select class="form-control" id="at-cat">
+        ${ADS_TASK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Task Title *</label>
+      <input type="text" class="form-control" id="at-title" placeholder="e.g. Optimize Broad Match Keywords for Summer Campaign">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-priority">
+          <option>High</option><option selected>Medium</option><option>Low</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Due Date</label>
+        <input type="date" class="form-control" id="at-due" value="${new Date(Date.now()+86400000).toISOString().split('T')[0]}">
+      </div>
+    </div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="at-assign">
+        <option value="${APP.user?.name}">${APP.user?.name} (Me)</option>
+        ${adsTeam.filter(u => u.name !== APP.user?.name).map(u => `<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Notes / Details</label>
+      <textarea class="form-control" id="at-notes" rows="2" placeholder="Task ke baare mein details..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitAdsTask()">📋 Task Create Karo</button>
+  `);
+}
+
+async function submitAdsTask() {
+  const sel = document.getElementById('at-client');
+  const clientCode = sel.value;
+  const clientName = sel.options[sel.selectedIndex]?.dataset?.name || '';
+  const title = document.getElementById('at-title').value.trim();
+  const category = document.getElementById('at-cat').value;
+  if (!clientCode || !title) { showToast('Seller aur title required hai', 'error'); return; }
+  const r = await api('POST', '/tasks', {
+    clientCode, clientName, title,
+    category,
+    description: document.getElementById('at-notes').value,
+    priority: document.getElementById('at-priority').value,
+    deadline: document.getElementById('at-due').value,
+    assignedTo: document.getElementById('at-assign').value,
+    assignedToRole: 'Ads Executive',
+    taskType: 'ads',
+  });
+  if (r?.success) { showToast('✅ Ads Task created!', 'success'); closePanel(); renderAdsTasks(); }
+  else showToast(r?.error || 'Error aya', 'error');
+}
+
+async function updateAdsTaskStatus(taskId, status, selectEl) {
+  if (!status) return;
+  const r = await api('PATCH', '/tasks/' + taskId, { status });
+  if (r?.success) {
+    showToast('✅ Status updated — ' + status, 'success');
+    renderAdsTasks();
+  } else {
+    showToast('Error updating status', 'error');
+    selectEl.value = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📞 MY CALL LOG — Executive ka personal call log
+// ═══════════════════════════════════════════════════════════
+async function renderMyCalls() {
+  const [calls, clients] = await Promise.all([
+    api('GET', '/crm/my-calls'),
+    getClients()
+  ]);
+  if (clients) APP.clients = clients;
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Calls</div><div class="kpi-value">${(calls||[]).length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${(calls||[]).filter(c=>c.outcome==='Connected'||c.call_outcome==='Connected').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${(calls||[]).filter(c=>(c.outcome||c.call_outcome||'').includes('No Response')).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📞 My Call Log</span>
+        <button class="btn btn-primary btn-sm" onclick="openLogMyCall()">➕ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!(calls||[]).length ? '<div class="empty-state"><div class="emoji">📞</div><h3>Koi call log nahi abhi tak</h3><p>Pehli call log karo!</p></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Seller / Client</th><th>Subject</th><th>Outcome</th><th>Notes</th><th>Action</th></tr></thead>
+          <tbody>${(calls||[]).map(c=>`<tr>
+            <td style="white-space:nowrap;">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):c.call_date||'—'}</td>
+            <td><strong>${c.client_name||c.clientName||'—'}</strong></td>
+            <td>${c.subject||c.notes||'—'}</td>
+            <td><span class="badge ${(c.outcome||c.call_outcome||'').includes('Connected')?'badge-green':(c.outcome||c.call_outcome||'').includes('No Response')?'badge-amber':'badge-gray'}">${c.outcome||c.call_outcome||'—'}</span></td>
+            <td style="max-width:200px;font-size:12px;">${c.description||c.remarks||'—'}</td>
+            <td><button class="btn btn-sm btn-primary" onclick="createTaskFromCall('${c.client_code||c.clientCode||''}','${(c.client_name||c.clientName||'').replace(/'/g,"\\'")}','${(c.subject||c.notes||'').replace(/'/g,"\\'")}')">📝 Task</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>`;
+}
+
+function openLogMyCall() {
+  const clients = APP.clients || [];
+  openPanel('📞 Call Log Karo', `
+    <div class="form-group"><label>Seller / Client *</label>
+      <select class="form-control" id="mc-client">
+        <option value="">-- Select Client --</option>
+        ${clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Subject / Kya baat hui *</label>
+      <input type="text" class="form-control" id="mc-subject" placeholder="e.g. Account health issue, Budget update...">
+    </div>
+    <div class="form-group"><label>Outcome</label>
+      <select class="form-control" id="mc-outcome">
+        <option>Connected</option>
+        <option>No Response</option>
+        <option>Callback Requested</option>
+        <option>Voicemail Left</option>
+        <option>Wrong Number</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Notes / Details</label>
+      <textarea class="form-control" id="mc-notes" rows="3" placeholder="Call mein kya hua, kya promise kiya, next step kya hai..."></textarea>
+    </div>
+    <div class="form-group"><label>Follow-up Date (optional)</label>
+      <input type="date" class="form-control" id="mc-followup">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitMyCall()">📞 Call Log Karo</button>
+  `);
+}
+
+async function submitMyCall() {
+  const sel = document.getElementById('mc-client');
+  const clientCode = sel.value;
+  const clientName = sel.options[sel.selectedIndex]?.dataset?.name || '';
+  const subject = document.getElementById('mc-subject').value.trim();
+  if (!clientCode || !subject) { showToast('Client aur subject required hai', 'error'); return; }
+  const r = await api('POST', '/crm/log', {
+    clientCode, clientName,
+    subject, notes: subject,
+    outcome: document.getElementById('mc-outcome').value,
+    description: document.getElementById('mc-notes').value,
+    followupDate: document.getElementById('mc-followup').value || null,
+    callDate: new Date().toISOString().split('T')[0],
+  });
+  if (r?.success) { showToast('✅ Call logged!', 'success'); closePanel(); renderMyCalls(); }
+  else showToast(r?.error || 'Error', 'error');
+}
+
+function createTaskFromCall(clientCode, clientName, subject) {
+  if (!clientCode) { showToast('Client select karo pehle', 'error'); return; }
+  openPanel(`📝 Task — ${clientName}`, `
+    <div style="background:#e8f4fd;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;">
+      📞 Call se create: <strong>${subject || 'Follow-up'}</strong>
+    </div>
+    <div class="form-group"><label>Task Title *</label>
+      <input type="text" class="form-control" id="cft-title" value="Follow up: ${subject}" placeholder="Task description...">
+    </div>
+    <div class="form-group"><label>Priority</label>
+      <select class="form-control" id="cft-priority">
+        <option>Medium</option><option>High</option><option>Low</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Due Date</label>
+      <input type="date" class="form-control" id="cft-due" value="${new Date(Date.now()+86400000).toISOString().split('T')[0]}">
+    </div>
+    <div class="form-group"><label>Notes</label>
+      <textarea class="form-control" id="cft-notes" rows="2" placeholder="Task details..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitTaskFromCall('${clientCode}','${clientName.replace(/'/g,"\\'")}')">✅ Task Create Karo</button>
+  `);
+}
+
+async function submitTaskFromCall(clientCode, clientName) {
+  const title = document.getElementById('cft-title').value.trim();
+  if (!title) { showToast('Task title required', 'error'); return; }
+  const r = await api('POST', '/tasks', {
+    clientCode, clientName,
+    title, description: document.getElementById('cft-notes').value,
+    priority: document.getElementById('cft-priority').value,
+    dueDate: document.getElementById('cft-due').value,
+    assignedTo: APP.user.name,
+  });
+  if (r?.success) { showToast('✅ Task created!', 'success'); closePanel(); }
+  else showToast(r?.error || 'Error', 'error');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────

@@ -5,14 +5,36 @@ const { authMiddleware } = require('../middleware/auth');
 
 crmRouter.get('/today', authMiddleware, async (req, res) => {
   const today = new Date(); today.setHours(0,0,0,0);
-  const { data, error } = await supabase.from('crm_calls').select('*')
-    .eq('crm_executive', req.user.name).gte('created_at', today.toISOString())
+  const { role, name } = req.user;
+  let query = supabase.from('crm_calls').select('*')
+    .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
+  // Admin/Ops Lead see all; others see only their own calls
+  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+    query = query.eq('crm_executive', name);
+  }
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(c => ({
     callId: c.call_id, clientCode: c.client_code, clientName: c.client_name,
     callOutcome: c.call_outcome, sellerComment: c.seller_comment,
     severity: c.severity, nextFollowUp: c.next_follow_up,
+    callDate: new Date(c.created_at).toLocaleString('en-IN'),
+  })));
+});
+
+// ✅ Executive/SME ka apna call log
+crmRouter.get('/my-calls', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase.from('crm_calls').select('*')
+    .eq('crm_executive', req.user.name)
+    .order('created_at', { ascending: false }).limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data.map(c => ({
+    callId: c.call_id, clientCode: c.client_code, clientName: c.client_name,
+    callOutcome: c.call_outcome, sellerComment: c.seller_comment,
+    subject: c.seller_comment, outcome: c.call_outcome,
+    severity: c.severity, nextFollowUp: c.next_follow_up,
+    created_at: c.created_at,
     callDate: new Date(c.created_at).toLocaleString('en-IN'),
   })));
 });
@@ -33,16 +55,43 @@ crmRouter.post('/', authMiddleware, async (req, res) => {
   const callId = 'CRM' + Date.now().toString().slice(-7);
   const { error } = await supabase.from('crm_calls').insert({
     call_id: callId, client_code: d.clientCode, client_name: d.clientName,
-    crm_executive: req.user.name, call_outcome: d.callOutcome,
-    seller_comment: d.sellerComment, severity: d.severity,
-    next_follow_up: d.nextFollowUp || null, ticket_raised: d.ticketRaised || false,
+    crm_executive: req.user.name, call_outcome: d.callOutcome || d.outcome || 'Connected',
+    seller_comment: d.sellerComment || d.notes || d.subject || '',
+    severity: d.severity || 'Low',
+    next_follow_up: d.nextFollowUp || d.followupDate || null,
+    ticket_raised: d.ticketRaised || false,
   });
   if (error) return res.status(500).json({ error: error.message });
   await supabase.from('activity_log').insert({
     client_code: d.clientCode, client_name: d.clientName,
     user_name: req.user.name, user_role: req.user.role,
-    action_type: 'CRM Call', action_detail: d.callOutcome + (d.sellerComment ? ' — ' + d.sellerComment : ''),
+    action_type: 'CRM Call',
+    action_detail: (d.callOutcome || d.outcome || 'Connected') + (d.sellerComment || d.notes ? ' — ' + (d.sellerComment || d.notes) : ''),
   });
+  res.json({ success: true, callId });
+});
+
+// ✅ NEW: Executive simple call log (same table, same columns)
+crmRouter.post('/log', authMiddleware, async (req, res) => {
+  const d = req.body;
+  const callId = 'CRM' + Date.now().toString().slice(-7);
+  const { error } = await supabase.from('crm_calls').insert({
+    call_id: callId,
+    client_code: d.clientCode,
+    client_name: d.clientName,
+    crm_executive: req.user.name,
+    call_outcome: d.outcome || 'Connected',
+    seller_comment: (d.subject ? d.subject + (d.description ? ' | ' + d.description : '') : d.description || ''),
+    severity: 'Low',
+    next_follow_up: d.followupDate || null,
+    ticket_raised: false,
+  });
+  if (error) return res.status(500).json({ error: error.message });
+  await supabase.from('activity_log').insert({
+    client_code: d.clientCode, client_name: d.clientName,
+    user_name: req.user.name, user_role: req.user.role,
+    action_type: 'Call Log', action_detail: d.subject || d.outcome || 'Call logged',
+  }).catch(() => {});
   res.json({ success: true, callId });
 });
 
@@ -52,7 +101,6 @@ const csiRouter = require('express').Router();
 csiRouter.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('csi_data').select('*').order('review_date', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  // Return latest per client
   const map = {};
   data.forEach(r => { if (!map[r.client_code]) map[r.client_code] = r; });
   res.json(Object.values(map).map(r => ({
@@ -67,7 +115,6 @@ csiRouter.get('/', authMiddleware, async (req, res) => {
 csiRouter.post('/', authMiddleware, async (req, res) => {
   const d = req.body;
   const csiId = 'CSI' + Date.now().toString().slice(-7);
-  // Upsert — update if exists for this client
   const { data: existing } = await supabase.from('csi_data').select('id').eq('client_code', d.clientCode).single();
   if (existing) {
     await supabase.from('csi_data').update({
@@ -83,7 +130,6 @@ csiRouter.post('/', authMiddleware, async (req, res) => {
       remarks: d.remarks, next_review_date: d.nextReviewDate || null,
     });
   }
-  // Update client health
   await supabase.from('clients').update({ health_status: d.healthStatus, health_index: d.csiPercent, last_updated: new Date() }).eq('client_code', d.clientCode);
   await supabase.from('activity_log').insert({
     client_code: d.clientCode, client_name: d.clientName, user_name: req.user.name, user_role: req.user.role,
@@ -94,6 +140,35 @@ csiRouter.post('/', authMiddleware, async (req, res) => {
 
 // ── TASKS ROUTES ──────────────────────────────────────────────
 const tasksRouter = require('express').Router();
+
+
+// GET /api/tasks/ads — Ads department tasks only
+tasksRouter.get('/ads', authMiddleware, async (req, res) => {
+  const { role, name } = req.user;
+  const ADS_CATEGORIES = [
+    'Campaign Optimization','New Campaign Live','Campaign Paused',
+    'Keyword Research','A/B Testing','Report Review','Client Approval Pending'
+  ];
+  let query = supabase.from('tasks').select('*')
+    .in('category', ADS_CATEGORIES)
+    .order('created_at', { ascending: false });
+  // Ads Executive sees only their own; Admin/Ops/SME/Team Lead see all
+  if (!['Admin','Ops Lead','CSI Lead','SME','Team Lead','Senior Executive'].includes(role)) {
+    query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
+  }
+  const { data, error } = await query.limit(200);
+  if (error) return res.status(500).json({ error: error.message });
+  const now = new Date();
+  res.json((data||[]).map(t => ({
+    taskId: t.task_id, title: t.title, description: t.description,
+    clientCode: t.client_code, clientName: t.client_name,
+    assignedTo: t.assigned_to, assignedBy: t.assigned_by,
+    priority: t.priority, category: t.category, status: t.status,
+    deadline: t.deadline, taskType: t.task_type,
+    isOverdue: t.deadline && t.status !== 'Done' ? new Date(t.deadline) < now : false,
+    createdAt: new Date(t.created_at).toLocaleString('en-IN'),
+  })));
+});
 
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
@@ -123,12 +198,14 @@ tasksRouter.post('/', authMiddleware, async (req, res) => {
   const { error } = await supabase.from('tasks').insert({
     task_id: taskId, title: d.title, description: d.description,
     client_code: d.clientCode || null, client_name: d.clientName || null,
-    assigned_to: d.assignedTo, assigned_to_role: d.assignedToRole,
+    assigned_to: d.assignedTo || req.user.name,
+    assigned_to_role: d.assignedToRole || req.user.role,
     assigned_by: req.user.name, assigned_by_role: req.user.role,
-    priority: d.priority, category: d.category, deadline: d.deadline || null,
+    priority: d.priority || 'Medium', category: d.category || 'General',
+    deadline: d.deadline || d.dueDate || null,
   });
   if (error) return res.status(500).json({ error: error.message });
-  if (d.assignedTo !== req.user.name) {
+  if (d.assignedTo && d.assignedTo !== req.user.name) {
     await supabase.from('notifications').insert({
       notif_id: 'NTF' + Date.now(), assigned_to: d.assignedTo, assigned_role: d.assignedToRole,
       type: 'NEW_TASK', message: `New task from ${req.user.name}: "${d.title}"`, related_id: taskId,
@@ -147,7 +224,6 @@ tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// Work Log
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(100);
@@ -193,6 +269,7 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
       if (role === 'Account Manager') clientQuery = clientQuery.eq('am_name', name);
       else if (role === 'CRM Executive') clientQuery = clientQuery.eq('crm_executive', name);
       else if (role === 'Ads Executive') clientQuery = clientQuery.eq('ads_manager', name);
+      else clientQuery = clientQuery.or(`am_name.eq.${name},ads_manager.eq.${name},crm_executive.eq.${name}`);
     }
     const [{ data: clients }, { data: tickets }, { data: renewals }] = await Promise.all([
       clientQuery,
@@ -220,9 +297,7 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
         { label: 'At Risk', value: atRisk, color: '#e74c3c' },
       ],
     });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 dashRouter.get('/team', authMiddleware, async (req, res) => {
@@ -266,17 +341,42 @@ notifRouter.patch('/:id/read', authMiddleware, async (req, res) => {
 const usersRouter = require('express').Router();
 
 usersRouter.get('/', authMiddleware, async (req, res) => {
-  const { data, error } = await supabase.from('users').select('user_code, name, email, role, is_active, last_login').order('name');
+  const { data, error } = await supabase.from('users').select('user_code, name, email, role, designation, department, reporting_to_name, is_active, last_login').order('name');
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data.map(u => ({ userId: u.user_code, name: u.name, email: u.email, role: u.role, isActive: u.is_active })));
+  res.json(data.map(u => ({
+    userId: u.user_code, name: u.name, email: u.email, role: u.role,
+    designation: u.designation, department: u.department,
+    reportingToName: u.reporting_to_name, isActive: u.is_active,
+  })));
 });
 
 usersRouter.post('/', authMiddleware, async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, designation, department, reportingToName } = req.body;
   const userCode = 'USR' + Date.now().toString().slice(-5);
-  const { error } = await supabase.from('users').insert({ user_code: userCode, name, email: email.toLowerCase(), password_hash: password, role });
+  const { error } = await supabase.from('users').insert({
+    user_code: userCode, name, email: email.toLowerCase(),
+    password_hash: password, role,
+    designation: designation || null,
+    department: department || null,
+    reporting_to_name: reportingToName || null,
+    is_active: true,
+  });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, userId: userCode });
+});
+
+usersRouter.patch('/:code', authMiddleware, async (req, res) => {
+  const { name, role, designation, department, reportingToName, isActive } = req.body;
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (role !== undefined) updates.role = role;
+  if (designation !== undefined) updates.designation = designation;
+  if (department !== undefined) updates.department = department;
+  if (reportingToName !== undefined) updates.reporting_to_name = reportingToName;
+  if (isActive !== undefined) updates.is_active = isActive;
+  const { error } = await supabase.from('users').update(updates).eq('user_code', req.params.code);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 usersRouter.patch('/:code/password', authMiddleware, async (req, res) => {
@@ -320,6 +420,6 @@ adsRouter.get('/', authMiddleware, async (req, res) => {
     adsManager: a.ads_manager, budgetAllocated: a.budget_allocated, budgetSpent: a.budget_spent,
     budgetPercent: a.budget_percent, acos: a.acos, campaignStatus: a.campaign_status,
   })));
-});
+}); 
 
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter };

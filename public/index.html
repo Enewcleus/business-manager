@@ -893,7 +893,11 @@ function globalSearch(q){
   const qa=QUICK_ACTIONS[APP.user.role]||[];
   document.getElementById('clients-table')?.innerHTML&&(document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
 }
-async function quickAction(cc,cn,action){await api('POST','/clients/quickaction',{clientCode:cc,clientName:cn,action});showToast('✅ '+action+' — '+cn,'success');}
+async function quickAction(cc,cn,action){
+  const r=await api('POST',`/clients/${cc}/quick-action`,{action,clientName:cn});
+  if(r?.success||r){showToast('✅ '+action+' — '+cn,'success');}
+  else showToast('Error — try again','error');
+}
 async function viewTimeline(cc,cn){
   openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
   const logs=await api('GET',`/clients/${cc}/activity`);
@@ -999,7 +1003,7 @@ async function submitTicket(){
 // ── CRM ──────────────────────────────────────────────────────
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
-  const [clients,todayCalls]=await Promise.all([getClients(),api('GET','/crm/today')]);
+  const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
   renderCRMPage(APP.clients,todayCalls||[]);
 }

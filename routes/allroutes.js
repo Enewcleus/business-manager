@@ -5,9 +5,15 @@ const { authMiddleware } = require('../middleware/auth');
 
 crmRouter.get('/today', authMiddleware, async (req, res) => {
   const today = new Date(); today.setHours(0,0,0,0);
-  const { data, error } = await supabase.from('crm_calls').select('*')
-    .eq('crm_executive', req.user.name).gte('created_at', today.toISOString())
+  const { role, name } = req.user;
+  let query = supabase.from('crm_calls').select('*')
+    .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
+  // Admin/Ops Lead see all; others see only their own calls
+  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+    query = query.eq('crm_executive', name);
+  }
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(c => ({
     callId: c.call_id, clientCode: c.client_code, clientName: c.client_name,
@@ -17,7 +23,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   })));
 });
 
-// ✅ NEW: Executive ka apna call log
+// ✅ Executive/SME ka apna call log
 crmRouter.get('/my-calls', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('crm_calls').select('*')
     .eq('crm_executive', req.user.name)
@@ -134,6 +140,35 @@ csiRouter.post('/', authMiddleware, async (req, res) => {
 
 // ── TASKS ROUTES ──────────────────────────────────────────────
 const tasksRouter = require('express').Router();
+
+
+// GET /api/tasks/ads — Ads department tasks only
+tasksRouter.get('/ads', authMiddleware, async (req, res) => {
+  const { role, name } = req.user;
+  const ADS_CATEGORIES = [
+    'Campaign Optimization','New Campaign Live','Campaign Paused',
+    'Keyword Research','A/B Testing','Report Review','Client Approval Pending'
+  ];
+  let query = supabase.from('tasks').select('*')
+    .in('category', ADS_CATEGORIES)
+    .order('created_at', { ascending: false });
+  // Ads Executive sees only their own; Admin/Ops/SME/Team Lead see all
+  if (!['Admin','Ops Lead','CSI Lead','SME','Team Lead','Senior Executive'].includes(role)) {
+    query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
+  }
+  const { data, error } = await query.limit(200);
+  if (error) return res.status(500).json({ error: error.message });
+  const now = new Date();
+  res.json((data||[]).map(t => ({
+    taskId: t.task_id, title: t.title, description: t.description,
+    clientCode: t.client_code, clientName: t.client_name,
+    assignedTo: t.assigned_to, assignedBy: t.assigned_by,
+    priority: t.priority, category: t.category, status: t.status,
+    deadline: t.deadline, taskType: t.task_type,
+    isOverdue: t.deadline && t.status !== 'Done' ? new Date(t.deadline) < now : false,
+    createdAt: new Date(t.created_at).toLocaleString('en-IN'),
+  })));
+});
 
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;

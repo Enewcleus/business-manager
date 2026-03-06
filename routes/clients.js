@@ -169,3 +169,14 @@ router.post('/:code/quick-action', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
+// POST /api/clients/quickaction — legacy route (backward compat)
+router.post('/quickaction', authMiddleware, async (req, res) => {
+  const { clientCode, clientName, action } = req.body;
+  await supabase.from('activity_log').insert({
+    client_code: clientCode, client_name: clientName,
+    user_name: req.user.name, user_role: req.user.role,
+    action_type: action, action_detail: action,
+  }).catch(() => {});
+  res.json({ success: true });
+});

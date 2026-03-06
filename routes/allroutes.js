@@ -420,6 +420,6 @@ adsRouter.get('/', authMiddleware, async (req, res) => {
     adsManager: a.ads_manager, budgetAllocated: a.budget_allocated, budgetSpent: a.budget_spent,
     budgetPercent: a.budget_percent, acos: a.acos, campaignStatus: a.campaign_status,
   })));
-});
+}); 
 
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter };

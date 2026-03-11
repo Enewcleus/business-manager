@@ -465,13 +465,13 @@ async function doLogin() {
   });
   const data = await res.json();
   btn.disabled = false; btn.textContent = 'Sign In';
-  if (data.success) {
+  if (data.token) {
     TOKEN = data.token;
     localStorage.setItem('en_token', TOKEN);
     APP.user = data.user;
     initApp();
   } else {
-    showError(err, data.message || 'Login failed');
+    showError(err, data.error || data.message || 'Login failed');
   }
 }
 

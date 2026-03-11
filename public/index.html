@@ -1994,26 +1994,25 @@ function parseBulkCSV(input) {
     previewEl.style.display = 'block';
 
     // Preview table
-    tableEl.innerHTML = \`
-      <div style="margin-bottom:8px;font-size:13px;color:#27ae60;font-weight:600;">✅ Valid rows: \${_bulkData.length} &nbsp;|&nbsp; <span style="color:#e74c3c;">❌ Error rows: \${errRows.length}</span></div>
-      <div class="table-wrap" style="max-height:280px;overflow-y:auto;">
-        <table><thead><tr>
-          <th>#</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Ads Manager</th><th>CRM Exec</th><th>Plan</th><th>Renewal</th><th>Status</th>
-        </tr></thead>
-        <tbody>
-          \${rows.map(r => \`<tr style="\${r._errors.length?'background:#fdf2f2;':''}"}>
-            <td>\${r._rowNum}</td>
-            <td><strong>\${r.busy_name||'—'}</strong></td>
-            <td>\${r.marketplace||'—'}</td>
-            <td style="font-size:12px;">\${r.am_name||'—'}</td>
-            <td style="font-size:12px;">\${r.ads_manager||'—'}</td>
-            <td style="font-size:12px;">\${r.crm_executive||'—'}</td>
-            <td style="font-size:12px;">\${r.service_plan||'—'}</td>
-            <td style="font-size:12px;">\${r.renewal_date||'—'}</td>
-            <td>\${r._errors.length?'<span class="badge badge-red">Error</span>':'<span class="badge badge-green">OK</span>'}</td>
-          </tr>\`).join('')}
-        </tbody></table>
-      </div>\`;
+    tableEl.innerHTML = [
+      '<div style="margin-bottom:8px;font-size:13px;color:#27ae60;font-weight:600;">Valid rows: ' + _bulkData.length + ' | Error rows: ' + errRows.length + '</div>',
+      '<div class="table-wrap" style="max-height:280px;overflow-y:auto;">',
+      '<table><thead><tr><th>#</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Ads Mgr</th><th>CRM</th><th>Plan</th><th>Renewal</th><th>Status</th></tr></thead><tbody>',
+      rows.map(function(r) {
+        return '<tr style="' + (r._errors.length ? 'background:#fdf2f2;' : '') + '">' +
+          '<td>' + r._rowNum + '</td>' +
+          '<td><strong>' + (r.busy_name||'-') + '</strong></td>' +
+          '<td>' + (r.marketplace||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.am_name||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.ads_manager||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.crm_executive||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.service_plan||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.renewal_date||'-') + '</td>' +
+          '<td>' + (r._errors.length ? '<span class="badge badge-red">Error</span>' : '<span class="badge badge-green">OK</span>') + '</td>' +
+          '</tr>';
+      }).join(''),
+      '</tbody></table></div>'
+    ].join('');
 
     // Error box
     if (errRows.length) {

@@ -844,7 +844,7 @@ function renderClientsUI(clients) {
         <span class="card-title">👥 Clients (${clients.length})</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)"><option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option></select>
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)"><option value="">All Markets</option><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option></select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)"><option value="">All Markets</option><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select>
           ${canAdd?'<button class="btn btn-primary btn-sm" onclick="openAddClient()">➕ Add Client</button><button class="btn btn-secondary btn-sm" onclick="openBulkUpload()">📥 Bulk Upload</button>':''}
         </div>
       </div>
@@ -916,7 +916,7 @@ async function viewTimeline(cc,cn){
 function openAddClient(){
   openPanel('➕ Add Client',`
     <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
-    <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
+    <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
     <div class="form-row">
       <div class="form-group"><label>Account Manager</label><input type="text" class="form-control" id="nc-am"></div>
       <div class="form-group"><label>Ads Manager</label><input type="text" class="form-control" id="nc-ads"></div>
@@ -1897,7 +1897,7 @@ async function resolveTransfer(id, status) {
 function downloadClientTemplate() {
   // Create CSV template with headers + 2 sample rows
   const headers = ['busy_name','marketplace','am_name','ads_manager','crm_executive','service_plan','renewal_date'];
-  const sample1 = ['ABC Traders','Amazon','Rohit Chouhan','Aarin','Ayushi','Basic','2026-06-01'];
+  const sample1 = ['ABC Traders','Amazon.in','Rohit Chouhan','Aarin','Ayushi','Basic','2026-06-01'];
   const sample2 = ['XYZ Enterprises','Flipkart','Suhani','Muskan','Ankit','Premium','2026-09-15'];
   const notes   = ['# NOTES: marketplace = Amazon/Flipkart/Meesho/Myntra | renewal_date = YYYY-MM-DD format | am_name/ads_manager/crm_executive = exact name as in system','','','','','',''];
 
@@ -1983,7 +1983,7 @@ function parseBulkCSV(input) {
 
     const rows = [];
     const errors = [];
-    const validMarkets = ['Amazon','Flipkart','Meesho','Myntra'];
+    const validMarkets = ['Amazon.in','Amazon.com','Amazon.uk','Amazon.ae','Amazon.ca','Flipkart','Meesho','Myntra','Snapdeal','Other'];
 
     for (let i = 1; i < lines.length; i++) {
       const vals = parseCSVLine(lines[i]);
@@ -1994,7 +1994,7 @@ function parseBulkCSV(input) {
       const rowErrors = [];
       if (!row.busy_name) rowErrors.push('busy_name missing');
       if (!row.marketplace) rowErrors.push('marketplace missing');
-      else if (!validMarkets.includes(row.marketplace)) rowErrors.push('marketplace invalid (use: Amazon/Flipkart/Meesho/Myntra)');
+      else if (!validMarkets.includes(row.marketplace)) rowErrors.push('marketplace invalid (use: Amazon.in/Amazon.com/Flipkart/Meesho/Myntra etc.)');
       if (row.renewal_date && !/^\d{4}-\d{2}-\d{2}$/.test(row.renewal_date)) rowErrors.push('renewal_date format galat (use YYYY-MM-DD)');
 
       if (rowErrors.length) errors.push('Row ' + (i+1) + ': ' + rowErrors.join(', '));

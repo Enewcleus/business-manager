@@ -153,7 +153,7 @@
 
   #overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:flex-start; justify-content:flex-end; }
   #overlay.show { display:flex; }
-  .panel { background:#fff; width:480px; max-width:100vw; height:100vh; overflow-y:auto; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,0.15); }
+  .panel { background:#fff; width:480px; max-width:100vw; height:100vh; overflow-y:auto; overflow-x:hidden; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,0.15); box-sizing:border-box; }
   .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
   .panel-title { font-size:17px; font-weight:700; color:var(--primary); }
   .panel-close { background:none; border:none; cursor:pointer; font-size:22px; color:var(--text-muted); }
@@ -1931,7 +1931,7 @@ function openBulkUpload() {
       <input type="file" id="bulk-file-input" accept=".csv" class="form-control" style="margin-bottom:10px;" onchange="parseBulkCSV(this)">
     </div>
 
-    <div id="bulk-preview" style="display:none;">
+    <div id="bulk-preview" style="display:none;margin-top:16px;">
       <div style="font-weight:700;color:#1C2B2D;margin-bottom:8px;">👁️ Step 3 — Preview & Confirm</div>
       <div id="bulk-preview-table"></div>
       <div id="bulk-error-box" style="display:none;background:#FDECEA;border:1px solid #e74c3c;border-radius:8px;padding:12px;margin-top:12px;"></div>
@@ -1944,6 +1944,24 @@ function openBulkUpload() {
 }
 
 let _bulkData = [];
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) {
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
 
 function parseBulkCSV(input) {
   const file = input.files[0];

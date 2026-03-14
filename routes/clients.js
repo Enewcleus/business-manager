@@ -168,7 +168,24 @@ router.post('/:code/quick-action', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = router;
+// DELETE /api/clients/:code — Admin/Ops Lead only
+router.delete('/:code', authMiddleware, async (req, res) => {
+  if (!['Admin', 'Ops Lead'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  const code = req.params.code;
+  // Delete from all related tables
+  await supabase.from('crm_calls').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('csi_data').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('tasks').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('tickets').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('renewals').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('dsr_data').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('activity_log').delete().eq('client_code', code).catch(()=>{});
+  const { error } = await supabase.from('clients').delete().eq('client_code', code);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
 
 // POST /api/clients/quickaction — legacy route (backward compat)
 router.post('/quickaction', authMiddleware, async (req, res) => {
@@ -180,3 +197,5 @@ router.post('/quickaction', authMiddleware, async (req, res) => {
   }).catch(() => {});
   res.json({ success: true });
 });
+
+module.exports = router;

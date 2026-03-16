@@ -4,7 +4,7 @@
   "description": "eNewcleus Business Manager Backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --max-old-space-size=460 server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
@@ -14,6 +14,7 @@
     "dotenv": "^16.3.1",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "express-rate-limit": "^7.1.5"
+    "express-rate-limit": "^7.1.5",
+    "compression": "^1.7.4"
   }
 }

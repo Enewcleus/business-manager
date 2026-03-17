@@ -2433,9 +2433,232 @@ function parseBulkCSV(input) {
 }
 
 // Open full client detail panel (Admin/Lead/CRM direct access)
+// Full page client view for Admin/Lead/CRM
+async function navigateClientPage(cc) {
+  APP.page = 'clientdetail';
+  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading client data...</div>';
+
+  const [timeline, dsrData, actLogs] = await Promise.all([
+    api('GET', '/clients/'+cc+'/timeline'),
+    api('GET', '/dsr/trend/'+cc),
+    api('GET', '/clients/'+cc+'/activity'),
+  ]);
+
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+  const hColor = client?.healthStatus==='Healthy'?'#27ae60':client?.healthStatus==='Warning'?'#f39c12':'#e74c3c';
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- Header -->
+    <div class="card" style="border-left:4px solid ${hColor};margin-bottom:12px;">
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary);">${client?.busyName||cc}</div>
+            <div style="font-size:13px;color:var(--text-muted);">${client?.clientCode} • ${client?.marketplace||'—'} • ${client?.servicePlan||'—'}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            ${healthBadge(client?.healthStatus)}
+            ${statusBadge(client?.status)}
+            <button class="btn btn-sm btn-outline" onclick="navigateBack()">← Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:12px;">
+      <div class="kpi-card green" style="cursor:pointer;" onclick="document.getElementById('cd-crm').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📞 CRM Calls</div>
+        <div class="kpi-value">${crmCalls.length}</div>
+      </div>
+      <div class="kpi-card red" style="cursor:pointer;" onclick="document.getElementById('cd-tickets').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">🎫 Tickets</div>
+        <div class="kpi-value">${tickets.length}</div>
+        <div class="kpi-sub">${tickets.filter(t=>t.status==='Open').length} open</div>
+      </div>
+      <div class="kpi-card purple" style="cursor:pointer;" onclick="document.getElementById('cd-tasks').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📝 Tasks</div>
+        <div class="kpi-value">${tasks.length}</div>
+        <div class="kpi-sub">${tasks.filter(t=>t.status!=='Completed').length} pending</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">🔄 Renewal</div>
+        <div class="kpi-value" style="font-size:14px;">${client?.renewalDate||'—'}</div>
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+          <div style="background:#d6eaf8;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.amName||''}','Account Manager')">
+            <div style="font-size:11px;color:#1a5276;font-weight:700;">ACCOUNT MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.amName||'—'}</div>
+            <div style="font-size:11px;color:#2E75B6;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#fdebd0;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;color:#a04000;font-weight:700;">ADS MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.adsManager||'—'}</div>
+            <div style="font-size:11px;color:#d35400;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#d5f5e3;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;color:#1e8449;font-weight:700;">CRM EXECUTIVE</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.crmExecutive||'—'}</div>
+            <div style="font-size:11px;color:#27ae60;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn btn-primary" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">🎫 Raise Ticket</button>
+      <button class="btn btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📝 Create Task</button>
+      <button class="btn btn-secondary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📞 Log Call</button>
+    </div>
+
+    <!-- CRM Calls -->
+    <div class="card" id="cd-crm" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#e8f4fd;">
+        <span class="card-title">📞 CRM Calls (${crmCalls.length})</span>
+        <button class="btn btn-sm btn-primary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+          <tbody>${crmCalls.map(c=>`<tr>
+            <td style="font-size:12px;">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td>${c.crm_executive||'—'}</td>
+            <td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td>
+            <td style="font-size:12px;max-width:180px;">${c.seller_comment||'—'}</td>
+            <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="card" id="cd-tickets" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">🎫 Tickets (${tickets.length})</span>
+        <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">+ Raise</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tickets.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+          <tbody>${tickets.map(t=>`<tr>
+            <td style="font-size:12px;">${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td style="max-width:180px;">${t.subject||t.category||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td>
+            <td style="font-size:12px;">${t.assigned_to||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card" id="cd-tasks" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f4f0fb;">
+        <span class="card-title">📝 Tasks (${tasks.length})</span>
+        <button class="btn btn-sm btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Add Task</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Priority</th><th>Status</th></tr></thead>
+          <tbody>${tasks.map(t=>`<tr>
+            <td style="max-width:180px;font-weight:600;">${t.title||'—'}</td>
+            <td>${t.assigned_to||'—'}</td>
+            <td style="font-size:12px;">${t.due_date||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">📋 Activity Log (${actLogs?.length||0})</span></div>
+      <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
+        ${!actLogs?.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>' :
+        actLogs.map(l=>`<div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:2px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function navigateBack() {
+  navigate('clients');
+}
+
+// Log CRM call directly from client detail page
+function logCRMCallFor(cc, cn) {
+  openPanel('📞 Log Call — '+cn, `
+    <div style="background:#d5f5e3;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">
+      📎 Client: <strong>${cn}</strong>
+    </div>
+    <div class="form-group"><label>Call Outcome</label>
+      <select class="form-control" id="lcd-outcome">
+        <option>Called — Connected</option><option>Called — No Response</option>
+        <option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Seller Feedback</label>
+      <textarea class="form-control" id="lcd-comment" placeholder="Seller ne kya kaha?" rows="3"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Severity</label>
+        <select class="form-control" id="lcd-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+      <div class="form-group"><label>Next Follow-up</label>
+        <input type="date" class="form-control" id="lcd-followup">
+      </div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="submitCRMCallFor('${cc}','${cn.replace(/'/g,"\'")}')">📞 Save Call</button>`);
+}
+
+async function submitCRMCallFor(cc, cn) {
+  const r = await api('POST', '/crm', {
+    clientCode: cc, clientName: cn,
+    callOutcome: document.getElementById('lcd-outcome').value,
+    sellerComment: document.getElementById('lcd-comment').value,
+    severity: document.getElementById('lcd-sev').value,
+    nextFollowUp: document.getElementById('lcd-followup').value||null,
+  });
+  if (r?.success) {
+    showToast('✅ Call logged!', 'success');
+    closePanel();
+    navigateClientPage(cc); // Refresh
+  }
+}
+
 async function openClientDetail(cc) {
   const client = APP.clients.find(c=>c.clientCode===cc);
   if (!client) return;
+  // Admin/Lead/CRM — full page view
+  if (['Admin','Ops Lead','CSI Lead','CRM Executive','SME','Team Lead'].includes(APP.user.role)) {
+    navigateClientPage(cc);
+    return;
+  }
   openPanel('👁️ '+client.busyName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
   const timeline = await api('GET', '/clients/'+cc+'/timeline');
   const crmCalls = timeline?.crmCalls||[];

@@ -196,6 +196,14 @@
   .client-name { font-size:14px; font-weight:700; color:var(--primary); }
   .client-meta { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
   .mobile-cards { display:none; }
+  .searchable-select-wrap { position:relative; }
+  .searchable-select-wrap input.search-input { width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px 8px 0 0; font-size:13px; outline:none; }
+  .searchable-select-wrap .dropdown-list { position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid var(--secondary); border-top:none; border-radius:0 0 8px 8px; max-height:200px; overflow-y:auto; z-index:500; display:none; }
+  .searchable-select-wrap .dropdown-list.open { display:block; }
+  .searchable-select-wrap .dropdown-item { padding:8px 12px; font-size:13px; cursor:pointer; }
+  .searchable-select-wrap .dropdown-item:hover { background:var(--bg); }
+  .searchable-select-wrap .dropdown-item.selected { background:#d6eaf8; font-weight:600; }
+  .hidden-select { display:none; }
 
   @media (max-width:768px) {
     .sidebar { transform:translateX(-100%); }
@@ -435,6 +443,50 @@ async function getClients(force = false) {
   const data = await api('GET', '/clients');
   if (data) { APP.clients = data; _clientCacheTs = Date.now(); }
   return APP.clients;
+}
+
+// ── SEARCHABLE CLIENT SELECT ─────────────────────────────────
+function buildSearchableSelect(containerId, clients, selectedCode='', placeholder='Search client...') {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const selected = clients.find(c => c.clientCode === selectedCode);
+  container.innerHTML = `
+    <div class="searchable-select-wrap">
+      <input type="text" class="search-input form-control" placeholder="${placeholder}" 
+        id="${containerId}_search" value="${selected ? selected.busyName + ' (' + selected.clientCode + ')' : ''}"
+        autocomplete="off" oninput="filterSearchableSelect('${containerId}', this.value)"
+        onfocus="openSearchableSelect('${containerId}')" onblur="setTimeout(()=>closeSearchableSelect('${containerId}'),200)">
+      <input type="hidden" id="${containerId}_val" value="${selectedCode}">
+      <div class="dropdown-list" id="${containerId}_list">
+        ${clients.map(c => `<div class="dropdown-item${c.clientCode===selectedCode?' selected':''}" 
+          onmousedown="selectSearchableItem('${containerId}','${c.clientCode}','${c.busyName.replace(/'/g,"\'")}')">
+          ${c.busyName} <span style="font-size:11px;color:var(--text-muted);">(${c.marketplace})</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+function openSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.add('open');
+}
+function closeSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function filterSearchableSelect(id, q) {
+  const list = document.getElementById(id+'_list');
+  if (!list) return;
+  list.classList.add('open');
+  const lq = q.toLowerCase();
+  list.querySelectorAll('.dropdown-item').forEach(item => {
+    item.style.display = item.textContent.toLowerCase().includes(lq) ? '' : 'none';
+  });
+}
+function selectSearchableItem(id, code, name) {
+  document.getElementById(id+'_val').value = code;
+  document.getElementById(id+'_search').value = name;
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function getSearchableVal(id) {
+  return document.getElementById(id+'_val')?.value || '';
 }
 
 async function api(method, path, body) {
@@ -909,23 +961,95 @@ async function quickAction(cc,cn,action){
   else showToast('Error — try again','error');
 }
 async function viewTimeline(cc,cn){
-  openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
-  const logs=await api('GET',`/clients/${cc}/activity`);
-  document.getElementById('panel-body').innerHTML=!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
-    logs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid var(--secondary);"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType}</span><span style="font-size:11px;color:var(--text-muted);">${l.timestamp}</span></div><div style="font-size:13px;">${l.actionDetail||''}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName}</div></div>`).join('');
+  openPanel('📋 '+cn+' — History','<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const [logs, timeline] = await Promise.all([
+    api('GET',`/clients/${cc}/activity`),
+    api('GET',`/clients/${cc}/timeline`)
+  ]);
+  const actLogs=logs||[], crmCalls=timeline?.crmCalls||[], tickets=timeline?.tickets||[], tasks=timeline?.tasks||[];
+  document.getElementById('panel-body').innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📋 Activity (${actLogs.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('crm')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!actLogs.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
+        actLogs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--secondary);">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-crm" style="display:none;">
+      ${!crmCalls.length?'<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>':
+        crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:6px;">${c.seller_comment||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length?'<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>':
+        tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;">${t.subject||t.category||'—'}</span>
+            <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${(t.description||'').slice(0,80)}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length?'<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>':
+        tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+            <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
-function openAddClient(){
+function showTimelineTab(tab){
+  ['act','crm','tkt','tsk'].forEach(t=>{
+    const el=document.getElementById('tl-'+t);
+    if(el) el.style.display=t===tab?'':'none';
+  });
+}
+
+async function openAddClient(){
+  const users = await api('GET','/users');
+  const ams = (users||[]).filter(u=>u.role==='Account Manager'&&u.isActive).map(u=>u.name);
+  const ads = (users||[]).filter(u=>u.role==='Ads Executive'&&u.isActive).map(u=>u.name);
+  const crms = (users||[]).filter(u=>u.role==='CRM Executive'&&u.isActive).map(u=>u.name);
+  const allExecs = (users||[]).filter(u=>u.isActive).map(u=>u.name);
   openPanel('➕ Add Client',`
     <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
     <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
     <div class="form-row">
-      <div class="form-group"><label>Account Manager</label><input type="text" class="form-control" id="nc-am"></div>
-      <div class="form-group"><label>Ads Manager</label><input type="text" class="form-control" id="nc-ads"></div>
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="nc-am"><option value="">-- Select AM --</option>${ams.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="nc-ads"><option value="">-- Select Ads --</option>${ads.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>CRM Executive</label><input type="text" class="form-control" id="nc-crm"></div>
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="nc-crm"><option value="">-- Select CRM --</option>${crms.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
       <div class="form-group"><label>Plan</label><select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
+    </div>
+    <div class="form-group"><label>Ops Lead / CSI Executive (optional)</label>
+      <select class="form-control" id="nc-ops"><option value="">-- Select --</option>${allExecs.map(n=>`<option>${n}</option>`).join('')}</select>
     </div>
     <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
     <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
@@ -1016,6 +1140,24 @@ async function renderCRM(){
   const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
   renderCRMPage(APP.clients,todayCalls||[]);
+  // Build searchable client select after render
+  setTimeout(() => {
+    buildSearchableSelect('crm-client-wrap', APP.clients, '', '🔍 Search client...');
+    // Watch for selection change
+    const wrap = document.getElementById('crm-client-wrap');
+    if (wrap) {
+      const origSelect = selectSearchableItem;
+      window._crmSelectItem = function(id, code, name) {
+        selectSearchableItem(id, code, name);
+        if (id === 'crm-client-wrap') loadCRMHistory(code);
+      };
+      wrap.querySelectorAll('.dropdown-item').forEach(item => {
+        item.onmousedown = function() {
+          const code = item.getAttribute('onmousedown')?.match(/'([^']+)'/)?.[1] || '';
+        };
+      });
+    }
+  }, 100);
 }
 
 function renderCRMPage(clients,todayCalls){
@@ -1067,7 +1209,8 @@ function renderCRMPage(clients,todayCalls){
 }
 
 async function saveCRMCall(andTicket){
-  const sel=document.getElementById('crm-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
+  const cc = getSearchableVal('crm-client-wrap') || document.getElementById('crm-client')?.value || '';
+  const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
   if(!cc){showToast('Select a client','error');return;}
   const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
   if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
@@ -1083,7 +1226,11 @@ async function loadCRMHistory(cc){
   document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
   <tbody>${calls.map(c=>`<tr><td style="font-size:12px;">${c.callDate}</td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td><td style="font-size:12px;">${c.nextFollowUp||'—'}</td><td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td></tr>`).join('')}</tbody></table></div>`;
 }
-function openCSIForClient(){const sel=document.getElementById('crm-client');openCSIForm(sel.value,sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'');}
+function openCSIForClient(){
+  const cc=getSearchableVal('crm-client-wrap')||document.getElementById('crm-client')?.value||'';
+  const cn=document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0]||'';
+  openCSIForm(cc,cn);
+}
 
 // ── CSI ───────────────────────────────────────────────────────
 async function renderCSI(){
@@ -1210,19 +1357,37 @@ async function openCreateTask(){
 }
 
 async function openAssignTask(){
-  const [users,clients]=await Promise.all([api('GET','/users'),getClients()]);if(clients) APP.clients=clients;
-  const execs=(users||[]).filter(u=>['Account Manager','Ads Executive','CRM Executive'].includes(u.role)&&u.isActive);
+  const [users,clients]=await Promise.all([api('GET','/users'),getClients()]);
+  if(clients) APP.clients=clients;
+  // All active users can be assigned tasks
+  const allUsers=(users||[]).filter(u=>u.isActive);
   openPanel('📤 Assign Task',`
-    <div class="form-group"><label>Assign To *</label><select class="form-control" id="at-exec"><option value="">Select executive...</option>${execs.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Assign To *</label>
+      <select class="form-control" id="at-exec">
+        <option value="">Select person...</option>
+        ${allUsers.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
-    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc"></textarea></div>
-    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="at-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <div class="form-group"><label>Client (optional)</label>
+      <div id="at-client-wrap"></div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label>Category</label><select class="form-control" id="at-cat"><option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option><option>Ads Campaign</option><option>General</option></select></div>
-      <div class="form-group"><label>Priority</label><select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="at-cat">
+          <option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option>
+          <option>Ads Campaign</option><option>Listing Work</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
     </div>
     <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
     <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
+  // Build searchable client select
+  setTimeout(()=>buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
 async function submitCreateTask(){
@@ -1236,8 +1401,9 @@ async function submitAssignTask(){
   const esel=document.getElementById('at-exec'),to=esel.value,toRole=esel.options[esel.selectedIndex]?.dataset?.role||'';
   const title=document.getElementById('at-title').value.trim(),deadline=document.getElementById('at-deadline').value;
   if(!to){showToast('Select executive','error');return;}if(!title){showToast('Title required','error');return;}if(!deadline){showToast('Deadline required','error');return;}
-  const csel=document.getElementById('at-client');
-  const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode,clientName,assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
   if(r?.success){showToast('✅ Task assigned to '+to,'success');closePanel();renderTasks();}
 }
 
@@ -1263,16 +1429,56 @@ async function submitWorkLog(taskId,cc,cn){
 
 // ── WORK LOG ─────────────────────────────────────────────────
 async function renderWorkLog(){
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
   const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),getClients()]);
   if(clients) APP.clients=clients;
+  const myLogs = logs||[];
+  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(new Date().toLocaleDateString('en-IN').split('/').reverse().join('-').slice(0,10)));
+  const totalMins = myLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
   document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${myLogs.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Today</div><div class="kpi-value">${todayLogs.length}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
+    </div>
     <div class="card">
-      <div class="card-header"><span class="card-title">📓 Work Log</span><button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button></div>
-      <div class="card-body" style="padding:0;">
-        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
-        <tbody>${logs.map(l=>`<tr><td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td><td><strong>${l.executiveName}</strong></td><td>${l.clientName||'—'}</td><td><span class="badge badge-blue">${l.workType}</span></td><td style="font-size:12px;max-width:200px;">${l.description}</td><td style="font-size:12px;">${l.outcome||'—'}</td><td>${l.timeSpent||'—'}</td></tr>`).join('')}</tbody></table></div>`}
+      <div class="card-header">
+        <span class="card-title">📓 Work Log</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
+            <option value="">All Types</option>
+            <option>Call</option><option>Meeting</option><option>Listing Update</option>
+            <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+            <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;" id="worklog-table">
+        ${renderWorkLogTable(myLogs)}
       </div>
     </div>`;
+  window._allWorkLogs = myLogs;
+}
+
+function renderWorkLogTable(logs) {
+  if (!logs?.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3><p style="color:var(--text-muted);">Log Work button se kaam record karo!</p></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+    <tbody>${logs.map(l=>`<tr>
+      <td style="font-size:11px;white-space:nowrap;">${l.loggedAt||'—'}</td>
+      <td><strong>${l.executiveName||'—'}</strong></td>
+      <td style="font-size:12px;">${l.clientName||'—'}</td>
+      <td><span class="badge badge-blue">${l.workType||'—'}</span></td>
+      <td style="font-size:12px;max-width:200px;">${l.description||'—'}</td>
+      <td style="font-size:12px;">${l.outcome||'—'}</td>
+      <td>${l.timeSpent||'—'}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function filterWorkLog(type) {
+  const logs = type ? (window._allWorkLogs||[]).filter(l=>l.workType===type) : (window._allWorkLogs||[]);
+  document.getElementById('worklog-table').innerHTML = renderWorkLogTable(logs);
 }
 
 function openQuickWorkLog(){

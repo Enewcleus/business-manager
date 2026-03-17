@@ -144,30 +144,35 @@ const tasksRouter = require('express').Router();
 
 // GET /api/tasks/ads — Ads department tasks only
 tasksRouter.get('/ads', authMiddleware, async (req, res) => {
-  const { role, name } = req.user;
-  const ADS_CATEGORIES = [
-    'Campaign Optimization','New Campaign Live','Campaign Paused',
-    'Keyword Research','A/B Testing','Report Review','Client Approval Pending'
-  ];
-  let query = supabase.from('tasks').select('*')
-    .in('category', ADS_CATEGORIES)
-    .order('created_at', { ascending: false });
-  // Ads Executive sees only their own; Admin/Ops/SME/Team Lead see all
-  if (!['Admin','Ops Lead','CSI Lead','SME','Team Lead','Senior Executive'].includes(role)) {
-    query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
+  try {
+    const { role, name } = req.user;
+    const ADS_CATEGORIES = [
+      'Campaign Optimization','New Campaign Live','Campaign Paused',
+      'Keyword Research','A/B Testing','Report Review','Client Approval Pending'
+    ];
+    let query = supabase.from('tasks').select('*')
+      .order('created_at', { ascending: false });
+    // Ads Executive sees only their own; Admin/Ops/SME/Team Lead see all
+    if (!['Admin','Ops Lead','CSI Lead','SME','Team Lead','Senior Executive'].includes(role)) {
+      query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
+    }
+    const { data, error } = await query.limit(500);
+    if (error) return res.status(500).json({ error: error.message });
+    // Filter ads categories in JS (safer than .in() with possible null values)
+    const now = new Date();
+    const filtered = (data||[]).filter(t => ADS_CATEGORIES.includes(t.category));
+    res.json(filtered.map(t => ({
+      taskId: t.task_id, title: t.title, description: t.description,
+      clientCode: t.client_code, clientName: t.client_name,
+      assignedTo: t.assigned_to, assignedBy: t.assigned_by,
+      priority: t.priority, category: t.category, status: t.status,
+      deadline: t.deadline,
+      isOverdue: t.deadline && t.status !== 'Done' && t.status !== 'Completed' ? new Date(t.deadline) < now : false,
+      createdAt: new Date(t.created_at).toLocaleString('en-IN'),
+    })));
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
-  const { data, error } = await query.limit(200);
-  if (error) return res.status(500).json({ error: error.message });
-  const now = new Date();
-  res.json((data||[]).map(t => ({
-    taskId: t.task_id, title: t.title, description: t.description,
-    clientCode: t.client_code, clientName: t.client_name,
-    assignedTo: t.assigned_to, assignedBy: t.assigned_by,
-    priority: t.priority, category: t.category, status: t.status,
-    deadline: t.deadline, taskType: t.task_type,
-    isOverdue: t.deadline && t.status !== 'Done' ? new Date(t.deadline) < now : false,
-    createdAt: new Date(t.created_at).toLocaleString('en-IN'),
-  })));
 });
 
 tasksRouter.get('/', authMiddleware, async (req, res) => {
@@ -302,7 +307,7 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
 
 dashRouter.get('/team', authMiddleware, async (req, res) => {
   const { data: users } = await supabase.from('users').select('name, role').eq('is_active', true)
-    .in('role', ['Account Manager', 'Ads Executive', 'CRM Executive']);
+    .in('role', ['Account Manager', 'Ads Executive', 'CRM Executive', 'SME', 'Team Lead', 'Senior Executive', 'Ops Lead', 'CSI Lead', 'Executive']);
   if (!users) return res.json([]);
   const today = new Date(); today.setHours(0,0,0,0);
   const result = await Promise.all(users.map(async u => {
@@ -420,6 +425,6 @@ adsRouter.get('/', authMiddleware, async (req, res) => {
     adsManager: a.ads_manager, budgetAllocated: a.budget_allocated, budgetSpent: a.budget_spent,
     budgetPercent: a.budget_percent, acos: a.acos, campaignStatus: a.campaign_status,
   })));
-}); 
+});
 
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter };

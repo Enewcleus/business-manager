@@ -776,13 +776,41 @@ async function load360(cc) {
   const [data,dsrData]=await Promise.all([api('GET','/clients/'+cc+'/timeline'),api('GET','/dsr/trend/'+cc)]);
   if(!data) return;
   document.getElementById('s360-content').innerHTML=`
-    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));">
-      <div class="kpi-card blue"><div class="kpi-label">Marketplace</div><div class="kpi-value" style="font-size:18px;">${client.marketplace||'—'}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Plan</div><div class="kpi-value" style="font-size:18px;">${client.servicePlan||'—'}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Account Manager</div><div class="kpi-value" style="font-size:16px;">${client.amName||'—'}</div></div>
-      <div class="kpi-card orange"><div class="kpi-label">Ads Manager</div><div class="kpi-value" style="font-size:16px;">${client.adsManager||'—'}</div></div>
-      <div class="kpi-card teal"><div class="kpi-label">CRM Executive</div><div class="kpi-value" style="font-size:16px;">${client.crmExecutive||'—'}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Renewal</div><div class="kpi-value" style="font-size:16px;">${client.renewalDate||'—'}</div></div>
+    <!-- Team Info + Quick Actions -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Client Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
+          <div style="background:#d6eaf8;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.amName||''}','Account Manager')">
+            <div style="font-size:11px;font-weight:700;color:#1a5276;text-transform:uppercase;">📋 Account Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.amName||'—'}</div>
+            ${client.amName?'<div style="font-size:11px;color:#2E75B6;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#fdebd0;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;font-weight:700;color:#a04000;text-transform:uppercase;">📢 Ads Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.adsManager||'—'}</div>
+            ${client.adsManager?'<div style="font-size:11px;color:#d35400;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#d5f5e3;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;font-weight:700;color:#1e8449;text-transform:uppercase;">📞 CRM Executive</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.crmExecutive||'—'}</div>
+            ${client.crmExecutive?'<div style="font-size:11px;color:#27ae60;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#f4f0fb;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#6c3483;text-transform:uppercase;">📦 Marketplace</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.marketplace||'—'}</div>
+            <div style="font-size:11px;color:#8e44ad;margin-top:4px;">${client.servicePlan||''}</div>
+          </div>
+          <div style="background:#fef9e7;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#b7950b;text-transform:uppercase;">🔄 Renewal</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.renewalDate||'—'}</div>
+            ${client.renewalDate?`<div style="font-size:11px;margin-top:4px;">${renewalBadge(client.renewalDate)}</div>`:''}
+          </div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="background:#e8f4fd;"><span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button></div>
@@ -839,6 +867,118 @@ async function load360(cc) {
       </div>
     </div>`:'<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}`;
   if(dsrData&&dsrData.length) setTimeout(()=>draw360Charts(dsrData),100);
+}
+
+// View tasks of a specific person from Seller 360
+async function viewPersonTasks(personName, role) {
+  if (!personName || personName === '—') { showToast('Koi assign nahi hai', 'error'); return; }
+  openPanel('📝 Tasks: '+personName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const tasks = await api('GET', '/tasks');
+  const myTasks = (tasks||[]).filter(t => t.assignedTo === personName || t.assignedBy === personName);
+  const pending = myTasks.filter(t=>t.status==='Pending');
+  const inprog = myTasks.filter(t=>t.status==='In Progress');
+  const done = myTasks.filter(t=>t.status==='Completed');
+  const overdue = myTasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  document.getElementById('panel-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#e74c3c;">${overdue.length}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#f39c12;">${pending.length}</div>
+        <div style="font-size:11px;color:#b7950b;">Pending</div>
+      </div>
+      <div style="background:#d6eaf8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#2E75B6;">${inprog.length}</div>
+        <div style="font-size:11px;color:#1a5276;">In Progress</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#27ae60;">${done.length}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+    </div>
+    ${!myTasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>' :
+    [...myTasks].sort((a,b)=>{
+      const order = {'Pending':0,'In Progress':1,'Completed':2};
+      return (order[a.status]||0)-(order[b.status]||0);
+    }).map(t=>`
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid ${t.status==='Completed'?'#27ae60':t.isOverdue?'#e74c3c':t.status==='In Progress'?'#2E75B6':'#f39c12'};">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${t.title||'—'}</div>
+          ${t.clientName?`<div style="font-size:12px;color:var(--text-muted);">👥 ${t.clientName}</div>`:''}
+          ${t.deadline?`<div style="font-size:11px;color:${t.isOverdue?'var(--red)':'var(--text-muted)'};">📅 ${t.deadline}${t.isOverdue?' 🔴 OVERDUE':''}</div>`:''}
+        </div>
+        <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+      </div>
+    </div>`).join('')}`;
+}
+
+// Edit client team from 360 view
+async function openEditClient360(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  const users = await api('GET','/users');
+  const active = (users||[]).filter(u=>u.isActive);
+  const ams = active.filter(u=>u.role==='Account Manager');
+  const ads = active.filter(u=>u.role==='Ads Executive');
+  const crms = active.filter(u=>u.role==='CRM Executive');
+  openPanel('✏️ Edit Team — '+client.busyName, `
+    <div class="form-group"><label>Account Manager</label>
+      <select class="form-control" id="e360-am">
+        <option value="">-- Select --</option>
+        ${ams.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Ads Manager</label>
+      <select class="form-control" id="e360-ads">
+        <option value="">-- Select --</option>
+        ${ads.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>CRM Executive</label>
+      <select class="form-control" id="e360-crm">
+        <option value="">-- Select --</option>
+        ${crms.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Service Plan</label>
+      <select class="form-control" id="e360-plan">
+        ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Renewal Date</label>
+      <input type="date" class="form-control" id="e360-renewal" value="${client.renewalDate||''}">
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="e360-status">
+        <option ${client.status==='Active'?'selected':''}>Active</option>
+        <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEdit360('${cc}')">💾 Save Changes</button>`);
+}
+
+async function submitEdit360(cc) {
+  const r = await api('PUT', '/clients/'+cc, {
+    busyName: APP.clients.find(c=>c.clientCode===cc)?.busyName,
+    marketplace: APP.clients.find(c=>c.clientCode===cc)?.marketplace,
+    amName: document.getElementById('e360-am').value,
+    adsManager: document.getElementById('e360-ads').value,
+    crmExecutive: document.getElementById('e360-crm').value,
+    servicePlan: document.getElementById('e360-plan').value,
+    renewalDate: document.getElementById('e360-renewal').value||null,
+    status: document.getElementById('e360-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    const clients = await getClients(true);
+    load360(cc);
+  } else {
+    showToast('Update failed', 'error');
+  }
 }
 
 function draw360Charts(dsrData) {
@@ -917,6 +1057,7 @@ function clientTableRows(clients,qa) {
     <td>${renewalBadge(c.renewalDate)}</td>
     <td><div class="quick-actions">${qa.map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
     <td><div style="display:flex;gap:4px;">
+      <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️</button>
       <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
       <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
       ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️</button>`:''}
@@ -931,6 +1072,7 @@ function clientCards(clients) {
       <div class="client-meta"><span class="badge badge-blue">${c.marketplace}</span>${statusBadge(c.status)}</div>
       <div class="quick-actions">${(QUICK_ACTIONS[APP.user.role]||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div>
       <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️ Detail</button>
         <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋 History</button>
         <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫 Ticket</button>
         ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️ Delete</button>`:''}
@@ -1342,18 +1484,31 @@ function taskCards(tasks){
 
 function filterTasks(val){let f=APP.tasks;if(val==='overdue')f=f.filter(t=>t.isOverdue&&t.status!=='Completed');else if(val)f=f.filter(t=>t.status===val);document.getElementById('tasks-body').innerHTML=taskCards(f);}
 
-async function openCreateTask(){
-  showToast('Loading...','info');const clients=await getClients();if(clients) APP.clients=clients;
-  openPanel('📝 Create Task',`
+async function openCreateTask(parentTaskId='', parentTitle=''){
+  const [clients, users] = await Promise.all([getClients(), api('GET','/users')]);
+  if(clients) APP.clients=clients;
+  const allUsers = (users||[]).filter(u=>u.isActive);
+  const isSubTask = !!parentTaskId;
+  openPanel(isSubTask ? '📝 Sub-Task: '+parentTitle : '📝 Create Task',`
+    ${isSubTask ? `<div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a5276;">📎 Parent Task: <strong>${parentTitle}</strong></div>` : ''}
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="tsk-title" placeholder="e.g. Review seller listings"></div>
-    <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..."></textarea></div>
-    <div class="form-group"><label>Related Client (optional)</label><select class="form-control" id="tsk-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..." rows="3"></textarea></div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="tsk-assignee">
+        <option value="">Myself (${APP.user.name})</option>
+        ${allUsers.filter(u=>u.name!==APP.user.name).map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Related Client (optional)</label>
+      <div id="tsk-client-wrap"></div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Category</label><select class="form-control" id="tsk-cat"><option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option><option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option></select></div>
       <div class="form-group"><label>Priority</label><select class="form-control" id="tsk-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
     </div>
     <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="tsk-deadline"></div>
-    <button class="btn btn-primary btn-full" onclick="submitCreateTask()">📝 Create Task</button>`);
+    <button class="btn btn-primary btn-full" onclick="submitCreateTask('${parentTaskId}')">📝 ${isSubTask?'Create Sub-Task':'Create Task'}</button>`);
+  setTimeout(()=>buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
 async function openAssignTask(){
@@ -1390,10 +1545,15 @@ async function openAssignTask(){
   setTimeout(()=>buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
-async function submitCreateTask(){
+async function submitCreateTask(parentTaskId=''){
   const title=document.getElementById('tsk-title').value.trim();if(!title){showToast('Title required','error');return;}
-  const csel=document.getElementById('tsk-client'),u=APP.user;
-  const r=await api('POST','/tasks',{title,description:document.getElementById('tsk-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:u.name,assignedToRole:u.role,priority:document.getElementById('tsk-pri').value,category:document.getElementById('tsk-cat').value,deadline:document.getElementById('tsk-deadline').value||null});
+  const u=APP.user;
+  const assigneeSel=document.getElementById('tsk-assignee');
+  const assignedTo=assigneeSel?.value||u.name;
+  const assignedToRole=assigneeSel?.options[assigneeSel.selectedIndex]?.dataset?.role||u.role;
+  const clientCode=getSearchableVal('tsk-client-wrap')||'';
+  const clientName=document.getElementById('tsk-client-wrap_search')?.value?.split(' (')[0]||'';
+  const r=await api('POST','/tasks',{title,description:document.getElementById('tsk-desc').value,clientCode,clientName,assignedTo,assignedToRole,priority:document.getElementById('tsk-pri').value,category:document.getElementById('tsk-cat').value,deadline:document.getElementById('tsk-deadline').value||null,parentTaskId:parentTaskId||null});
   if(r?.success){showToast('✅ Task created: '+r.taskId,'success');closePanel();renderTasks();}
 }
 
@@ -1414,11 +1574,18 @@ function openWorkLogEntry(taskId,cc,cn){
   openPanel('📓 Log Work',`
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label><select class="form-control" id="wl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Other</option></select></div>
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="wl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
       <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
-    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save</button>`);
+    ${cc?`<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px;">📎 Client: <strong>${cn||cc}</strong></div>`:''}
+    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save Work Log</button>`);
 }
 
 async function submitWorkLog(taskId,cc,cn){
@@ -1483,20 +1650,30 @@ function filterWorkLog(type) {
 
 function openQuickWorkLog(){
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="qwl-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Client (optional)</label>
+      <div id="qwl-client-wrap"></div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label><select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select></div>
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="qwl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
       <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
-    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save</button>`);
+    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save Work Log</button>`);
+  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
 async function submitQuickWorkLog(){
   const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
-  const csel=document.getElementById('qwl-client');
-  const r=await api('POST','/tasks/worklog',{clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
+  const clientCode=getSearchableVal('qwl-client-wrap')||'';
+  const clientName=document.getElementById('qwl-client-wrap_search')?.value?.split(' (')[0]||'';
+  const r=await api('POST','/tasks/worklog',{clientCode,clientName,workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
   if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
 }
 
@@ -2253,6 +2430,76 @@ function parseBulkCSV(input) {
     submitBtn.textContent = '✅ Confirm & Save ' + _bulkData.length + ' Clients';
   };
   reader.readAsText(file);
+}
+
+// Open full client detail panel (Admin/Lead/CRM direct access)
+async function openClientDetail(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  openPanel('👁️ '+client.busyName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const timeline = await api('GET', '/clients/'+cc+'/timeline');
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+
+  document.getElementById('panel-body').innerHTML = `
+    <!-- Client Info -->
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+        <div><span style="color:var(--text-muted);">Code:</span> <strong>${client.clientCode}</strong></div>
+        <div><span style="color:var(--text-muted);">Market:</span> <strong>${client.marketplace||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">AM:</span> <strong>${client.amName||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Ads:</span> <strong>${client.adsManager||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">CRM:</span> <strong>${client.crmExecutive||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Plan:</span> <strong>${client.servicePlan||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Status:</span> ${statusBadge(client.status)}</div>
+        <div><span style="color:var(--text-muted);">Health:</span> ${healthBadge(client.healthStatus)}</div>
+        <div><span style="color:var(--text-muted);">Renewal:</span> <strong>${client.renewalDate||'—'}</strong></div>
+      </div>
+    </div>
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-sm btn-primary" onclick="openRaiseTicketFor('${cc}','${client.busyName}')">🎫 Raise Ticket</button>
+      <button class="btn btn-sm btn-success" onclick="openCreateTask('','${client.busyName}');document.getElementById('tsk-client-wrap_val')&&(document.getElementById('tsk-client-wrap_val').value='${cc}')">📝 Add Task</button>
+      <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>' :
+      crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+        </div>
+        <div style="font-size:13px;margin-top:4px;">${c.seller_comment||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length ? '<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>' :
+      tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.subject||t.category||'—'}</span>
+          <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Priority: ${t.priority||'—'} | ${t.assigned_to||'—'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>' :
+      tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+          <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+      </div>`).join('')}
+    </div>`;
 }
 
 async function deleteClient(code, name) {

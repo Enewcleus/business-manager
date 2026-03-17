@@ -196,6 +196,14 @@
   .client-name { font-size:14px; font-weight:700; color:var(--primary); }
   .client-meta { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
   .mobile-cards { display:none; }
+  .searchable-select-wrap { position:relative; }
+  .searchable-select-wrap input.search-input { width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px 8px 0 0; font-size:13px; outline:none; }
+  .searchable-select-wrap .dropdown-list { position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid var(--secondary); border-top:none; border-radius:0 0 8px 8px; max-height:200px; overflow-y:auto; z-index:500; display:none; }
+  .searchable-select-wrap .dropdown-list.open { display:block; }
+  .searchable-select-wrap .dropdown-item { padding:8px 12px; font-size:13px; cursor:pointer; }
+  .searchable-select-wrap .dropdown-item:hover { background:var(--bg); }
+  .searchable-select-wrap .dropdown-item.selected { background:#d6eaf8; font-weight:600; }
+  .hidden-select { display:none; }
 
   @media (max-width:768px) {
     .sidebar { transform:translateX(-100%); }
@@ -435,6 +443,50 @@ async function getClients(force = false) {
   const data = await api('GET', '/clients');
   if (data) { APP.clients = data; _clientCacheTs = Date.now(); }
   return APP.clients;
+}
+
+// ── SEARCHABLE CLIENT SELECT ─────────────────────────────────
+function buildSearchableSelect(containerId, clients, selectedCode='', placeholder='Search client...') {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const selected = clients.find(c => c.clientCode === selectedCode);
+  container.innerHTML = `
+    <div class="searchable-select-wrap">
+      <input type="text" class="search-input form-control" placeholder="${placeholder}" 
+        id="${containerId}_search" value="${selected ? selected.busyName + ' (' + selected.clientCode + ')' : ''}"
+        autocomplete="off" oninput="filterSearchableSelect('${containerId}', this.value)"
+        onfocus="openSearchableSelect('${containerId}')" onblur="setTimeout(()=>closeSearchableSelect('${containerId}'),200)">
+      <input type="hidden" id="${containerId}_val" value="${selectedCode}">
+      <div class="dropdown-list" id="${containerId}_list">
+        ${clients.map(c => `<div class="dropdown-item${c.clientCode===selectedCode?' selected':''}" 
+          onmousedown="selectSearchableItem('${containerId}','${c.clientCode}','${c.busyName.replace(/'/g,"\'")}')">
+          ${c.busyName} <span style="font-size:11px;color:var(--text-muted);">(${c.marketplace})</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+function openSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.add('open');
+}
+function closeSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function filterSearchableSelect(id, q) {
+  const list = document.getElementById(id+'_list');
+  if (!list) return;
+  list.classList.add('open');
+  const lq = q.toLowerCase();
+  list.querySelectorAll('.dropdown-item').forEach(item => {
+    item.style.display = item.textContent.toLowerCase().includes(lq) ? '' : 'none';
+  });
+}
+function selectSearchableItem(id, code, name) {
+  document.getElementById(id+'_val').value = code;
+  document.getElementById(id+'_search').value = name;
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function getSearchableVal(id) {
+  return document.getElementById(id+'_val')?.value || '';
 }
 
 async function api(method, path, body) {
@@ -724,13 +776,41 @@ async function load360(cc) {
   const [data,dsrData]=await Promise.all([api('GET','/clients/'+cc+'/timeline'),api('GET','/dsr/trend/'+cc)]);
   if(!data) return;
   document.getElementById('s360-content').innerHTML=`
-    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));">
-      <div class="kpi-card blue"><div class="kpi-label">Marketplace</div><div class="kpi-value" style="font-size:18px;">${client.marketplace||'—'}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Plan</div><div class="kpi-value" style="font-size:18px;">${client.servicePlan||'—'}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Account Manager</div><div class="kpi-value" style="font-size:16px;">${client.amName||'—'}</div></div>
-      <div class="kpi-card orange"><div class="kpi-label">Ads Manager</div><div class="kpi-value" style="font-size:16px;">${client.adsManager||'—'}</div></div>
-      <div class="kpi-card teal"><div class="kpi-label">CRM Executive</div><div class="kpi-value" style="font-size:16px;">${client.crmExecutive||'—'}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Renewal</div><div class="kpi-value" style="font-size:16px;">${client.renewalDate||'—'}</div></div>
+    <!-- Team Info + Quick Actions -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Client Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
+          <div style="background:#d6eaf8;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.amName||''}','Account Manager')">
+            <div style="font-size:11px;font-weight:700;color:#1a5276;text-transform:uppercase;">📋 Account Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.amName||'—'}</div>
+            ${client.amName?'<div style="font-size:11px;color:#2E75B6;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#fdebd0;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;font-weight:700;color:#a04000;text-transform:uppercase;">📢 Ads Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.adsManager||'—'}</div>
+            ${client.adsManager?'<div style="font-size:11px;color:#d35400;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#d5f5e3;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;font-weight:700;color:#1e8449;text-transform:uppercase;">📞 CRM Executive</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.crmExecutive||'—'}</div>
+            ${client.crmExecutive?'<div style="font-size:11px;color:#27ae60;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#f4f0fb;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#6c3483;text-transform:uppercase;">📦 Marketplace</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.marketplace||'—'}</div>
+            <div style="font-size:11px;color:#8e44ad;margin-top:4px;">${client.servicePlan||''}</div>
+          </div>
+          <div style="background:#fef9e7;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#b7950b;text-transform:uppercase;">🔄 Renewal</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.renewalDate||'—'}</div>
+            ${client.renewalDate?`<div style="font-size:11px;margin-top:4px;">${renewalBadge(client.renewalDate)}</div>`:''}
+          </div>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-header" style="background:#e8f4fd;"><span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button></div>
@@ -787,6 +867,118 @@ async function load360(cc) {
       </div>
     </div>`:'<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}`;
   if(dsrData&&dsrData.length) setTimeout(()=>draw360Charts(dsrData),100);
+}
+
+// View tasks of a specific person from Seller 360
+async function viewPersonTasks(personName, role) {
+  if (!personName || personName === '—') { showToast('Koi assign nahi hai', 'error'); return; }
+  openPanel('📝 Tasks: '+personName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const tasks = await api('GET', '/tasks');
+  const myTasks = (tasks||[]).filter(t => t.assignedTo === personName || t.assignedBy === personName);
+  const pending = myTasks.filter(t=>t.status==='Pending');
+  const inprog = myTasks.filter(t=>t.status==='In Progress');
+  const done = myTasks.filter(t=>t.status==='Completed');
+  const overdue = myTasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  document.getElementById('panel-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#e74c3c;">${overdue.length}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#f39c12;">${pending.length}</div>
+        <div style="font-size:11px;color:#b7950b;">Pending</div>
+      </div>
+      <div style="background:#d6eaf8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#2E75B6;">${inprog.length}</div>
+        <div style="font-size:11px;color:#1a5276;">In Progress</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#27ae60;">${done.length}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+    </div>
+    ${!myTasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>' :
+    [...myTasks].sort((a,b)=>{
+      const order = {'Pending':0,'In Progress':1,'Completed':2};
+      return (order[a.status]||0)-(order[b.status]||0);
+    }).map(t=>`
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid ${t.status==='Completed'?'#27ae60':t.isOverdue?'#e74c3c':t.status==='In Progress'?'#2E75B6':'#f39c12'};">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${t.title||'—'}</div>
+          ${t.clientName?`<div style="font-size:12px;color:var(--text-muted);">👥 ${t.clientName}</div>`:''}
+          ${t.deadline?`<div style="font-size:11px;color:${t.isOverdue?'var(--red)':'var(--text-muted)'};">📅 ${t.deadline}${t.isOverdue?' 🔴 OVERDUE':''}</div>`:''}
+        </div>
+        <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+      </div>
+    </div>`).join('')}`;
+}
+
+// Edit client team from 360 view
+async function openEditClient360(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  const users = await api('GET','/users');
+  const active = (users||[]).filter(u=>u.isActive);
+  const ams = active.filter(u=>u.role==='Account Manager');
+  const ads = active.filter(u=>u.role==='Ads Executive');
+  const crms = active.filter(u=>u.role==='CRM Executive');
+  openPanel('✏️ Edit Team — '+client.busyName, `
+    <div class="form-group"><label>Account Manager</label>
+      <select class="form-control" id="e360-am">
+        <option value="">-- Select --</option>
+        ${ams.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Ads Manager</label>
+      <select class="form-control" id="e360-ads">
+        <option value="">-- Select --</option>
+        ${ads.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>CRM Executive</label>
+      <select class="form-control" id="e360-crm">
+        <option value="">-- Select --</option>
+        ${crms.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Service Plan</label>
+      <select class="form-control" id="e360-plan">
+        ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Renewal Date</label>
+      <input type="date" class="form-control" id="e360-renewal" value="${client.renewalDate||''}">
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="e360-status">
+        <option ${client.status==='Active'?'selected':''}>Active</option>
+        <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEdit360('${cc}')">💾 Save Changes</button>`);
+}
+
+async function submitEdit360(cc) {
+  const r = await api('PUT', '/clients/'+cc, {
+    busyName: APP.clients.find(c=>c.clientCode===cc)?.busyName,
+    marketplace: APP.clients.find(c=>c.clientCode===cc)?.marketplace,
+    amName: document.getElementById('e360-am').value,
+    adsManager: document.getElementById('e360-ads').value,
+    crmExecutive: document.getElementById('e360-crm').value,
+    servicePlan: document.getElementById('e360-plan').value,
+    renewalDate: document.getElementById('e360-renewal').value||null,
+    status: document.getElementById('e360-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    const clients = await getClients(true);
+    load360(cc);
+  } else {
+    showToast('Update failed', 'error');
+  }
 }
 
 function draw360Charts(dsrData) {
@@ -865,6 +1057,7 @@ function clientTableRows(clients,qa) {
     <td>${renewalBadge(c.renewalDate)}</td>
     <td><div class="quick-actions">${qa.map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
     <td><div style="display:flex;gap:4px;">
+      <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️</button>
       <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
       <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
       ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️</button>`:''}
@@ -879,6 +1072,7 @@ function clientCards(clients) {
       <div class="client-meta"><span class="badge badge-blue">${c.marketplace}</span>${statusBadge(c.status)}</div>
       <div class="quick-actions">${(QUICK_ACTIONS[APP.user.role]||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div>
       <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️ Detail</button>
         <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋 History</button>
         <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫 Ticket</button>
         ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️ Delete</button>`:''}
@@ -909,23 +1103,95 @@ async function quickAction(cc,cn,action){
   else showToast('Error — try again','error');
 }
 async function viewTimeline(cc,cn){
-  openPanel('📋 Activity: '+cn,'<div class="loading"><div class="spinner"></div></div>');
-  const logs=await api('GET',`/clients/${cc}/activity`);
-  document.getElementById('panel-body').innerHTML=!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
-    logs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid var(--secondary);"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType}</span><span style="font-size:11px;color:var(--text-muted);">${l.timestamp}</span></div><div style="font-size:13px;">${l.actionDetail||''}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName}</div></div>`).join('');
+  openPanel('📋 '+cn+' — History','<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const [logs, timeline] = await Promise.all([
+    api('GET',`/clients/${cc}/activity`),
+    api('GET',`/clients/${cc}/timeline`)
+  ]);
+  const actLogs=logs||[], crmCalls=timeline?.crmCalls||[], tickets=timeline?.tickets||[], tasks=timeline?.tasks||[];
+  document.getElementById('panel-body').innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📋 Activity (${actLogs.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('crm')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!actLogs.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
+        actLogs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--secondary);">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-crm" style="display:none;">
+      ${!crmCalls.length?'<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>':
+        crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:6px;">${c.seller_comment||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length?'<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>':
+        tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;">${t.subject||t.category||'—'}</span>
+            <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${(t.description||'').slice(0,80)}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length?'<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>':
+        tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+            <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
-function openAddClient(){
+function showTimelineTab(tab){
+  ['act','crm','tkt','tsk'].forEach(t=>{
+    const el=document.getElementById('tl-'+t);
+    if(el) el.style.display=t===tab?'':'none';
+  });
+}
+
+async function openAddClient(){
+  const users = await api('GET','/users');
+  const ams = (users||[]).filter(u=>u.role==='Account Manager'&&u.isActive).map(u=>u.name);
+  const ads = (users||[]).filter(u=>u.role==='Ads Executive'&&u.isActive).map(u=>u.name);
+  const crms = (users||[]).filter(u=>u.role==='CRM Executive'&&u.isActive).map(u=>u.name);
+  const allExecs = (users||[]).filter(u=>u.isActive).map(u=>u.name);
   openPanel('➕ Add Client',`
     <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
     <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
     <div class="form-row">
-      <div class="form-group"><label>Account Manager</label><input type="text" class="form-control" id="nc-am"></div>
-      <div class="form-group"><label>Ads Manager</label><input type="text" class="form-control" id="nc-ads"></div>
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="nc-am"><option value="">-- Select AM --</option>${ams.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="nc-ads"><option value="">-- Select Ads --</option>${ads.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>CRM Executive</label><input type="text" class="form-control" id="nc-crm"></div>
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="nc-crm"><option value="">-- Select CRM --</option>${crms.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
       <div class="form-group"><label>Plan</label><select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
+    </div>
+    <div class="form-group"><label>Ops Lead / CSI Executive (optional)</label>
+      <select class="form-control" id="nc-ops"><option value="">-- Select --</option>${allExecs.map(n=>`<option>${n}</option>`).join('')}</select>
     </div>
     <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
     <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
@@ -1016,6 +1282,24 @@ async function renderCRM(){
   const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
   renderCRMPage(APP.clients,todayCalls||[]);
+  // Build searchable client select after render
+  setTimeout(() => {
+    buildSearchableSelect('crm-client-wrap', APP.clients, '', '🔍 Search client...');
+    // Watch for selection change
+    const wrap = document.getElementById('crm-client-wrap');
+    if (wrap) {
+      const origSelect = selectSearchableItem;
+      window._crmSelectItem = function(id, code, name) {
+        selectSearchableItem(id, code, name);
+        if (id === 'crm-client-wrap') loadCRMHistory(code);
+      };
+      wrap.querySelectorAll('.dropdown-item').forEach(item => {
+        item.onmousedown = function() {
+          const code = item.getAttribute('onmousedown')?.match(/'([^']+)'/)?.[1] || '';
+        };
+      });
+    }
+  }, 100);
 }
 
 function renderCRMPage(clients,todayCalls){
@@ -1067,7 +1351,8 @@ function renderCRMPage(clients,todayCalls){
 }
 
 async function saveCRMCall(andTicket){
-  const sel=document.getElementById('crm-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
+  const cc = getSearchableVal('crm-client-wrap') || document.getElementById('crm-client')?.value || '';
+  const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
   if(!cc){showToast('Select a client','error');return;}
   const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
   if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
@@ -1083,7 +1368,11 @@ async function loadCRMHistory(cc){
   document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
   <tbody>${calls.map(c=>`<tr><td style="font-size:12px;">${c.callDate}</td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td><td style="font-size:12px;">${c.nextFollowUp||'—'}</td><td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td></tr>`).join('')}</tbody></table></div>`;
 }
-function openCSIForClient(){const sel=document.getElementById('crm-client');openCSIForm(sel.value,sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'');}
+function openCSIForClient(){
+  const cc=getSearchableVal('crm-client-wrap')||document.getElementById('crm-client')?.value||'';
+  const cn=document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0]||'';
+  openCSIForm(cc,cn);
+}
 
 // ── CSI ───────────────────────────────────────────────────────
 async function renderCSI(){
@@ -1195,40 +1484,76 @@ function taskCards(tasks){
 
 function filterTasks(val){let f=APP.tasks;if(val==='overdue')f=f.filter(t=>t.isOverdue&&t.status!=='Completed');else if(val)f=f.filter(t=>t.status===val);document.getElementById('tasks-body').innerHTML=taskCards(f);}
 
-async function openCreateTask(){
-  showToast('Loading...','info');const clients=await getClients();if(clients) APP.clients=clients;
-  openPanel('📝 Create Task',`
+async function openCreateTask(parentTaskId='', parentTitle=''){
+  const [clients, users] = await Promise.all([getClients(), api('GET','/users')]);
+  if(clients) APP.clients=clients;
+  const allUsers = (users||[]).filter(u=>u.isActive);
+  const isSubTask = !!parentTaskId;
+  openPanel(isSubTask ? '📝 Sub-Task: '+parentTitle : '📝 Create Task',`
+    ${isSubTask ? `<div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a5276;">📎 Parent Task: <strong>${parentTitle}</strong></div>` : ''}
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="tsk-title" placeholder="e.g. Review seller listings"></div>
-    <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..."></textarea></div>
-    <div class="form-group"><label>Related Client (optional)</label><select class="form-control" id="tsk-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Description</label><textarea class="form-control" id="tsk-desc" placeholder="Details..." rows="3"></textarea></div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="tsk-assignee">
+        <option value="">Myself (${APP.user.name})</option>
+        ${allUsers.filter(u=>u.name!==APP.user.name).map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Related Client (optional)</label>
+      <div id="tsk-client-wrap"></div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Category</label><select class="form-control" id="tsk-cat"><option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option><option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option></select></div>
       <div class="form-group"><label>Priority</label><select class="form-control" id="tsk-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
     </div>
     <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="tsk-deadline"></div>
-    <button class="btn btn-primary btn-full" onclick="submitCreateTask()">📝 Create Task</button>`);
+    <button class="btn btn-primary btn-full" onclick="submitCreateTask('${parentTaskId}')">📝 ${isSubTask?'Create Sub-Task':'Create Task'}</button>`);
+  setTimeout(()=>buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
 async function openAssignTask(){
-  const [users,clients]=await Promise.all([api('GET','/users'),getClients()]);if(clients) APP.clients=clients;
-  const execs=(users||[]).filter(u=>['Account Manager','Ads Executive','CRM Executive'].includes(u.role)&&u.isActive);
+  const [users,clients]=await Promise.all([api('GET','/users'),getClients()]);
+  if(clients) APP.clients=clients;
+  // All active users can be assigned tasks
+  const allUsers=(users||[]).filter(u=>u.isActive);
   openPanel('📤 Assign Task',`
-    <div class="form-group"><label>Assign To *</label><select class="form-control" id="at-exec"><option value="">Select executive...</option>${execs.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Assign To *</label>
+      <select class="form-control" id="at-exec">
+        <option value="">Select person...</option>
+        ${allUsers.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
-    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc"></textarea></div>
-    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="at-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <div class="form-group"><label>Client (optional)</label>
+      <div id="at-client-wrap"></div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label>Category</label><select class="form-control" id="at-cat"><option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option><option>Ads Campaign</option><option>General</option></select></div>
-      <div class="form-group"><label>Priority</label><select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="at-cat">
+          <option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option>
+          <option>Ads Campaign</option><option>Listing Work</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
     </div>
     <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
     <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
+  // Build searchable client select
+  setTimeout(()=>buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
-async function submitCreateTask(){
+async function submitCreateTask(parentTaskId=''){
   const title=document.getElementById('tsk-title').value.trim();if(!title){showToast('Title required','error');return;}
-  const csel=document.getElementById('tsk-client'),u=APP.user;
-  const r=await api('POST','/tasks',{title,description:document.getElementById('tsk-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:u.name,assignedToRole:u.role,priority:document.getElementById('tsk-pri').value,category:document.getElementById('tsk-cat').value,deadline:document.getElementById('tsk-deadline').value||null});
+  const u=APP.user;
+  const assigneeSel=document.getElementById('tsk-assignee');
+  const assignedTo=assigneeSel?.value||u.name;
+  const assignedToRole=assigneeSel?.options[assigneeSel.selectedIndex]?.dataset?.role||u.role;
+  const clientCode=getSearchableVal('tsk-client-wrap')||'';
+  const clientName=document.getElementById('tsk-client-wrap_search')?.value?.split(' (')[0]||'';
+  const r=await api('POST','/tasks',{title,description:document.getElementById('tsk-desc').value,clientCode,clientName,assignedTo,assignedToRole,priority:document.getElementById('tsk-pri').value,category:document.getElementById('tsk-cat').value,deadline:document.getElementById('tsk-deadline').value||null,parentTaskId:parentTaskId||null});
   if(r?.success){showToast('✅ Task created: '+r.taskId,'success');closePanel();renderTasks();}
 }
 
@@ -1236,8 +1561,9 @@ async function submitAssignTask(){
   const esel=document.getElementById('at-exec'),to=esel.value,toRole=esel.options[esel.selectedIndex]?.dataset?.role||'';
   const title=document.getElementById('at-title').value.trim(),deadline=document.getElementById('at-deadline').value;
   if(!to){showToast('Select executive','error');return;}if(!title){showToast('Title required','error');return;}if(!deadline){showToast('Deadline required','error');return;}
-  const csel=document.getElementById('at-client');
-  const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r=await api('POST','/tasks',{title,description:document.getElementById('at-desc').value,clientCode,clientName,assignedTo:to,assignedToRole:toRole,priority:document.getElementById('at-pri').value,category:document.getElementById('at-cat').value,deadline});
   if(r?.success){showToast('✅ Task assigned to '+to,'success');closePanel();renderTasks();}
 }
 
@@ -1248,11 +1574,18 @@ function openWorkLogEntry(taskId,cc,cn){
   openPanel('📓 Log Work',`
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label><select class="form-control" id="wl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Other</option></select></div>
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="wl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
       <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
-    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save</button>`);
+    ${cc?`<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px;">📎 Client: <strong>${cn||cc}</strong></div>`:''}
+    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save Work Log</button>`);
 }
 
 async function submitWorkLog(taskId,cc,cn){
@@ -1263,34 +1596,84 @@ async function submitWorkLog(taskId,cc,cn){
 
 // ── WORK LOG ─────────────────────────────────────────────────
 async function renderWorkLog(){
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
   const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),getClients()]);
   if(clients) APP.clients=clients;
+  const myLogs = logs||[];
+  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(new Date().toLocaleDateString('en-IN').split('/').reverse().join('-').slice(0,10)));
+  const totalMins = myLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
   document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${myLogs.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Today</div><div class="kpi-value">${todayLogs.length}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
+    </div>
     <div class="card">
-      <div class="card-header"><span class="card-title">📓 Work Log</span><button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button></div>
-      <div class="card-body" style="padding:0;">
-        ${!logs?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
-        <tbody>${logs.map(l=>`<tr><td style="font-size:11px;white-space:nowrap;">${l.loggedAt}</td><td><strong>${l.executiveName}</strong></td><td>${l.clientName||'—'}</td><td><span class="badge badge-blue">${l.workType}</span></td><td style="font-size:12px;max-width:200px;">${l.description}</td><td style="font-size:12px;">${l.outcome||'—'}</td><td>${l.timeSpent||'—'}</td></tr>`).join('')}</tbody></table></div>`}
+      <div class="card-header">
+        <span class="card-title">📓 Work Log</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
+            <option value="">All Types</option>
+            <option>Call</option><option>Meeting</option><option>Listing Update</option>
+            <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+            <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;" id="worklog-table">
+        ${renderWorkLogTable(myLogs)}
       </div>
     </div>`;
+  window._allWorkLogs = myLogs;
+}
+
+function renderWorkLogTable(logs) {
+  if (!logs?.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3><p style="color:var(--text-muted);">Log Work button se kaam record karo!</p></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+    <tbody>${logs.map(l=>`<tr>
+      <td style="font-size:11px;white-space:nowrap;">${l.loggedAt||'—'}</td>
+      <td><strong>${l.executiveName||'—'}</strong></td>
+      <td style="font-size:12px;">${l.clientName||'—'}</td>
+      <td><span class="badge badge-blue">${l.workType||'—'}</span></td>
+      <td style="font-size:12px;max-width:200px;">${l.description||'—'}</td>
+      <td style="font-size:12px;">${l.outcome||'—'}</td>
+      <td>${l.timeSpent||'—'}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function filterWorkLog(type) {
+  const logs = type ? (window._allWorkLogs||[]).filter(l=>l.workType===type) : (window._allWorkLogs||[]);
+  document.getElementById('worklog-table').innerHTML = renderWorkLogTable(logs);
 }
 
 function openQuickWorkLog(){
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client (optional)</label><select class="form-control" id="qwl-client"><option value="">No specific client</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Client (optional)</label>
+      <div id="qwl-client-wrap"></div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label>Work Type</label><select class="form-control" id="qwl-type"><option>Call</option><option>Meeting</option><option>Listing Update</option><option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option><option>Follow-up</option><option>Store Visit</option><option>Other</option></select></div>
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="qwl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
       <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
     </div>
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
-    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save</button>`);
+    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save Work Log</button>`);
+  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
 }
 
 async function submitQuickWorkLog(){
   const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
-  const csel=document.getElementById('qwl-client');
-  const r=await api('POST','/tasks/worklog',{clientCode:csel.value,clientName:csel.options[csel.selectedIndex]?.dataset?.name||'',workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
+  const clientCode=getSearchableVal('qwl-client-wrap')||'';
+  const clientName=document.getElementById('qwl-client-wrap_search')?.value?.split(' (')[0]||'';
+  const r=await api('POST','/tasks/worklog',{clientCode,clientName,workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
   if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
 }
 
@@ -2047,6 +2430,299 @@ function parseBulkCSV(input) {
     submitBtn.textContent = '✅ Confirm & Save ' + _bulkData.length + ' Clients';
   };
   reader.readAsText(file);
+}
+
+// Open full client detail panel (Admin/Lead/CRM direct access)
+// Full page client view for Admin/Lead/CRM
+async function navigateClientPage(cc) {
+  APP.page = 'clientdetail';
+  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading client data...</div>';
+
+  const [timeline, dsrData, actLogs] = await Promise.all([
+    api('GET', '/clients/'+cc+'/timeline'),
+    api('GET', '/dsr/trend/'+cc),
+    api('GET', '/clients/'+cc+'/activity'),
+  ]);
+
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+  const hColor = client?.healthStatus==='Healthy'?'#27ae60':client?.healthStatus==='Warning'?'#f39c12':'#e74c3c';
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- Header -->
+    <div class="card" style="border-left:4px solid ${hColor};margin-bottom:12px;">
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary);">${client?.busyName||cc}</div>
+            <div style="font-size:13px;color:var(--text-muted);">${client?.clientCode} • ${client?.marketplace||'—'} • ${client?.servicePlan||'—'}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            ${healthBadge(client?.healthStatus)}
+            ${statusBadge(client?.status)}
+            <button class="btn btn-sm btn-outline" onclick="navigateBack()">← Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:12px;">
+      <div class="kpi-card green" style="cursor:pointer;" onclick="document.getElementById('cd-crm').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📞 CRM Calls</div>
+        <div class="kpi-value">${crmCalls.length}</div>
+      </div>
+      <div class="kpi-card red" style="cursor:pointer;" onclick="document.getElementById('cd-tickets').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">🎫 Tickets</div>
+        <div class="kpi-value">${tickets.length}</div>
+        <div class="kpi-sub">${tickets.filter(t=>t.status==='Open').length} open</div>
+      </div>
+      <div class="kpi-card purple" style="cursor:pointer;" onclick="document.getElementById('cd-tasks').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📝 Tasks</div>
+        <div class="kpi-value">${tasks.length}</div>
+        <div class="kpi-sub">${tasks.filter(t=>t.status!=='Completed').length} pending</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">🔄 Renewal</div>
+        <div class="kpi-value" style="font-size:14px;">${client?.renewalDate||'—'}</div>
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+          <div style="background:#d6eaf8;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.amName||''}','Account Manager')">
+            <div style="font-size:11px;color:#1a5276;font-weight:700;">ACCOUNT MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.amName||'—'}</div>
+            <div style="font-size:11px;color:#2E75B6;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#fdebd0;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;color:#a04000;font-weight:700;">ADS MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.adsManager||'—'}</div>
+            <div style="font-size:11px;color:#d35400;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#d5f5e3;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;color:#1e8449;font-weight:700;">CRM EXECUTIVE</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.crmExecutive||'—'}</div>
+            <div style="font-size:11px;color:#27ae60;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn btn-primary" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">🎫 Raise Ticket</button>
+      <button class="btn btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📝 Create Task</button>
+      <button class="btn btn-secondary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📞 Log Call</button>
+    </div>
+
+    <!-- CRM Calls -->
+    <div class="card" id="cd-crm" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#e8f4fd;">
+        <span class="card-title">📞 CRM Calls (${crmCalls.length})</span>
+        <button class="btn btn-sm btn-primary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+          <tbody>${crmCalls.map(c=>`<tr>
+            <td style="font-size:12px;">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td>${c.crm_executive||'—'}</td>
+            <td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td>
+            <td style="font-size:12px;max-width:180px;">${c.seller_comment||'—'}</td>
+            <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="card" id="cd-tickets" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">🎫 Tickets (${tickets.length})</span>
+        <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">+ Raise</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tickets.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+          <tbody>${tickets.map(t=>`<tr>
+            <td style="font-size:12px;">${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td style="max-width:180px;">${t.subject||t.category||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td>
+            <td style="font-size:12px;">${t.assigned_to||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card" id="cd-tasks" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f4f0fb;">
+        <span class="card-title">📝 Tasks (${tasks.length})</span>
+        <button class="btn btn-sm btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Add Task</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Priority</th><th>Status</th></tr></thead>
+          <tbody>${tasks.map(t=>`<tr>
+            <td style="max-width:180px;font-weight:600;">${t.title||'—'}</td>
+            <td>${t.assigned_to||'—'}</td>
+            <td style="font-size:12px;">${t.due_date||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">📋 Activity Log (${actLogs?.length||0})</span></div>
+      <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
+        ${!actLogs?.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>' :
+        actLogs.map(l=>`<div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:2px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function navigateBack() {
+  navigate('clients');
+}
+
+// Log CRM call directly from client detail page
+function logCRMCallFor(cc, cn) {
+  openPanel('📞 Log Call — '+cn, `
+    <div style="background:#d5f5e3;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">
+      📎 Client: <strong>${cn}</strong>
+    </div>
+    <div class="form-group"><label>Call Outcome</label>
+      <select class="form-control" id="lcd-outcome">
+        <option>Called — Connected</option><option>Called — No Response</option>
+        <option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Seller Feedback</label>
+      <textarea class="form-control" id="lcd-comment" placeholder="Seller ne kya kaha?" rows="3"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Severity</label>
+        <select class="form-control" id="lcd-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+      <div class="form-group"><label>Next Follow-up</label>
+        <input type="date" class="form-control" id="lcd-followup">
+      </div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="submitCRMCallFor('${cc}','${cn.replace(/'/g,"\'")}')">📞 Save Call</button>`);
+}
+
+async function submitCRMCallFor(cc, cn) {
+  const r = await api('POST', '/crm', {
+    clientCode: cc, clientName: cn,
+    callOutcome: document.getElementById('lcd-outcome').value,
+    sellerComment: document.getElementById('lcd-comment').value,
+    severity: document.getElementById('lcd-sev').value,
+    nextFollowUp: document.getElementById('lcd-followup').value||null,
+  });
+  if (r?.success) {
+    showToast('✅ Call logged!', 'success');
+    closePanel();
+    navigateClientPage(cc); // Refresh
+  }
+}
+
+async function openClientDetail(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  // Admin/Lead/CRM — full page view
+  if (['Admin','Ops Lead','CSI Lead','CRM Executive','SME','Team Lead'].includes(APP.user.role)) {
+    navigateClientPage(cc);
+    return;
+  }
+  openPanel('👁️ '+client.busyName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const timeline = await api('GET', '/clients/'+cc+'/timeline');
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+
+  document.getElementById('panel-body').innerHTML = `
+    <!-- Client Info -->
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+        <div><span style="color:var(--text-muted);">Code:</span> <strong>${client.clientCode}</strong></div>
+        <div><span style="color:var(--text-muted);">Market:</span> <strong>${client.marketplace||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">AM:</span> <strong>${client.amName||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Ads:</span> <strong>${client.adsManager||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">CRM:</span> <strong>${client.crmExecutive||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Plan:</span> <strong>${client.servicePlan||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Status:</span> ${statusBadge(client.status)}</div>
+        <div><span style="color:var(--text-muted);">Health:</span> ${healthBadge(client.healthStatus)}</div>
+        <div><span style="color:var(--text-muted);">Renewal:</span> <strong>${client.renewalDate||'—'}</strong></div>
+      </div>
+    </div>
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-sm btn-primary" onclick="openRaiseTicketFor('${cc}','${client.busyName}')">🎫 Raise Ticket</button>
+      <button class="btn btn-sm btn-success" onclick="openCreateTask('','${client.busyName}');document.getElementById('tsk-client-wrap_val')&&(document.getElementById('tsk-client-wrap_val').value='${cc}')">📝 Add Task</button>
+      <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>' :
+      crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+        </div>
+        <div style="font-size:13px;margin-top:4px;">${c.seller_comment||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length ? '<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>' :
+      tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.subject||t.category||'—'}</span>
+          <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Priority: ${t.priority||'—'} | ${t.assigned_to||'—'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>' :
+      tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+          <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+      </div>`).join('')}
+    </div>`;
 }
 
 async function deleteClient(code, name) {

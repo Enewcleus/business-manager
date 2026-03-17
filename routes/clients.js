@@ -187,6 +187,25 @@ router.delete('/:code', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/clients/:code/activity — activity log
+router.get('/:code/activity', authMiddleware, async (req, res) => {
+  const cc = req.params.code;
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*')
+    .eq('client_code', cc)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json((data||[]).map(l => ({
+    actionType: l.action_type,
+    actionDetail: l.action_detail,
+    userName: l.user_name,
+    userRole: l.user_role,
+    timestamp: l.created_at ? new Date(l.created_at).toLocaleString('en-IN') : '—',
+  })));
+});
+
 // POST /api/clients/quickaction — legacy route (backward compat)
 router.post('/quickaction', authMiddleware, async (req, res) => {
   const { clientCode, clientName, action } = req.body;

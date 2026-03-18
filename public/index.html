@@ -2445,11 +2445,13 @@ async function renderReports(){
           <button class="btn btn-secondary" onclick="window._currentReport='renewal';generateReport()">🔄 Renewal Report</button>
           <button class="btn btn-secondary" onclick="window._currentReport='ticket';generateReport()">🎫 Ticket Report</button>
           <button class="btn btn-secondary" onclick="window._currentReport='team';generateReport()">👥 Team Report</button>
+          <button class="btn btn-secondary" style="background:var(--primary);color:#fff;" onclick="window._currentReport='executive';generateReport()">🧑‍💼 Executive Summary</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
           <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="rpt-to" value="${today}"></div>
           <div class="form-group"><label>Seller</label><select class="form-control" id="rpt-client"><option value="">-- All Sellers --</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}</select></div>
+          <div class="form-group" id="rpt-exec-wrap" style="display:none;"><label>Executive</label><select class="form-control" id="rpt-exec"><option value="">-- All Executives --</option></select></div>
           <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
             <button class="btn btn-primary" onclick="generateReport()">🔍 Generate</button>
             <button class="btn btn-success" onclick="exportExcel()">📥 Excel</button>
@@ -2465,7 +2467,168 @@ async function renderReports(){
 async function generateReport(){
   const type=window._currentReport||'dsr',from=document.getElementById('rpt-from')?.value,to=document.getElementById('rpt-to')?.value,cc=document.getElementById('rpt-client')?.value,el=document.getElementById('report-output');
   if(!el) return;
+
+  // Show/hide executive filter based on report type
+  const execWrap=document.getElementById('rpt-exec-wrap');
+  if(execWrap) execWrap.style.display = type==='executive' ? '' : 'none';
+
   el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  if(type==='executive'){
+    // Fetch tasks + worklogs + users
+    const [tasks, worklogs, users] = await Promise.all([
+      api('GET','/tasks'),
+      api('GET','/tasks/worklog'),
+      api('GET','/users')
+    ]);
+
+    const allTasks = tasks||[];
+    const allLogs = worklogs||[];
+    const allUsers = (users||[]).filter(u=>u.isActive);
+
+    // Populate executive dropdown
+    const execSel = document.getElementById('rpt-exec');
+    if(execSel && execSel.options.length <= 1){
+      allUsers.forEach(u=>{
+        const opt=document.createElement('option');
+        opt.value=u.name; opt.textContent=u.name+' — '+u.role;
+        execSel.appendChild(opt);
+      });
+    }
+
+    const filterExec = execSel?.value||'';
+
+    // Date filter helper
+    function inRange(dateStr){
+      if(!dateStr) return false;
+      const d = dateStr.split('T')[0];
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    }
+
+    // Filter tasks by date (createdAt or updatedAt) and client
+    const filteredTasks = allTasks.filter(t=>{
+      const taskDate = (t.completedAt||t.createdAt||'').split('T')[0];
+      if(from && taskDate < from) return false;
+      if(to && taskDate > to) return false;
+      if(cc && t.clientCode !== cc) return false;
+      return true;
+    });
+
+    // Filter worklogs by date and client
+    const filteredLogs = allLogs.filter(l=>{
+      const logDate = (l.loggedAt||l.createdAt||'').split('T')[0];
+      if(from && logDate < from) return false;
+      if(to && logDate > to) return false;
+      if(cc && l.clientCode !== cc) return false;
+      return true;
+    });
+
+    // Build per-executive summary
+    // Use tasks assignedTo as primary source, supplement with worklogs
+    const execMap = {};
+
+    filteredTasks.forEach(t=>{
+      const exec = t.assignedTo||'Unknown';
+      if(!execMap[exec]) execMap[exec]={ name:exec, role:'', tasksDone:0, inProgress:0, overdue:0, clientsMap:{} };
+      if(t.status==='Completed') execMap[exec].tasksDone++;
+      else if(t.status==='In Progress') execMap[exec].inProgress++;
+      if(t.isOverdue && t.status!=='Completed') execMap[exec].overdue++;
+      if(t.clientCode){
+        if(!execMap[exec].clientsMap[t.clientCode]){
+          execMap[exec].clientsMap[t.clientCode]={ clientCode:t.clientCode, clientName:t.clientName||t.clientCode, tasks:[] };
+        }
+        execMap[exec].clientsMap[t.clientCode].tasks.push(t);
+      }
+    });
+
+    // Add work logs to client map too
+    filteredLogs.forEach(l=>{
+      const exec = l.enteredBy||l.executive||'Unknown';
+      if(!execMap[exec]) execMap[exec]={ name:exec, role:'', tasksDone:0, inProgress:0, overdue:0, clientsMap:{} };
+      if(l.clientCode && !execMap[exec].clientsMap[l.clientCode]){
+        execMap[exec].clientsMap[l.clientCode]={ clientCode:l.clientCode, clientName:l.clientName||l.clientCode, tasks:[] };
+      }
+    });
+
+    // Attach roles from users
+    allUsers.forEach(u=>{ if(execMap[u.name]) execMap[u.name].role=u.role; });
+
+    let rows = Object.values(execMap);
+    if(filterExec) rows = rows.filter(r=>r.name===filterExec);
+    rows.sort((a,b)=> Object.keys(b.clientsMap).length - Object.keys(a.clientsMap).length);
+
+    window._reportData = rows;
+    window._reportType = 'executive';
+
+    if(!rows.length){
+      el.innerHTML='<div class="empty-state"><div class="emoji">📭</div><h3>Is range mein koi data nahi</h3></div>';
+      return;
+    }
+
+    el.innerHTML=`
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🧑‍💼 Executive Summary (${from} to ${to})</span>
+          <span class="badge badge-blue">${rows.length} Executives</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Executive</th>
+                  <th>Role</th>
+                  <th style="text-align:center;">Clients Worked</th>
+                  <th style="text-align:center;">✅ Done</th>
+                  <th style="text-align:center;">▶ In Progress</th>
+                  <th style="text-align:center;">🔴 Overdue</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(r=>{
+                  const clientCount = Object.keys(r.clientsMap).length;
+                  const rowBg = r.overdue > 0 ? 'background:#fff8f8;' : '';
+                  return '<tr style="'+rowBg+'">'
+                    +'<td><strong>'+r.name+'</strong></td>'
+                    +'<td><span class="badge badge-blue" style="font-size:11px;">'+( r.role||'—')+'</span></td>'
+                    +'<td style="text-align:center;">'
+                      +(clientCount > 0
+                        ? '<button onclick="toggleExecClients(\'exec-'+r.name.replace(/\s/g,'_')+'\')" style="background:var(--secondary);color:#fff;border:none;border-radius:20px;padding:3px 14px;cursor:pointer;font-weight:700;font-size:13px;">'+clientCount+' clients 👆</button>'
+                        : '<span style="color:var(--text-muted);">0</span>')
+                    +'</td>'
+                    +'<td style="text-align:center;"><span class="badge badge-green">'+r.tasksDone+'</span></td>'
+                    +'<td style="text-align:center;"><span class="badge badge-blue">'+r.inProgress+'</span></td>'
+                    +'<td style="text-align:center;">'+(r.overdue>0?'<span class="badge badge-red">'+r.overdue+'</span>':'<span class="badge badge-green">0</span>')+'</td>'
+                    +'</tr>'
+                    // Expandable client rows
+                    +'<tr id="exec-'+r.name.replace(/\s/g,'_')+'" style="display:none;">'
+                    +'<td colspan="6" style="padding:0 0 0 32px;background:#f8fafc;">'
+                    +'<div style="padding:12px;">'
+                    +'<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">'+r.name+' — Clients:</div>'
+                    + Object.values(r.clientsMap).map(cl=>{
+                        const done = cl.tasks.filter(t=>t.status==='Completed').length;
+                        const prog = cl.tasks.filter(t=>t.status==='In Progress').length;
+                        const over = cl.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+                        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--secondary);">'
+                          +'<div style="flex:1;font-size:13px;font-weight:600;">👥 '+cl.clientName+'</div>'
+                          +(done?'<span class="badge badge-green" style="font-size:11px;">✅ '+done+' done</span>':'')
+                          +(prog?'<span class="badge badge-blue" style="font-size:11px;">▶ '+prog+' progress</span>':'')
+                          +(over?'<span class="badge badge-red" style="font-size:11px;">🔴 '+over+' overdue</span>':'')
+                          +'<span style="font-size:11px;color:var(--text-muted);">'+cl.tasks.length+' tasks total</span>'
+                          +'</div>';
+                      }).join('')
+                    +'</div></td></tr>';
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
   if(type==='dsr'){
     let url='/dsr?x=1';if(from)url+=`&from=${from}`;if(to)url+=`&to=${to}`;if(cc)url+=`&client=${cc}`;
     const data=await api('GET',url)||[];window._reportData=data;window._reportType='dsr';
@@ -2488,11 +2651,27 @@ async function generateReport(){
   }
 }
 
+function toggleExecClients(rowId){
+  const el = document.getElementById(rowId);
+  if(el) el.style.display = el.style.display==='none' ? '' : 'none';
+}
+
 function exportExcel(){
   const data=window._reportData||[],type=window._reportType||'report';
   if(!data.length){showToast('Pehle report generate karo','error');return;}
   let csv='';
-  if(type==='dsr'){csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');}
+  if(type==='executive'){
+    csv='Executive,Role,Clients Worked,Tasks Done,In Progress,Overdue\n';
+    csv+=data.map(r=>[
+      r.name,
+      r.role||'',
+      Object.keys(r.clientsMap).length,
+      r.tasksDone,
+      r.inProgress,
+      r.overdue
+    ].join(',')).join('\n');
+  }
+  else if(type==='dsr'){csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');}
   else if(type==='crm'){csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');}
   else if(type==='renewal'){csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');}
   else if(type==='ticket'){csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');}

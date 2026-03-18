@@ -9,7 +9,6 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
-  // Admin/Ops Lead see all; others see only their own calls
   if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
     query = query.eq('crm_executive', name);
   }
@@ -23,7 +22,6 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   })));
 });
 
-// ✅ Executive/SME ka apna call log
 crmRouter.get('/my-calls', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('crm_calls').select('*')
     .eq('crm_executive', req.user.name)
@@ -50,6 +48,22 @@ crmRouter.get('/client/:code', authMiddleware, async (req, res) => {
   })));
 });
 
+crmRouter.get('/', authMiddleware, async (req, res) => {
+  const { role, name } = req.user;
+  const { client } = req.query;
+  let query = supabase.from('crm_calls').select('*').order('created_at', { ascending: false }).limit(500);
+  if (client) query = query.eq('client_code', client);
+  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) query = query.eq('crm_executive', name);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data.map(c => ({
+    call_id: c.call_id, client_code: c.client_code, client_name: c.client_name,
+    crm_executive: c.crm_executive, call_outcome: c.call_outcome,
+    seller_comment: c.seller_comment, severity: c.severity,
+    next_follow_up: c.next_follow_up, created_at: c.created_at,
+  })));
+});
+
 crmRouter.post('/', authMiddleware, async (req, res) => {
   const d = req.body;
   const callId = 'CRM' + Date.now().toString().slice(-7);
@@ -71,7 +85,6 @@ crmRouter.post('/', authMiddleware, async (req, res) => {
   res.json({ success: true, callId });
 });
 
-// ✅ NEW: Executive simple call log (same table, same columns)
 crmRouter.post('/log', authMiddleware, async (req, res) => {
   const d = req.body;
   const callId = 'CRM' + Date.now().toString().slice(-7);
@@ -141,7 +154,6 @@ csiRouter.post('/', authMiddleware, async (req, res) => {
 // ── TASKS ROUTES ──────────────────────────────────────────────
 const tasksRouter = require('express').Router();
 
-
 // GET /api/tasks/ads — Ads department tasks only
 tasksRouter.get('/ads', authMiddleware, async (req, res) => {
   try {
@@ -150,15 +162,12 @@ tasksRouter.get('/ads', authMiddleware, async (req, res) => {
       'Campaign Optimization','New Campaign Live','Campaign Paused',
       'Keyword Research','A/B Testing','Report Review','Client Approval Pending'
     ];
-    let query = supabase.from('tasks').select('*')
-      .order('created_at', { ascending: false });
-    // Ads Executive sees only their own; Admin/Ops/SME/Team Lead see all
+    let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
     if (!['Admin','Ops Lead','CSI Lead','SME','Team Lead','Senior Executive'].includes(role)) {
       query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
     }
     const { data, error } = await query.limit(500);
     if (error) return res.status(500).json({ error: error.message });
-    // Filter ads categories in JS (safer than .in() with possible null values)
     const now = new Date();
     const filtered = (data||[]).filter(t => ADS_CATEGORIES.includes(t.category));
     res.json(filtered.map(t => ({
@@ -175,60 +184,96 @@ tasksRouter.get('/ads', authMiddleware, async (req, res) => {
   }
 });
 
+// ✅ GET /api/tasks — now includes parentTaskId for sub-task support
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
   if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
     query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
   }
-  const { data, error } = await query.limit(100);
+  const { data, error } = await query.limit(200);
   if (error) return res.status(500).json({ error: error.message });
   const now = new Date();
   res.json(data.map(t => ({
-    taskId: t.task_id, title: t.title, description: t.description,
-    clientCode: t.client_code, clientName: t.client_name,
-    assignedTo: t.assigned_to, assignedToRole: t.assigned_to_role,
-    assignedBy: t.assigned_by, assignedByRole: t.assigned_by_role,
-    priority: t.priority, category: t.category, status: t.status,
-    deadline: t.deadline, workLog: t.work_log,
+    taskId: t.task_id,
+    title: t.title,
+    description: t.description,
+    clientCode: t.client_code,
+    clientName: t.client_name,
+    assignedTo: t.assigned_to,
+    assignedToRole: t.assigned_to_role,
+    assignedBy: t.assigned_by,
+    assignedByRole: t.assigned_by_role,
+    priority: t.priority,
+    category: t.category,
+    status: t.status,
+    deadline: t.deadline,
+    workLog: t.work_log,
+    // ✅ NEW: sub-task support
+    parentTaskId: t.parent_task_id || null,
     isOverdue: t.deadline && t.status !== 'Completed' ? new Date(t.deadline) < now : false,
     createdAt: new Date(t.created_at).toLocaleString('en-IN'),
     completedAt: t.completed_at ? new Date(t.completed_at).toLocaleString('en-IN') : '',
   })));
 });
 
+// ✅ POST /api/tasks — now saves parentTaskId for sub-tasks
 tasksRouter.post('/', authMiddleware, async (req, res) => {
   const d = req.body;
   const taskId = 'TSK' + Date.now().toString().slice(-7);
   const { error } = await supabase.from('tasks').insert({
-    task_id: taskId, title: d.title, description: d.description,
-    client_code: d.clientCode || null, client_name: d.clientName || null,
+    task_id: taskId,
+    title: d.title,
+    description: d.description,
+    client_code: d.clientCode || null,
+    client_name: d.clientName || null,
     assigned_to: d.assignedTo || req.user.name,
     assigned_to_role: d.assignedToRole || req.user.role,
-    assigned_by: req.user.name, assigned_by_role: req.user.role,
-    priority: d.priority || 'Medium', category: d.category || 'General',
+    assigned_by: req.user.name,
+    assigned_by_role: req.user.role,
+    priority: d.priority || 'Medium',
+    category: d.category || 'General',
     deadline: d.deadline || d.dueDate || null,
+    // ✅ NEW: save parent_task_id for sub-tasks
+    parent_task_id: d.parentTaskId || null,
   });
   if (error) return res.status(500).json({ error: error.message });
+  // Send notification if assigning to someone else
   if (d.assignedTo && d.assignedTo !== req.user.name) {
     await supabase.from('notifications').insert({
-      notif_id: 'NTF' + Date.now(), assigned_to: d.assignedTo, assigned_role: d.assignedToRole,
-      type: 'NEW_TASK', message: `New task from ${req.user.name}: "${d.title}"`, related_id: taskId,
-    });
+      notif_id: 'NTF' + Date.now(),
+      assigned_to: d.assignedTo,
+      assigned_role: d.assignedToRole,
+      type: 'NEW_TASK',
+      message: `New task from ${req.user.name}: "${d.title}"`,
+      related_id: taskId,
+    }).catch(() => {});
   }
   res.json({ success: true, taskId });
 });
 
+// ✅ PATCH /api/tasks/:id — now supports full edit (title, assignedTo, priority, deadline, status)
 tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
-  const { status, workLog } = req.body;
-  const updates = { status };
+  const { status, workLog, title, assignedTo, priority, deadline } = req.body;
+  const updates = {};
+
+  // Status update
+  if (status !== undefined) updates.status = status;
   if (workLog) updates.work_log = workLog;
   if (status === 'Completed') updates.completed_at = new Date();
+
+  // ✅ NEW: Full edit fields (Admin/Lead use)
+  if (title !== undefined) updates.title = title;
+  if (assignedTo !== undefined) updates.assigned_to = assignedTo;
+  if (priority !== undefined) updates.priority = priority;
+  if (deadline !== undefined) updates.deadline = deadline || null;
+
   const { error } = await supabase.from('tasks').update(updates).eq('task_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
+// GET /api/tasks/worklog
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(100);
@@ -243,6 +288,7 @@ tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   })));
 });
 
+// POST /api/tasks/worklog
 tasksRouter.post('/worklog', authMiddleware, async (req, res) => {
   const d = req.body;
   const logId = 'WRK' + Date.now().toString().slice(-7);
@@ -355,6 +401,16 @@ usersRouter.get('/', authMiddleware, async (req, res) => {
   })));
 });
 
+usersRouter.get('/hierarchy', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase.from('users').select('user_code, name, role, designation, department, reporting_to_name, is_active').order('name');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data.map(u => ({
+    userId: u.user_code, name: u.name, role: u.role,
+    designation: u.designation, department: u.department,
+    reportingToName: u.reporting_to_name, isActive: u.is_active,
+  })));
+});
+
 usersRouter.post('/', authMiddleware, async (req, res) => {
   const { name, email, password, role, designation, department, reportingToName } = req.body;
   const userCode = 'USR' + Date.now().toString().slice(-5);
@@ -400,15 +456,54 @@ renewalsRouter.get('/', authMiddleware, async (req, res) => {
   const now = new Date();
   res.json(data.map(r => {
     const daysLeft = r.renewal_date ? Math.ceil((new Date(r.renewal_date) - now) / 86400000) : null;
-    return { renewalId: r.renewal_id, clientCode: r.client_code, clientName: r.client_name, servicePlan: r.service_plan, amount: r.amount, renewalDate: r.renewal_date, status: r.status, owner: r.owner, daysLeft };
+    const isOverdue = daysLeft !== null && daysLeft < 0;
+    const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 15;
+    return {
+      renewalId: r.renewal_id, clientCode: r.client_code, clientName: r.client_name,
+      servicePlan: r.service_plan, amount: r.amount, renewalDate: r.renewal_date,
+      status: r.status, owner: r.owner, daysLeft, isOverdue, isDueSoon,
+    };
   }));
 });
 
+renewalsRouter.get('/stats', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase.from('renewals').select('amount, status').eq('status', 'Confirmed');
+  if (error) return res.status(500).json({ error: error.message });
+  const totalValue = (data||[]).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  res.json({ totalValue, count: data?.length || 0 });
+});
+
 renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
-  const { status, notes } = req.body;
-  const { error } = await supabase.from('renewals').update({ status, notes, updated_at: new Date() }).eq('renewal_id', req.params.id);
+  const { status, notes, amount, renewalDate } = req.body;
+  const updates = { updated_at: new Date() };
+  if (status !== undefined) updates.status = status;
+  if (notes !== undefined) updates.notes = notes;
+  if (amount !== undefined) updates.amount = amount;
+  if (renewalDate !== undefined) updates.renewal_date = renewalDate || null;
+  const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
+});
+
+renewalsRouter.post('/trigger-reminders', authMiddleware, async (req, res) => {
+  const { data: renewals } = await supabase.from('renewals').select('*').eq('status', 'Pending');
+  const now = new Date();
+  let sent = 0;
+  for (const r of (renewals||[])) {
+    if (!r.renewal_date) continue;
+    const days = Math.ceil((new Date(r.renewal_date) - now) / 86400000);
+    if (days <= 15) {
+      await supabase.from('notifications').insert({
+        notif_id: 'NTF' + Date.now() + sent,
+        assigned_role: 'Admin',
+        type: 'RENEWAL_ALERT',
+        message: `Renewal due in ${days} days: ${r.client_name}`,
+        related_id: r.renewal_id,
+      }).catch(() => {});
+      sent++;
+    }
+  }
+  res.json({ success: true, reminders_sent: sent });
 });
 
 // ── ADS ───────────────────────────────────────────────────────

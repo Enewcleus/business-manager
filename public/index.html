@@ -1441,7 +1441,6 @@ async function submitCSI(){
   if(r?.success){showToast(`✅ CSI Saved! ${percent}% — ${percent>=80?'Healthy':percent>=50?'Warning':'At Risk'}`,'success');closePanel();renderCSI();}
 }
 
-
 // ═══════════════════════════════════════════════════════════════════
 // 📝 NEW TASK MANAGER — Teamwork Style
 // Replace everything between "// ── TASKS" and "// ── WORK LOG"
@@ -1594,6 +1593,627 @@ function buildMyTasksTab(tasks) {
           ${completed.map(t => twTaskCard(t, tasks)).join('')}
         </div>
       ` : ''}
+
+      ${!myTasks.length ? `<div class="empty-state"><div class="emoji">🎉</div><h3>Koi task nahi!</h3><p style="color:var(--text-muted);">Sab clear hai ya naya create karo.</p></div>` : ''}
+    </div>
+  `;
+}
+
+function toggleCompletedSection() {
+  const el = document.getElementById('completed-section');
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function filterTasksBySection(section) {
+  const tasks = _allTasksCache;
+  const u = APP.user;
+  let filtered;
+  if (section === 'overdue')    filtered = tasks.filter(t => t.isOverdue && t.status !== 'Completed');
+  else if (section === 'pending')    filtered = tasks.filter(t => t.status === 'Pending');
+  else if (section === 'inprogress') filtered = tasks.filter(t => t.status === 'In Progress');
+  else filtered = tasks; // all
+
+  const container = document.getElementById('my-tasks-sections');
+  if (!container) return;
+  const parentOnly = filtered.filter(t => !t.parentTaskId);
+  container.innerHTML = parentOnly.length
+    ? parentOnly.map(t => twTaskCard(t, tasks)).join('')
+    : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi is section mein</h3></div>';
+}
+
+// ─── TEAMWORK-STYLE TASK CARD ─────────────────────────────────────
+
+function twTaskCard(task, allTasks) {
+  const t = task;
+  const safeTitle = (t.title||'').replace(/'/g, '');
+  const safeClientName = (t.clientName||'').replace(/'/g, '');
+  const subTasks = allTasks.filter(x => x.parentTaskId === t.taskId);
+  const subDone  = subTasks.filter(x => x.status === 'Completed').length;
+  const isOpen   = _taskSubtasksOpen[t.taskId];
+
+  const priorityColor = t.priority === 'Critical' ? 'var(--red)' : t.priority === 'High' ? 'var(--orange)' : t.priority === 'Medium' ? 'var(--amber)' : 'var(--green)';
+  const statusBadgeClass = t.status === 'Completed' ? 'badge-green' : t.status === 'In Progress' ? 'badge-blue' : 'badge-gray';
+  const cardBg = t.status === 'Completed' ? '#f9fffe' : t.isOverdue ? '#fff8f8' : '#fff';
+
+  return `
+  <div style="background:${cardBg};border-radius:12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid ${priorityColor};overflow:hidden;">
+    <!-- Main Task Row -->
+    <div style="padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <!-- Title row -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="font-size:14px;font-weight:700;color:var(--primary);${t.status==='Completed'?'text-decoration:line-through;opacity:0.6;':''}">${t.title || '—'}</span>
+            ${t.isOverdue && t.status !== 'Completed' ? '<span style="background:#fadbd8;color:#922b21;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">🔴 OVERDUE</span>' : ''}
+          </div>
+          <!-- Meta row -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);align-items:center;">
+            ${t.clientName ? `<span>👥 <strong style="color:var(--primary);">${t.clientName}</strong></span>` : ''}
+            <span>👤 <strong>${t.assignedTo || '—'}</strong></span>
+            ${t.assignedBy && t.assignedBy !== t.assignedTo ? `<span style="color:#999;">📤 from ${t.assignedBy}</span>` : ''}
+            ${t.deadline ? `<span style="color:${t.isOverdue ? 'var(--red)' : 'var(--text-muted)'};">📅 ${t.deadline}</span>` : ''}
+            ${t.category ? `<span class="badge badge-gray" style="font-size:10px;">${t.category}</span>` : ''}
+          </div>
+          ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;">${t.description.slice(0,120)}${t.description.length>120?'...':''}</div>` : ''}
+        </div>
+        <!-- Right: status + priority -->
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <span class="badge ${statusBadgeClass}">${t.status}</span>
+          <span class="badge" style="background:${priorityColor}20;color:${priorityColor};font-size:10px;">${t.priority}</span>
+        </div>
+      </div>
+
+      <!-- Sub-tasks progress bar (if any) -->
+      ${subTasks.length ? `
+        <div style="margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text-muted);">Sub-tasks: ${subDone}/${subTasks.length}</span>
+            <button onclick="toggleSubTasks('${t.taskId}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--secondary);font-weight:700;">
+              ${isOpen ? '▲ Hide' : '▼ Show Sub-tasks'}
+            </button>
+          </div>
+          <div style="background:#ecf0f1;border-radius:4px;height:4px;overflow:hidden;">
+            <div style="height:100%;background:${subDone===subTasks.length?'var(--green)':'var(--secondary)'};border-radius:4px;width:${Math.round(subDone/subTasks.length*100)}%;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Action Buttons -->
+      ${t.status !== 'Completed' ? `
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+          ${t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
+          ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
+          <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
+          ${['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
+        </div>
+      ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
+    </div>
+
+    <!-- Sub-tasks Inline -->
+    <div id="subtasks-${t.taskId}" style="display:${isOpen?'':'none'};">
+      ${renderSubTasksBlock(subTasks, t.taskId, safeTitle)}
+    </div>
+  </div>`;
+}
+
+function renderSubTaskRow(st) {
+  const borderColor = st.status === 'Completed' ? 'var(--green)' : st.isOverdue ? 'var(--red)' : 'var(--border)';
+  const titleStyle = st.status === 'Completed' ? 'text-decoration:line-through;opacity:0.5;' : '';
+  const badgeClass = st.status === 'Completed' ? 'badge-green' : st.status === 'In Progress' ? 'badge-blue' : 'badge-gray';
+  const deadlinePart = st.deadline ? ' | 📅 ' + st.deadline : '';
+  const overduePart = (st.isOverdue && st.status !== 'Completed') ? ' 🔴' : '';
+  const startBtn = st.status !== 'Completed'
+    ? '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="updateTask(\'' + st.taskId + '\',\'In Progress\')">▶</button>'
+    : '';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid ' + borderColor + ';">'
+    + '<input type="checkbox" ' + (st.status === 'Completed' ? 'checked' : '') + ' onchange="updateTask(\'' + st.taskId + '\',this.checked?\'Completed\':\'Pending\')" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green);">'
+    + '<div style="flex:1;">'
+    + '<div style="font-size:13px;font-weight:600;' + titleStyle + '">' + (st.title || '—') + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">👤 ' + (st.assignedTo || '—') + deadlinePart + overduePart + '</div>'
+    + '</div>'
+    + '<span class="badge ' + badgeClass + '" style="font-size:10px;">' + st.status + '</span>'
+    + startBtn
+    + '</div>';
+}
+
+function renderSubTasksBlock(subTasks, parentId, parentTitle) {
+  if (!subTasks.length) {
+    return '<div style="background:#f8fafc;border-top:1px solid var(--border);padding:10px 16px;">'
+      + '<button onclick="openCreateTask(\'' + parentId + '\',\'' + parentTitle + '\',\'inline\')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 14px;width:100%;cursor:pointer;font-size:12px;color:var(--text-muted);">'
+      + '➕ Sub-task add karo</button></div>';
+  }
+  return '<div style="background:#f8fafc;border-top:1px solid var(--border);padding:10px 16px;">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Sub-Tasks</div>'
+    + subTasks.map(renderSubTaskRow).join('')
+    + '<button onclick="openCreateTask(\'' + parentId + '\',\'' + parentTitle + '\',\'inline\')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 14px;width:100%;cursor:pointer;font-size:12px;color:var(--text-muted);margin-top:4px;">'
+    + '➕ Add sub-task</button></div>';
+}
+
+function toggleSubTasks(taskId) {
+  _taskSubtasksOpen[taskId] = !_taskSubtasksOpen[taskId];
+  const el = document.getElementById('subtasks-'+taskId);
+  if (el) el.style.display = _taskSubtasksOpen[taskId] ? '' : 'none';
+  // Update button text
+  const btn = el?.previousElementSibling?.querySelector('button[onclick*="toggleSubTasks"]');
+  if (btn) btn.textContent = _taskSubtasksOpen[taskId] ? '▲ Hide' : '▼ Show Sub-tasks';
+}
+
+// ─── CLIENT TASKS TAB ─────────────────────────────────────────────
+
+function buildClientTasksTab() {
+  const clients = APP.clients || [];
+  return `
+    <div class="card">
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Client Select Karo</label>
+            <select class="form-control" id="ct-client-sel" onchange="loadClientTasks(this.value,this.options[this.selectedIndex].text)">
+              <option value="">-- Client choose karo --</option>
+              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.marketplace})</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateTask()" style="flex-shrink:0;">➕ New Task</button>
+        </div>
+      </div>
+    </div>
+    <div id="client-tasks-body">
+      <div class="empty-state"><div class="emoji">👆</div><h3>Client select karo tasks dekhne ke liye</h3></div>
+    </div>`;
+}
+
+async function loadClientTasks(clientCode, clientName) {
+  if (!clientCode) return;
+  const container = document.getElementById('client-tasks-body');
+  if (!container) return;
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  const tasks = await api('GET', '/tasks');
+  _allTasksCache = tasks || [];
+  const clientTasks = (tasks||[]).filter(t => t.clientCode === clientCode);
+  const parentTasks = clientTasks.filter(t => !t.parentTaskId);
+
+  const open   = clientTasks.filter(t => t.status !== 'Completed').length;
+  const done   = clientTasks.filter(t => t.status === 'Completed').length;
+  const over   = clientTasks.filter(t => t.isOverdue && t.status !== 'Completed').length;
+  const safeClientName = (clientName||'').replace(/'/g, '');
+
+  container.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--red);">${over}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--amber);">${open}</div>
+        <div style="font-size:11px;color:#b7950b;">Open</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--green);">${done}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="openCreateTask('','${safeClientName}')">➕ Add Task for this Client</button>
+      </div>
+    </div>
+    ${!parentTasks.length
+      ? '<div class="empty-state"><div class="emoji">📝</div><h3>Is client ke koi tasks nahi hain</h3><p style="color:var(--text-muted);">Upar se naya task create karo</p></div>'
+      : parentTasks.map(t => twTaskCard(t, tasks||[])).join('')
+    }`;
+}
+
+// ─── TEAM OVERVIEW TAB ────────────────────────────────────────────
+
+async function loadTeamOverviewTab() {
+  const container = document.getElementById('tab-teamoverview');
+  if (!container) return;
+
+  const [tasks, users] = await Promise.all([api('GET','/tasks'), api('GET','/users')]);
+  if (!tasks) return;
+
+  const activeUsers = (users||[]).filter(u => u.isActive);
+  // Group tasks by assignee
+  const byPerson = {};
+  activeUsers.forEach(u => { byPerson[u.name] = { user: u, tasks: [] }; });
+  tasks.forEach(t => {
+    if (byPerson[t.assignedTo]) byPerson[t.assignedTo].tasks.push(t);
+    else byPerson[t.assignedTo] = { user: { name: t.assignedTo, role: '' }, tasks: [t] };
+  });
+
+  const rows = Object.values(byPerson).filter(p => p.tasks.length > 0).sort((a,b) => {
+    const aOver = a.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+    const bOver = b.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+    return bOver - aOver; // sort by overdue count desc
+  });
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">🏢 Team Task Overview</span></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Team Member</th><th>Role</th><th>Overdue</th><th>Pending</th><th>In Progress</th><th>Done</th><th>Total</th><th>Action</th></tr></thead>
+          <tbody>
+            ${rows.map(p => {
+              const over = p.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+              const pend = p.tasks.filter(t=>t.status==='Pending').length;
+              const inp  = p.tasks.filter(t=>t.status==='In Progress').length;
+              const done = p.tasks.filter(t=>t.status==='Completed').length;
+              return `<tr style="${over > 0 ? 'background:#fff8f8;' : ''}">
+                <td><strong>${p.user.name || '—'}</strong></td>
+                <td><span class="badge badge-blue" style="font-size:10px;">${p.user.role||'—'}</span></td>
+                <td><span style="color:var(--red);font-weight:700;">${over||'—'}</span></td>
+                <td>${pend||'—'}</td>
+                <td>${inp||'—'}</td>
+                <td><span style="color:var(--green);font-weight:700;">${done||'—'}</span></td>
+                <td><strong>${p.tasks.length}</strong></td>
+                <td>
+                  <button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="viewPersonTasksFromOverview('${p.user.name}')">👁️ View</button>
+                  <button class="btn btn-sm btn-primary" style="font-size:11px;" onclick="openAssignTaskTo('${p.user.name}','${p.user.role||''}')">📤 Assign</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>`;
+}
+
+async function viewPersonTasksFromOverview(name) {
+  openPanel('📝 Tasks: ' + name, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const tasks = _allTasksCache.length ? _allTasksCache : await api('GET','/tasks');
+  const myTasks = (tasks||[]).filter(t => t.assignedTo === name);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role);
+
+  document.getElementById('panel-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      ${[['Overdue','#fadbd8','var(--red)','#922b21'], ['Pending','#fef9e7','var(--amber)','#b7950b'], ['In Progress','#d6eaf8','var(--primary)','#1a5276'], ['Completed','#d5f5e3','var(--green)','#1e8449']].map(([label,bg,clr,txtclr]) => {
+        const cnt = label==='Overdue' ? myTasks.filter(t=>t.isOverdue&&t.status!=='Completed').length : myTasks.filter(t=>t.status===label).length;
+        return `<div style="background:${bg};border-radius:8px;padding:8px 12px;text-align:center;flex:1;">
+          <div style="font-size:18px;font-weight:800;color:${clr};">${cnt}</div>
+          <div style="font-size:11px;color:${txtclr};">${label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${isLead ? `<button class="btn btn-primary btn-sm" onclick="openAssignTaskTo('${name}','')" style="margin-bottom:12px;width:100%;">📤 Assign Task to ${name}</button>` : ''}
+    ${myTasks.length
+      ? myTasks.filter(t=>!t.parentTaskId).map(t => twTaskCard(t, tasks||[])).join('')
+      : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>'}`;
+}
+
+// ─── CREATE TASK WITH @MENTION ─────────────────────────────────────
+
+async function openCreateTask(parentTaskId = '', parentTitle = '', mode = '') {
+  const [clients, users] = await Promise.all([getClients(), api('GET', '/users')]);
+  if (clients) APP.clients = clients;
+  const allUsers = (users||[]).filter(u => u.isActive);
+  const isSubTask = !!parentTaskId;
+
+  openPanel(isSubTask ? '📝 Sub-Task: ' + parentTitle : '📝 Create Task', `
+    ${isSubTask ? `<div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a5276;">📎 Parent Task: <strong>${parentTitle}</strong></div>` : ''}
+
+    <div class="form-group">
+      <label>Task Title *</label>
+      <input type="text" class="form-control" id="tsk-title" placeholder="Task kya karna hai...">
+    </div>
+
+    <div class="form-group">
+      <label>Assign To — @mention ya dropdown se</label>
+      <div style="position:relative;">
+        <input type="text" class="form-control" id="tsk-assignee-search"
+          placeholder="@name type karo ya search karo..."
+          value="${APP.user.name}"
+          oninput="filterAssigneeList(this.value)"
+          onfocus="showAssigneeList()"
+          onblur="setTimeout(()=>hideAssigneeList(),200)"
+          autocomplete="off">
+        <input type="hidden" id="tsk-assignee-val" value="${APP.user.name}">
+        <div id="tsk-assignee-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--secondary);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:500;">
+          ${allUsers.map(u => `<div class="dropdown-item" style="padding:8px 12px;cursor:pointer;font-size:13px;" data-name="${u.name}" data-role="${u.role}"
+            onmousedown="selectAssignee('${u.name}','${u.role}')">
+            <strong>${u.name}</strong> <span style="font-size:11px;color:var(--text-muted);">— ${u.role}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Related Client (optional)</label>
+      <div id="tsk-client-wrap"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Description / Notes</label>
+      <textarea class="form-control" id="tsk-desc" placeholder="Details..." rows="3"></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Category</label>
+        <select class="form-control" id="tsk-cat">
+          <option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option>
+          <option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select class="form-control" id="tsk-pri">
+          <option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Deadline</label>
+      <input type="date" class="form-control" id="tsk-deadline">
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitCreateTask('${parentTaskId}')">
+      📝 ${isSubTask ? 'Create Sub-Task' : 'Create Task'}
+    </button>
+  `);
+
+  setTimeout(() => buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+  window._assigneeList = allUsers;
+}
+
+function showAssigneeList() {
+  document.getElementById('tsk-assignee-list').style.display = '';
+}
+function hideAssigneeList() {
+  document.getElementById('tsk-assignee-list').style.display = 'none';
+}
+function filterAssigneeList(q) {
+  const list = document.getElementById('tsk-assignee-list');
+  if (!list) return;
+  const lq = q.toLowerCase().replace('@','');
+  list.style.display = '';
+  list.querySelectorAll('.dropdown-item').forEach(item => {
+    item.style.display = item.dataset.name.toLowerCase().includes(lq) ? '' : 'none';
+  });
+}
+function selectAssignee(name, role) {
+  document.getElementById('tsk-assignee-search').value = name;
+  document.getElementById('tsk-assignee-val').value = name;
+  hideAssigneeList();
+}
+
+// openAssignTask — for Leads assigning to others
+async function openAssignTask() {
+  const [users, clients] = await Promise.all([api('GET','/users'), getClients()]);
+  if (clients) APP.clients = clients;
+  const allUsers = (users||[]).filter(u => u.isActive);
+  openPanel('📤 Assign Task to Someone', `
+    <div class="form-group"><label>Assign To *</label>
+      <select class="form-control" id="at-exec">
+        <option value="">Select person...</option>
+        ${allUsers.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <div class="form-group"><label>Client (optional)</label><div id="at-client-wrap"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="at-cat">
+          <option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option>
+          <option>Ads Campaign</option><option>Listing Work</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
+    <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
+  setTimeout(() => buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+}
+
+// Quick assign to specific person (from team overview)
+async function openAssignTaskTo(name, role) {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+  openPanel(`📤 Assign Task to ${name}`, `
+    <div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;">
+      👤 Assigning to: <strong>${name}</strong> <span style="font-size:12px;color:#666;">(${role})</span>
+    </div>
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
+    <div class="form-group"><label>Client (optional)</label><div id="at-client-wrap"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+      <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
+    </div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <button class="btn btn-primary btn-full" onclick="submitDirectAssign('${name}','${role}')">📤 Assign</button>`);
+  setTimeout(() => buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+}
+
+async function submitDirectAssign(name, role) {
+  const title = document.getElementById('at-title').value.trim();
+  const deadline = document.getElementById('at-deadline').value;
+  if (!title) { showToast('Title required', 'error'); return; }
+  if (!deadline) { showToast('Deadline required', 'error'); return; }
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r = await api('POST', '/tasks', {
+    title,
+    description: document.getElementById('at-desc').value,
+    clientCode, clientName,
+    assignedTo: name, assignedToRole: role,
+    priority: document.getElementById('at-pri').value,
+    category: 'General',
+    deadline,
+  });
+  if (r?.success) { showToast('✅ Task assigned to ' + name, 'success'); closePanel(); renderTasks(); }
+}
+
+// Edit task (admin/lead only)
+async function openEditTask(taskId) {
+  const task = _allTasksCache.find(t => t.taskId === taskId);
+  if (!task) return;
+  const [users] = await Promise.all([api('GET','/users')]);
+  const allUsers = (users||[]).filter(u=>u.isActive);
+  openPanel('✏️ Edit Task', `
+    <div class="form-group"><label>Title</label><input type="text" class="form-control" id="et-title" value="${task.title||''}"></div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="et-assignee">
+        ${allUsers.map(u=>`<option value="${u.name}" ${task.assignedTo===u.name?'selected':''}>${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="et-pri">
+          ${['Low','Medium','High','Critical'].map(p=>`<option ${task.priority===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="et-deadline" value="${task.deadline||''}"></div>
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="et-status">
+        ${['Pending','In Progress','Completed'].map(s=>`<option ${task.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditTask('${taskId}')">💾 Save</button>
+  `);
+}
+
+async function submitEditTask(taskId) {
+  const r = await api('PATCH', '/tasks/'+taskId, {
+    title: document.getElementById('et-title').value.trim(),
+    assignedTo: document.getElementById('et-assignee').value,
+    priority: document.getElementById('et-pri').value,
+    deadline: document.getElementById('et-deadline').value,
+    status: document.getElementById('et-status').value,
+  });
+  if (r?.success) { showToast('✅ Task updated!', 'success'); closePanel(); renderTasks(); }
+  else showToast('Error updating task', 'error');
+}
+
+// ─── SUBMIT FUNCTIONS ─────────────────────────────────────────────
+
+async function submitCreateTask(parentTaskId = '') {
+  const title = document.getElementById('tsk-title').value.trim();
+  if (!title) { showToast('Title required', 'error'); return; }
+  const assignedTo = document.getElementById('tsk-assignee-val')?.value || document.getElementById('tsk-assignee-search')?.value || APP.user.name;
+  const clientCode = getSearchableVal('tsk-client-wrap') || '';
+  const clientName = document.getElementById('tsk-client-wrap_search')?.value?.split(' (')[0] || '';
+  const u = APP.user;
+  const r = await api('POST', '/tasks', {
+    title,
+    description: document.getElementById('tsk-desc').value,
+    clientCode, clientName,
+    assignedTo,
+    assignedBy: u.name,
+    priority: document.getElementById('tsk-pri').value,
+    category: document.getElementById('tsk-cat').value,
+    deadline: document.getElementById('tsk-deadline').value || null,
+    parentTaskId: parentTaskId || null,
+  });
+  if (r?.success) {
+    showToast('✅ Task created: ' + r.taskId, 'success');
+    closePanel();
+    renderTasks();
+  }
+}
+
+async function submitAssignTask() {
+  const esel = document.getElementById('at-exec');
+  const to = esel.value, toRole = esel.options[esel.selectedIndex]?.dataset?.role || '';
+  const title = document.getElementById('at-title').value.trim();
+  const deadline = document.getElementById('at-deadline').value;
+  if (!to) { showToast('Select executive', 'error'); return; }
+  if (!title) { showToast('Title required', 'error'); return; }
+  if (!deadline) { showToast('Deadline required', 'error'); return; }
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r = await api('POST', '/tasks', {
+    title, description: document.getElementById('at-desc').value,
+    clientCode, clientName,
+    assignedTo: to, assignedToRole: toRole,
+    priority: document.getElementById('at-pri').value,
+    category: document.getElementById('at-cat').value,
+    deadline,
+  });
+  if (r?.success) { showToast('✅ Task assigned to ' + to, 'success'); closePanel(); renderTasks(); }
+}
+
+async function updateTask(id, status, workLog) {
+  const r = await api('PATCH', `/tasks/${id}`, { status, workLog: workLog || '' });
+  if (r?.success) { showToast('Task: ' + status, 'success'); renderTasks(); }
+}
+
+function promptCompleteTask(id, title) {
+  const n = prompt(`Complete: "${title}"\nWork log (optional):`);
+  if (n !== null) updateTask(id, 'Completed', n || 'Done');
+}
+
+function filterTasks(val) {
+  let f = _allTasksCache;
+  if (val === 'overdue') f = f.filter(t => t.isOverdue && t.status !== 'Completed');
+  else if (val) f = f.filter(t => t.status === val);
+  // Re-render in my tasks tab
+  const container = document.getElementById('my-tasks-sections');
+  if (container) {
+    const parentOnly = f.filter(t => !t.parentTaskId);
+    container.innerHTML = parentOnly.length
+      ? parentOnly.map(t => twTaskCard(t, _allTasksCache)).join('')
+      : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>';
+  }
+}
+
+// ─── WORK LOG (kept same, just referenced here) ───────────────────
+function openWorkLogEntry(taskId, cc, cn) {
+  openPanel('📓 Log Work', `
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="wl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
+    </div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
+    ${cc ? `<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px;">📎 Client: <strong>${cn || cc}</strong></div>` : ''}
+    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save Work Log</button>`);
+}
+
+async function submitWorkLog(taskId, cc, cn) {
+  const desc = document.getElementById('wl-desc').value.trim();
+  if (!desc) { showToast('Description required', 'error'); return; }
+  const r = await api('POST', '/tasks/worklog', {
+    clientCode: cc, clientName: cn,
+    workType: document.getElementById('wl-type').value,
+    description: desc,
+    outcome: document.getElementById('wl-outcome').value,
+    timeSpent: document.getElementById('wl-time').value,
+  });
+  if (r?.success) { showToast('✅ Work logged!', 'success'); closePanel(); renderTasks(); }
+}
+
+// ─── PERFORMANCE: CLIENT CACHE ALREADY AT 60s ─────────────────────
+// Additional perf fix: debounce global search
+let _searchDebounce;
+function globalSearch(q) {
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(() => {
+    if (!q.trim() || APP.page !== 'clients') return;
+    const f = APP.clients.filter(c =>
+      c.busyName.toLowerCase().includes(q.toLowerCase()) ||
+      c.clientCode.toLowerCase().includes(q.toLowerCase())
+    );
+    const qa = QUICK_ACTIONS[APP.user.role] || [];
+    const tbl = document.getElementById('clients-table');
+    if (tbl) tbl.innerHTML = clientTableRows(f, qa);
+    const cards = document.getElementById('clients-cards');
+    if (cards) cards.innerHTML = clientCards(f);
+  }, 300); // 300ms debounce
+}
+
 
       ${!myTasks.length ? `<div class="empty-state"><div class="emoji">🎉</div><h3>Koi task nahi!</h3><p style="color:var(--text-muted);">Sab clear hai ya naya create karo.</p></div>` : ''}
     </div>

@@ -89,7 +89,7 @@ router.get('/alerts', auth, async (req, res) => {
   try {
     const { data, error } = await supabase.from('dsr_data')
       .select('*')
-      .or('alert_overspend.eq.true,alert_budget_80.eq.true,alert_high_returns.eq.true,alert_sales_drop.eq.true')
+      .or('alert_overspend.eq.true,alert_budget_80.eq.true,alert_high_returns.eq.true,alert_sales_drop.eq.true,alert_under_spend.eq.true')
       .order('report_date', { ascending: false }).limit(50);
     if (error) throw error;
     res.json(data || []);

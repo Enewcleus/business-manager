@@ -349,8 +349,10 @@ const NAV_CONFIG = {
     {id:'clients',icon:'👥',label:'My Clients'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
   ],
   'Ads Executive': [
+    {id:'tasks',icon:'📋',label:'Task Manager',badge:'tasks'},
     {id:'adstasks',icon:'📋',label:'Ads Tasks',badge:'tasks'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
@@ -400,6 +402,7 @@ const NAV_CONFIG = {
     {id:'mycalls',icon:'📞',label:'My Call Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
   ],
 };
 
@@ -3740,7 +3743,7 @@ async function submitAdsTask() {
 
 async function updateAdsTaskStatus(taskId, status, selectEl) {
   if (!status) return;
-  const r = await api('PATCH', '/tasks/' + taskId, { status });
+  const r = await api('PATCH', '/ads/' + taskId, { status });
   if (r?.success) {
     showToast('✅ Status updated — ' + status, 'success');
     renderAdsTasks();

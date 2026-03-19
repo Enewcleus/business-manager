@@ -521,5 +521,11 @@ adsRouter.get('/', authMiddleware, async (req, res) => {
     budgetPercent: a.budget_percent, acos: a.acos, campaignStatus: a.campaign_status,
   })));
 });
-
+adsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
+  const { clientCode } = req.params;
+  const { status } = req.body;
+  const { error } = await supabase.from('ads_data').update({ status }).eq('client_code', clientCode);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter };

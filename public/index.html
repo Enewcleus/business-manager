@@ -624,6 +624,7 @@ async function renderDSR() {
           const al=[];
           if(a.alert_overspend) al.push('<span class="badge badge-red">💸 Over Budget</span>');
           if(a.alert_budget_80) al.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
+          if(a.alert_under_spend) al.push('<span class="badge badge-red">📉 Under 80% Spend</span>');
           if(a.alert_high_returns) al.push('<span class="badge badge-red">🔄 High Returns</span>');
           if(a.alert_sales_drop) al.push('<span class="badge badge-amber">📉 Sales Drop</span>');
           return `<tr><td><strong>${a.client_name}</strong></td><td>${a.report_date}</td><td>${al.join(' ')}</td><td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td></tr>`;

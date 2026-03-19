@@ -3,6 +3,7 @@ const crmRouter = require('express').Router();
 const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
+const clientsRouter = require('express').Router();
 crmRouter.get('/today', authMiddleware, async (req, res) => {
   const today = new Date(); today.setHours(0,0,0,0);
   const { role, name } = req.user;

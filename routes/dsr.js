@@ -124,6 +124,7 @@ router.post('/', auth, async (req, res) => {
     const alertOverspend  = budget > 0 && spend > budget;
     const alertBudget80   = budget > 0 && budgetUsed >= 80 && !alertOverspend;
     const alertHighReturn = returnRate > 15;
+    const alertUnderSpend = budget > 0 && budgetUsed < 80 && !alertOverspend;
 
     const { data: prev } = await supabase.from('dsr_data')
       .select('sales_amount').eq('client_code', clientCode)
@@ -137,8 +138,8 @@ router.post('/', auth, async (req, res) => {
       return_rate: returnRate, ad_spend: spend, seller_budget: budget,
       budget_used_pct: budgetUsed, alert_overspend: alertOverspend,
       alert_budget_80: alertBudget80, alert_high_returns: alertHighReturn,
-      alert_sales_drop: alertSalesDrop, notes: notes || '',
-      entered_by: req.user.name,
+      alert_sales_drop: alertSalesDrop, alert_under_spend: alertUnderSpend,
+      notes: notes || '', entered_by: req.user.name,
     }, { onConflict: 'client_code,report_date' });
     if (error) throw error;
 
@@ -174,18 +175,20 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Alert notifications
-    if (alertOverspend || alertHighReturn) {
+    if (alertOverspend || alertHighReturn || alertUnderSpend) {
+      const msg = alertOverspend
+        ? `⚠️ Budget overspent: ${clientName} — ₹${spend} vs ₹${budget}`
+        : alertUnderSpend
+        ? `📉 Under 80% spend: ${clientName} — ${budgetUsed}% used (₹${spend} of ₹${budget})`
+        : `⚠️ High returns (${returnRate}%): ${clientName}`;
       await supabase.from('notifications').insert({
-        type: 'DSR_ALERT',
-        message: alertOverspend
-          ? `⚠️ Budget overspent: ${clientName} — ₹${spend} vs ₹${budget}`
-          : `⚠️ High returns (${returnRate}%): ${clientName}`,
+        type: 'DSR_ALERT', message: msg,
         for_roles: JSON.stringify(['Admin', 'Ops Lead']),
         is_read: false, related_client: clientCode,
       }).catch(() => {});
     }
 
-    res.json({ success: true, returnRate, budgetUsed, alerts: { alertOverspend, alertBudget80, alertHighReturn, alertSalesDrop } });
+    res.json({ success: true, returnRate, budgetUsed, alerts: { alertOverspend, alertBudget80, alertHighReturn, alertSalesDrop, alertUnderSpend } });
   } catch (e) {
     console.error('DSR POST:', e);
     res.status(500).json({ error: e.message });

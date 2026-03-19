@@ -529,3 +529,14 @@ adsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter };
+clientsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
+  const { clientCode } = req.params;
+  const { amName, crmExecutive, adsManager } = req.body;
+  const updates = {};
+  if (amName !== undefined) updates.am_name = amName;
+  if (crmExecutive !== undefined) updates.crm_executive = crmExecutive;
+  if (adsManager !== undefined) updates.ads_manager = adsManager;
+  const { error } = await supabase.from('clients').update(updates).eq('client_code', clientCode);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});

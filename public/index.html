@@ -3743,7 +3743,7 @@ async function submitAdsTask() {
 
 async function updateAdsTaskStatus(taskId, status, selectEl) {
   if (!status) return;
-  const r = await api('PATCH', '/tasks/' + taskId, { status });
+  const r = await api('PATCH', '/ads/' + taskId, { status });
   if (r?.success) {
     showToast('✅ Status updated — ' + status, 'success');
     renderAdsTasks();

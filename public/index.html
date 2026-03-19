@@ -1063,6 +1063,7 @@ function clientTableRows(clients,qa) {
       <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️</button>
       <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
       <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
+     $['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm btn-secondary" onclick="openEditClient('${c.clientCode}','${c.busyName}','${c.amName||''}','${c.crmExecutive||''}','${c.adsManager||''}')">✏️</button>`:''}
       ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️</button>`:''}
     </div></td>
   </tr>`).join('')}</tbody></table>`;

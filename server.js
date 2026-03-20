@@ -51,7 +51,8 @@ app.use('/api/notifications',   require('./routes/notifications'));
 app.use('/api/users',           require('./routes/users'));
 app.use('/api/dsr',             require('./routes/dsr'));
 app.use('/api/close-requests',  require('./routes/close_requests'));
-app.use('/api/staff-transfer',  require('./routes/staff_transfer'));
+
+app.use('/api/hurdles',         require('./routes/allroutes').hurdleRouter);
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

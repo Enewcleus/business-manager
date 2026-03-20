@@ -618,7 +618,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 

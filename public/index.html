@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -323,6 +323,8 @@ const NAV_CONFIG = {
     {id:'adstasks',icon:'📋',label:'Ads Tasks'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'Ops Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -333,6 +335,8 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'CSI Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -342,6 +346,8 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'Account Manager': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -351,6 +357,8 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'worklog',icon:'📋',label:'Work Log'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'Ads Executive': [
     {id:'tasks',icon:'📋',label:'Task Manager',badge:'tasks'},
@@ -360,6 +368,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'CRM Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -369,6 +379,8 @@ const NAV_CONFIG = {
     {id:'csi',icon:'📊',label:'CSI Forms'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'SME': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -379,7 +391,9 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
-  ],
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+      ],
   'Senior Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
@@ -387,6 +401,8 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'Team Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -397,6 +413,8 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
   'Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -404,6 +422,8 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
 };
 
@@ -598,7 +618,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -3918,6 +3938,1605 @@ function initTheme(){
 function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
 document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 1: DSR EXECUTIVE FILTER
+// Add filterDSRByExec function + inject exec dropdown in renderDSR
+// ═══════════════════════════════════════════════════════════════════
+
+let _dsrAllData = [];
+
+function injectDSRExecFilter(data) {
+  _dsrAllData = data || [];
+  const isLead = ['Admin','Ops Lead','CSI Lead','Team Lead','SME'].includes(APP.user.role);
+  if (!isLead) return;
+  if (document.getElementById('dsr-exec-filter')) return;
+  const execs = [...new Set((_dsrAllData).map(d => d.entered_by).filter(Boolean))].sort();
+  const wrap = document.querySelector('#dsr-exec-filter-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Executive</label>'
+    + '<select class="form-control" id="dsr-exec-filter" onchange="filterDSRByExec()">'
+    + '<option value="">-- All Executives --</option>'
+    + execs.map(function(e){ return '<option value="' + e + '">' + e + '</option>'; }).join('')
+    + '</select>';
+}
+
+function filterDSRByExec() {
+  const execVal = (document.getElementById('dsr-exec-filter') || {}).value || '';
+  const rows = document.querySelectorAll('#dsr-data-table tr[data-exec]');
+  rows.forEach(function(row) {
+    if (!execVal) { row.style.display = ''; return; }
+    row.style.display = (row.dataset.exec || '').toLowerCase().includes(execVal.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 2: HURDLE TRACKER
+// ═══════════════════════════════════════════════════════════════════
+
+async function renderHurdleTracker() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading hurdles...</div>';
+  const [hurdles, clients] = await Promise.all([api('GET','/hurdles'), getClients()]);
+  if (clients) APP.clients = clients;
+  const all = hurdles || [];
+  const statusFilter = window._hurdleStatus || 'Open';
+  const filtered = statusFilter === 'All' ? all : all.filter(function(h){ return h.status === statusFilter; });
+  const open = all.filter(function(h){ return h.status === 'Open'; }).length;
+  const inprog = all.filter(function(h){ return h.status === 'In Progress'; }).length;
+  const resolved = all.filter(function(h){ return h.status === 'Resolved'; }).length;
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="kpi-grid" style="margin-bottom:16px;">'
+    + '<div class="kpi-card red"><div class="kpi-label">🔴 Open</div><div class="kpi-value">' + open + '</div></div>'
+    + '<div class="kpi-card amber"><div class="kpi-label">⏳ In Progress</div><div class="kpi-value">' + inprog + '</div></div>'
+    + '<div class="kpi-card green"><div class="kpi-label">✅ Resolved</div><div class="kpi-value">' + resolved + '</div></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+    + '<div style="display:flex;gap:8px;">'
+    + '<button class="btn btn-sm ' + (statusFilter==='All'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'All\')">All (' + all.length + ')</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='Open'?'btn-primary':'btn-outline') + '" style="color:var(--red);border-color:var(--red);" onclick="setHurdleFilter(\'Open\')">🔴 Open</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='In Progress'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'In Progress\')">⏳ In Progress</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='Resolved'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'Resolved\')">✅ Resolved</button>'
+    + '</div>'
+    + '<button class="btn btn-primary" onclick="openAddHurdle()">➕ Add Hurdle</button>'
+    + '</div>'
+    + buildHurdleTable(filtered);
+}
+
+function setHurdleFilter(status) {
+  window._hurdleStatus = status;
+  renderHurdleTracker();
+}
+
+function buildHurdleTable(hurdles) {
+  if (!hurdles.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>Koi hurdle nahi!</h3><p style="color:var(--text-muted);">Sab clients smooth chal rahe hain.</p></div>';
+  var rows = hurdles.map(function(h) {
+    var attempts = h.attempts || [];
+    var lastAttempt = attempts.length ? attempts[attempts.length-1] : null;
+    var statusClass = h.status==='Resolved' ? 'badge-green' : h.status==='In Progress' ? 'badge-blue' : 'badge-red';
+    var daysSince = h.created_at ? Math.floor((Date.now() - new Date(h.created_at)) / 86400000) : 0;
+    return '<tr>'
+      + '<td><strong>' + (h.client_name || h.client_code) + '</strong><br><small style="color:var(--text-muted);">' + h.client_code + '</small></td>'
+      + '<td style="max-width:200px;font-size:13px;">' + (h.description || '').slice(0, 80) + (h.description && h.description.length > 80 ? '...' : '') + '</td>'
+      + '<td><span class="badge ' + statusClass + '">' + h.status + '</span></td>'
+      + '<td style="text-align:center;"><strong>' + attempts.length + '</strong> attempts</td>'
+      + '<td style="font-size:12px;">' + (lastAttempt ? (lastAttempt.channel || '') + '<br>' + new Date(lastAttempt.date).toLocaleDateString('en-IN') : '—') + '</td>'
+      + '<td style="font-size:12px;color:var(--text-muted);">' + h.added_by + '<br>' + daysSince + 'd ago</td>'
+      + '<td>'
+      + '<button class="btn btn-sm btn-primary" onclick="openHurdleDetail(\'' + h.id + '\')">📋 Detail</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  return '<div class="card"><div class="card-body" style="padding:0;"><div class="table-wrap">'
+    + '<table><thead><tr>'
+    + '<th>Client</th><th>Hurdle</th><th>Status</th><th>Attempts</th><th>Last Contact</th><th>Added By</th><th>Action</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+}
+
+async function openAddHurdle() {
+  const clients = APP.clients || [];
+  openPanel('🚧 Add Client Hurdle', `
+    <div style="background:#fef9e7;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;border-left:4px solid var(--amber);">
+      ⚠️ <strong>Important:</strong> Hurdle add karne se pehle client ko email karna MANDATORY hai.
+    </div>
+
+    <div class="form-group">
+      <label>Client *</label>
+      <select class="form-control" id="h-client">
+        <option value="">-- Select Client --</option>
+        ${clients.map(function(c){ return '<option value="' + c.clientCode + '">' + c.busyName + ' (' + c.clientCode + ')</option>'; }).join('')}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Hurdle Description * <span style="color:var(--text-muted);font-size:11px;">(Kya kaam nahi kar raha hai?)</span></label>
+      <textarea class="form-control" id="h-desc" rows="4" placeholder="Seller ne kya nahi kiya / kya problem hai..."></textarea>
+    </div>
+
+    <div style="background:#d5f5e3;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">📧 Email Confirmation (Required)</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
+        <input type="checkbox" id="h-email-sent" onchange="toggleHurdleEmail()" style="width:18px;height:18px;accent-color:var(--green);">
+        <span style="font-size:13px;font-weight:600;">Maine client ko email kar diya hai</span>
+      </label>
+      <div id="h-email-fields" style="display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email Date</label>
+            <input type="date" class="form-control" id="h-email-date">
+          </div>
+          <div class="form-group">
+            <label>Email Subject</label>
+            <input type="text" class="form-control" id="h-email-subject" placeholder="Subject line...">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Pehli Communication</label>
+      <div class="form-row">
+        <div class="form-group">
+          <select class="form-control" id="h-channel">
+            <option value="">Channel</option>
+            <option>Phone</option><option>WhatsApp</option><option>Email</option><option>Meeting</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select class="form-control" id="h-response">
+            <option value="">Response</option>
+            <option>No Response</option><option>Promised</option><option>Partial</option><option>Refused</option>
+          </select>
+        </div>
+      </div>
+      <input type="text" class="form-control" id="h-notes" placeholder="Notes (kya bola client ne)...">
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitHurdle()">🚧 Add Hurdle</button>
+  `);
+}
+
+function toggleHurdleEmail() {
+  var checked = document.getElementById('h-email-sent').checked;
+  document.getElementById('h-email-fields').style.display = checked ? '' : 'none';
+}
+
+async function submitHurdle() {
+  const clientSel = document.getElementById('h-client');
+  const clientCode = clientSel.value;
+  const clientName = clientSel.options[clientSel.selectedIndex]?.text?.split(' (')[0] || '';
+  const desc = document.getElementById('h-desc').value.trim();
+  const emailSent = document.getElementById('h-email-sent').checked;
+
+  if (!clientCode) { showToast('Client select karo', 'error'); return; }
+  if (!desc) { showToast('Hurdle description daalo', 'error'); return; }
+  if (!emailSent) { showToast('Email confirmation required hai!', 'error'); return; }
+
+  const attempt = {
+    channel: document.getElementById('h-channel').value,
+    response: document.getElementById('h-response').value,
+    notes: document.getElementById('h-notes').value,
+  };
+
+  const r = await api('POST', '/hurdles', {
+    clientCode, clientName, description: desc,
+    emailSent: true,
+    emailDate: document.getElementById('h-email-date').value,
+    emailSubject: document.getElementById('h-email-subject').value,
+    attempt: attempt.channel ? attempt : null,
+  });
+
+  if (r?.success) {
+    showToast('✅ Hurdle added!', 'success');
+    closePanel();
+    renderHurdleTracker();
+  } else {
+    showToast(r?.error || 'Error adding hurdle', 'error');
+  }
+}
+
+async function openHurdleDetail(hurdleId) {
+  const hurdles = await api('GET', '/hurdles');
+  const h = (hurdles || []).find(function(x){ return x.id === hurdleId; });
+  if (!h) { showToast('Hurdle not found', 'error'); return; }
+
+  const attempts = h.attempts || [];
+  const attemptsHtml = attempts.length
+    ? attempts.map(function(a, i) {
+        var channelIcon = a.channel === 'Phone' ? '📞' : a.channel === 'WhatsApp' ? '💬' : a.channel === 'Email' ? '📧' : '🤝';
+        var responseClass = a.response === 'No Response' ? 'badge-red' : a.response === 'Promised' ? 'badge-green' : 'badge-amber';
+        return '<div style="display:flex;gap:10px;padding:10px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--secondary);">'
+          + '<div style="font-size:20px;">' + channelIcon + '</div>'
+          + '<div style="flex:1;">'
+          + '<div style="font-size:13px;font-weight:600;">' + (a.channel || '—') + ' — ' + (a.addedBy || '') + '</div>'
+          + '<div style="font-size:12px;color:var(--text-muted);">' + new Date(a.date).toLocaleString('en-IN') + '</div>'
+          + (a.notes ? '<div style="font-size:12px;margin-top:4px;">' + a.notes + '</div>' : '')
+          + '</div>'
+          + '<span class="badge ' + responseClass + '" style="font-size:10px;align-self:flex-start;">' + (a.response || '—') + '</span>'
+          + '</div>';
+      }).join('')
+    : '<div style="color:var(--text-muted);font-size:13px;padding:8px;">Koi attempt log nahi hua abhi</div>';
+
+  const statusOptions = ['Open','In Progress','Resolved'].map(function(s){
+    return '<option value="' + s + '"' + (h.status === s ? ' selected' : '') + '>' + s + '</option>';
+  }).join('');
+
+  openPanel('📋 Hurdle: ' + (h.client_name || h.client_code),
+    '<div style="background:#d6eaf8;border-radius:8px;padding:12px;margin-bottom:14px;">'
+    + '<strong>' + (h.client_name || h.client_code) + '</strong> | ' + h.client_code + '<br>'
+    + '<span style="font-size:12px;color:#1a5276;">' + h.description + '</span>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">'
+    + '<label style="font-size:13px;font-weight:600;">Status:</label>'
+    + '<select class="form-control" id="h-status-sel" style="width:auto;" onchange="updateHurdleStatus(\'' + hurdleId + '\')">'
+    + statusOptions
+    + '</select>'
+    + '</div>'
+
+    + (h.email_sent ? '<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;">✅ Email sent: <strong>' + (h.email_date || '') + '</strong> — ' + (h.email_subject || '') + '</div>' : '')
+
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">📞 Communication History (' + attempts.length + ' attempts)</div>'
+    + attemptsHtml
+
+    + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">'
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">➕ New Attempt Log</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><select class="form-control" id="na-channel"><option value="">Channel</option><option>Phone</option><option>WhatsApp</option><option>Email</option><option>Meeting</option></select></div>'
+    + '<div class="form-group"><select class="form-control" id="na-response"><option value="">Response</option><option>No Response</option><option>Promised</option><option>Partial</option><option>Refused</option><option>Resolved</option></select></div>'
+    + '</div>'
+    + '<input type="text" class="form-control" id="na-notes" placeholder="Notes (kya bola client ne)..." style="margin-bottom:10px;">'
+    + '<button class="btn btn-secondary btn-full" onclick="addHurdleAttempt(\'' + hurdleId + '\')">📝 Log Attempt</button>'
+    + '</div>'
+  );
+}
+
+async function updateHurdleStatus(hurdleId) {
+  const status = document.getElementById('h-status-sel').value;
+  const r = await api('PATCH', '/hurdles/' + hurdleId, { status });
+  if (r?.success) { showToast('✅ Status updated!', 'success'); renderHurdleTracker(); }
+}
+
+async function addHurdleAttempt(hurdleId) {
+  const channel = document.getElementById('na-channel').value;
+  const response = document.getElementById('na-response').value;
+  const notes = document.getElementById('na-notes').value;
+  if (!channel) { showToast('Channel select karo', 'error'); return; }
+  const r = await api('PATCH', '/hurdles/' + hurdleId, {
+    attempt: { channel, response, notes }
+  });
+  if (r?.success) {
+    showToast('✅ Attempt logged!', 'success');
+    closePanel();
+    renderHurdleTracker();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 3: AMAZON REPORT ANALYZER
+// ═══════════════════════════════════════════════════════════════════
+
+let _reportData = {
+  business: null,
+  targeting: null,
+  advertised: null,
+  searchterm: null,
+  inventory: null,
+  returns: null,
+};
+let _reportInsights = [];
+let _reportClientCode = '';
+let _reportClientName = '';
+
+async function renderReportAnalyzer() {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Upload karo → AI Analysis → Task Create karo</span></div>'
+    + '<div class="card-body">'
+
+    + '<div class="form-group" style="margin-bottom:20px;">'
+    + '<label style="font-weight:700;">Seller Select Karo *</label>'
+    + '<select class="form-control" id="ra-client" onchange="setRAClient()">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + (clients || []).map(function(c){ return '<option value="' + c.clientCode + '">' + c.busyName + ' (' + c.marketplace + ')</option>'; }).join('')
+    + '</select>'
+    + '</div>'
+
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">'
+    + buildUploadCard('business', '📊', 'Business Report', 'Sessions, Page Views, Conversion, Sales', '.csv')
+    + buildUploadCard('targeting', '🎯', 'Sponsored Products Targeting', 'Keywords, ACOS, Spend, CTR', '.xlsx,.csv')
+    + buildUploadCard('advertised', '📢', 'Advertised Product Report', 'ASIN-level ads performance', '.xlsx,.csv')
+    + buildUploadCard('searchterm', '🔍', 'Search Term Report', 'Customer search terms', '.xlsx,.csv')
+    + buildUploadCard('inventory', '📦', 'Inventory Report', 'FBA Stock, Replenishment needed', '.xlsx,.csv,.txt')
+    + buildUploadCard('returns', '🔄', 'Returns Report', 'Return reasons and count', '.tsv,.csv')
+    + '</div>'
+
+    + '<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">'
+    + '<button class="btn btn-primary" onclick="runReportAnalysis()" style="font-size:15px;padding:12px 24px;">🔍 Analyze All Reports</button>'
+    + '<button class="btn btn-outline" onclick="clearAllReports()">🗑️ Clear All</button>'
+    + '</div>'
+    + '</div></div>'
+
+    + '<div id="ra-results"></div>';
+}
+
+function buildUploadCard(type, icon, title, subtitle, accept) {
+  return '<div id="card-' + type + '" style="border:2px dashed var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s;background:#fff;" '
+    + 'onclick="document.getElementById(\'file-' + type + '\').click()" '
+    + 'onmouseover="this.style.borderColor=\'var(--secondary)\'" '
+    + 'onmouseout="this.style.borderColor=\'var(--border)\'">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+    + '<span style="font-size:24px;">' + icon + '</span>'
+    + '<div>'
+    + '<div style="font-weight:700;font-size:14px;">' + title + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">' + subtitle + '</div>'
+    + '</div>'
+    + '</div>'
+    + '<div id="status-' + type + '" style="font-size:12px;color:var(--text-muted);">Click to upload</div>'
+    + '<input type="file" id="file-' + type + '" accept="' + accept + '" style="display:none;" onchange="handleReportUpload(\'' + type + '\', this)">'
+    + '</div>';
+}
+
+function setRAClient() {
+  var sel = document.getElementById('ra-client');
+  _reportClientCode = sel.value;
+  _reportClientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+}
+
+async function handleReportUpload(type, input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var statusEl = document.getElementById('status-' + type);
+  var cardEl = document.getElementById('card-' + type);
+  statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
+
+  try {
+    var content = await readFileContent(file, type);
+    _reportData[type] = { raw: content, filename: file.name };
+    statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
+    cardEl.style.borderColor = 'var(--green)';
+    cardEl.style.background = '#f0fff4';
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:var(--red);">❌ Error: ' + e.message + '</span>';
+  }
+}
+
+function readFileContent(file, type) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.onerror = function() { reject(new Error('File read error')); };
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
+
+function clearAllReports() {
+  _reportData = { business: null, targeting: null, advertised: null, searchterm: null, inventory: null, returns: null };
+  renderReportAnalyzer();
+}
+
+async function runReportAnalysis() {
+  if (!_reportClientCode) { showToast('Pehle seller select karo!', 'error'); return; }
+  var hasData = Object.values(_reportData).some(function(v){ return v !== null; });
+  if (!hasData) { showToast('Pehle koi report upload karo!', 'error'); return; }
+
+  var results = document.getElementById('ra-results');
+  results.innerHTML = '<div class="loading"><div class="spinner"></div> Reports analyze ho rahi hain...</div>';
+
+  try {
+    var insights = [];
+
+    // Parse Business Report
+    if (_reportData.business) {
+      var bizInsights = parseBusinessReport(_reportData.business.raw);
+      insights = insights.concat(bizInsights);
+    }
+
+    // Parse Inventory
+    if (_reportData.inventory) {
+      var invInsights = parseInventoryReport(_reportData.inventory.raw);
+      insights = insights.concat(invInsights);
+    }
+
+    // Parse Ads (Targeting)
+    if (_reportData.targeting) {
+      var adsInsights = parseAdsReport(_reportData.targeting.raw);
+      insights = insights.concat(adsInsights);
+    }
+
+    // Parse Advertised Product
+    if (_reportData.advertised) {
+      var advInsights = parseAdvertisedReport(_reportData.advertised.raw);
+      insights = insights.concat(advInsights);
+    }
+
+    // Parse Search Terms
+    if (_reportData.searchterm) {
+      var stInsights = parseSearchTermReport(_reportData.searchterm.raw);
+      insights = insights.concat(stInsights);
+    }
+
+    // Parse Returns
+    if (_reportData.returns) {
+      var retInsights = parseReturnsReport(_reportData.returns.raw);
+      insights = insights.concat(retInsights);
+    }
+
+    _reportInsights = insights;
+    renderInsights(insights);
+
+  } catch(e) {
+    results.innerHTML = '<div class="card"><div class="card-body"><p style="color:var(--red);">Error: ' + e.message + '</p></div></div>';
+  }
+}
+
+function parseCSV(text) {
+  var lines = text.trim().split('\n');
+  if (!lines.length) return [];
+  // Handle BOM
+  lines[0] = lines[0].replace(/^\uFEFF/, '');
+  var headers = parseCSVLine(lines[0]);
+  var rows = [];
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var vals = parseCSVLine(lines[i]);
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+    else { current += ch; }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseTSV(text) {
+  var lines = text.trim().split('\n');
+  if (!lines.length) return [];
+  var headers = lines[0].split('\t');
+  var rows = [];
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var vals = lines[i].split('\t');
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function cleanNum(val) {
+  if (!val) return 0;
+  return parseFloat(String(val).replace(/[₹,%\s]/g,'').replace(/,/g,'')) || 0;
+}
+
+function parseBusinessReport(raw) {
+  var rows = parseCSV(raw);
+  var insights = [];
+  var lowConvItems = [];
+  var highSessionLowConv = [];
+  var lowBuyBox = [];
+
+  rows.forEach(function(row) {
+    var sessions = cleanNum(row['Sessions - Total'] || row['Sessions']);
+    var units = cleanNum(row['Units Ordered']);
+    var sales = cleanNum(row['Ordered Product Sales'] || row['Sales(INR)']);
+    var convRaw = row['Unit Session Percentage'] || row['Conversion rate'] || '0';
+    var conv = cleanNum(convRaw);
+    var fop = cleanNum(row['Featured Offer Percentage'] || '100');
+    var title = (row['Title'] || '').slice(0, 60);
+    var sku = row['SKU'] || row['(Child) ASIN'] || '';
+
+    if (sessions > 100 && conv < 5) {
+      lowConvItems.push({ title: title, sessions: sessions, conv: conv, sales: sales, sku: sku });
+    }
+    if (sessions > 300 && conv < 10) {
+      highSessionLowConv.push({ title: title, sessions: sessions, conv: conv });
+    }
+    if (fop < 80 && sessions > 50) {
+      lowBuyBox.push({ title: title, fop: fop });
+    }
+  });
+
+  if (lowConvItems.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '📉',
+      title: 'Low Conversion Products (' + lowConvItems.length + ')',
+      detail: lowConvItems.slice(0,3).map(function(x){ return x.title + ' — ' + x.sessions + ' sessions, ' + x.conv + '% conv'; }).join(' | '),
+      suggestions: [
+        { text: 'Main images improve karo — white background, zoomable', dept: 'Ops', time: 2 },
+        { text: 'Price competitive karo — competitor price check karo', dept: 'Ops', time: 1 },
+        { text: 'A+ content add karo listing mein', dept: 'Ops', time: 3 },
+        { text: 'Review count badhao — request review button use karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  if (highSessionLowConv.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '👁️',
+      title: 'High Traffic But Low Sales (' + highSessionLowConv.length + ' products)',
+      detail: highSessionLowConv.slice(0,2).map(function(x){ return x.title + ' (' + x.sessions + ' sessions)'; }).join(' | '),
+      suggestions: [
+        { text: 'Listing bullet points rewrite karo — benefits highlight karo', dept: 'Ops', time: 2 },
+        { text: 'Discount coupon add karo listing pe', dept: 'Ops', time: 1 },
+        { text: 'Video content add karo listing mein', dept: 'Ops', time: 5 },
+      ]
+    });
+  }
+
+  if (lowBuyBox.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '🏆',
+      title: 'Buy Box Loss (' + lowBuyBox.length + ' products)',
+      detail: lowBuyBox.slice(0,2).map(function(x){ return x.title + ' (' + x.fop + '% FOP)'; }).join(' | '),
+      suggestions: [
+        { text: 'Buy Box recover karo — price match competitor', dept: 'Ops', time: 1 },
+        { text: 'FBA se fulfill karo agar MFN hai', dept: 'Ops', time: 3 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseInventoryReport(raw) {
+  var insights = [];
+  var rows;
+  if (raw.includes('\t')) {
+    rows = parseTSV(raw);
+  } else {
+    rows = parseCSV(raw);
+  }
+
+  var outOfStock = [];
+  var lowStock = [];
+  var needReplenish = [];
+
+  rows.forEach(function(row) {
+    var qty = cleanNum(row['Quantity Available'] || row['Current FBA Stock'] || '0');
+    var replenish = cleanNum(row['Replenish Inventory'] || '0');
+    var sku = row['seller-sku'] || row['SKU'] || '';
+    var title = (row['Title'] || sku || '').slice(0, 60);
+
+    if (qty === 0) outOfStock.push({ sku: sku, title: title, replenish: replenish });
+    else if (qty < 10 && qty > 0) lowStock.push({ sku: sku, title: title, qty: qty });
+    if (replenish > 0) needReplenish.push({ sku: sku, title: title, replenish: replenish });
+  });
+
+  if (outOfStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'urgent',
+      icon: '🚨',
+      title: 'OUT OF STOCK — ' + outOfStock.length + ' Products!',
+      detail: outOfStock.slice(0,3).map(function(x){ return (x.title || x.sku); }).join(' | '),
+      suggestions: [
+        { text: 'FBA mein stock bhejo ASAP — ' + outOfStock.length + ' products out of stock hain. Sales loss ho raha hai!', dept: 'Ops', time: 1 },
+        { text: 'Out of stock SKUs pe ads pause karo — wasted spend rokne ke liye', dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (lowStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '⚠️',
+      title: 'Low Stock Warning (' + lowStock.length + ' products < 10 units)',
+      detail: lowStock.slice(0,3).map(function(x){ return x.title + ' (' + x.qty + ' left)'; }).join(' | '),
+      suggestions: [
+        { text: 'Replenishment plan banao — low stock products ke liye shipment schedule karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  if (needReplenish.length > outOfStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '📦',
+      title: 'Replenishment Needed (' + needReplenish.length + ' products)',
+      detail: needReplenish.slice(0,3).map(function(x){ return x.title + ' (' + x.replenish + ' units)'; }).join(' | '),
+      suggestions: [
+        { text: 'Inventory plan review karo aur FBA shipment create karo', dept: 'Ops', time: 3 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseAdsReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var highSpendNoSales = [];
+  var highACOS = [];
+  var goodCTRLowConv = [];
+  var totalSpend = 0;
+  var totalSales = 0;
+
+  rows.forEach(function(row) {
+    var spend = cleanNum(row['Spend'] || '0');
+    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
+    var acos = cleanNum(row['Total Advertising Cost of Sales (ACOS) '] || '0');
+    var clicks = cleanNum(row['Clicks'] || '0');
+    var ctr = cleanNum(row['Click-Through Rate (CTR)'] || '0');
+    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
+    var keyword = row['Targeting'] || row['Customer Search Term'] || '';
+    totalSpend += spend;
+    totalSales += sales;
+
+    if (spend > 100 && sales === 0) highSpendNoSales.push({ keyword: keyword, spend: spend, clicks: clicks });
+    if (acos > 50 && spend > 50) highACOS.push({ keyword: keyword, acos: acos, spend: spend });
+    if (ctr > 0.5 && conv < 5 && spend > 50) goodCTRLowConv.push({ keyword: keyword, ctr: ctr, conv: conv });
+  });
+
+  var overallACOS = totalSales > 0 ? Math.round((totalSpend / totalSales) * 100) : 0;
+
+  if (highSpendNoSales.length) {
+    var totalWasted = highSpendNoSales.reduce(function(s,x){ return s + x.spend; }, 0);
+    insights.push({
+      type: 'ads',
+      priority: 'urgent',
+      icon: '💸',
+      title: 'Wasted Spend — ₹' + Math.round(totalWasted).toLocaleString('en-IN') + ' on ' + highSpendNoSales.length + ' keywords (0 sales)',
+      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.keyword + '" ₹' + Math.round(x.spend); }).join(' | '),
+      suggestions: [
+        { text: 'Ye keywords pause karo ya bid ₹5 tak kam karo: ' + highSpendNoSales.slice(0,5).map(function(x){ return x.keyword; }).join(', '), dept: 'Ads', time: 1 },
+        { text: 'Negative keywords add karo irrelevant traffic rokne ke liye', dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (highACOS.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'high',
+      icon: '📊',
+      title: 'High ACOS Keywords (' + highACOS.length + ' keywords > 50% ACOS)',
+      detail: highACOS.slice(0,3).map(function(x){ return '"' + x.keyword + '" ACOS:' + x.acos + '%'; }).join(' | '),
+      suggestions: [
+        { text: 'High ACOS keywords ke bids 20-30% kam karo', dept: 'Ads', time: 1 },
+        { text: 'Campaign structure review karo — exact match mein move karo', dept: 'Ads', time: 2 },
+      ]
+    });
+  }
+
+  if (overallACOS > 30) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '📈',
+      title: 'Overall ACOS ' + overallACOS + '% — Target 20-25% hona chahiye',
+      detail: 'Total Spend: ₹' + Math.round(totalSpend).toLocaleString('en-IN') + ' | Total Sales: ₹' + Math.round(totalSales).toLocaleString('en-IN'),
+      suggestions: [
+        { text: 'Budget allocation review karo — top performing campaigns mein shift karo', dept: 'Ads', time: 2 },
+        { text: 'Dayparting set karo — peak hours mein hi ads chalao', dept: 'Ads', time: 2 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseAdvertisedReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var lowImpression = [];
+  rows.forEach(function(row) {
+    var imp = cleanNum(row['Impressions'] || '0');
+    var spend = cleanNum(row['Spend'] || '0');
+    var asin = row['Advertised ASIN'] || row['(Child) ASIN'] || '';
+    var sku = row['Advertised SKU'] || '';
+    if (imp < 100 && spend > 0) lowImpression.push({ asin: asin, sku: sku, imp: imp, spend: spend });
+  });
+
+  if (lowImpression.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '👁️',
+      title: 'Low Impression ASINs (' + lowImpression.length + ' products < 100 impressions)',
+      detail: 'Yeh products ads mein proper show nahi ho rahe',
+      suggestions: [
+        { text: 'Low impression ASINs ke bids increase karo 30-50%', dept: 'Ads', time: 1 },
+        { text: 'Campaign mein broader match types add karo', dept: 'Ads', time: 2 },
+        { text: 'Product listing quality check karo — listing suppressed to nahi?', dept: 'Ops', time: 1 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseSearchTermReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var highConvTerms = [];
+  var highSpendNoSales = [];
+
+  rows.forEach(function(row) {
+    var term = row['Customer Search Term'] || '';
+    var orders = cleanNum(row['7 Day Total Orders (#)'] || '0');
+    var spend = cleanNum(row['Spend'] || '0');
+    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
+    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
+    var clicks = cleanNum(row['Clicks'] || '0');
+
+    if (orders >= 2 && conv > 10 && term) highConvTerms.push({ term: term, orders: orders, conv: conv });
+    if (spend > 200 && sales === 0 && term) highSpendNoSales.push({ term: term, spend: spend });
+  });
+
+  if (highConvTerms.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '🌟',
+      title: 'High Converting Search Terms (' + highConvTerms.length + ' terms)',
+      detail: highConvTerms.slice(0,3).map(function(x){ return '"' + x.term + '" ' + x.conv + '% conv'; }).join(' | '),
+      suggestions: [
+        { text: 'Yeh terms exact match mein add karo aur budget badhao: ' + highConvTerms.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (highSpendNoSales.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'high',
+      icon: '🚫',
+      title: 'Irrelevant Search Terms (' + highSpendNoSales.length + ' terms — spend without sales)',
+      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.term + '" ₹' + Math.round(x.spend); }).join(' | '),
+      suggestions: [
+        { text: 'Yeh search terms negative mein add karo: ' + highSpendNoSales.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseReturnsReport(raw) {
+  var insights = [];
+  var rows = parseTSV(raw);
+  if (rows.length < 2) return insights;
+
+  var reasons = {};
+  rows.forEach(function(row) {
+    var reason = row['Return reason'] || '';
+    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+  });
+
+  var topReasons = Object.entries(reasons).sort(function(a,b){ return b[1]-a[1]; }).slice(0,3);
+  if (topReasons.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '🔄',
+      title: 'Returns Analysis (' + rows.length + ' returns)',
+      detail: topReasons.map(function(r){ return r[0] + ': ' + r[1]; }).join(' | '),
+      suggestions: [
+        { text: 'Return reasons analyze karo aur product quality/packaging improve karo', dept: 'Ops', time: 3 },
+        { text: 'High return rate ASINs ki listings mein accurate size/spec add karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function renderInsights(insights) {
+  var results = document.getElementById('ra-results');
+  if (!insights.length) {
+    results.innerHTML = '<div class="empty-state"><div class="emoji">✅</div><h3>Koi major issue nahi mila!</h3><p>Reports analyze ho gayi — sab theek dikh raha hai.</p></div>';
+    return;
+  }
+
+  var urgent = insights.filter(function(x){ return x.priority === 'urgent'; });
+  var high = insights.filter(function(x){ return x.priority === 'high'; });
+  var medium = insights.filter(function(x){ return x.priority === 'medium'; });
+
+  var html = '<div style="margin-bottom:16px;">'
+    + '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">📊 Analysis Complete — ' + _reportClientName + '</div>'
+    + '<div style="font-size:13px;color:var(--text-muted);">' + insights.length + ' insights mili | '
+    + (urgent.length ? '<span style="color:var(--red);">🚨 ' + urgent.length + ' Urgent</span> | ' : '')
+    + '<span style="color:var(--orange);">⚠️ ' + high.length + ' High</span> | '
+    + '<span style="color:var(--amber);">📌 ' + medium.length + ' Medium</span>'
+    + '</div></div>';
+
+  // All suggestions list for task creation
+  var allSuggestions = [];
+  insights.forEach(function(ins){ allSuggestions = allSuggestions.concat(ins.suggestions || []); });
+
+  insights.forEach(function(ins, idx) {
+    var priorityColor = ins.priority === 'urgent' ? 'var(--red)' : ins.priority === 'high' ? 'var(--orange)' : 'var(--amber)';
+    var priorityBg = ins.priority === 'urgent' ? '#fadbd8' : ins.priority === 'high' ? '#fdebd0' : '#fef9e7';
+    var deptColor = ins.type === 'ads' ? 'badge-blue' : 'badge-green';
+
+    var suggestionsHtml = (ins.suggestions || []).map(function(s, sidx) {
+      var globalIdx = allSuggestions.indexOf(s);
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#fff;border-radius:8px;margin-bottom:6px;border:1px solid var(--border);">'
+        + '<div style="flex:1;">'
+        + '<span class="badge ' + deptColor + '" style="font-size:10px;margin-bottom:4px;">' + s.dept + '</span>'
+        + '<div style="font-size:13px;">' + s.text + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">⏱ ' + s.time + ' din mein karo</div>'
+        + '</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="createTaskFromInsight(' + JSON.stringify(s.text).replace(/'/g,"\\'") + ',' + JSON.stringify(s.dept) + ',' + s.time + ')" style="white-space:nowrap;font-size:11px;">➕ Task</button>'
+        + '</div>';
+    }).join('');
+
+    html += '<div class="card" style="margin-bottom:12px;border-left:4px solid ' + priorityColor + ';">'
+      + '<div class="card-header" style="background:' + priorityBg + ';">'
+      + '<span style="font-size:16px;">' + ins.icon + '</span>'
+      + '<span class="card-title" style="font-size:14px;">' + ins.title + '</span>'
+      + '<span class="badge" style="background:' + priorityColor + '20;color:' + priorityColor + ';font-size:10px;">' + ins.priority.toUpperCase() + '</span>'
+      + '</div>'
+      + '<div class="card-body">'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">' + ins.detail + '</div>'
+      + '<div style="font-weight:700;font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">💡 Suggested Tasks:</div>'
+      + suggestionsHtml
+      + '</div></div>';
+  });
+
+  results.innerHTML = html;
+}
+
+async function createTaskFromInsight(text, dept, days) {
+  if (!_reportClientCode) { showToast('Seller select nahi hai!', 'error'); return; }
+  var deadline = new Date();
+  deadline.setDate(deadline.getDate() + days);
+  var deadlineStr = deadline.toISOString().split('T')[0];
+
+  var category = dept === 'Ads' ? 'Ads Campaign' : 'Account Management';
+  var priority = days <= 1 ? 'Critical' : days <= 2 ? 'High' : 'Medium';
+
+  var r = await api('POST', '/tasks', {
+    title: text.slice(0, 120),
+    description: 'Amazon Report Analysis se auto-generated task. Client: ' + _reportClientName,
+    clientCode: _reportClientCode,
+    clientName: _reportClientName,
+    assignedTo: APP.user.name,
+    assignedBy: APP.user.name,
+    priority: priority,
+    category: category,
+    deadline: deadlineStr,
+  });
+
+  if (r?.success) {
+    showToast('✅ Task created: ' + r.taskId, 'success');
+  } else {
+    showToast('Error creating task', 'error');
+  }
+}
+// ═══════════════════════════════════════════════════════════════════
+// AMAZON REPORT ANALYZER v2 — ASIN LEVEL + SALES PROJECTION
+// Replace previous renderReportAnalyzer section in FRONTEND_ALL.js
+// ═══════════════════════════════════════════════════════════════════
+
+// Global data store
+var _ra = {
+  client: '', clientName: '',
+  business: null, targeting: null, advertised: null,
+  searchterm: null, inventory: null, returns: null,
+  dsrHistory: null,
+  asinMap: {},        // ASIN -> merged data
+  keywordMap: {},     // ASIN -> best keywords
+  tasks: [],          // Generated tasks
+};
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────
+async function renderReportAnalyzer() {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">ASIN-level insights + AI tasks + Sales Projection</span></div>'
+    + '<div class="card-body">'
+    + '<div class="form-group" style="margin-bottom:16px;">'
+    + '<label style="font-weight:700;">Seller Select Karo *</label>'
+    + '<select class="form-control" id="ra-client" onchange="raSetClient()">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + (clients||[]).map(c => '<option value="'+c.clientCode+'">'+c.busyName+' ('+c.marketplace+')</option>').join('')
+    + '</select></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">'
+    + raUploadCard('business',  '📊', 'Business Report',         'Sessions/Conv/Sales per ASIN',        '.csv')
+    + raUploadCard('targeting', '🎯', 'SP Targeting Report',     'Keywords, ACOS, Spend',               '.xlsx,.csv')
+    + raUploadCard('advertised','📢', 'Advertised Product',      'ASIN-level ads perf',                 '.xlsx,.csv')
+    + raUploadCard('searchterm','🔍', 'Search Term Report',      'Customer keywords',                   '.xlsx,.csv')
+    + raUploadCard('inventory', '📦', 'Inventory Report',        'FBA stock levels',                    '.xlsx,.csv,.txt')
+    + raUploadCard('returns',   '🔄', 'Returns Report',          'Return reasons',                      '.tsv,.csv')
+    + '</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    + '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;" onclick="raRunAnalysis()">🔍 Analyze & Generate Tasks</button>'
+    + '<button class="btn btn-outline" onclick="renderReportAnalyzer()">🗑 Clear All</button>'
+    + '</div></div></div>'
+    + '<div id="ra-results"></div>';
+}
+
+function raUploadCard(type, icon, title, sub, accept) {
+  return '<div id="racard-'+type+'" style="border:2px dashed var(--border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;transition:all 0.2s;" onclick="document.getElementById(\'rafile-'+type+'\').click()" onmouseover="this.style.borderColor=\'var(--secondary)\'" onmouseout="this.style.borderColor=(_ra.'+type+'?\'var(--green)\':\'var(--border)\')">'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+    + '<span style="font-size:22px;">'+icon+'</span>'
+    + '<div><div style="font-weight:700;font-size:13px;">'+title+'</div><div style="font-size:11px;color:var(--text-muted);">'+sub+'</div></div></div>'
+    + '<div id="rastatus-'+type+'" style="font-size:12px;color:var(--text-muted);">Click to upload</div>'
+    + '<input type="file" id="rafile-'+type+'" accept="'+accept+'" style="display:none;" onchange="raHandleUpload(\''+type+'\',this)">'
+    + '</div>';
+}
+
+function raSetClient() {
+  const sel = document.getElementById('ra-client');
+  _ra.client = sel.value;
+  _ra.clientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+}
+
+async function raHandleUpload(type, input) {
+  if (!input.files?.[0]) return;
+  const file = input.files[0];
+  const statusEl = document.getElementById('rastatus-'+type);
+  const cardEl = document.getElementById('racard-'+type);
+  statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
+  try {
+    const text = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = () => rej(new Error('Read error'));
+      r.readAsText(file);
+    });
+    _ra[type] = { text, filename: file.name };
+    statusEl.innerHTML = '<span style="color:var(--green);">✅ '+file.name+'</span>';
+    cardEl.style.borderColor = 'var(--green)';
+    cardEl.style.background = '#f0fff4';
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:var(--red);">❌ '+e.message+'</span>';
+  }
+}
+
+// ─── MAIN ANALYSIS ───────────────────────────────────────────────
+async function raRunAnalysis() {
+  if (!_ra.client) { showToast('Pehle seller select karo!','error'); return; }
+  const hasData = ['business','targeting','advertised','searchterm','inventory','returns'].some(k => _ra[k]);
+  if (!hasData) { showToast('Pehle koi report upload karo!','error'); return; }
+
+  document.getElementById('ra-results').innerHTML = '<div class="loading"><div class="spinner"></div> ASIN-level analysis chal rahi hai...</div>';
+
+  // Load DSR history for sales projection
+  const dsrData = await api('GET', '/dsr?client='+_ra.client+'&limit=90') || [];
+  _ra.dsrHistory = dsrData;
+
+  // Build ASIN map
+  _ra.asinMap = {};
+  _ra.keywordMap = {};
+
+  if (_ra.business)   raParseBusiness();
+  if (_ra.inventory)  raParseInventory();
+  if (_ra.advertised) raParseAdvertised();
+  if (_ra.targeting)  raParseTargeting();
+  if (_ra.searchterm) raParseSearchTerms();
+  if (_ra.returns)    raParseReturns();
+
+  // Generate tasks per ASIN
+  _ra.tasks = [];
+  raGenerateTasks();
+
+  // Render results
+  raRenderResults();
+}
+
+// ─── PARSERS ─────────────────────────────────────────────────────
+function raCSV(text) {
+  const lines = text.replace(/^\uFEFF/,'').trim().split('\n');
+  if (!lines.length) return [];
+  const headers = raCSVLine(lines[0]);
+  return lines.slice(1).filter(l=>l.trim()).map(l => {
+    const vals = raCSVLine(l);
+    const obj = {};
+    headers.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
+    return obj;
+  });
+}
+
+function raCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let ch of line) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+function raTSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split('\t');
+  return lines.slice(1).filter(l=>l.trim()).map(l => {
+    const vals = l.split('\t');
+    const obj = {};
+    headers.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
+    return obj;
+  });
+}
+
+function raNum(v) { return parseFloat(String(v||0).replace(/[₹,%\s,]/g,'')) || 0; }
+
+function raGetAsin(asin) {
+  if (!asin) return null;
+  if (!_ra.asinMap[asin]) _ra.asinMap[asin] = { asin, title:'', sessions:0, pageViews:0, units:0, sales:0, conv:0, fop:100, stock:0, needReplenish:0, adSpend:0, adSales:0, acos:0, roas:0, impressions:0, clicks:0, ctr:0, returns:0, keywords:[] };
+  return _ra.asinMap[asin];
+}
+
+function raParseBusiness() {
+  const rows = raCSV(_ra.business.text);
+  rows.forEach(r => {
+    const asin = r['(Child) ASIN'] || r['(Parent) ASIN'] || r['ASIN'] || '';
+    if (!asin) return;
+    const a = raGetAsin(asin);
+    a.title = a.title || (r['Title']||'').slice(0,80);
+    a.sku = a.sku || r['SKU'] || '';
+    a.sessions += raNum(r['Sessions - Total']||r['Sessions']);
+    a.pageViews += raNum(r['Page Views - Total']||r['Page Views']);
+    a.units += raNum(r['Units Ordered']);
+    a.sales += raNum(r['Ordered Product Sales']||r['Sales(INR)']);
+    const convRaw = r['Unit Session Percentage']||r['Conversion rate']||'0';
+    a.conv = raNum(convRaw); // last value wins (per ASIN)
+    a.fop = raNum(r['Featured Offer Percentage']||'100');
+  });
+}
+
+function raParseInventory() {
+  const text = _ra.inventory.text;
+  const rows = text.includes('\t') ? raTSV(text) : raCSV(text);
+  rows.forEach(r => {
+    const asin = r['asin'] || r['ASIN'] || r['(Child) ASIN'] || '';
+    const sku = r['seller-sku'] || r['SKU'] || '';
+    // Try to match by ASIN or SKU
+    const key = asin || sku;
+    if (!key) return;
+    let a = _ra.asinMap[asin] || Object.values(_ra.asinMap).find(x => x.sku === sku);
+    if (!a) a = raGetAsin(asin || sku);
+    a.title = a.title || (r['Title']||sku).slice(0,80);
+    a.stock = raNum(r['Quantity Available']||r['Current FBA Stock']||'0');
+    a.needReplenish = raNum(r['Replenish Inventory']||'0');
+  });
+}
+
+function raParseAdvertised() {
+  const rows = raCSV(_ra.advertised.text);
+  rows.forEach(r => {
+    const asin = r['Advertised ASIN'] || r['(Child) ASIN'] || '';
+    if (!asin) return;
+    const a = raGetAsin(asin);
+    a.adSpend += raNum(r['Spend']);
+    a.adSales += raNum(r['7 Day Total Sales (₹)']);
+    a.impressions += raNum(r['Impressions']);
+    a.clicks += raNum(r['Clicks']);
+    const s = raNum(r['Spend']); const sl = raNum(r['7 Day Total Sales (₹)']);
+    if (sl > 0) a.acos = Math.round((s/sl)*100);
+    a.roas = raNum(r['Total Return on Advertising Spend (ROAS)']);
+  });
+}
+
+function raParseTargeting() {
+  const rows = raCSV(_ra.targeting.text);
+  rows.forEach(r => {
+    const kw = r['Targeting']||r['Customer Search Term']||'';
+    const spend = raNum(r['Spend']);
+    const sales = raNum(r['7 Day Total Sales (₹)']);
+    const acos = raNum(r['Total Advertising Cost of Sales (ACOS) ']);
+    const matchType = r['Match Type']||'';
+    const campaignName = r['Campaign Name']||'';
+    // Store globally for recommendations
+    if (!_ra.keywordMap['_all']) _ra.keywordMap['_all'] = [];
+    _ra.keywordMap['_all'].push({ kw, spend, sales, acos, matchType, campaignName });
+  });
+}
+
+function raParseSearchTerms() {
+  const rows = raCSV(_ra.searchterm.text);
+  rows.forEach(r => {
+    const term = r['Customer Search Term']||'';
+    const orders = raNum(r['7 Day Total Orders (#)']);
+    const conv = raNum(r['7 Day Conversion Rate']);
+    const spend = raNum(r['Spend']);
+    const sales = raNum(r['7 Day Total Sales (₹)']);
+    const asin = r['Advertised ASIN']||'';
+    if (!term) return;
+    // Store best converting terms
+    if (orders >= 1 || conv > 5) {
+      if (asin) {
+        if (!_ra.keywordMap[asin]) _ra.keywordMap[asin] = [];
+        _ra.keywordMap[asin].push({ term, orders, conv, spend, sales });
+      }
+      if (!_ra.keywordMap['_converting']) _ra.keywordMap['_converting'] = [];
+      _ra.keywordMap['_converting'].push({ term, orders, conv });
+    }
+    if (spend > 200 && sales === 0) {
+      if (!_ra.keywordMap['_wasted']) _ra.keywordMap['_wasted'] = [];
+      _ra.keywordMap['_wasted'].push({ term, spend });
+    }
+  });
+}
+
+function raParseReturns() {
+  const text = _ra.returns.text;
+  const rows = text.includes('\t') ? raTSV(text) : raCSV(text);
+  const reasonMap = {};
+  rows.forEach(r => {
+    const reason = r['Return reason']||'';
+    const asin = r['ASIN']||'';
+    if (!_ra.asinMap['_returns']) _ra.asinMap['_returns'] = {};
+    if (asin) {
+      const a = _ra.asinMap[asin];
+      if (a) a.returns = (a.returns||0) + 1;
+    }
+    if (reason) reasonMap[reason] = (reasonMap[reason]||0) + 1;
+  });
+  _ra.returnReasons = reasonMap;
+}
+
+// ─── TASK GENERATION ─────────────────────────────────────────────
+function raGenerateTasks() {
+  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
+  const allKeywords = _ra.keywordMap['_all'] || [];
+  const convertingTerms = _ra.keywordMap['_converting'] || [];
+  const wastedTerms = _ra.keywordMap['_wasted'] || [];
+
+  asins.forEach(a => {
+    const asinLabel = '[' + (a.asin||a.sku||'?') + '] ' + (a.title||'').slice(0,50);
+    const asinKeywords = _ra.keywordMap[a.asin] || [];
+
+    // === OPS TASKS ===
+    // 1. Out of Stock
+    if (a.stock === 0 && (a.sessions > 0 || a.units > 0)) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'urgent', dept: 'Ops',
+        issue: '🚨 OUT OF STOCK',
+        task: 'FBA mein stock bhejo — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
+        reason: 'Stock = 0, sessions aa rahe hain. Sales loss ho raha hai!',
+        deadline: 1,
+        metric: 'Stock: 0 units',
+      });
+    }
+
+    // 2. Low conversion + High sessions
+    if (a.sessions > 150 && a.conv < 8 && a.conv > 0) {
+      const kwSuggest = asinKeywords.filter(k=>k.conv>10).slice(0,3).map(k=>k.term).join(', ');
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: a.conv < 4 ? 'urgent' : 'high', dept: 'Ops',
+        issue: '📉 Low Conversion (' + a.conv + '%)',
+        task: 'Listing optimize karo — Images, Price, Bullets: ' + asinLabel,
+        reason: a.sessions + ' sessions aa rahe hain par sirf ' + a.conv + '% convert ho rahe hain. Industry avg 12-15% hota hai.',
+        deadline: 2,
+        metric: 'Sessions: '+a.sessions+' | Conv: '+a.conv+'%',
+        subTasks: [
+          { task: 'Main image check karo — white bg, high res, zoom enable', dept: 'Ops', deadline: 1 },
+          { task: 'Price compare karo competitors se — ₹ 5-10 adjust karo', dept: 'Ops', deadline: 1 },
+          { task: 'Bullet points rewrite karo — top 3 benefits bold karo', dept: 'Ops', deadline: 2 },
+          a.units > 10 ? { task: 'Discount coupon 5-10% add karo listing pe', dept: 'Ops', deadline: 1 } : null,
+        ].filter(Boolean),
+      });
+    }
+
+    // 3. Low sessions — new listing / keyword issue
+    if (a.sessions < 50 && a.units > 0) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '👁️ Low Visibility ('+a.sessions+' sessions)',
+        task: 'Listing keywords update karo: ' + asinLabel,
+        reason: 'Bahut kam sessions aa rahe hain. Organic ranking improve karni hogi.',
+        deadline: 3,
+        metric: 'Sessions: '+a.sessions,
+        subTasks: [
+          { task: 'Title mein top keywords add karo (brand + category + benefit)', dept: 'Ops', deadline: 2 },
+          { task: 'Backend search terms fill karo — 250 bytes use karo', dept: 'Ops', deadline: 2 },
+          { task: 'A+ Content add karo — comparison table aur lifestyle images', dept: 'Ops', deadline: 5 },
+        ],
+      });
+    }
+
+    // 4. Buy Box loss
+    if (a.fop < 80 && a.sessions > 50) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '🏆 Buy Box Loss (' + a.fop + '% FOP)',
+        task: 'Buy Box recover karo: ' + asinLabel,
+        reason: 'Sirf ' + a.fop + '% time Buy Box mil raha hai. Sales directly impact ho rahi hai.',
+        deadline: 1,
+        metric: 'Featured Offer: '+a.fop+'%',
+        subTasks: [
+          { task: 'Price competitor se ₹ 5-10 kam karo', dept: 'Ops', deadline: 1 },
+          { task: 'FBA fulfillment ensure karo', dept: 'Ops', deadline: 2 },
+        ],
+      });
+    }
+
+    // 5. High returns
+    if ((a.returns||0) > 3) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ops',
+        issue: '🔄 High Returns (' + a.returns + ' returns)',
+        task: 'Return reasons investigate karo: ' + asinLabel,
+        reason: a.returns + ' returns aaye hain. Product description ya quality issue ho sakta hai.',
+        deadline: 3,
+        metric: 'Returns: '+a.returns,
+        subTasks: [
+          { task: 'Customer reviews check karo — kya complain kar rahe hain', dept: 'Ops', deadline: 1 },
+          { task: 'Product description accurate hai? Size/specs correct hain?', dept: 'Ops', deadline: 2 },
+          { task: 'Packaging quality check karo — damaged goods ka risk', dept: 'Ops', deadline: 3 },
+        ],
+      });
+    }
+
+    // === ADS TASKS ===
+    // 6. High ACOS
+    if (a.acos > 35 && a.adSpend > 200) {
+      const highWaste = allKeywords.filter(k => raNum(k.spend) > 100 && raNum(k.sales) === 0).slice(0,5);
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ads',
+        issue: '💸 High ACOS (' + a.acos + '%)',
+        task: 'Ad campaign optimize karo — ACOS 20-25% target: ' + asinLabel,
+        reason: 'ACOS ' + a.acos + '% hai — target 20-25% hona chahiye. ₹' + Math.round(a.adSpend).toLocaleString('en-IN') + ' spend ho raha hai.',
+        deadline: 1,
+        metric: 'ACOS: '+a.acos+'% | Spend: ₹'+Math.round(a.adSpend),
+        subTasks: [
+          highWaste.length ? { task: 'Pause karo — 0 sales ke keywords: ' + highWaste.map(k=>k.kw).join(', '), dept: 'Ads', deadline: 1 } : null,
+          { task: 'Top 5 converting keywords ke bids 10-15% badhao', dept: 'Ads', deadline: 1 },
+          { task: 'Broad match ko phrase/exact mein convert karo', dept: 'Ads', deadline: 2 },
+          wastedTerms.length ? { task: 'Negative keywords add karo: ' + wastedTerms.slice(0,5).map(k=>k.term).join(', '), dept: 'Ads', deadline: 1 } : null,
+        ].filter(Boolean),
+      });
+    }
+
+    // 7. Low impressions (visibility issue in ads)
+    if (a.impressions < 500 && a.adSpend > 0) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ads',
+        issue: '📡 Low Ad Impressions (' + a.impressions + ')',
+        task: 'Ad visibility badhao — bids increase karo: ' + asinLabel,
+        reason: 'Sirf ' + a.impressions + ' impressions aa rahe hain. Product ads mein proper show nahi ho raha.',
+        deadline: 1,
+        metric: 'Impressions: '+a.impressions,
+        subTasks: [
+          { task: 'CPC bid 30-50% increase karo top keywords pe', dept: 'Ads', deadline: 1 },
+          { task: 'Broad match campaign launch karo — new keywords discover karo', dept: 'Ads', deadline: 2 },
+          { task: 'Sponsored Display ads add karo competitor pages pe', dept: 'Ads', deadline: 3 },
+        ],
+      });
+    }
+
+    // 8. Good sales — new campaign opportunity
+    if (a.sales > 30000 && a.adSpend < 5000 && a.sessions > 200) {
+      const topConverting = asinKeywords.sort((a,b)=>b.conv-a.conv).slice(0,5);
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ads',
+        issue: '🌟 Scale Opportunity',
+        task: 'New ad campaign launch karo — strong performer: ' + asinLabel,
+        reason: 'Yeh ASIN ₹'+Math.round(a.sales/1000)+'K sales kar raha hai kam ads ke saath. Scale karne ka time!',
+        deadline: 2,
+        metric: 'Sales: ₹'+Math.round(a.sales/1000)+'K | Ad Spend: ₹'+Math.round(a.adSpend),
+        subTasks: [
+          { task: 'Exact match campaign launch karo — budget ₹500/day: ' + asinLabel, dept: 'Ads', deadline: 1 },
+          topConverting.length ? { task: 'Top converting keywords ke liye dedicated campaign: ' + topConverting.map(k=>k.term).join(', '), dept: 'Ads', deadline: 2 } : null,
+          { task: 'Sponsored Brand campaign launch karo — brand awareness ke liye', dept: 'Ads', deadline: 3 },
+          { task: 'Competitor targeting campaign add karo', dept: 'Ads', deadline: 3 },
+        ].filter(Boolean),
+      });
+    }
+
+    // 9. Keyword placement suggestions
+    if (asinKeywords.length > 0) {
+      const highConvKW = asinKeywords.filter(k=>k.conv>15).slice(0,5);
+      const medConvKW = asinKeywords.filter(k=>k.conv>5&&k.conv<=15).slice(0,5);
+      if (highConvKW.length) {
+        _ra.tasks.push({
+          asin: a.asin, title: a.title, sku: a.sku,
+          priority: 'medium', dept: 'Ops',
+          issue: '🔑 Keyword Optimization',
+          task: 'High-converting keywords listing mein add karo: ' + asinLabel,
+          reason: 'Yeh keywords customers ko convert kar rahe hain — inhe listing mein include karo.',
+          deadline: 2,
+          metric: 'Identified: '+asinKeywords.length+' keywords',
+          keywordData: {
+            title: highConvKW.map(k=>k.term),
+            bullets: medConvKW.map(k=>k.term),
+            backend: asinKeywords.filter(k=>k.conv<=5).slice(0,10).map(k=>k.term),
+          },
+          subTasks: [
+            highConvKW.length ? { task: 'Title mein add karo (high conv): ' + highConvKW.map(k=>k.term).join(', '), dept: 'Ops', deadline: 1 } : null,
+            medConvKW.length ? { task: 'Bullet points mein add karo: ' + medConvKW.map(k=>k.term).join(', '), dept: 'Ops', deadline: 2 } : null,
+            { task: 'Backend search terms update karo — remaining keywords', dept: 'Ops', deadline: 2 },
+          ].filter(Boolean),
+        });
+      }
+    }
+  });
+
+  // === ACCOUNT MANAGER TASKS ===
+  // Overall account health
+  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+  const totalSpend = asins.reduce((s,a)=>s+a.adSpend,0);
+  const outOfStockCount = asins.filter(a=>a.stock===0&&a.sessions>0).length;
+  const avgConv = asins.length ? asins.reduce((s,a)=>s+a.conv,0)/asins.length : 0;
+
+  if (outOfStockCount > 0) {
+    _ra.tasks.push({
+      asin: 'ACCOUNT', title: 'Account Overview',
+      priority: 'urgent', dept: 'Account Manager',
+      issue: '🚨 Account Alert — ' + outOfStockCount + ' OOS Products',
+      task: 'Seller se immediately baat karo — ' + outOfStockCount + ' products OOS hain. Sales loss ho raha hai.',
+      reason: 'Out of stock products se account health aur ranking dono impact hoti hai.',
+      deadline: 1,
+      metric: 'OOS Products: '+outOfStockCount,
+    });
+  }
+
+  // Team Lead review task
+  _ra.tasks.push({
+    asin: 'REVIEW', title: 'Team Lead Review',
+    priority: 'medium', dept: 'Team Lead',
+    issue: '👀 Weekly Review',
+    task: 'Is week ki report review karo — ' + _ra.clientName + '. Total tasks: ' + (_ra.tasks.length) + '. Key issues check karo.',
+    reason: 'Regular review ensures sab tasks time pe complete ho.',
+    deadline: 2,
+    metric: 'Total Insights: '+(_ra.tasks.length+1),
+  });
+}
+
+// ─── SALES PROJECTION ────────────────────────────────────────────
+function raCalcProjection() {
+  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
+  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+
+  // Also use DSR data if available
+  let baseSales = totalSales;
+  if (_ra.dsrHistory && _ra.dsrHistory.length > 0) {
+    const recentMonth = _ra.dsrHistory.slice(0,30).reduce((s,d)=>s+(raNum(d.sales_amount)||0),0);
+    if (recentMonth > 0) baseSales = Math.max(baseSales, recentMonth);
+  }
+
+  if (baseSales === 0) return null;
+
+  const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const projections = [];
+  const minGrowth = 0.08; // 8%
+  const maxGrowth = 0.18; // 18%
+  const targetGrowth = 0.12; // 12% target
+
+  // Peak months: Oct-Dec (festive), Jan (New Year)
+  const peakMonths = [9,10,11,0];
+  const slowMonths = [2,3,4]; // Mar-May
+
+  for (let i = 0; i < 12; i++) {
+    const monthIdx = (currentMonth + i) % 12;
+    const monthName = months[monthIdx];
+    const isPeak = peakMonths.includes(monthIdx);
+    const isSlow = slowMonths.includes(monthIdx);
+    const growth = isPeak ? maxGrowth : isSlow ? minGrowth : targetGrowth;
+    const prev = i === 0 ? baseSales : projections[i-1].target;
+    const min = Math.round(prev * (1 + minGrowth));
+    const target = Math.round(prev * (1 + growth));
+    const max = Math.round(prev * (1 + maxGrowth));
+    projections.push({ month: monthName, min, target, max, growth: Math.round(growth*100), isPeak, isSlow });
+  }
+
+  return { baseSales, projections };
+}
+
+// ─── RENDER RESULTS ──────────────────────────────────────────────
+function raRenderResults() {
+  const tasks = _ra.tasks;
+  const urgent = tasks.filter(t=>t.priority==='urgent');
+  const high = tasks.filter(t=>t.priority==='high');
+  const medium = tasks.filter(t=>t.priority==='medium');
+
+  const proj = raCalcProjection();
+  const asins = Object.values(_ra.asinMap).filter(a=>a.asin!=='_returns'&&a.sessions>0);
+
+  let html = '';
+
+  // Summary bar
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
+    + raSummaryCard('🚨','Urgent',urgent.length,'red')
+    + raSummaryCard('⚠️','High Priority',high.length,'orange')
+    + raSummaryCard('📌','Medium',medium.length,'amber')
+    + raSummaryCard('📦','ASINs Analyzed',asins.length,'blue')
+    + raSummaryCard('📋','Total Tasks',tasks.length,'green')
+    + '</div>';
+
+  // Urgent section
+  if (urgent.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:10px;padding:8px 12px;background:#fadbd8;border-radius:8px;">🚨 Urgent — Abhi Karo</div>';
+    urgent.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // High priority
+  if (high.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--orange);margin:16px 0 10px;padding:8px 12px;background:#fdebd0;border-radius:8px;">⚠️ High Priority — Is Hafte</div>';
+    high.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // Medium
+  if (medium.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--amber);margin:16px 0 10px;padding:8px 12px;background:#fef9e7;border-radius:8px;">📌 Medium — Is Mahine</div>';
+    medium.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // Sales Projection
+  if (proj) {
+    html += '<div style="margin-top:24px;">';
+    html += '<div style="font-size:16px;font-weight:700;margin-bottom:12px;padding:8px 12px;background:#d6eaf8;border-radius:8px;">📈 Sales Projection — Next 12 Months</div>';
+    html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Base: ₹'+Math.round(proj.baseSales).toLocaleString('en-IN')+' | Min Growth: 8%/month | Target: 12% | Peak: 18% (Festive)</div>';
+    html += '<div class="card"><div class="card-body" style="padding:0;"><div class="table-wrap"><table><thead><tr>'
+      + '<th>Month</th><th>Minimum (8%)</th><th style="background:#d5f5e3;">Target (12%)</th><th>Maximum (18%)</th><th>Growth%</th><th>Type</th></tr></thead><tbody>';
+    proj.projections.forEach(p => {
+      const rowBg = p.isPeak ? 'background:#d5f5e3;' : p.isSlow ? 'background:#fef9e7;' : '';
+      html += '<tr style="'+rowBg+'">'
+        + '<td><strong>'+p.month+'</strong></td>'
+        + '<td>₹'+p.min.toLocaleString('en-IN')+'</td>'
+        + '<td style="font-weight:700;color:var(--green);">₹'+p.target.toLocaleString('en-IN')+'</td>'
+        + '<td>₹'+p.max.toLocaleString('en-IN')+'</td>'
+        + '<td><span class="badge '+(p.isPeak?'badge-green':p.isSlow?'badge-amber':'badge-blue')+'">'+p.growth+'%</span></td>'
+        + '<td style="font-size:11px;">'+(p.isPeak?'🎯 Peak':p.isSlow?'🐢 Slow':'📊 Normal')+'</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div></div>';
+
+    // Projection tasks
+    html += '<div style="margin-top:12px;padding:14px;background:#fff;border-radius:10px;border:1.5px solid var(--border);">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">📋 Projection Achieve Karne Ke Liye Tasks:</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">'
+      + raProjTaskCard('Ops','Monthly listing refresh — new images, updated keywords',1,'Ops')
+      + raProjTaskCard('Ads','Budget planning — peak months mein +30% budget allocate karo',2,'Ads')
+      + raProjTaskCard('Ops','A+ content all top ASINs pe add karo',5,'Ops')
+      + raProjTaskCard('Ads','Festive campaign ready rakho — Oct se pehle setup',14,'Ads')
+      + raProjTaskCard('AM','Monthly performance review seller ke saath karo',7,'Account Manager')
+      + raProjTaskCard('Ads','New product launch campaign plan banao',10,'Ads')
+      + '</div></div>';
+    html += '</div>';
+  }
+
+  document.getElementById('ra-results').innerHTML = html;
+}
+
+function raSummaryCard(icon, label, val, color) {
+  return '<div style="background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'
+    + '<div style="font-size:22px;">'+icon+'</div>'
+    + '<div style="font-size:22px;font-weight:800;color:var(--'+color+');">'+val+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">'+label+'</div>'
+    + '</div>';
+}
+
+function raTaskCard(t) {
+  const deptColor = t.dept==='Ads'?'badge-blue':t.dept==='Team Lead'?'badge-gray':t.dept==='Account Manager'?'badge-amber':'badge-green';
+  const priorityColor = t.priority==='urgent'?'var(--red)':t.priority==='high'?'var(--orange)':'var(--amber)';
+  const isAccountLevel = t.asin==='ACCOUNT'||t.asin==='REVIEW';
+
+  let subTasksHtml = '';
+  if (t.subTasks && t.subTasks.length) {
+    subTasksHtml = '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Sub-tasks:</div>'
+      + t.subTasks.map((s,i) =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f8fafc;border-radius:6px;margin-bottom:4px;">'
+        + '<div style="flex:1;font-size:12px;">'+s.task+'</div>'
+        + '<span class="badge '+(s.dept==='Ads'?'badge-blue':'badge-green')+'" style="font-size:10px;white-space:nowrap;">'+s.dept+'</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">'+s.deadline+'d</span>'
+        + '<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--secondary);color:#fff;white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(s.task)+'\',\''+s.dept+'\','+s.deadline+')">➕</button>'
+        + '</div>'
+      ).join('')
+      + '</div>';
+  }
+
+  let kwHtml = '';
+  if (t.keywordData) {
+    kwHtml = '<div style="margin-top:8px;background:#eaf4fb;border-radius:8px;padding:10px;font-size:12px;">'
+      + '<div style="font-weight:700;margin-bottom:6px;">🔑 Keyword Placement Map:</div>'
+      + (t.keywordData.title.length ? '<div><span style="background:#d5f5e3;padding:2px 6px;border-radius:4px;font-weight:600;">TITLE:</span> '+t.keywordData.title.join(', ')+'</div>' : '')
+      + (t.keywordData.bullets.length ? '<div style="margin-top:4px;"><span style="background:#d6eaf8;padding:2px 6px;border-radius:4px;font-weight:600;">BULLETS:</span> '+t.keywordData.bullets.join(', ')+'</div>' : '')
+      + (t.keywordData.backend.length ? '<div style="margin-top:4px;"><span style="background:#fdebd0;padding:2px 6px;border-radius:4px;font-weight:600;">BACKEND:</span> '+t.keywordData.backend.join(', ')+'</div>' : '')
+      + '</div>';
+  }
+
+  return '<div class="card" style="margin-bottom:10px;border-left:4px solid '+priorityColor+';">'
+    + '<div style="padding:14px 16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+    + '<div style="flex:1;">'
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">'
+    + '<span class="badge '+deptColor+'">'+t.dept+'</span>'
+    + (!isAccountLevel ? '<span style="font-size:11px;background:#f0f0f0;padding:2px 8px;border-radius:12px;font-weight:600;">'+t.asin+'</span>' : '')
+    + '<span style="font-size:11px;color:var(--text-muted);">⏱ '+t.deadline+(t.deadline===1?' day':' days')+'</span>'
+    + '</div>'
+    + '<div style="font-weight:700;font-size:14px;color:'+priorityColor+';">'+t.issue+'</div>'
+    + '<div style="font-size:13px;margin-top:2px;">'+t.task+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+t.reason+'</div>'
+    + (t.metric ? '<div style="font-size:11px;background:#f8f8f8;padding:4px 8px;border-radius:6px;margin-top:6px;display:inline-block;">📊 '+t.metric+'</div>' : '')
+    + '</div>'
+    + '<button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(t.task)+'\',\''+t.dept+'\','+t.deadline+')">➕ Create Task</button>'
+    + '</div>'
+    + kwHtml
+    + subTasksHtml
+    + '</div></div>';
+}
+
+function raProjTaskCard(label, text, days, dept) {
+  const deptColor = dept==='Ads'?'badge-blue':dept==='Account Manager'?'badge-amber':'badge-green';
+  return '<div style="padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);display:flex;gap:8px;align-items:flex-start;">'
+    + '<div style="flex:1;">'
+    + '<span class="badge '+deptColor+'" style="font-size:10px;margin-bottom:4px;">'+dept+'</span>'
+    + '<div style="font-size:12px;">'+text+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">⏱ '+days+' days</div>'
+    + '</div>'
+    + '<button class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:var(--secondary);color:#fff;white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(text)+'\',\''+dept+'\','+days+')">➕</button>'
+    + '</div>';
+}
+
+async function raCreateTask(encodedTask, dept, days) {
+  if (!_ra.client) { showToast('Seller select nahi hai!','error'); return; }
+  const text = decodeURIComponent(encodedTask);
+  const deadline = new Date();
+  deadline.setDate(deadline.getDate() + days);
+  const deadlineStr = deadline.toISOString().split('T')[0];
+  const category = dept==='Ads' ? 'Ads Campaign' : dept==='Account Manager' ? 'Account Management' : 'Listing Work';
+  const priority = days<=1?'Critical':days<=2?'High':days<=5?'Medium':'Low';
+
+  const r = await api('POST','/tasks',{
+    title: text.slice(0,120),
+    description: 'Amazon Report Analysis se auto-generated. Client: '+_ra.clientName+' | Dept: '+dept,
+    clientCode: _ra.client, clientName: _ra.clientName,
+    assignedTo: APP.user.name, assignedBy: APP.user.name,
+    priority, category, deadline: deadlineStr,
+  });
+
+  if (r?.success) {
+    showToast('✅ Task created! — '+r.taskId,'success');
+  } else {
+    showToast('Error: '+(r?.error||'Task create nahi hua'),'error');
+  }
+}
+
 </script>
 </body>
 </html>

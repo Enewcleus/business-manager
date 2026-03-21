@@ -540,5 +540,68 @@ clientsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
-module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter,clientsRouter };
+// ── ADD TO allroutes.js — before module.exports line ──────────────
+// Hurdle Tracker Routes
+
+const hurdleRouter = require('express').Router();
+
+// GET all hurdles
+hurdleRouter.get('/', authMiddleware, async (req, res) => {
+  const { role, name } = req.user;
+  let query = supabase.from('hurdles').select('*').order('created_at', { ascending: false });
+  if (!['Admin', 'Ops Lead', 'CSI Lead', 'SME', 'Team Lead'].includes(role)) {
+    query = query.eq('added_by', name);
+  }
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+// POST new hurdle
+hurdleRouter.post('/', authMiddleware, async (req, res) => {
+  const { clientCode, clientName, description, emailSent, emailDate, emailSubject } = req.body;
+  if (!clientCode || !description) return res.status(400).json({ error: 'clientCode and description required' });
+  if (!emailSent) return res.status(400).json({ error: 'Email confirmation required before adding hurdle' });
+  const { data, error } = await supabase.from('hurdles').insert({
+    client_code: clientCode, client_name: clientName, description,
+    email_sent: emailSent, email_date: emailDate || null, email_subject: emailSubject || '',
+    added_by: req.user.name, status: 'Open', attempts: []
+  }).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, hurdle: data?.[0] });
+});
+
+// PATCH hurdle — update status or add attempt
+hurdleRouter.patch('/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { status, attempt } = req.body;
+  const updates = { updated_at: new Date().toISOString() };
+  if (status) updates.status = status;
+  if (attempt) {
+    const { data: existing } = await supabase.from('hurdles').select('attempts').eq('id', id).single();
+    const attempts = existing?.attempts || [];
+    attempts.push({ ...attempt, addedBy: req.user.name, date: new Date().toISOString() });
+    updates.attempts = attempts;
+  }
+  const { error } = await supabase.from('hurdles').update(updates).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// DELETE hurdle (Admin only)
+hurdleRouter.delete('/:id', authMiddleware, async (req, res) => {
+  if (!['Admin', 'Ops Lead'].includes(req.user.role)) return res.status(403).json({ error: 'Not allowed' });
+  const { error } = await supabase.from('hurdles').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ── Also update module.exports to include hurdleRouter ──
+// module.exports = { ..., hurdleRouter };
+
+// ── Add to server.js ──
+// const { hurdleRouter } = require('./routes/allroutes');
+// app.use('/api/hurdles', hurdleRouter);
+
+module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter,clientsRouter, hurdleRouter };
 

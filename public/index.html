@@ -3937,8 +3937,7 @@ function initTheme(){
 function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
 document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
-</script>
-  // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // FEATURE 1: DSR EXECUTIVE FILTER
 // Add filterDSRByExec function + inject exec dropdown in renderDSR
 // ═══════════════════════════════════════════════════════════════════
@@ -5537,5 +5536,6 @@ async function raCreateTask(encodedTask, dept, days) {
   }
 }
 
+</script>
 </body>
 </html>

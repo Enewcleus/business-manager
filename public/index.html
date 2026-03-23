@@ -3031,7 +3031,7 @@ async function generateReport(){
                         const borderColor = over>0?'var(--red)':prog>0?'var(--secondary)':'var(--green)';
                         const safeCode = cl.clientCode||'';
                         const safeName = (cl.clientName||'').replace(/'/g,"'");
-                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" onclick="showExecClientTasksFromStore(\\\\''+storeKey+'\\\\',\\\\''+safeName+'\\\\')" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" data-key="'+storeKey+'" data-name="'+safeName.replace(/"/g,\'&quot;\')+'" onclick="var k=this.getAttribute(\'data-key\'),n=this.getAttribute(\'data-name\');showExecClientTasksFromStore(k,n)" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
                           +'<div style="flex:1;">'
                           +'<div style="font-size:13px;font-weight:600;color:var(--primary);">👥 '+cl.clientName+'</div>'
                           +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+cl.tasks.length+' tasks total · click for detail</div>'

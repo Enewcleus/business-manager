@@ -1406,10 +1406,20 @@ async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
   const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
-  renderCRMPage(APP.clients,todayCalls||[]);
-  // Build searchable client select after render
+
+  // Role-based filtering — CRM Executive sees only assigned sellers
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  let myClients = APP.clients || [];
+  if (!isLead) {
+    myClients = myClients.filter(c =>
+      c.amName === u.name || c.adsManager === u.name || c.crmExecutive === u.name
+    );
+  }
+
+  renderCRMPage(myClients, todayCalls||[]);
   setTimeout(() => {
-    buildSearchableSelect('crm-client-wrap', APP.clients, '', '🔍 Search client...');
+    buildSearchableSelect('crm-client-wrap', myClients, '', '🔍 Search client...');
     // Watch for selection change
     const wrap = document.getElementById('crm-client-wrap');
     if (wrap) {

@@ -739,7 +739,7 @@ async function loadDSRPage() {
             <td><strong>${c.busyName}</strong></td>
             <td><span class="badge badge-blue" style="font-size:11px;">${c.marketplace}</span></td>
             ${isLead?`<td style="font-size:12px;color:var(--text-muted);">${c.amName||'—'}</td>`:''}
-            <td><button class="btn btn-primary btn-sm" onclick="openDSRForm('${c.clientCode}','${c.busyName.replace(/'/g,"\'")}')">+ DSR Bharo</button></td>
+            <td><button class="btn btn-primary btn-sm" data-cc="${c.clientCode}" data-cn="${c.busyName.replace(/"/g,'&quot;')}" onclick="var b=this;openDSRForm(b.getAttribute('data-cc'),b.getAttribute('data-cn'),false)">+ DSR Bharo</button></td>
           </tr>`).join('')}
         </tbody>
       </table></div></div>
@@ -766,7 +766,7 @@ async function loadDSRPage() {
             '<td style="text-align:right;">'+(d.returns_count||0)+'</td>'+
             '<td style="text-align:right;">₹'+(d.ad_spend||0).toLocaleString('en-IN')+'</td>'+
             '<td>'+(al.length?al.join(' '):'<span class="badge badge-green" style="font-size:10px;">OK</span>')+'</td>'+
-            '<td><button class="btn btn-sm btn-outline" onclick="openDSRForm(''+c.clientCode+'',''+c.busyName.replace(/'/g,"\'")+'',true)">Edit</button></td>'+
+            '<td><button class="btn btn-sm btn-outline" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/"/g,'&quot;')+'" onclick="var b=this;openDSRForm(b.getAttribute(\'data-cc\'),b.getAttribute(\'data-cn\'),true)">Edit</button></td>'+
           '</tr>';
         }).join('')}
         </tbody>

@@ -8,7 +8,7 @@
 <style>
   :root {
     --primary:#1C2B2D; --secondary:#D4A03D; --accent:#C8903A;
-    --green:#27ae60; --amber:#f39c12; --red:#e74c3c; --purple:#8e44ad; 
+    --green:#27ae60; --amber:#f39c12; --red:#e74c3c; --purple:#8e44ad;
     --teal:#16a085; --orange:#d35400;
     --bg:#F0F4F8; --card:#FFFFFF; --text:#2c3e50; --text-muted:#7f8c8d;
     --border:#e0e6ed; --sidebar-w:240px;
@@ -3024,24 +3024,24 @@ async function generateReport(){
                     +'<td colspan="6" style="padding:0 0 0 32px;background:#f8fafc;">'
                     +'<div style="padding:12px;">'
                     +'<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">'+r.name+' — Clients:</div>'
-                    + Object.values(r.clientsMap).map(cl=>{
+                    + (()=>{ window._execClientStore = window._execClientStore||{}; return Object.values(r.clientsMap).map(cl=>{
                         const done = cl.tasks.filter(t=>t.status==='Completed').length;
                         const prog = cl.tasks.filter(t=>t.status==='In Progress').length;
                         const over = cl.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
                         const borderColor = over>0?'var(--red)':prog>0?'var(--secondary)':'var(--green)';
-                        const safeCode = cl.clientCode||'';
-                        const safeName = (cl.clientName||'').replace(/'/g,"'");
-                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" data-key="'+storeKey+'" data-name="'+safeName.replace(/"/g,\'&quot;\')+'" onclick="var k=this.getAttribute(\'data-key\'),n=this.getAttribute(\'data-name\');showExecClientTasksFromStore(k,n)" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+                        const storeKey = 'ec_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+                        window._execClientStore[storeKey] = {tasks:cl.tasks, name:cl.clientName||''};
+                        return '<div class="exec-cl-row" data-sk="'+storeKey+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;">'
                           +'<div style="flex:1;">'
                           +'<div style="font-size:13px;font-weight:600;color:var(--primary);">👥 '+cl.clientName+'</div>'
-                          +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+cl.tasks.length+' tasks total · click for detail</div>'
+                          +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+cl.tasks.length+' tasks · click for detail</div>'
                           +'</div>'
                           +(done?'<span class="badge badge-green" style="font-size:11px;">✅ '+done+'</span>':'')
                           +(prog?'<span class="badge badge-blue" style="font-size:11px;">▶ '+prog+'</span>':'')
                           +(over?'<span class="badge badge-red" style="font-size:11px;">🔴 '+over+'</span>':'')
                           +'<span style="background:var(--secondary);color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;">Tasks →</span>'
                           +'</div>';
-                      }).join('')
+                      }).join(''); })() 
                     +'</div></td></tr>';
                 }).join('')}
               </tbody>
@@ -3616,6 +3616,15 @@ function viewClientTasksFromReport(clientCode, clientName) {
     }, 300);
   }, 500);
 }
+
+document.addEventListener('click', function(e) {
+  const row = e.target.closest('.exec-cl-row');
+  if (!row) return;
+  const sk = row.getAttribute('data-sk');
+  if (!sk || !window._execClientStore) return;
+  const stored = window._execClientStore[sk];
+  if (stored) showExecClientTasks('', stored.name, stored.tasks);
+});
 
 function toggleExecClients(rowId){
   const el = document.getElementById(rowId);

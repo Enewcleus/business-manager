@@ -632,130 +632,235 @@ function navigate(page) {
 
 // ── DSR ──────────────────────────────────────────────────────
 async function renderDSR() {
-  const today = new Date().toISOString().split('T')[0];
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isExec = !isLead;
+  window._dsrSelectedDate = window._dsrSelectedDate || new Date().toISOString().split('T')[0];
+  const selDate = window._dsrSelectedDate;
+
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
-  const [clients, todayStatus, alerts] = await Promise.all([getClients(), api('GET', '/dsr/today-status'), api('GET', '/dsr/alerts')]);
+
+  const [clients, alerts] = await Promise.all([getClients(), api('GET', '/dsr/alerts')]);
   if (clients) APP.clients = clients;
+
+  // Role-based client filtering
+  let myClients = APP.clients || [];
+  if (isExec) {
+    myClients = myClients.filter(c =>
+      c.amName === u.name || c.adsManager === u.name || c.crmExecutive === u.name
+    );
+  }
+
+  // Fetch DSR for selected date
+  const dsrData = await api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate) || [];
+  const filedCodes = new Set(dsrData.map(d => d.client_code || d.clientCode));
+
+  const pending = myClients.filter(c => !filedCodes.has(c.clientCode));
+  const filed   = myClients.filter(c =>  filedCodes.has(c.clientCode));
+  const myAlerts = isExec ? (alerts||[]).filter(a => myClients.some(c=>c.clientCode===(a.client_code||a.clientCode))) : (alerts||[]);
+
+  const isToday = selDate === new Date().toISOString().split('T')[0];
+  const isYest  = selDate === (() => { const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+
   document.getElementById('page-content').innerHTML = `
-    <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">${todayStatus?.total||0}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">DSR Done Today</div><div class="kpi-value">${todayStatus?.done||0}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Pending Today</div><div class="kpi-value">${todayStatus?.pending?.length||0}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">Active Alerts</div><div class="kpi-value">${alerts?.length||0}</div></div>
+    <!-- Date Selector -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-body" style="padding:12px 16px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:13px;font-weight:600;color:var(--primary);">📅 Date:</span>
+          <button class="btn btn-sm ${isToday?'btn-primary':'btn-outline'}" onclick="dsrChangeDate('today')">Today</button>
+          <button class="btn btn-sm ${isYest?'btn-primary':'btn-outline'}" onclick="dsrChangeDate('yesterday')">Yesterday</button>
+          <input type="date" class="form-control" id="dsr-date-picker" value="${selDate}" style="width:160px;" onchange="dsrChangeDate(this.value)">
+          ${isLead ? `
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+            <span style="font-size:12px;color:var(--text-muted);">Executive:</span>
+            <select class="form-control" style="width:180px;padding:6px;" id="dsr-exec-sel" onchange="renderDSRContent()">
+              <option value="">All Executives</option>
+              ${[...new Set((APP.clients||[]).map(c=>c.amName).filter(Boolean))].sort().map(n=>`<option value="${n}">${n}</option>`).join('')}
+            </select>
+          </div>` : ''}
+        </div>
+      </div>
     </div>
-    ${alerts?.length ? `
-    <div class="card" style="border-left:4px solid #e74c3c;">
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">My Sellers</div><div class="kpi-value">${myClients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Filed</div><div class="kpi-value">${filed.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">${pending.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">🚨 Alerts</div><div class="kpi-value">${myAlerts.length}</div></div>
+    </div>
+
+    <div id="dsr-main-content"></div>
+    <div id="dsr-form-section"></div>
+  `;
+
+  window._dsrMyClients = myClients;
+  window._dsrPending = pending;
+  window._dsrFiled = filed;
+  window._dsrFiledData = dsrData;
+  window._dsrMyAlerts = myAlerts;
+  window._dsrIsLead = isLead;
+  renderDSRContent();
+}
+
+function dsrChangeDate(val) {
+  if (val === 'today') window._dsrSelectedDate = new Date().toISOString().split('T')[0];
+  else if (val === 'yesterday') {
+    const d = new Date(); d.setDate(d.getDate()-1);
+    window._dsrSelectedDate = d.toISOString().split('T')[0];
+  } else {
+    window._dsrSelectedDate = val;
+  }
+  renderDSR();
+}
+
+async function renderDSRContent() {
+  const isLead = window._dsrIsLead;
+  const execFilter = document.getElementById('dsr-exec-sel')?.value || '';
+  let pending = window._dsrPending || [];
+  let filed   = window._dsrFiled || [];
+  let myClients = window._dsrMyClients || [];
+  const dsrData = window._dsrFiledData || [];
+  const alerts  = window._dsrMyAlerts || [];
+  const selDate = window._dsrSelectedDate || new Date().toISOString().split('T')[0];
+
+  // Apply exec filter for admin
+  if (execFilter) {
+    pending = pending.filter(c => c.amName === execFilter || c.adsManager === execFilter || c.crmExecutive === execFilter);
+    filed   = filed.filter(c => c.amName === execFilter || c.adsManager === execFilter || c.crmExecutive === execFilter);
+  }
+
+  const el = document.getElementById('dsr-main-content');
+  if (!el) return;
+
+  let html = '';
+
+  // Alerts section
+  if (alerts.length) {
+    html += `<div class="card" style="border-left:4px solid var(--red);margin-bottom:12px;">
       <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Active Alerts (${alerts.length})</span></div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Seller</th><th>Date</th><th>Alert</th><th>Details</th></tr></thead>
-        <tbody>${alerts.map(a => {
+        <thead><tr><th>Seller</th><th>Date</th><th>Alert</th></tr></thead>
+        <tbody>${alerts.map(a=>{
           const al=[];
-          if(a.alert_overspend) al.push('<span class="badge badge-red">💸 Over Budget</span>');
-          if(a.alert_budget_80) al.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
-          if(a.alert_under_spend) al.push('<span class="badge badge-red">📉 Under 80% Spend</span>');
-          if(a.alert_high_returns) al.push('<span class="badge badge-red">🔄 High Returns</span>');
-          if(a.alert_sales_drop) al.push('<span class="badge badge-amber">📉 Sales Drop</span>');
-          return `<tr><td><strong>${a.client_name}</strong></td><td>${a.report_date}</td><td>${al.join(' ')}</td><td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td></tr>`;
+          if(a.alert_overspend) al.push('<span class="badge badge-red">Over Budget</span>');
+          if(a.alert_budget_80) al.push('<span class="badge badge-amber">80% Used</span>');
+          if(a.alert_high_returns) al.push('<span class="badge badge-red">High Returns</span>');
+          if(a.alert_sales_drop) al.push('<span class="badge badge-amber">Sales Drop</span>');
+          return `<tr><td><strong>${a.client_name}</strong></td><td>${a.report_date}</td><td>${al.join(' ')}</td></tr>`;
         }).join('')}</tbody>
       </table></div></div>
-    </div>` : ''}
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">➕ Daily Report Enter Karo</span>
-        <input type="date" class="form-control" id="dsr-date" value="${today}" style="width:160px;">
+    </div>`;
+  }
+
+  // --- PENDING SECTION ---
+  if (pending.length) {
+    html += `<div class="card" style="border-left:4px solid var(--red);margin-bottom:12px;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">⏳ Pending — ${selDate} (${pending.length} sellers)</span>
       </div>
-      <div class="card-body">
-        <div class="form-group"><label>Seller Select Karo *</label>
-          <select class="form-control" id="dsr-client" onchange="loadDSRTrend(this.value)">
-            <option value="">-- Seller Choose Karo --</option>
-            ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}" data-budget="${c.sellerBudget||0}">${c.busyName} (${c.marketplace})</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>📦 Orders Count</label><input type="number" class="form-control" id="dsr-orders" placeholder="0" min="0"></div>
-          <div class="form-group"><label>💰 Sales Amount (₹)</label><input type="number" class="form-control" id="dsr-sales" placeholder="0.00" min="0"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>🔄 Returns Count</label><input type="number" class="form-control" id="dsr-ret-count" placeholder="0" min="0"></div>
-          <div class="form-group"><label>🔄 Returns Amount (₹)</label><input type="number" class="form-control" id="dsr-ret-amount" placeholder="0.00" min="0"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>📢 Ad Spend (₹)</label><input type="number" class="form-control" id="dsr-spend" placeholder="0.00" min="0" oninput="checkBudget()"></div>
-          <div class="form-group"><label>🎯 Seller Budget (₹)</label><input type="number" class="form-control" id="dsr-budget" placeholder="0.00" min="0" oninput="checkBudget()"></div>
-        </div>
-        <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">⚠️ Ad Spend budget se zyada ho gaya!</div>
-        <div class="form-group"><label>Notes</label><textarea class="form-control" id="dsr-notes" placeholder="Koi special note..."></textarea></div>
-        <button class="btn btn-primary" onclick="saveDSR()">💾 Save Daily Report</button>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th><th>Market</th>${isLead?'<th>Executive</th>':''}<th>Kaal ki Sale</th><th>Action</th></tr></thead>
+        <tbody>${pending.map(c => {
+          // Get yesterday's data for reference
+          const prevData = (window._dsrPrevData||{})[c.clientCode];
+          const prevSale = prevData ? `₹${(prevData.sales_amount||0).toLocaleString('en-IN')} · ${prevData.orders_count||0} orders` : '—';
+          return `<tr style="background:#fff8f8;">
+            <td><strong>${c.busyName}</strong></td>
+            <td><span class="badge badge-blue" style="font-size:11px;">${c.marketplace}</span></td>
+            ${isLead?`<td style="font-size:12px;color:var(--text-muted);">${c.amName||'—'}</td>`:''}
+            <td style="font-size:12px;color:var(--text-muted);">${prevSale}</td>
+            <td><button class="btn btn-primary btn-sm" onclick="openDSRForm('${c.clientCode}','${c.busyName.replace(/'/g,"\\'")}')">+ DSR Bharo</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+  }
+
+  // --- FILED SECTION ---
+  if (filed.length) {
+    html += `<div class="card" style="border-left:4px solid var(--green);margin-bottom:12px;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">✅ Filed — ${selDate} (${filed.length} sellers)</span>
       </div>
-    </div>
-    <div class="card" id="dsr-trend-card" style="display:none;">
-      <div class="card-header"><span class="card-title" id="dsr-trend-title">📈 Last 7 Days Trend</span></div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Return %</th><th>Ad Spend</th><th>Budget</th><th>Used %</th><th>Status</th></tr></thead>
-        <tbody id="dsr-trend-body"></tbody>
+        <thead><tr><th>Seller</th>${isLead?'<th>Executive</th>':''}<th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Ad Spend</th><th>Alert</th><th>Action</th></tr></thead>
+        <tbody>${filed.map(c => {
+          const d = dsrData.find(x=>(x.client_code||x.clientCode)===c.clientCode) || {};
+          const al = [];
+          if(d.alert_overspend) al.push('<span class="badge badge-red" style="font-size:10px;">Over Budget</span>');
+          if(d.alert_high_returns) al.push('<span class="badge badge-red" style="font-size:10px;">High Returns</span>');
+          if(d.alert_sales_drop) al.push('<span class="badge badge-amber" style="font-size:10px;">Sales Drop</span>');
+          const isZero = !d.orders_count && !d.sales_amount;
+          return `<tr style="${isZero?'background:#fdf2f2;':''}">
+            <td><strong>${c.busyName}</strong></td>
+            ${isLead?`<td style="font-size:12px;color:var(--text-muted);">${d.entered_by||c.amName||'—'}</td>`:''}
+            <td style="text-align:right;${isZero?'color:var(--red);font-weight:700;':''}">${d.orders_count||0}</td>
+            <td style="text-align:right;${isZero?'color:var(--red);font-weight:700;':''}">₹${(d.sales_amount||0).toLocaleString('en-IN')}</td>
+            <td style="text-align:right;">${d.returns_count||0}</td>
+            <td style="text-align:right;">₹${(d.ad_spend||0).toLocaleString('en-IN')}</td>
+            <td>${al.length?al.join(' '):'<span class="badge badge-green" style="font-size:10px;">OK</span>'}</td>
+            <td><button class="btn btn-sm btn-outline" onclick="openDSRForm('${c.clientCode}','${c.busyName.replace(/'/g,"\\'")}',true)">Edit</button></td>
+          </tr>`;
+        }).join('')}</tbody>
       </table></div></div>
-    </div>
-    ${todayStatus?.pending?.length ? `
-    <div class="card">
-      <div class="card-header" style="background:#fef9e7;"><span class="card-title">⏳ Aaj DSR Pending (${todayStatus.pending.length} sellers)</span></div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Seller</th><th>Marketplace</th><th>Ads Manager</th><th>Action</th></tr></thead>
-        <tbody>${todayStatus.pending.map(p=>`<tr>
-          <td><strong>${p.busy_name}</strong></td><td>${p.marketplace||'—'}</td><td>${p.ads_manager||'—'}</td>
-          <td><button class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="selectDSRClient('${p.client_code}','${p.busy_name}')">+ Enter DSR</button></td>
-        </tr>`).join('')}</tbody>
-      </table></div></div>
-    </div>` : '<div class="card"><div class="card-body" style="text-align:center;color:#27ae60;font-weight:700;font-size:16px;">✅ Aaj sab sellers ka DSR enter ho gaya!</div></div>'}`;
+    </div>`;
+  }
+
+  if (!pending.length && !filed.length) {
+    html += '<div class="card"><div class="card-body" style="text-align:center;color:var(--text-muted);padding:30px;">No sellers found for this filter</div></div>';
+  }
+
+  el.innerHTML = html;
 }
 
-function checkBudget() {
-  const spend=parseFloat(document.getElementById('dsr-spend')?.value)||0;
-  const budget=parseFloat(document.getElementById('dsr-budget')?.value)||0;
-  const warn=document.getElementById('dsr-budget-warning');
-  if(warn) warn.style.display=(budget>0&&spend>budget)?'block':'none';
-}
+function openDSRForm(clientCode, clientName, isEdit = false) {
+  const selDate = window._dsrSelectedDate || new Date().toISOString().split('T')[0];
+  const client = (APP.clients||[]).find(c=>c.clientCode===clientCode);
+  const existingData = (window._dsrFiledData||[]).find(d=>(d.client_code||d.clientCode)===clientCode) || {};
 
-function selectDSRClient(cc,name) {
-  const sel=document.getElementById('dsr-client');
-  if(sel){sel.value=cc;loadDSRTrend(cc);}
-  window.scrollTo(0,0);
-}
-
-async function loadDSRTrend(cc) {
-  if(!cc) return;
-  const client=APP.clients.find(c=>c.clientCode===cc);
-  const budgetField=document.getElementById('dsr-budget');
-  if(budgetField&&client?.sellerBudget) budgetField.value=client.sellerBudget;
-  const data=await api('GET','/dsr/trend/'+cc);
-  if(!data||!data.length) return;
-  document.getElementById('dsr-trend-card').style.display='';
-  document.getElementById('dsr-trend-title').textContent=`📈 ${client?.busyName||cc} — Last 7 Days`;
-  document.getElementById('dsr-trend-body').innerHTML=data.map((d,i)=>{
-    const prev=data[i-1];
-    const st=prev?(d.sales_amount>prev.sales_amount?'📈':d.sales_amount<prev.sales_amount?'📉':'➡️'):'—';
-    const al=[];
-    if(d.alert_overspend) al.push('<span class="badge badge-red">Over Budget</span>');
-    if(d.alert_budget_80) al.push('<span class="badge badge-amber">80% Used</span>');
-    if(d.alert_high_returns) al.push('<span class="badge badge-red">High Returns</span>');
-    if(d.alert_sales_drop) al.push('<span class="badge badge-amber">Sales Drop</span>');
-    return `<tr>
-      <td>${d.report_date}</td><td>${d.orders_count||0}</td>
-      <td>${st} ₹${(d.sales_amount||0).toLocaleString('en-IN')}</td>
-      <td>${d.returns_count||0}</td>
-      <td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td>
-      <td>₹${(d.ad_spend||0).toLocaleString('en-IN')}</td>
-      <td>₹${(d.seller_budget||0).toLocaleString('en-IN')}</td>
-      <td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td>
-      <td>${al.length?al.join(' '):'<span class="badge badge-green">✅ OK</span>'}</td>
-    </tr>`;
-  }).join('');
+  const el = document.getElementById('dsr-form-section');
+  if (el) {
+    el.innerHTML = `
+      <div class="card" style="border-left:4px solid var(--secondary);margin-bottom:12px;" id="dsr-entry-form">
+        <div class="card-header" style="background:#fff8e7;">
+          <span class="card-title">${isEdit?'✏️ Edit':'➕ Enter'} DSR — ${clientName} (${selDate})</span>
+          <button class="btn btn-sm btn-outline" onclick="document.getElementById('dsr-entry-form').remove()">✕ Close</button>
+        </div>
+        <div class="card-body">
+          <input type="hidden" id="dsr-client-code" value="${clientCode}">
+          <input type="hidden" id="dsr-client-name" value="${clientName}">
+          <input type="hidden" id="dsr-date" value="${selDate}">
+          <div class="form-row">
+            <div class="form-group"><label>📦 Orders Count</label><input type="number" class="form-control" id="dsr-orders" value="${existingData.orders_count||''}" placeholder="0" min="0"></div>
+            <div class="form-group"><label>💰 Sales Amount (₹)</label><input type="number" class="form-control" id="dsr-sales" value="${existingData.sales_amount||''}" placeholder="0.00" min="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>🔄 Returns Count</label><input type="number" class="form-control" id="dsr-ret-count" value="${existingData.returns_count||''}" placeholder="0" min="0"></div>
+            <div class="form-group"><label>🔄 Returns Amount (₹)</label><input type="number" class="form-control" id="dsr-ret-amount" value="${existingData.returns_amount||''}" placeholder="0.00" min="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>📢 Ad Spend (₹)</label><input type="number" class="form-control" id="dsr-spend" value="${existingData.ad_spend||''}" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+            <div class="form-group"><label>🎯 Seller Budget (₹)</label><input type="number" class="form-control" id="dsr-budget" value="${existingData.seller_budget||client?.sellerBudget||''}" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+          </div>
+          <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">⚠️ Ad Spend budget se zyada!</div>
+          <div class="form-group"><label>Notes</label><textarea class="form-control" id="dsr-notes" placeholder="Koi special note...">${existingData.notes||''}</textarea></div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="saveDSR()">💾 Save DSR</button>
+            <button class="btn btn-outline" onclick="document.getElementById('dsr-entry-form').remove()">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
 }
 
 async function saveDSR() {
-  const sel=document.getElementById('dsr-client');
-  const cc=sel?.value,cn=sel?.options[sel.selectedIndex]?.dataset?.name||'';
+  const cc = document.getElementById('dsr-client-code')?.value || document.getElementById('dsr-client')?.value;
+  const cn = document.getElementById('dsr-client-name')?.value || document.getElementById('dsr-client')?.options[document.getElementById('dsr-client')?.selectedIndex]?.dataset?.name || '';
+  const date = document.getElementById('dsr-date')?.value;
   if(!cc){showToast('Seller select karo','error');return;}
-  const date=document.getElementById('dsr-date')?.value;
   if(!date){showToast('Date select karo','error');return;}
   const r=await api('POST','/dsr',{clientCode:cc,clientName:cn,reportDate:date,ordersCount:document.getElementById('dsr-orders')?.value||0,salesAmount:document.getElementById('dsr-sales')?.value||0,returnsCount:document.getElementById('dsr-ret-count')?.value||0,returnsAmount:document.getElementById('dsr-ret-amount')?.value||0,adSpend:document.getElementById('dsr-spend')?.value||0,sellerBudget:document.getElementById('dsr-budget')?.value||0,notes:document.getElementById('dsr-notes')?.value||''});
   if(r?.success){
@@ -764,8 +869,9 @@ async function saveDSR() {
     else if(r.alerts?.alertHighReturns) msg='⚠️ Saved! Returns '+r.returnRate+'% — zyada hain!';
     else if(r.alerts?.alertBudget80) msg='⚠️ Saved! Budget 80% use ho gaya!';
     showToast(msg,r.alerts?.alertOverspend||r.alerts?.alertHighReturns?'error':'success');
-    ['dsr-orders','dsr-sales','dsr-ret-count','dsr-ret-amount','dsr-spend','dsr-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    loadDSRTrend(cc); renderDSR();
+    const formEl = document.getElementById('dsr-entry-form');
+    if (formEl) formEl.remove();
+    renderDSR();
   }
 }
 
@@ -1779,7 +1885,6 @@ function twTaskCard(task, allTasks) {
           ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;">${t.description.slice(0,120)}${t.description.length>120?'...':''}</div>` : ''}
         </div>
         <!-- Right: status + priority -->
-       
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
           <span class="badge ${statusBadgeClass}">${t.status}</span>
           <span class="badge" style="background:${priorityColor}20;color:${priorityColor};font-size:10px;">${t.priority}</span>
@@ -2923,12 +3028,18 @@ async function generateReport(){
                         const done = cl.tasks.filter(t=>t.status==='Completed').length;
                         const prog = cl.tasks.filter(t=>t.status==='In Progress').length;
                         const over = cl.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
-                        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--secondary);">'
-                          +'<div style="flex:1;font-size:13px;font-weight:600;">👥 '+cl.clientName+'</div>'
-                          +(done?'<span class="badge badge-green" style="font-size:11px;">✅ '+done+' done</span>':'')
-                          +(prog?'<span class="badge badge-blue" style="font-size:11px;">▶ '+prog+' progress</span>':'')
-                          +(over?'<span class="badge badge-red" style="font-size:11px;">🔴 '+over+' overdue</span>':'')
-                          +'<span style="font-size:11px;color:var(--text-muted);">'+cl.tasks.length+' tasks total</span>'
+                        const borderColor = over>0?'var(--red)':prog>0?'var(--secondary)':'var(--green)';
+                        const safeCode = cl.clientCode||'';
+                        const safeName = (cl.clientName||'').replace(/'/g,\'\\\'\')
+                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" onclick="showExecClientTasks(\''+safeCode+'\',\''+safeName+'\','+JSON.stringify(cl.tasks).replace(/\"/g,\'&quot;\')+')" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+                          +'<div style="flex:1;">'
+                          +'<div style="font-size:13px;font-weight:600;color:var(--primary);">👥 '+cl.clientName+'</div>'
+                          +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+cl.tasks.length+' tasks total · click for detail</div>'
+                          +'</div>'
+                          +(done?'<span class="badge badge-green" style="font-size:11px;">✅ '+done+'</span>':'')
+                          +(prog?'<span class="badge badge-blue" style="font-size:11px;">▶ '+prog+'</span>':'')
+                          +(over?'<span class="badge badge-red" style="font-size:11px;">🔴 '+over+'</span>':'')
+                          +'<span style="background:var(--secondary);color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;">Tasks →</span>'
                           +'</div>';
                       }).join('')
                     +'</div></td></tr>';
@@ -3381,6 +3492,62 @@ function exportDSRDayWiseExcel() {
   a.download = 'DSR_' + d.clientName.replace(/[^a-z0-9]/gi,'_') + '_' + (d.from||'') + '_to_' + (d.to||'') + '.csv';
   a.click();
   showToast('✅ DSR Day-wise downloaded!', 'success');
+}
+
+function showExecClientTasks(clientCode, clientName, tasks) {
+  // Show in panel
+  const statusColor = {'Completed':'#d5f5e3','In Progress':'#d6eaf8','Pending':'#fef9e7'};
+  const statusText  = {'Completed':'#1e8449','In Progress':'#1a5276','Pending':'#b7950b'};
+  const borderColor = {'Completed':'var(--green)','In Progress':'var(--secondary)','Pending':'var(--amber)'};
+
+  const done  = tasks.filter(t=>t.status==='Completed');
+  const prog  = tasks.filter(t=>t.status==='In Progress');
+  const over  = tasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  const pend  = tasks.filter(t=>t.status==='Pending'&&!t.isOverdue);
+
+  const taskRow = (t) => `
+    <div style="background:${statusColor[t.status]||'#f8fafc'};border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:4px solid ${borderColor[t.status]||'#ccc'};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--primary);${t.status==='Completed'?'text-decoration:line-through;opacity:0.7;':''}">${t.title||'—'}</div>
+          <div style="display:flex;gap:10px;font-size:12px;color:var(--text-muted);margin-top:5px;flex-wrap:wrap;">
+            ${t.deadline?`<span>📅 Due: ${t.deadline}</span>`:''}
+            ${t.completedAt?`<span style="color:var(--green);">✅ Done: ${t.completedAt.split('T')[0]}</span>`:''}
+            ${t.category?`<span class="badge badge-gray" style="font-size:10px;">${t.category}</span>`:''}
+            ${t.priority?`<span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-gray'}" style="font-size:10px;">${t.priority}</span>`:''}
+          </div>
+          ${t.description?`<div style="font-size:12px;color:var(--text-muted);margin-top:5px;">${t.description.slice(0,100)}${t.description.length>100?'...':''}</div>`:''}
+        </div>
+        <span class="badge" style="background:${statusColor[t.status]};color:${statusText[t.status]||'#666'};border:1px solid;flex-shrink:0;">${t.status}</span>
+      </div>
+    </div>`;
+
+  openPanel('📋 ' + clientName + ' — Tasks (' + tasks.length + ')', `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:60px;">
+        <div style="font-size:18px;font-weight:800;color:var(--red);">${over.length}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:60px;">
+        <div style="font-size:18px;font-weight:800;color:var(--amber);">${pend.length}</div>
+        <div style="font-size:11px;color:#b7950b;">Pending</div>
+      </div>
+      <div style="background:#d6eaf8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:60px;">
+        <div style="font-size:18px;font-weight:800;color:var(--primary);">${prog.length}</div>
+        <div style="font-size:11px;color:#1a5276;">In Progress</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:60px;">
+        <div style="font-size:18px;font-weight:800;color:var(--green);">${done.length}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+    </div>
+
+    ${over.length?'<div style="font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;margin-bottom:6px;">🔴 Overdue</div>'+over.map(taskRow).join(''):''}
+    ${prog.length?'<div style="font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;margin:10px 0 6px;">▶ In Progress</div>'+prog.map(taskRow).join(''):''}
+    ${pend.length?'<div style="font-size:12px;font-weight:700;color:var(--amber);text-transform:uppercase;margin:10px 0 6px;">⏳ Pending</div>'+pend.map(taskRow).join(''):''}
+    ${done.length?'<div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;margin:10px 0 6px;">✅ Completed</div>'+done.map(taskRow).join(''):''}
+    ${!tasks.length?'<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>':''}
+  `);
 }
 
 async function showExecTasks(execName, filterType, from, to) {

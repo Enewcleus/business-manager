@@ -2588,7 +2588,15 @@ async function submitRenewalPayment(id, name) {
   }
 }
 
-async function triggerRenewalReminders() {────────────────────────
+async function triggerRenewalReminders() {
+  const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Sending...';
+  const r = await api('POST', '/renewals/trigger-reminders', {});
+  btn.disabled = false; btn.textContent = '📨 Reminders';
+  if (r?.success) showToast('✅ ' + r.reminders_sent + ' reminders bheje gaye!', 'success');
+  else showToast('Error sending reminders', 'error');
+}
+
+// ── ADS ───────────────────────────────────────────────────────
 async function renderAds(){
   const ads=await api('GET','/ads');if(!ads) return;
   document.getElementById('page-content').innerHTML=`

@@ -948,6 +948,91 @@ async function viewPersonTasks(personName, role) {
 }
 
 // Edit client team from 360 view
+async function openEditClient(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) { showToast('Client not found', 'error'); return; }
+  const users = await api('GET','/users');
+  const active = (users||[]).filter(u=>u.isActive);
+  const ams  = active.filter(u=>u.role==='Account Manager');
+  const ads  = active.filter(u=>u.role==='Ads Executive');
+  const crms = active.filter(u=>u.role==='CRM Executive');
+  openPanel('✏️ Edit Client — '+client.busyName, `
+    <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;">
+      <strong>${client.clientCode}</strong> · ${client.marketplace}
+    </div>
+    <div class="form-group"><label>Busy Name *</label>
+      <input type="text" class="form-control" id="ec-name" value="${client.busyName||''}">
+    </div>
+    <div class="form-group"><label>Marketplace</label>
+      <select class="form-control" id="ec-market">
+        ${['Amazon.in','Amazon.com','Amazon.uk','Amazon.ae','Amazon.ca','Flipkart','Meesho','Myntra','Snapdeal','Other'].map(m=>`<option ${client.marketplace===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="ec-am">
+          <option value="">-- Select --</option>
+          ${ams.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="ec-ads">
+          <option value="">-- Select --</option>
+          ${ads.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="ec-crm">
+          <option value="">-- Select --</option>
+          ${crms.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Service Plan</label>
+        <select class="form-control" id="ec-plan">
+          ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Renewal Date</label>
+        <input type="date" class="form-control" id="ec-renewal" value="${client.renewalDate||''}">
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select class="form-control" id="ec-status">
+          <option ${client.status==='Active'?'selected':''}>Active</option>
+          <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditClient('${cc}')">💾 Save Changes</button>
+  `);
+}
+
+async function submitEditClient(cc) {
+  const name = document.getElementById('ec-name').value.trim();
+  if (!name) { showToast('Name required', 'error'); return; }
+  const r = await api('PATCH', '/clients/'+cc, {
+    busyName: name,
+    marketplace: document.getElementById('ec-market').value,
+    amName: document.getElementById('ec-am').value,
+    adsManager: document.getElementById('ec-ads').value,
+    crmExecutive: document.getElementById('ec-crm').value,
+    servicePlan: document.getElementById('ec-plan').value,
+    renewalDate: document.getElementById('ec-renewal').value || null,
+    status: document.getElementById('ec-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    const clients = await getClients(true);
+    renderClients();
+  } else {
+    showToast(r?.error || 'Update failed', 'error');
+  }
+}
+
 async function openEditClient360(cc) {
   const client = APP.clients.find(c=>c.clientCode===cc);
   if (!client) return;
@@ -2335,9 +2420,42 @@ async function submitQuickWorkLog(){
 
 // ── RENEWALS ─────────────────────────────────────────────────
 async function renderRenewals(){
-  const [renewals, stats] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats')]);
-  if(!renewals) return;
-  window._allRenewals = renewals;
+  const [renewals, stats, clients] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats'), getClients()]);
+  if (clients) APP.clients = clients;
+
+  // If renewals table is empty/few, auto-fill from clients renewal dates
+  let allRenewals = renewals || [];
+  if (allRenewals.length < (APP.clients||[]).filter(c=>c.renewalDate).length) {
+    // Merge: show clients with renewalDate that aren't in renewals table
+    const existingCodes = new Set(allRenewals.map(r=>r.clientCode||r.client_code));
+    const fromClients = (APP.clients||[]).filter(c=>c.renewalDate && !existingCodes.has(c.clientCode)).map(c=>{
+      const d = new Date(c.renewalDate); d.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const daysLeft = Math.ceil((d-today)/86400000);
+      return {
+        renewalId: 'CLT_'+c.clientCode,
+        clientCode: c.clientCode,
+        clientName: c.busyName,
+        servicePlan: c.servicePlan||'—',
+        renewalDate: c.renewalDate,
+        daysLeft: daysLeft,
+        isOverdue: daysLeft < 0,
+        isDueSoon: daysLeft>=0 && daysLeft<=15,
+        status: daysLeft < 0 ? 'Pending' : 'Pending',
+        owner: c.amName||'—',
+        amount: null,
+        crmComment: null,
+      };
+    });
+    allRenewals = [...allRenewals, ...fromClients];
+  }
+
+  if(!allRenewals.length) {
+    document.getElementById('page-content').innerHTML = '<div class="empty-state"><div class="emoji">🔄</div><h3>Koi renewals nahi</h3><p style="color:var(--text-muted);">Clients mein renewal dates add karo</p></div>';
+    return;
+  }
+  window._allRenewals = allRenewals;
+  const renewals2 = allRenewals;
 
   const u = APP.user;
   const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
@@ -2348,14 +2466,14 @@ async function renderRenewals(){
   const today = new Date(); today.setHours(0,0,0,0);
   const next30 = new Date(today); next30.setDate(today.getDate()+30);
 
-  const overdue   = renewals.filter(r=>r.isOverdue&&r.status!=='Confirmed'&&r.status!=='Lost');
-  const next30List= renewals.filter(r=>{
+  const overdue   = renewals2.filter(r=>r.isOverdue&&r.status!=='Confirmed'&&r.status!=='Lost');
+  const next30List= renewals2.filter(r=>{
     if(r.status==='Confirmed'||r.status==='Lost') return false;
     if(!r.renewalDate) return false;
     const d = new Date(r.renewalDate); d.setHours(0,0,0,0);
     return d >= today && d <= next30;
   });
-  const urgent    = renewals.filter(r=>r.daysLeft!=null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed'&&r.status!=='Lost');
+  const urgent    = renewals2.filter(r=>r.daysLeft!=null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed'&&r.status!=='Lost');
 
   function amtCell(r){ return canSeeAmount ? (r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—') : '—'; }
   function renewalRowActions(r){
@@ -2377,8 +2495,8 @@ async function renderRenewals(){
       <div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">${overdue.length}</div></div>
       <div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">${urgent.length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">${next30List.length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
-      <div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">${renewals.filter(r=>r.status==='Hold').length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">${renewals2.filter(r=>r.status==='Confirmed').length}</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">${renewals2.filter(r=>r.status==='Hold').length}</div></div>
       ${canSeeAmount&&stats?.totalValue?`<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹${Number(stats.totalValue).toLocaleString('en-IN')}</div></div>`:''}
     </div>
 
@@ -2426,7 +2544,7 @@ async function renderRenewals(){
 
     <div class="card">
       <div class="card-header">
-        <span class="card-title">🔄 All Renewals (${renewals.length})</span>
+        <span class="card-title">🔄 All Renewals (${renewals2.length})</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">
             <option value="">All Status</option>
@@ -2437,7 +2555,7 @@ async function renderRenewals(){
       </div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
         <thead><tr><th>Client</th><th>Plan</th>${canSeeAmount?'<th>Amount</th>':''}<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead>
-        <tbody id="renewals-tbody">${renewals.map(r=>`<tr>
+        <tbody id="renewals-tbody">${renewals2.map(r=>`<tr>
           <td><strong>${r.clientName}</strong></td>
           <td style="font-size:12px;">${r.servicePlan||'—'}</td>
           ${canSeeAmount?`<td>${amtCell(r)}</td>`:''}
@@ -2628,6 +2746,7 @@ async function renderReports(){
           <button class="btn btn-secondary" onclick="window._currentReport='ticket';generateReport()">🎫 Ticket Report</button>
           <button class="btn btn-secondary" onclick="window._currentReport='team';generateReport()">👥 Team Report</button>
           <button class="btn btn-secondary" style="background:var(--primary);color:#fff;" onclick="window._currentReport='executive';generateReport()">🧑‍💼 Executive Summary</button>
+          <button class="btn btn-secondary" style="background:#e74c3c;color:#fff;" onclick="window._currentReport='pendingdsr';generateReport()">⚠️ Pending DSR</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -2818,6 +2937,84 @@ async function generateReport(){
           </div>
         </div>
       </div>`;
+    return;
+  }
+
+  if(type==='pendingdsr'){
+    // Pending DSR: show which executive hasn't filed DSR for which seller on each date
+    const execFilter = document.getElementById('rpt-exec')?.value||'';
+    const clientFilter = document.getElementById('rpt-client')?.value||'';
+    if (!from || !to) { el.innerHTML='<div class="empty-state"><div class="emoji">📅</div><h3>Date range select karo</h3></div>'; return; }
+
+    const [allClients, dsrData] = await Promise.all([
+      getClients(),
+      api('GET', '/dsr?x=1&from='+from+'&to='+to) || [],
+    ]);
+    const clients = (allClients||[]).filter(c => !clientFilter || c.clientCode === clientFilter);
+
+    // Build date list
+    const dates = [];
+    let cur = new Date(from);
+    const end = new Date(to);
+    while (cur <= end) { dates.push(cur.toISOString().split('T')[0]); cur.setDate(cur.getDate()+1); }
+
+    // Build DSR map: clientCode+date → entry
+    const dsrMap = {};
+    (dsrData||[]).forEach(d => {
+      const key = (d.client_code||d.clientCode) + '_' + d.report_date;
+      dsrMap[key] = d.entered_by || '—';
+    });
+
+    // Find missing entries
+    const missing = [];
+    clients.forEach(c => {
+      if (execFilter && c.amName !== execFilter && c.adsManager !== execFilter && c.crmExecutive !== execFilter) return;
+      dates.forEach(date => {
+        const key = c.clientCode + '_' + date;
+        if (!dsrMap[key]) {
+          missing.push({ clientCode: c.clientCode, clientName: c.busyName, date, executive: c.amName||'—', marketplace: c.marketplace });
+        }
+      });
+    });
+
+    window._reportData = missing; window._reportType = 'pendingdsr';
+
+    // Group by executive
+    const byExec = {};
+    missing.forEach(m => {
+      if (!byExec[m.executive]) byExec[m.executive] = [];
+      byExec[m.executive].push(m);
+    });
+
+    const totalDays = dates.length;
+    const totalExpected = clients.length * totalDays;
+    const totalFiled = (dsrData||[]).length;
+    const totalPending = missing.length;
+
+    el.innerHTML = `
+      <div class="kpi-grid" style="margin-bottom:14px;">
+        <div class="kpi-card blue"><div class="kpi-label">Sellers</div><div class="kpi-value">${clients.length}</div></div>
+        <div class="kpi-card amber"><div class="kpi-label">Days in Range</div><div class="kpi-value">${totalDays}</div></div>
+        <div class="kpi-card green"><div class="kpi-label">DSR Filed</div><div class="kpi-value">${totalFiled}</div></div>
+        <div class="kpi-card red"><div class="kpi-label">Pending Entries</div><div class="kpi-value">${totalPending}</div></div>
+      </div>
+      ${Object.keys(byExec).length ? Object.entries(byExec).sort((a,b)=>b[1].length-a[1].length).map(([exec, items]) => `
+      <div class="card" style="margin-bottom:12px;border-left:4px solid var(--red);">
+        <div class="card-header" style="background:#fdf2f2;">
+          <span class="card-title">👤 ${exec} — ${items.length} pending entries</span>
+          <span class="badge badge-red">${[...new Set(items.map(i=>i.clientName))].length} sellers</span>
+        </div>
+        <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Seller</th><th>Marketplace</th></tr></thead>
+          <tbody>${items.sort((a,b)=>a.date.localeCompare(b.date)).map(i=>`
+            <tr>
+              <td style="font-weight:600;color:var(--red);">${i.date}</td>
+              <td><strong>${i.clientName}</strong></td>
+              <td><span class="badge badge-blue" style="font-size:11px;">${i.marketplace}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div></div>
+      </div>`).join('') : '<div class="empty-state"><div class="emoji">🎉</div><h3>Sab DSR file ho gaye hain!</h3></div>'}`;
     return;
   }
 
@@ -3183,6 +3380,55 @@ function exportDSRDayWiseExcel() {
   a.download = 'DSR_' + d.clientName.replace(/[^a-z0-9]/gi,'_') + '_' + (d.from||'') + '_to_' + (d.to||'') + '.csv';
   a.click();
   showToast('✅ DSR Day-wise downloaded!', 'success');
+}
+
+async function showExecTasks(execName, filterType, from, to) {
+  openPanel('📝 ' + execName + ' — ' + (filterType==='done'?'Completed Tasks':filterType==='inprogress'?'In Progress':' Overdue Tasks'),
+    '<div class="loading"><div class="spinner"></div> Loading...</div>');
+
+  const tasks = await api('GET', '/tasks');
+  let myTasks = (tasks||[]).filter(t => t.assignedTo === execName || t.assignedBy === execName);
+
+  // Filter by type
+  if (filterType === 'done') {
+    myTasks = myTasks.filter(t => t.status === 'Completed');
+    // Further filter by date range if provided
+    if (from && to) {
+      myTasks = myTasks.filter(t => {
+        const d = (t.completedAt||t.deadline||'').split('T')[0];
+        return d >= from && d <= to;
+      });
+    }
+  } else if (filterType === 'inprogress') {
+    myTasks = myTasks.filter(t => t.status === 'In Progress');
+  } else if (filterType === 'overdue') {
+    myTasks = myTasks.filter(t => t.isOverdue && t.status !== 'Completed');
+  }
+
+  const statusColor = {'Completed':'#d5f5e3','In Progress':'#d6eaf8','Pending':'#fef9e7'};
+  const statusText = {'Completed':'#1e8449','In Progress':'#1a5276','Pending':'#b7950b'};
+
+  document.getElementById('panel-body').innerHTML = !myTasks.length
+    ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi is category mein</h3></div>'
+    : `<div style="margin-bottom:12px;font-size:13px;color:var(--text-muted);">${myTasks.length} tasks · ${from||'—'} to ${to||'—'}</div>`
+      + myTasks.map(t => `
+      <div style="background:${statusColor[t.status]||'#f8fafc'};border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:4px solid ${statusText[t.status]||'#999'};">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--primary);">${t.title||'—'}</div>
+            ${t.clientName?`<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">👥 ${t.clientName}</div>`:''}
+            <div style="display:flex;gap:10px;font-size:12px;color:var(--text-muted);margin-top:4px;flex-wrap:wrap;">
+              ${t.deadline?`<span>📅 Due: ${t.deadline}</span>`:''}
+              ${t.completedAt?`<span style="color:var(--green);">✅ Done: ${t.completedAt.split('T')[0]}</span>`:''}
+              ${t.category?`<span class="badge badge-gray" style="font-size:10px;">${t.category}</span>`:''}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+            <span class="badge" style="background:${statusColor[t.status]};color:${statusText[t.status]};border:1px solid ${statusText[t.status]};">${t.status}</span>
+            <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-gray'}" style="font-size:10px;">${t.priority||'—'}</span>
+          </div>
+        </div>
+      </div>`).join('');
 }
 
 function viewClientTasksFromReport(clientCode, clientName) {

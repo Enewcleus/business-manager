@@ -652,6 +652,7 @@ async function renderDSR() {
           const al=[];
           if(a.alert_overspend) al.push('<span class="badge badge-red">💸 Over Budget</span>');
           if(a.alert_budget_80) al.push('<span class="badge badge-amber">⚠️ 80% Budget Used</span>');
+          if(a.alert_under_spend) al.push('<span class="badge badge-red">📉 Under 80% Spend</span>');
           if(a.alert_high_returns) al.push('<span class="badge badge-red">🔄 High Returns</span>');
           if(a.alert_sales_drop) al.push('<span class="badge badge-amber">📉 Sales Drop</span>');
           return `<tr><td><strong>${a.client_name}</strong></td><td>${a.report_date}</td><td>${al.join(' ')}</td><td style="font-size:12px;">Spend: ₹${a.ad_spend||0} / Budget: ₹${a.seller_budget||0} | Returns: ${a.return_rate||0}%</td></tr>`;
@@ -1778,6 +1779,7 @@ function twTaskCard(task, allTasks) {
           ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;">${t.description.slice(0,120)}${t.description.length>120?'...':''}</div>` : ''}
         </div>
         <!-- Right: status + priority -->
+       
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
           <span class="badge ${statusBadgeClass}">${t.status}</span>
           <span class="badge" style="background:${priorityColor}20;color:${priorityColor};font-size:10px;">${t.priority}</span>

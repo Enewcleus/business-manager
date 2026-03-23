@@ -12,10 +12,7 @@ router.post('/clients', authMiddleware, async (req, res) => {
   }
   const results = { success: 0, failed: 0, errors: [] };
   for (const c of clients) {
-    if (!c.busy_name || !c.marketplace) {
-      results.failed++;
-      continue;
-    }
+    if (!c.busy_name || !c.marketplace) { results.failed++; continue; }
     const clientCode = 'CLT' + Date.now().toString().slice(-6) + Math.floor(Math.random()*100);
     const { error } = await supabase.from('clients').insert({
       client_code: clientCode,

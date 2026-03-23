@@ -1594,7 +1594,7 @@ function buildMyTasksTab(tasks) {
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${!isViewer ? '<button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>' : ''}
         ${isLead && !isViewer ? '<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>' : ''}
-        ${isViewer ? '<span style="background:#fef9e7;color:#b7950b;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;">👁️ View Only Mode</span>' : ''}
+        ${isViewer ? '<span style="background:#fef9e7;color:#b7950b;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;">👁️ View Only</span>' : ''}
       </div>
     </div>
 
@@ -1718,10 +1718,10 @@ function twTaskCard(task, allTasks) {
       <!-- Action Buttons -->
       ${t.status !== 'Completed' ? `
         <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center;">
-          ${APP.user.role !== 'Viewer' && t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
-          ${APP.user.role !== 'Viewer' && t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
-          ${APP.user.role !== 'Viewer' ? `<button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>` : ''}
-          ${APP.user.role !== 'Viewer' ? `<button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>` : ''}
+          ${t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
+          ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
+          <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
           ${['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
         </div>
       ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
@@ -2337,94 +2337,175 @@ async function submitQuickWorkLog(){
 async function renderRenewals(){
   const [renewals, stats] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats')]);
   if(!renewals) return;
-  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(APP.user.role);
-  const urgent = renewals.filter(r=>r.daysLeft!==null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed');
-  const overdue = renewals.filter(r=>r.isOverdue&&r.status!=='Confirmed');
+  window._allRenewals = renewals;
+
+  const u = APP.user;
+  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+
+  // Next 30 days filter (default view)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next30 = new Date(today); next30.setDate(today.getDate()+30);
+
+  const overdue   = renewals.filter(r=>r.isOverdue&&r.status!=='Confirmed'&&r.status!=='Lost');
+  const next30List= renewals.filter(r=>{
+    if(r.status==='Confirmed'||r.status==='Lost') return false;
+    if(!r.renewalDate) return false;
+    const d = new Date(r.renewalDate); d.setHours(0,0,0,0);
+    return d >= today && d <= next30;
+  });
+  const urgent    = renewals.filter(r=>r.daysLeft!=null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed'&&r.status!=='Lost');
+
+  function amtCell(r){ return canSeeAmount ? (r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—') : '—'; }
+  function renewalRowActions(r){
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+      ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
+      ${r.status!=='Lost'&&r.status!=='Confirmed'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
+      ${r.status!=='Hold'&&r.status!=='Confirmed'?`<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" onclick="updateRenewal('${r.renewalId}','Hold')">⏸</button>`:''}
+      <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
+      ${isCRM?`<button class="btn btn-sm btn-secondary" onclick="openRenewalPayment('${r.renewalId}','${r.clientName}')">💰</button>`:''}
+    </div>`;
+  }
+  function renewalStatusBadge(s){
+    const map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};
+    return `<span class="badge ${map[s]||'badge-amber'}">${s||'Pending'}</span>`;
+  }
+
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">${overdue.length}</div></div>
       <div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">${urgent.length}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">📅 Due ≤15 Days</div><div class="kpi-value">${renewals.filter(r=>r.isDueSoon&&r.status!=='Confirmed').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">${next30List.length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
-      <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${renewals.length}</div></div>
-      ${stats?.totalValue?`<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹${Number(stats.totalValue).toLocaleString('en-IN')}</div></div>`:''}
+      <div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">${renewals.filter(r=>r.status==='Hold').length}</div></div>
+      ${canSeeAmount&&stats?.totalValue?`<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹${Number(stats.totalValue).toLocaleString('en-IN')}</div></div>`:''}
     </div>
-    ${overdue.length||urgent.length?`
+
+    ${(overdue.length||urgent.length)?`
     <div class="card" style="border-left:4px solid var(--red);">
-      <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Urgent Renewals (${overdue.length+urgent.length})</span>
-        ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Send Reminders</button>`:''}
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">🚨 Urgent Renewals (${overdue.length+urgent.length})</span>
+        ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>`:''}
       </div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Action</th></tr></thead>
+        <thead><tr><th>Client</th><th>Plan</th>${canSeeAmount?'<th>Amount</th>':''}<th>Date</th><th>Days</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>${[...overdue,...urgent].map(r=>`<tr style="background:${r.isOverdue?'#fff8f8':''};">
-          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
+          <td><strong>${r.clientName}</strong>${r.crmComment?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">💬 ${r.crmComment}</div>`:''}</td>
+          <td style="font-size:12px;">${r.servicePlan||'—'}</td>
+          ${canSeeAmount?`<td>${amtCell(r)}</td>`:''}
           <td>${r.renewalDate||'—'}</td>
-          <td><strong style="color:${r.isOverdue?'var(--red)':'var(--amber)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d left'}</strong></td>
-          <td>${r.owner||'—'}</td>
-          <td><div style="display:flex;gap:4px;">
-            <button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅ Confirm</button>
-            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-          </div></td>
+          <td><strong style="color:${r.isOverdue?'var(--red)':'var(--amber)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong></td>
+          <td style="font-size:12px;">${r.owner||'—'}</td>
+          <td>${renewalStatusBadge(r.status)}</td>
+          <td>${renewalRowActions(r)}</td>
         </tr>`).join('')}</tbody>
       </table></div></div>
-    </div>`:''}
+    </div>`:''
+    }
+
+    <div class="card" style="border-left:4px solid var(--amber);">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">📅 Next 30 Days (${next30List.length})</span>
+      </div>
+      ${!next30List.length?'<div class="card-body"><div class="empty-state"><div class="emoji">📅</div><h3>Next 30 days mein koi renewal nahi</h3></div></div>':
+      `<div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Plan</th>${canSeeAmount?'<th>Amount</th>':''}<th>Renewal Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${next30List.sort((a,b)=>a.daysLeft-b.daysLeft).map(r=>`<tr>
+          <td><strong>${r.clientName}</strong>${r.crmComment?`<div style="font-size:11px;color:var(--secondary);margin-top:2px;">💬 ${r.crmComment}</div>`:''}</td>
+          <td style="font-size:12px;">${r.servicePlan||'—'}</td>
+          ${canSeeAmount?`<td><strong>${amtCell(r)}</strong></td>`:''}
+          <td>${r.renewalDate||'—'}</td>
+          <td><strong style="color:${(r.daysLeft||99)<=7?'var(--red)':'var(--amber)'};">${r.daysLeft}d left</strong></td>
+          <td style="font-size:12px;">${r.owner||'—'}</td>
+          <td>${renewalStatusBadge(r.status)}</td>
+          <td>${renewalRowActions(r)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div></div>`}
+    </div>
+
     <div class="card">
       <div class="card-header">
         <span class="card-title">🔄 All Renewals (${renewals.length})</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">
-            <option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option>
+            <option value="">All Status</option>
+            <option>Pending</option><option>Confirmed</option><option>Lost</option><option>Hold</option>
           </select>
           ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>`:''}
         </div>
       </div>
-      <div class="card-body" style="padding:0;" id="renewals-table-wrap"><div class="table-wrap"><table>
-        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Plan</th>${canSeeAmount?'<th>Amount</th>':''}<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead>
         <tbody id="renewals-tbody">${renewals.map(r=>`<tr>
-          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
+          <td><strong>${r.clientName}</strong></td>
+          <td style="font-size:12px;">${r.servicePlan||'—'}</td>
+          ${canSeeAmount?`<td>${amtCell(r)}</td>`:''}
           <td>${r.renewalDate||'—'}</td>
-          <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
-          <td>${r.owner||'—'}</td>
-          <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-          <td><div style="display:flex;gap:4px;">
-            ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
-            ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
-            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-          </div></td>
+          <td>${r.daysLeft!=null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
+          <td style="font-size:12px;">${r.owner||'—'}</td>
+          <td>${renewalStatusBadge(r.status)}</td>
+          <td style="font-size:12px;max-width:150px;color:var(--text-muted);">${r.crmComment||'—'}</td>
+          <td>${renewalRowActions(r)}</td>
         </tr>`).join('')}</tbody>
       </table></div></div>
     </div>`;
-  window._allRenewals = renewals;
 }
 
 function filterRenewals(status){
+  const u = APP.user;
+  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
   const data = status ? (window._allRenewals||[]).filter(r=>r.status===status) : (window._allRenewals||[]);
-  document.getElementById('renewals-tbody').innerHTML = data.map(r=>`<tr>
-    <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-    <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
-    <td>${r.renewalDate||'—'}</td>
-    <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
-    <td>${r.owner||'—'}</td>
-    <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-    <td><div style="display:flex;gap:4px;">
+  function amtCell(r){ return canSeeAmount ? (r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—') : '—'; }
+  function renewalRowActions(r){
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap;">
       ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
-      ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
+      ${r.status!=='Lost'&&r.status!=='Confirmed'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
+      ${r.status!=='Hold'&&r.status!=='Confirmed'?`<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" onclick="updateRenewal('${r.renewalId}','Hold')">⏸</button>`:''}
       <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-    </div></td>
+      ${isCRM?`<button class="btn btn-sm btn-secondary" onclick="openRenewalPayment('${r.renewalId}','${r.clientName}')">💰</button>`:''}
+    </div>`;
+  }
+  document.getElementById('renewals-tbody').innerHTML = data.map(r=>`<tr>
+    <td><strong>${r.clientName}</strong></td>
+    <td style="font-size:12px;">${r.servicePlan||'—'}</td>
+    ${canSeeAmount?`<td>${amtCell(r)}</td>`:''}
+    <td>${r.renewalDate||'—'}</td>
+    <td>${r.daysLeft!=null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
+    <td style="font-size:12px;">${r.owner||'—'}</td>
+    <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber'}">${r.status||'Pending'}</span></td>
+    <td style="font-size:12px;max-width:150px;color:var(--text-muted);">${r.crmComment||'—'}</td>
+    <td>${renewalRowActions(r)}</td>
   </tr>`).join('');
 }
 
 function openEditRenewal(id, name) {
-  openPanel(`✏️ Renewal Update — ${name}`, `
-    <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="er-date"></div>
-    <div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" placeholder="0"></div>
-    <div class="form-group"><label>Status</label>
-      <select class="form-control" id="er-status"><option>Pending</option><option>Confirmed</option><option>Lost</option></select>
+  const renewal = (window._allRenewals||[]).find(r=>r.renewalId===id)||{};
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(APP.user.role);
+  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+  openPanel(`✏️ Renewal — ${name}`, `
+    <div class="form-group"><label>Renewal Date (Seller ne bataya)</label>
+      <input type="date" class="form-control" id="er-date" value="${renewal.renewalDate||''}">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Seller se jo date mili hai woh yahan update karo</div>
     </div>
-    <div class="form-group"><label>Notes</label><textarea class="form-control" id="er-notes" placeholder="Koi update..."></textarea></div>
-    <button class="btn btn-primary btn-full" onclick="submitEditRenewal('${id}')">💾 Save Update</button>`);
+    ${canSeeAmount?`<div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" value="${renewal.amount||''}" placeholder="0"></div>`:'<input type="hidden" id="er-amount" value="">'}
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="er-status">
+        <option ${renewal.status==='Pending'?'selected':''}>Pending</option>
+        <option ${renewal.status==='Confirmed'?'selected':''}>Confirmed</option>
+        <option ${renewal.status==='Hold'?'selected':''}>Hold</option>
+        <option ${renewal.status==='Lost'?'selected':''}>Lost</option>
+      </select>
+    </div>
+    ${isCRM?`<div class="form-group"><label>CRM Comment / Status Update</label>
+      <textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha? Hold kyun? Koi update...">${renewal.crmComment||''}</textarea>
+    </div>`:'<input type="hidden" id="er-comment" value="">'}
+    <div class="form-group"><label>Additional Notes</label>
+      <textarea class="form-control" id="er-notes" rows="2" placeholder="Koi aur update...">${renewal.notes||''}</textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditRenewal('${id}')">💾 Save Update</button>
+    <button class="btn btn-secondary btn-full" style="margin-top:8px;" onclick="openRenewalPayment('${id}','${name}')">💰 Payment Record Karo</button>`);
 }
 
 async function submitEditRenewal(id) {
@@ -2433,24 +2514,81 @@ async function submitEditRenewal(id) {
     amount: document.getElementById('er-amount').value || undefined,
     renewalDate: document.getElementById('er-date').value || undefined,
     notes: document.getElementById('er-notes').value,
+    crmComment: document.getElementById('er-comment').value || undefined,
   });
   if (r?.success) { showToast('✅ Renewal updated!', 'success'); closePanel(); renderRenewals(); }
+  else showToast('Update failed', 'error');
 }
 
-async function updateRenewal(id,status){
-  const r=await api('PATCH',`/renewals/${id}`,{status});
-  if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}
+async function updateRenewal(id, status){
+  const r = await api('PATCH', `/renewals/${id}`, {status});
+  if(r?.success){ showToast('Renewal: '+status, 'success'); renderRenewals(); }
 }
 
-async function triggerRenewalReminders() {
-  const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Sending...';
-  const r = await api('POST', '/renewals/trigger-reminders', {});
-  btn.disabled = false; btn.textContent = '📨 Reminders';
-  if (r?.success) showToast(`✅ ${r.reminders_sent} reminders bheje gaye!`, 'success');
-  else showToast('Error sending reminders', 'error');
+function openRenewalPayment(id, name) {
+  const renewal = (window._allRenewals||[]).find(r=>r.renewalId===id)||{};
+  openPanel(`💰 Payment Record — ${name}`, `
+    <div style="background:#d5f5e3;border-radius:8px;padding:12px;margin-bottom:16px;">
+      <strong>📋 Renewal Details</strong>
+      <div style="font-size:13px;margin-top:6px;color:var(--text-muted);">
+        <div>Client: <strong>${name}</strong></div>
+        <div>Plan: ${renewal.servicePlan||'—'}</div>
+        <div>Amount: ${renewal.amount?'₹'+Number(renewal.amount).toLocaleString('en-IN'):'—'}</div>
+      </div>
+    </div>
+    <div class="form-group"><label>Payment Date *</label>
+      <input type="date" class="form-control" id="pay-date" value="${new Date().toISOString().split('T')[0]}">
+    </div>
+    <div class="form-group"><label>Amount Received (₹) *</label>
+      <input type="number" class="form-control" id="pay-amount" value="${renewal.amount||''}" placeholder="0">
+    </div>
+    <div class="form-group"><label>Payment Mode</label>
+      <select class="form-control" id="pay-mode">
+        <option>NEFT</option><option>RTGS</option><option>IMPS</option>
+        <option>UPI</option><option>Cheque</option><option>Cash</option><option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>UTR / Transaction Number *</label>
+      <input type="text" class="form-control" id="pay-utr" placeholder="UTR number ya transaction ID daalo">
+    </div>
+    <div class="form-group"><label>Bank / Payment App</label>
+      <input type="text" class="form-control" id="pay-bank" placeholder="e.g. HDFC, PhonePe, GPay...">
+    </div>
+    <div class="form-group"><label>Remarks</label>
+      <textarea class="form-control" id="pay-remarks" rows="2" placeholder="Koi aur detail..."></textarea>
+    </div>
+    <button class="btn btn-success btn-full" onclick="submitRenewalPayment('${id}','${name}')">💰 Payment Save Karo</button>`);
 }
 
-// ── ADS ───────────────────────────────────────────────────────
+async function submitRenewalPayment(id, name) {
+  const utr = document.getElementById('pay-utr').value.trim();
+  const amount = document.getElementById('pay-amount').value;
+  const date = document.getElementById('pay-date').value;
+  if (!utr) { showToast('UTR/Transaction number required!', 'error'); return; }
+  if (!amount) { showToast('Amount required!', 'error'); return; }
+
+  // Save payment + mark renewal as Confirmed
+  const r = await api('PATCH', `/renewals/${id}`, {
+    status: 'Confirmed',
+    amount: amount,
+    renewalDate: date,
+    paymentDate: date,
+    paymentMode: document.getElementById('pay-mode').value,
+    utrNumber: utr,
+    paymentBank: document.getElementById('pay-bank').value,
+    paymentRemarks: document.getElementById('pay-remarks').value,
+    crmComment: `Payment received — UTR: ${utr} via ${document.getElementById('pay-mode').value}`,
+  });
+  if (r?.success) {
+    showToast(`✅ Payment saved! ${name} — UTR: ${utr}`, 'success');
+    closePanel();
+    renderRenewals();
+  } else {
+    showToast('Payment save failed — check connection', 'error');
+  }
+}
+
+async function triggerRenewalReminders() {────────────────────────
 async function renderAds(){
   const ads=await api('GET','/ads');if(!ads) return;
   document.getElementById('page-content').innerHTML=`
@@ -2487,7 +2625,7 @@ async function renderReports(){
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
           <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="rpt-to" value="${today}"></div>
           <div class="form-group"><label>Seller</label><select class="form-control" id="rpt-client"><option value="">-- All Sellers --</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}</select></div>
-          <div class="form-group" id="rpt-exec-wrap" style="display:none;"><label>Executive</label><select class="form-control" id="rpt-exec"><option value="">-- All Executives --</option></select></div>
+          <div class="form-group"><label>Executive</label><select class="form-control" id="rpt-exec"><option value="">-- All Executives --</option></select></div>
           <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
             <button class="btn btn-primary" onclick="generateReport()">🔍 Generate</button>
             <button class="btn btn-success" onclick="exportExcel()">📥 Excel</button>
@@ -2504,9 +2642,16 @@ async function generateReport(){
   const type=window._currentReport||'dsr',from=document.getElementById('rpt-from')?.value,to=document.getElementById('rpt-to')?.value,cc=document.getElementById('rpt-client')?.value,el=document.getElementById('report-output');
   if(!el) return;
 
-  // Show/hide executive filter based on report type
-  const execWrap=document.getElementById('rpt-exec-wrap');
-  if(execWrap) execWrap.style.display = type==='executive' ? '' : 'none';
+  // Populate executive dropdown from users (all report types)
+  const execSel = document.getElementById('rpt-exec');
+  if(execSel && execSel.options.length <= 1){
+    const users = await api('GET','/users');
+    (users||[]).filter(u=>u.isActive).forEach(u=>{
+      const opt=document.createElement('option');
+      opt.value=u.name; opt.textContent=u.name+' — '+u.role;
+      execSel.appendChild(opt);
+    });
+  }
 
   el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
 
@@ -2669,20 +2814,32 @@ async function generateReport(){
   }
 
   if(type==='dsr'){
+    const execFilter = document.getElementById('rpt-exec')?.value||'';
     let url='/dsr?x=1';if(from)url+=`&from=${from}`;if(to)url+=`&to=${to}`;if(cc)url+=`&client=${cc}`;
-    const data=await api('GET',url)||[];window._reportData=data;window._reportType='dsr';
-    const zeros=data.filter(d=>!d.sales_amount||!d.orders_count);
-    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📊 DSR Report (${data.length} records)</span>${zeros.length?`<span class="badge badge-red">⚠️ ${zeros.length} Zero Sale Days</span>`:''}</div>
-    <div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>Koi data nahi</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Orders</th><th>Sales(Rs)</th><th>Returns</th><th>Return%</th><th>Ad Spend</th><th>Budget</th><th>Used%</th><th>Alert</th><th>By</th></tr></thead>
-    <tbody>${data.map(d=>{const z=!d.sales_amount||!d.orders_count;const al=[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':'',d.alert_budget_80?'80%Budget':''].filter(Boolean).join(' ')||'OK';return `<tr style="${z?'background:#fdf2f2;':''}"><td>${d.report_date}</td><td><strong>${d.client_name||d.client_code}</strong></td><td>${z&&!d.orders_count?'<b style="color:red">0</b>':d.orders_count||0}</td><td>${z&&!d.sales_amount?'<b style="color:red">Rs 0</b>':`Rs ${(d.sales_amount||0).toLocaleString('en-IN')}`}</td><td>${d.returns_count||0}</td><td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td><td>Rs ${(d.ad_spend||0).toLocaleString('en-IN')}</td><td>Rs ${(d.seller_budget||0).toLocaleString('en-IN')}</td><td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td><td style="font-size:11px;">${al}</td><td style="font-size:11px;">${d.entered_by||'—'}</td></tr>`;}).join('')}</tbody></table></div>`}</div></div>`;
+    const data=await api('GET',url)||[];
+    // Apply exec filter
+    const filteredData = execFilter ? data.filter(d=>(d.entered_by||'')=== execFilter) : data;
+    window._reportData=filteredData;window._reportType='dsr';
+    window._dsrFrom=from;window._dsrTo=to;
+    renderDSRSummary(filteredData,from,to);
+    return;
   } else if(type==='crm'){
-    let url='/crm?x=1';if(cc)url+=`&client=${cc}`;const data=await api('GET',url)||[];window._reportData=data;window._reportType='crm';
+    const execFilterCRM = document.getElementById('rpt-exec')?.value||'';
+    let url='/crm?x=1';if(cc)url+=`&client=${cc}`;let data=await api('GET',url)||[];
+    if(execFilterCRM) data=data.filter(d=>(d.crm_executive||d.entered_by||'')===execFilterCRM);
+    window._reportData=data;window._reportType='crm';
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📞 CRM Report (${data.length} calls)</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Executive</th><th>Outcome</th><th>Severity</th><th>Follow Up</th><th>Feedback</th></tr></thead><tbody>${data.map(d=>`<tr><td>${d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.client_name||d.client_code||'—'}</strong></td><td>${d.crm_executive||d.entered_by||'—'}</td><td><span class="badge ${d.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${d.call_outcome||'—'}</span></td><td><span class="badge ${d.severity==='Critical'?'badge-red':d.severity==='High'?'badge-amber':'badge-blue'}">${d.severity||'Low'}</span></td><td>${d.next_follow_up||'—'}</td><td style="font-size:12px;max-width:160px;">${d.seller_comment||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='renewal'){
-    const data=await api('GET','/renewals')||[];window._reportData=data;window._reportType='renewal';
+    const execFilterRen = document.getElementById('rpt-exec')?.value||'';
+    let data=await api('GET','/renewals')||[];
+    if(execFilterRen) data=data.filter(d=>(d.owner||'')===execFilterRen);
+    window._reportData=data;window._reportType='renewal';
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🔄 Renewal Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No renewals</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Plan</th><th>Amount(Rs)</th><th>Renewal Date</th><th>Days Left</th><th>Status</th><th>Owner</th></tr></thead><tbody>${data.map(d=>`<tr><td><strong>${d.clientName||d.clientCode}</strong></td><td>${d.servicePlan||'—'}</td><td>Rs ${(d.amount||0).toLocaleString('en-IN')}</td><td>${d.renewalDate||'—'}</td><td><span class="badge ${(d.daysLeft||99)<=7?'badge-red':(d.daysLeft||99)<=15?'badge-amber':'badge-green'}">${d.daysLeft!=null?d.daysLeft+' days':'—'}</span></td><td>${d.status||'—'}</td><td>${d.owner||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='ticket'){
-    const data=await api('GET','/tickets')||[];window._reportData=data;window._reportType='ticket';
+    const execFilterTkt = document.getElementById('rpt-exec')?.value||'';
+    let data=await api('GET','/tickets')||[];
+    if(execFilterTkt) data=data.filter(d=>(d.assignedTo||'')===execFilterTkt);
+    window._reportData=data;window._reportType='ticket';
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-size:11px;">${d.ticketId||'—'}</td><td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.clientName||'—'}</strong></td><td>${d.subject||'—'}</td><td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td><td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td><td>${d.assignedTo||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='team'){
     const data=await api('GET','/dashboard/team')||[];window._reportData=data;window._reportType='team';
@@ -2690,18 +2847,343 @@ async function generateReport(){
   }
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// DSR SUMMARY + DAY-WISE DETAIL
+// ═══════════════════════════════════════════════════════════════
+
+function renderDSRSummary(data, from, to) {
+  const el = document.getElementById('report-output');
+  if (!el) return;
+
+  // Group by client
+  const clientMap = {};
+  data.forEach(d => {
+    const key = d.client_code || d.clientCode;
+    if (!clientMap[key]) {
+      clientMap[key] = {
+        clientCode: key,
+        clientName: d.client_name || d.clientCode || key,
+        executive: d.entered_by || '—',
+        rows: [],
+        totalOrders: 0, totalSales: 0, totalReturns: 0,
+        totalSpend: 0, zeroDays: 0, daysEntered: 0,
+      };
+    }
+    const c = clientMap[key];
+    c.rows.push(d);
+    c.totalOrders += parseInt(d.orders_count) || 0;
+    c.totalSales += parseFloat(d.sales_amount) || 0;
+    c.totalReturns += parseInt(d.returns_count) || 0;
+    c.totalSpend += parseFloat(d.ad_spend) || 0;
+    c.daysEntered++;
+    if (!d.orders_count || !d.sales_amount) c.zeroDays++;
+  });
+
+  // Calculate range days
+  let rangeDays = 0;
+  if (from && to) {
+    rangeDays = Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
+  }
+
+  const clients = Object.values(clientMap);
+
+  // Totals
+  const grandOrders = clients.reduce((s,c)=>s+c.totalOrders,0);
+  const grandSales = clients.reduce((s,c)=>s+c.totalSales,0);
+  const grandReturns = clients.reduce((s,c)=>s+c.totalReturns,0);
+  const grandSpend = clients.reduce((s,c)=>s+c.totalSpend,0);
+  const totalZeroDays = clients.reduce((s,c)=>s+c.zeroDays,0);
+
+  if (!clients.length) {
+    el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><h3>Is date range mein koi DSR data nahi</h3></div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px;">
+      <div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Total Orders</div><div class="kpi-value">${grandOrders.toLocaleString('en-IN')}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Sales</div><div class="kpi-value" style="font-size:18px;">₹${(grandSales/1000).toFixed(1)}K</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Total Returns</div><div class="kpi-value">${grandReturns}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Zero Days</div><div class="kpi-value">${totalZeroDays}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📊 DSR Summary — ${from||'—'} to ${to||'—'}</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success btn-sm" onclick="exportDSRSummaryExcel()">📥 Excel</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Seller</th>
+                <th>Executive</th>
+                ${rangeDays ? `<th style="text-align:center;">Days (${rangeDays} total)</th>` : '<th style="text-align:center;">Days</th>'}
+                <th style="text-align:right;">Orders</th>
+                <th style="text-align:right;">Sales (₹)</th>
+                <th style="text-align:right;">Returns</th>
+                <th style="text-align:right;">Ad Spend (₹)</th>
+                <th style="text-align:center;">Zero Days</th>
+                <th style="text-align:center;">Day-wise</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${clients.map(c => `
+              <tr style="${c.zeroDays > 0 && c.zeroDays === c.daysEntered ? 'background:#fdf2f2;' : c.zeroDays > 0 ? 'background:#fef9e7;' : ''}">
+                <td><strong>${c.clientName}</strong></td>
+                <td style="font-size:12px;color:var(--text-muted);">${c.executive}</td>
+                <td style="text-align:center;">
+                  <span style="font-size:12px;">${c.daysEntered}${rangeDays?'/'+rangeDays:''}</span>
+                  ${rangeDays && c.daysEntered < rangeDays ? `<span class="badge badge-amber" style="font-size:10px;margin-left:4px;">${rangeDays-c.daysEntered} missing</span>` : ''}
+                </td>
+                <td style="text-align:right;"><strong>${c.totalOrders.toLocaleString('en-IN')}</strong></td>
+                <td style="text-align:right;"><strong>₹${c.totalSales.toLocaleString('en-IN')}</strong></td>
+                <td style="text-align:right;">${c.totalReturns}</td>
+                <td style="text-align:right;">₹${c.totalSpend.toLocaleString('en-IN')}</td>
+                <td style="text-align:center;">${c.zeroDays > 0 ? `<span class="badge badge-red">${c.zeroDays}</span>` : '<span class="badge badge-green">0</span>'}</td>
+                <td style="text-align:center;">
+                  <button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 10px;"
+                    onclick="renderDSRDayWise('${c.clientCode}','${c.clientName.replace(/'/g,'\'')}')">
+                    Day-wise →
+                  </button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:var(--bg);border-top:2px solid var(--border);">
+                <td style="padding:10px 12px;font-weight:700;">TOTAL</td>
+                <td colspan="2" style="padding:10px 12px;font-size:12px;color:var(--text-muted);">${clients.length} sellers</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">${grandOrders.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">₹${grandSales.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">${grandReturns}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">₹${grandSpend.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px;text-align:center;font-weight:700;color:var(--red);">${totalZeroDays}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  window._dsrSummaryClients = clientMap;
+}
+
+async function renderDSRDayWise(clientCode, clientName) {
+  const el = document.getElementById('report-output');
+  if (!el) return;
+  const from = window._dsrFrom || document.getElementById('rpt-from')?.value;
+  const to = window._dsrTo || document.getElementById('rpt-to')?.value;
+
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Loading day-wise data...</div>';
+
+  let url = '/dsr?x=1&client=' + clientCode;
+  if (from) url += '&from=' + from;
+  if (to) url += '&to=' + to;
+  const data = await api('GET', url) || [];
+
+  // Build date map from actual data
+  const dateMap = {};
+  data.forEach(d => { dateMap[d.report_date] = d; });
+
+  // Generate all dates in range
+  const days = [];
+  if (from && to) {
+    let cur = new Date(from);
+    const end = new Date(to);
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    while (cur <= end) {
+      const dateStr = cur.toISOString().split('T')[0];
+      const entry = dateMap[dateStr];
+      days.push({
+        date: dateStr,
+        dayName: dayNames[cur.getDay()],
+        orders: entry ? (parseInt(entry.orders_count)||0) : 0,
+        sales: entry ? (parseFloat(entry.sales_amount)||0) : 0,
+        returns: entry ? (parseInt(entry.returns_count)||0) : 0,
+        returnRate: entry ? (parseFloat(entry.return_rate)||0) : 0,
+        adSpend: entry ? (parseFloat(entry.ad_spend)||0) : 0,
+        budget: entry ? (parseFloat(entry.seller_budget)||0) : 0,
+        budgetPct: entry ? (parseFloat(entry.budget_used_pct)||0) : 0,
+        alertOverspend: entry?.alert_overspend,
+        alertHighReturns: entry?.alert_high_returns,
+        alertSalesDrop: entry?.alert_sales_drop,
+        enteredBy: entry?.entered_by || '—',
+        hasEntry: !!entry,
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else {
+    // No range — just show available data
+    data.forEach(d => {
+      const cur = new Date(d.report_date);
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      days.push({
+        date: d.report_date, dayName: dayNames[cur.getDay()],
+        orders: parseInt(d.orders_count)||0, sales: parseFloat(d.sales_amount)||0,
+        returns: parseInt(d.returns_count)||0, returnRate: parseFloat(d.return_rate)||0,
+        adSpend: parseFloat(d.ad_spend)||0, budget: parseFloat(d.seller_budget)||0,
+        budgetPct: parseFloat(d.budget_used_pct)||0,
+        alertOverspend: d.alert_overspend, alertHighReturns: d.alert_high_returns,
+        enteredBy: d.entered_by||'—', hasEntry: true,
+      });
+    });
+  }
+
+  // Totals
+  const totOrders = days.reduce((s,d)=>s+d.orders,0);
+  const totSales = days.reduce((s,d)=>s+d.sales,0);
+  const totReturns = days.reduce((s,d)=>s+d.returns,0);
+  const totSpend = days.reduce((s,d)=>s+d.adSpend,0);
+  const zeroDays = days.filter(d=>!d.hasEntry||(!d.orders&&!d.sales)).length;
+  const avgReturnRate = days.filter(d=>d.hasEntry&&d.returnRate>0).length
+    ? (days.filter(d=>d.hasEntry&&d.returnRate>0).reduce((s,d)=>s+d.returnRate,0) / days.filter(d=>d.hasEntry&&d.returnRate>0).length).toFixed(1)
+    : 0;
+
+  // Store for Excel
+  window._dsrDayWiseData = { clientName, from, to, days };
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:14px;">
+      <div class="kpi-card blue"><div class="kpi-label">Total Orders</div><div class="kpi-value">${totOrders.toLocaleString('en-IN')}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Total Sales</div><div class="kpi-value" style="font-size:17px;">₹${totSales.toLocaleString('en-IN')}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Total Returns</div><div class="kpi-value">${totReturns}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Ad Spend</div><div class="kpi-value" style="font-size:17px;">₹${totSpend.toLocaleString('en-IN')}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Zero Days</div><div class="kpi-value">${zeroDays}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="renderDSRSummary(window._reportData,window._dsrFrom,window._dsrTo)">← Summary</button>
+          <span class="card-title">${clientName} — Day-wise (${from||'—'} to ${to||'—'})</span>
+        </div>
+        <button class="btn btn-success btn-sm" onclick="exportDSRDayWiseExcel()">📥 Excel</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Day</th>
+                <th style="text-align:right;">Orders</th>
+                <th style="text-align:right;">Sales (₹)</th>
+                <th style="text-align:right;">Returns</th>
+                <th style="text-align:right;">Return %</th>
+                <th style="text-align:right;">Ad Spend (₹)</th>
+                <th style="text-align:right;">Budget (₹)</th>
+                <th style="text-align:right;">Used %</th>
+                <th style="text-align:center;">Status</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${days.map(d => {
+                const isZero = !d.hasEntry || (!d.orders && !d.sales);
+                const isOver = d.alertOverspend;
+                const isHighRet = d.alertHighReturns;
+                const rowBg = isZero ? 'background:#fdf2f2;' : (isOver||isHighRet) ? 'background:#fef9e7;' : '';
+                const status = isZero
+                  ? '<span class="badge badge-red">No Entry</span>'
+                  : isOver ? '<span class="badge badge-amber">Over Budget</span>'
+                  : isHighRet ? '<span class="badge badge-amber">High Returns</span>'
+                  : '<span class="badge badge-green">OK</span>';
+                return `<tr style="${rowBg}">
+                  <td style="font-weight:600;${isZero?'color:var(--red);':''}">${d.date}</td>
+                  <td style="color:var(--text-muted);${isZero?'color:var(--red);':''}">${d.dayName}</td>
+                  <td style="text-align:right;${isZero?'color:var(--red);font-weight:700;':''}">${d.orders}</td>
+                  <td style="text-align:right;${isZero?'color:var(--red);font-weight:700;':''}">₹${d.sales.toLocaleString('en-IN')}</td>
+                  <td style="text-align:right;">${d.returns}</td>
+                  <td style="text-align:right;"><span class="badge ${d.returnRate>10?'badge-red':d.returnRate>5?'badge-amber':'badge-green'}">${d.returnRate}%</span></td>
+                  <td style="text-align:right;">₹${d.adSpend.toLocaleString('en-IN')}</td>
+                  <td style="text-align:right;color:var(--text-muted);">₹${d.budget.toLocaleString('en-IN')}</td>
+                  <td style="text-align:right;"><span class="badge ${d.budgetPct>100?'badge-red':d.budgetPct>80?'badge-amber':'badge-green'}">${d.budgetPct}%</span></td>
+                  <td style="text-align:center;">${status}</td>
+                  <td style="font-size:12px;color:var(--text-muted);">${d.enteredBy}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:var(--bg);border-top:2px solid var(--border);">
+                <td style="padding:10px 12px;font-weight:700;">TOTAL</td>
+                <td style="padding:10px 12px;font-size:12px;color:var(--text-muted);">${days.length} days</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">${totOrders.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">₹${totSales.toLocaleString('en-IN')}</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">${totReturns}</td>
+                <td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--text-muted);">${avgReturnRate}% avg</td>
+                <td style="padding:10px 12px;text-align:right;font-weight:700;">₹${totSpend.toLocaleString('en-IN')}</td>
+                <td colspan="4" style="padding:10px 12px;"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;margin-top:8px;padding:0 4px;">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#fadbd8;border-radius:2px;display:inline-block;"></span> No entry / zero sale</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#fef9e7;border-radius:2px;display:inline-block;"></span> Alert (over budget / high returns)</span>
+    </div>`;
+}
+
+function exportDSRSummaryExcel() {
+  const clientMap = window._dsrSummaryClients || {};
+  const clients = Object.values(clientMap);
+  if (!clients.length) { showToast('Pehle report generate karo','error'); return; }
+  let csv = 'Seller,Executive,Days Entered,Total Orders,Total Sales (Rs),Total Returns,Ad Spend (Rs),Zero Days\n';
+  csv += clients.map(c => [
+    '"'+c.clientName+'"', c.executive, c.daysEntered,
+    c.totalOrders, c.totalSales.toFixed(2), c.totalReturns,
+    c.totalSpend.toFixed(2), c.zeroDays
+  ].join(',')).join('\n');
+  // Grand total
+  const grandOrders = clients.reduce((s,c)=>s+c.totalOrders,0);
+  const grandSales = clients.reduce((s,c)=>s+c.totalSales,0);
+  const grandReturns = clients.reduce((s,c)=>s+c.totalReturns,0);
+  const grandSpend = clients.reduce((s,c)=>s+c.totalSpend,0);
+  const totalZero = clients.reduce((s,c)=>s+c.zeroDays,0);
+  csv += '\nTOTAL,,' + clients.length + ' sellers,' + grandOrders + ',' + grandSales.toFixed(2) + ',' + grandReturns + ',' + grandSpend.toFixed(2) + ',' + totalZero;
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'DSR_Summary_' + (window._dsrFrom||'') + '_to_' + (window._dsrTo||'') + '.csv';
+  a.click();
+  showToast('✅ DSR Summary downloaded!', 'success');
+}
+
+function exportDSRDayWiseExcel() {
+  const d = window._dsrDayWiseData;
+  if (!d) { showToast('Pehle day-wise report dekho','error'); return; }
+  let csv = 'Date,Day,Orders,Sales (Rs),Returns,Return %,Ad Spend (Rs),Budget (Rs),Used %,Status,Entered By\n';
+  csv += d.days.map(r => [
+    r.date, r.dayName, r.orders, r.sales.toFixed(2),
+    r.returns, r.returnRate, r.adSpend.toFixed(2), r.budget.toFixed(2),
+    r.budgetPct,
+    r.hasEntry ? (r.alertOverspend ? 'Over Budget' : r.alertHighReturns ? 'High Returns' : 'OK') : 'No Entry',
+    r.enteredBy
+  ].join(',')).join('\n');
+  // Total row
+  const totOrders = d.days.reduce((s,r)=>s+r.orders,0);
+  const totSales = d.days.reduce((s,r)=>s+r.sales,0);
+  const totRet = d.days.reduce((s,r)=>s+r.returns,0);
+  const totSpend = d.days.reduce((s,r)=>s+r.adSpend,0);
+  csv += '\nTOTAL,,' + totOrders + ',' + totSales.toFixed(2) + ',' + totRet + ',,,,' + totSpend.toFixed(2) + ',,';
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'DSR_' + d.clientName.replace(/[^a-z0-9]/gi,'_') + '_' + (d.from||'') + '_to_' + (d.to||'') + '.csv';
+  a.click();
+  showToast('✅ DSR Day-wise downloaded!', 'success');
+}
+
 function viewClientTasksFromReport(clientCode, clientName) {
-  // Navigate to Task Manager and filter by this client
   navigate('tasks');
-  // After render, switch to client tasks tab and select client
   setTimeout(() => {
     switchTaskTab('clienttasks');
     setTimeout(() => {
       const sel = document.getElementById('ct-client-sel');
-      if (sel) {
-        sel.value = clientCode;
-        loadClientTasks(clientCode, clientName);
-      }
+      if (sel) { sel.value = clientCode; loadClientTasks(clientCode, clientName); }
     }, 300);
   }, 500);
 }
@@ -3963,8 +4445,7 @@ function initTheme(){
 function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
 document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
-
-  // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // FEATURE 1: DSR EXECUTIVE FILTER
 // Add filterDSRByExec function + inject exec dropdown in renderDSR
 // ═══════════════════════════════════════════════════════════════════

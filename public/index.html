@@ -374,13 +374,21 @@ const NAV_CONFIG = {
   'CRM Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
-    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'clients',icon:'👥',label:'All Clients'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'csi',icon:'📊',label:'CSI Forms'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+  ],
+  'Viewer': [
+    {id:'tasks',icon:'📝',label:'Task Manager'},
+    {id:'clients',icon:'👥',label:'All Clients'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
   ],
   'SME': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -1565,7 +1573,8 @@ function switchTaskTab(tab) {
 function buildMyTasksTab(tasks) {
   const u = APP.user;
   const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
-  const myTasks = tasks.filter(t => t.assignedTo === u.name || t.assignedBy === u.name);
+  const isViewer = u.role === 'Viewer';
+  const myTasks = isViewer ? tasks : tasks.filter(t => t.assignedTo === u.name || t.assignedBy === u.name);
 
   const overdue   = myTasks.filter(t => t.isOverdue && t.status !== 'Completed');
   const today     = myTasks.filter(t => !t.isOverdue && t.deadline && isToday(t.deadline) && t.status !== 'Completed');
@@ -1583,8 +1592,9 @@ function buildMyTasksTab(tasks) {
         <button id="tsec-inprogress" class="btn btn-sm btn-outline" onclick="filterTasksBySection('inprogress')">▶ In Progress</button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>
-        ${isLead ? '<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>' : ''}
+        ${!isViewer ? '<button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>' : ''}
+        ${isLead && !isViewer ? '<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>' : ''}
+        ${isViewer ? '<span style="background:#fef9e7;color:#b7950b;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;">👁️ View Only Mode</span>' : ''}
       </div>
     </div>
 
@@ -1708,10 +1718,10 @@ function twTaskCard(task, allTasks) {
       <!-- Action Buttons -->
       ${t.status !== 'Completed' ? `
         <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center;">
-          ${t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
-          ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
-          <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
-          <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
+          ${APP.user.role !== 'Viewer' && t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
+          ${APP.user.role !== 'Viewer' && t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
+          ${APP.user.role !== 'Viewer' ? `<button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>` : ''}
+          ${APP.user.role !== 'Viewer' ? `<button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>` : ''}
           ${['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
         </div>
       ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
@@ -2680,6 +2690,22 @@ async function generateReport(){
   }
 }
 
+function viewClientTasksFromReport(clientCode, clientName) {
+  // Navigate to Task Manager and filter by this client
+  navigate('tasks');
+  // After render, switch to client tasks tab and select client
+  setTimeout(() => {
+    switchTaskTab('clienttasks');
+    setTimeout(() => {
+      const sel = document.getElementById('ct-client-sel');
+      if (sel) {
+        sel.value = clientCode;
+        loadClientTasks(clientCode, clientName);
+      }
+    }, 300);
+  }, 500);
+}
+
 function toggleExecClients(rowId){
   const el = document.getElementById(rowId);
   if(el) el.style.display = el.style.display==='none' ? '' : 'none';
@@ -2779,7 +2805,7 @@ function openAddUser(){
     <div class="form-row"><div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="nu-dept"><option value="">-- Select --</option><option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option></select></div>
-      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="CSI Lead">CSI Lead</option><option value="Admin">Admin</option></select></div>
+      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="CSI Lead">CSI Lead</option><option value="Admin">Admin</option><option value="Viewer">Viewer (View Only)</option></select></div>
     </div>
     <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
     <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
@@ -2798,7 +2824,7 @@ function openEditUser(userId){
     <div class="form-row"><div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="eu-dept"><option value="">-- Select --</option>${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','Ops Lead','CSI Lead','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','Ops Lead','CSI Lead','Admin','Viewer'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>
     <div class="form-group"><label>Reports To</label><select class="form-control" id="eu-manager"><option value="">-- Top Level --</option>${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}</select></div>
     <div class="form-group"><label>Status</label><select class="form-control" id="eu-active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
@@ -3937,7 +3963,8 @@ function initTheme(){
 function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
 document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
-// ═══════════════════════════════════════════════════════════════════
+</script>
+  // ═══════════════════════════════════════════════════════════════════
 // FEATURE 1: DSR EXECUTIVE FILTER
 // Add filterDSRByExec function + inject exec dropdown in renderDSR
 // ═══════════════════════════════════════════════════════════════════
@@ -5536,6 +5563,5 @@ async function raCreateTask(encodedTask, dept, days) {
   }
 }
 
-</script>
 </body>
 </html>

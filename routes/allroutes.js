@@ -77,12 +77,14 @@ crmRouter.post('/', authMiddleware, async (req, res) => {
     ticket_raised: d.ticketRaised || false,
   });
   if (error) return res.status(500).json({ error: error.message });
-  await supabase.from('activity_log').insert({
-    client_code: d.clientCode, client_name: d.clientName,
-    user_name: req.user.name, user_role: req.user.role,
-    action_type: 'CRM Call',
-    action_detail: (d.callOutcome || d.outcome || 'Connected') + (d.sellerComment || d.notes ? ' — ' + (d.sellerComment || d.notes) : ''),
-  });
+  try {
+    await supabase.from('activity_log').insert({
+      client_code: d.clientCode, client_name: d.clientName,
+      user_name: req.user.name, user_role: req.user.role,
+      action_type: 'CRM Call',
+      action_detail: (d.callOutcome || d.outcome || 'Connected') + (d.sellerComment || d.notes ? ' — ' + (d.sellerComment || d.notes) : ''),
+    });
+  } catch(e) {}
   res.json({ success: true, callId });
 });
 
@@ -101,11 +103,13 @@ crmRouter.post('/log', authMiddleware, async (req, res) => {
     ticket_raised: false,
   });
   if (error) return res.status(500).json({ error: error.message });
-  await supabase.from('activity_log').insert({
-    client_code: d.clientCode, client_name: d.clientName,
-    user_name: req.user.name, user_role: req.user.role,
-    action_type: 'Call Log', action_detail: d.subject || d.outcome || 'Call logged',
-  }).catch(() => {});
+  try {
+    await supabase.from('activity_log').insert({
+      client_code: d.clientCode, client_name: d.clientName,
+      user_name: req.user.name, user_role: req.user.role,
+      action_type: 'Call Log', action_detail: d.subject || d.outcome || 'Call logged',
+    });
+  } catch(e) {}
   res.json({ success: true, callId });
 });
 
@@ -145,17 +149,18 @@ csiRouter.post('/', authMiddleware, async (req, res) => {
     });
   }
   await supabase.from('clients').update({ health_status: d.healthStatus, health_index: d.csiPercent, last_updated: new Date() }).eq('client_code', d.clientCode);
-  await supabase.from('activity_log').insert({
-    client_code: d.clientCode, client_name: d.clientName, user_name: req.user.name, user_role: req.user.role,
-    action_type: 'CSI Review', action_detail: `CSI Score: ${d.csiPercent}% — ${d.healthStatus}`,
-  });
+  try {
+    await supabase.from('activity_log').insert({
+      client_code: d.clientCode, client_name: d.clientName, user_name: req.user.name, user_role: req.user.role,
+      action_type: 'CSI Review', action_detail: `CSI Score: ${d.csiPercent}% — ${d.healthStatus}`,
+    });
+  } catch(e) {}
   res.json({ success: true, csiId });
 });
 
 // ── TASKS ROUTES ──────────────────────────────────────────────
 const tasksRouter = require('express').Router();
 
-// GET /api/tasks/ads — Ads department tasks only
 tasksRouter.get('/ads', authMiddleware, async (req, res) => {
   try {
     const { role, name } = req.user;
@@ -185,7 +190,6 @@ tasksRouter.get('/ads', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ GET /api/tasks — now includes parentTaskId for sub-task support
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
@@ -196,21 +200,12 @@ tasksRouter.get('/', authMiddleware, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   const now = new Date();
   res.json(data.map(t => ({
-    taskId: t.task_id,
-    title: t.title,
-    description: t.description,
-    clientCode: t.client_code,
-    clientName: t.client_name,
-    assignedTo: t.assigned_to,
-    assignedToRole: t.assigned_to_role,
-    assignedBy: t.assigned_by,
-    assignedByRole: t.assigned_by_role,
-    priority: t.priority,
-    category: t.category,
-    status: t.status,
-    deadline: t.deadline,
-    workLog: t.work_log,
-    // ✅ NEW: sub-task support
+    taskId: t.task_id, title: t.title, description: t.description,
+    clientCode: t.client_code, clientName: t.client_name,
+    assignedTo: t.assigned_to, assignedToRole: t.assigned_to_role,
+    assignedBy: t.assigned_by, assignedByRole: t.assigned_by_role,
+    priority: t.priority, category: t.category, status: t.status,
+    deadline: t.deadline, workLog: t.work_log,
     parentTaskId: t.parent_task_id || null,
     isOverdue: t.deadline && t.status !== 'Completed' ? new Date(t.deadline) < now : false,
     createdAt: new Date(t.created_at).toLocaleString('en-IN'),
@@ -218,63 +213,53 @@ tasksRouter.get('/', authMiddleware, async (req, res) => {
   })));
 });
 
-// ✅ POST /api/tasks — now saves parentTaskId for sub-tasks
 tasksRouter.post('/', authMiddleware, async (req, res) => {
-  const d = req.body;
-  const taskId = 'TSK' + Date.now().toString().slice(-7);
-  const { error } = await supabase.from('tasks').insert({
-    task_id: taskId,
-    title: d.title,
-    description: d.description,
-    client_code: d.clientCode || null,
-    client_name: d.clientName || null,
-    assigned_to: d.assignedTo || req.user.name,
-    assigned_to_role: d.assignedToRole || req.user.role,
-    assigned_by: req.user.name,
-    assigned_by_role: req.user.role,
-    priority: d.priority || 'Medium',
-    category: d.category || 'General',
-    deadline: d.deadline || d.dueDate || null,
-    // ✅ NEW: save parent_task_id for sub-tasks
-    parent_task_id: d.parentTaskId || null,
-  });
-  if (error) return res.status(500).json({ error: error.message });
-  // Send notification if assigning to someone else
-  if (d.assignedTo && d.assignedTo !== req.user.name) {
-    await supabase.from('notifications').insert({
-      notif_id: 'NTF' + Date.now(),
-      assigned_to: d.assignedTo,
-      assigned_role: d.assignedToRole,
-      type: 'NEW_TASK',
-      message: `New task from ${req.user.name}: "${d.title}"`,
-      related_id: taskId,
-    }).catch(() => {});
+  try {
+    const d = req.body;
+    const taskId = 'TSK' + Date.now().toString().slice(-7);
+    const { error } = await supabase.from('tasks').insert({
+      task_id: taskId, title: d.title, description: d.description,
+      client_code: d.clientCode || null, client_name: d.clientName || null,
+      assigned_to: d.assignedTo || req.user.name,
+      assigned_to_role: d.assignedToRole || req.user.role,
+      assigned_by: req.user.name, assigned_by_role: req.user.role,
+      priority: d.priority || 'Medium', category: d.category || 'General',
+      deadline: d.deadline || d.dueDate || null,
+      parent_task_id: d.parentTaskId || null,
+    });
+    if (error) return res.status(500).json({ error: error.message });
+    // Notification — fire and forget, don't block response
+    if (d.assignedTo && d.assignedTo !== req.user.name) {
+      supabase.from('notifications').insert({
+        notif_id: 'NTF' + Date.now(),
+        assigned_to: d.assignedTo,
+        assigned_role: d.assignedToRole,
+        type: 'NEW_TASK',
+        message: `New task from ${req.user.name}: "${d.title}"`,
+        related_id: taskId,
+      }).then(() => {}).catch(() => {});
+    }
+    res.json({ success: true, taskId });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
-  res.json({ success: true, taskId });
 });
 
-// ✅ PATCH /api/tasks/:id — now supports full edit (title, assignedTo, priority, deadline, status)
 tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
   const { status, workLog, title, assignedTo, priority, deadline } = req.body;
   const updates = {};
-
-  // Status update
   if (status !== undefined) updates.status = status;
   if (workLog) updates.work_log = workLog;
   if (status === 'Completed') updates.completed_at = new Date();
-
-  // ✅ NEW: Full edit fields (Admin/Lead use)
   if (title !== undefined) updates.title = title;
   if (assignedTo !== undefined) updates.assigned_to = assignedTo;
   if (priority !== undefined) updates.priority = priority;
   if (deadline !== undefined) updates.deadline = deadline || null;
-
   const { error } = await supabase.from('tasks').update(updates).eq('task_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
-// GET /api/tasks/worklog
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(100);
@@ -289,7 +274,6 @@ tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   })));
 });
 
-// POST /api/tasks/worklog
 tasksRouter.post('/worklog', authMiddleware, async (req, res) => {
   const d = req.body;
   const logId = 'WRK' + Date.now().toString().slice(-7);
@@ -301,11 +285,13 @@ tasksRouter.post('/worklog', authMiddleware, async (req, res) => {
   });
   if (error) return res.status(500).json({ error: error.message });
   if (d.clientCode) {
-    await supabase.from('activity_log').insert({
-      client_code: d.clientCode, client_name: d.clientName,
-      user_name: req.user.name, user_role: req.user.role,
-      action_type: d.workType, action_detail: d.description,
-    });
+    try {
+      await supabase.from('activity_log').insert({
+        client_code: d.clientCode, client_name: d.clientName,
+        user_name: req.user.name, user_role: req.user.role,
+        action_type: d.workType, action_detail: d.description,
+      });
+    } catch(e) {}
   }
   res.json({ success: true, logId });
 });
@@ -463,6 +449,7 @@ renewalsRouter.get('/', authMiddleware, async (req, res) => {
       renewalId: r.renewal_id, clientCode: r.client_code, clientName: r.client_name,
       servicePlan: r.service_plan, amount: r.amount, renewalDate: r.renewal_date,
       status: r.status, owner: r.owner, daysLeft, isOverdue, isDueSoon,
+      crmComment: r.crm_comment || null,
     };
   }));
 });
@@ -475,12 +462,18 @@ renewalsRouter.get('/stats', authMiddleware, async (req, res) => {
 });
 
 renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
-  const { status, notes, amount, renewalDate } = req.body;
+  const { status, notes, amount, renewalDate, crmComment, paymentDate, paymentMode, utrNumber, paymentBank, paymentRemarks } = req.body;
   const updates = { updated_at: new Date() };
   if (status !== undefined) updates.status = status;
   if (notes !== undefined) updates.notes = notes;
   if (amount !== undefined) updates.amount = amount;
   if (renewalDate !== undefined) updates.renewal_date = renewalDate || null;
+  if (crmComment !== undefined) updates.crm_comment = crmComment;
+  if (utrNumber !== undefined) updates.utr_number = utrNumber;
+  if (paymentDate !== undefined) updates.payment_date = paymentDate;
+  if (paymentMode !== undefined) updates.payment_mode = paymentMode;
+  if (paymentBank !== undefined) updates.payment_bank = paymentBank;
+  if (paymentRemarks !== undefined) updates.payment_remarks = paymentRemarks;
   const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -494,13 +487,15 @@ renewalsRouter.post('/trigger-reminders', authMiddleware, async (req, res) => {
     if (!r.renewal_date) continue;
     const days = Math.ceil((new Date(r.renewal_date) - now) / 86400000);
     if (days <= 15) {
-      await supabase.from('notifications').insert({
-        notif_id: 'NTF' + Date.now() + sent,
-        assigned_role: 'Admin',
-        type: 'RENEWAL_ALERT',
-        message: `Renewal due in ${days} days: ${r.client_name}`,
-        related_id: r.renewal_id,
-      }).catch(() => {});
+      try {
+        await supabase.from('notifications').insert({
+          notif_id: 'NTF' + Date.now() + sent,
+          assigned_role: 'Admin',
+          type: 'RENEWAL_ALERT',
+          message: `Renewal due in ${days} days: ${r.client_name}`,
+          related_id: r.renewal_id,
+        });
+      } catch(e) {}
       sent++;
     }
   }
@@ -522,6 +517,7 @@ adsRouter.get('/', authMiddleware, async (req, res) => {
     budgetPercent: a.budget_percent, acos: a.acos, campaignStatus: a.campaign_status,
   })));
 });
+
 adsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
   const { clientCode } = req.params;
   const { status } = req.body;
@@ -529,23 +525,27 @@ adsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
+
 clientsRouter.patch('/:clientCode', authMiddleware, async (req, res) => {
   const { clientCode } = req.params;
-  const { amName, crmExecutive, adsManager } = req.body;
+  const { amName, crmExecutive, adsManager, busyName, marketplace, servicePlan, renewalDate, status } = req.body;
   const updates = {};
   if (amName !== undefined) updates.am_name = amName;
   if (crmExecutive !== undefined) updates.crm_executive = crmExecutive;
   if (adsManager !== undefined) updates.ads_manager = adsManager;
+  if (busyName !== undefined) updates.busy_name = busyName;
+  if (marketplace !== undefined) updates.marketplace = marketplace;
+  if (servicePlan !== undefined) updates.service_plan = servicePlan;
+  if (renewalDate !== undefined) updates.renewal_date = renewalDate || null;
+  if (status !== undefined) updates.status = status;
   const { error } = await supabase.from('clients').update(updates).eq('client_code', clientCode);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
-// ── ADD TO allroutes.js — before module.exports line ──────────────
-// Hurdle Tracker Routes
 
+// ── HURDLE TRACKER ────────────────────────────────────────────
 const hurdleRouter = require('express').Router();
 
-// GET all hurdles
 hurdleRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('hurdles').select('*').order('created_at', { ascending: false });
@@ -557,7 +557,6 @@ hurdleRouter.get('/', authMiddleware, async (req, res) => {
   res.json(data || []);
 });
 
-// POST new hurdle
 hurdleRouter.post('/', authMiddleware, async (req, res) => {
   const { clientCode, clientName, description, emailSent, emailDate, emailSubject } = req.body;
   if (!clientCode || !description) return res.status(400).json({ error: 'clientCode and description required' });
@@ -571,7 +570,6 @@ hurdleRouter.post('/', authMiddleware, async (req, res) => {
   res.json({ success: true, hurdle: data?.[0] });
 });
 
-// PATCH hurdle — update status or add attempt
 hurdleRouter.patch('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { status, attempt } = req.body;
@@ -588,7 +586,6 @@ hurdleRouter.patch('/:id', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// DELETE hurdle (Admin only)
 hurdleRouter.delete('/:id', authMiddleware, async (req, res) => {
   if (!['Admin', 'Ops Lead'].includes(req.user.role)) return res.status(403).json({ error: 'Not allowed' });
   const { error } = await supabase.from('hurdles').delete().eq('id', req.params.id);
@@ -596,12 +593,4 @@ hurdleRouter.delete('/:id', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// ── Also update module.exports to include hurdleRouter ──
-// module.exports = { ..., hurdleRouter };
-
-// ── Add to server.js ──
-// const { hurdleRouter } = require('./routes/allroutes');
-// app.use('/api/hurdles', hurdleRouter);
-
-module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter,clientsRouter, hurdleRouter };
-
+module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter, clientsRouter, hurdleRouter };

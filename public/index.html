@@ -3030,8 +3030,8 @@ async function generateReport(){
                         const over = cl.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
                         const borderColor = over>0?'var(--red)':prog>0?'var(--secondary)':'var(--green)';
                         const safeCode = cl.clientCode||'';
-                        const safeName = (cl.clientName||'').replace(/'/g,\'\\\'\')
-                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" onclick="showExecClientTasks(\''+safeCode+'\',\''+safeName+'\','+JSON.stringify(cl.tasks).replace(/\"/g,\'&quot;\')+')" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+                        const safeName = (cl.clientName||'').replace(/'/g,"'");
+                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid '+borderColor+';cursor:pointer;" onclick="showExecClientTasksFromStore(\\\\''+storeKey+'\\\\',\\\\''+safeName+'\\\\')" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
                           +'<div style="flex:1;">'
                           +'<div style="font-size:13px;font-weight:600;color:var(--primary);">👥 '+cl.clientName+'</div>'
                           +'<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+cl.tasks.length+' tasks total · click for detail</div>'
@@ -3492,6 +3492,13 @@ function exportDSRDayWiseExcel() {
   a.download = 'DSR_' + d.clientName.replace(/[^a-z0-9]/gi,'_') + '_' + (d.from||'') + '_to_' + (d.to||'') + '.csv';
   a.click();
   showToast('✅ DSR Day-wise downloaded!', 'success');
+}
+
+function showExecClientTasksFromStore(storeKey, clientName) {
+  const store = window._execTaskStore || {};
+  const tasks = store[storeKey] || [];
+  const clientCode = storeKey.replace('tasks_','').split('_')[0];
+  showExecClientTasks(clientCode, clientName, tasks);
 }
 
 function showExecClientTasks(clientCode, clientName, tasks) {

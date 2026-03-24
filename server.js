@@ -51,6 +51,7 @@ app.use('/api/notifications',   require('./routes/notifications'));
 app.use('/api/users',           require('./routes/users'));
 app.use('/api/dsr',             require('./routes/dsr'));
 app.use('/api/close-requests',  require('./routes/close_requests'));
+app.use('/api/settings',        require('./routes/settings'));  // ✅ NEW
 
 app.use('/api/hurdles',         require('./routes/allroutes').hurdleRouter);
 

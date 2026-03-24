@@ -5831,22 +5831,30 @@ const ACCESS_DEFAULTS = {
 
 window._accessState = null;
 
-function getAccessState() {
-  if (!window._accessState) {
-    const saved = localStorage.getItem('en_access_matrix');
-    if (saved) {
-      try { window._accessState = JSON.parse(saved); }
-      catch(e) { window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS)); }
+async function loadAccessFromDB() {
+  try {
+    const r = await api('GET', '/settings/access-matrix');
+    if (r && r.value) {
+      window._accessState = JSON.parse(r.value);
     } else {
       window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
     }
+  } catch(e) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+  }
+}
+
+function getAccessState() {
+  if (!window._accessState) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
   }
   return window._accessState;
 }
 
-function renderAccessMatrix() {
+async function renderAccessMatrix() {
   const tbody = document.getElementById('access-matrix-body');
   if (!tbody) return;
+  await loadAccessFromDB();
   const state = getAccessState();
 
   tbody.innerHTML = ACCESS_MODULES.map(mod => {
@@ -5879,15 +5887,23 @@ function toggleAccess(moduleKey, roleIdx) {
   renderAccessMatrix();
 }
 
-function saveAccessMatrix() {
+async function saveAccessMatrix() {
   const state = getAccessState();
-  localStorage.setItem('en_access_matrix', JSON.stringify(state));
-  showToast('✅ Access Matrix saved! Changes applied immediately.', 'success');
+  // Save to DB
+  const r = await api('POST', '/settings/access-matrix', { value: JSON.stringify(state) });
+  if (r?.success) {
+    showToast('✅ Access Matrix saved! All browsers pe apply ho gaya.', 'success');
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem('en_access_matrix', JSON.stringify(state));
+    showToast('✅ Saved locally!', 'success');
+  }
 }
 
-function resetAccessMatrix() {
+async function resetAccessMatrix() {
   window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
   localStorage.removeItem('en_access_matrix');
+  await api('POST', '/settings/access-matrix', { value: JSON.stringify(window._accessState) });
   renderAccessMatrix();
   showToast('Access Matrix reset to defaults', 'success');
 }

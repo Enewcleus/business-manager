@@ -2598,120 +2598,239 @@ async function submitQuickWorkLog(){
 
 // ── RENEWALS ─────────────────────────────────────────────────
 async function renderRenewals(){
-  const [renewals, stats] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats')]);
-  if(!renewals) return;
-  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(APP.user.role);
-  const urgent = renewals.filter(r=>r.daysLeft!==null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed');
-  const overdue = renewals.filter(r=>r.isOverdue&&r.status!=='Confirmed');
-  document.getElementById('page-content').innerHTML=`
-    <div class="kpi-grid">
-      <div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">${overdue.length}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">${urgent.length}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">📅 Due ≤15 Days</div><div class="kpi-value">${renewals.filter(r=>r.isDueSoon&&r.status!=='Confirmed').length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">${renewals.filter(r=>r.status==='Confirmed').length}</div></div>
-      <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${renewals.length}</div></div>
-      ${stats?.totalValue?`<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹${Number(stats.totalValue).toLocaleString('en-IN')}</div></div>`:''}
-    </div>
-    ${overdue.length||urgent.length?`
-    <div class="card" style="border-left:4px solid var(--red);">
-      <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Urgent Renewals (${overdue.length+urgent.length})</span>
-        ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Send Reminders</button>`:''}
-      </div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Action</th></tr></thead>
-        <tbody>${[...overdue,...urgent].map(r=>`<tr style="background:${r.isOverdue?'#fff8f8':''};">
-          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
-          <td>${r.renewalDate||'—'}</td>
-          <td><strong style="color:${r.isOverdue?'var(--red)':'var(--amber)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d left'}</strong></td>
-          <td>${r.owner||'—'}</td>
-          <td><div style="display:flex;gap:4px;">
-            <button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅ Confirm</button>
-            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-          </div></td>
-        </tr>`).join('')}</tbody>
-      </table></div></div>
-    </div>`:''}
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">🔄 All Renewals (${renewals.length})</span>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">
-            <option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option>
-          </select>
-          ${isAdmin?`<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>`:''}
-        </div>
-      </div>
-      <div class="card-body" style="padding:0;" id="renewals-table-wrap"><div class="table-wrap"><table>
-        <thead><tr><th>Client</th><th>Plan</th><th>Amount</th><th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody id="renewals-tbody">${renewals.map(r=>`<tr>
-          <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-          <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
-          <td>${r.renewalDate||'—'}</td>
-          <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
-          <td>${r.owner||'—'}</td>
-          <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-          <td><div style="display:flex;gap:4px;">
-            ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
-            ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
-            <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-          </div></td>
-        </tr>`).join('')}</tbody>
-      </table></div></div>
-    </div>`;
-  window._allRenewals = renewals;
+  const [renewals, stats, clients] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats'), getClients()]);
+  if(clients) APP.clients = clients;
+
+  // Merge clients renewal dates if renewals table is sparse
+  let allRenewals = renewals || [];
+  if (allRenewals.length < (APP.clients||[]).filter(c=>c.renewalDate).length) {
+    const existingCodes = new Set(allRenewals.map(r=>r.clientCode||r.client_code));
+    const fromClients = (APP.clients||[]).filter(c=>c.renewalDate && !existingCodes.has(c.clientCode)).map(c=>{
+      const d = new Date(c.renewalDate); d.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const daysLeft = Math.ceil((d-today)/86400000);
+      return {
+        renewalId: 'CLT_'+c.clientCode, clientCode: c.clientCode,
+        clientName: c.busyName, servicePlan: c.servicePlan||'—',
+        renewalDate: c.renewalDate, daysLeft, isOverdue: daysLeft<0,
+        isDueSoon: daysLeft>=0&&daysLeft<=15, status: 'Pending',
+        owner: c.amName||'—', amount: null, crmComment: null,
+      };
+    });
+    allRenewals = [...allRenewals, ...fromClients];
+  }
+  window._allRenewals = allRenewals;
+
+  const u = APP.user;
+  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next30 = new Date(today); next30.setDate(today.getDate()+30);
+
+  const overdue    = allRenewals.filter(r=>r.isOverdue&&r.status!=='Confirmed'&&r.status!=='Lost');
+  const next30List = allRenewals.filter(r=>{
+    if(r.status==='Confirmed'||r.status==='Lost') return false;
+    if(!r.renewalDate) return false;
+    const d=new Date(r.renewalDate); d.setHours(0,0,0,0);
+    return d>=today&&d<=next30;
+  });
+  const urgent = allRenewals.filter(r=>r.daysLeft!=null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed'&&r.status!=='Lost');
+
+  function amtCell(r){ return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—'; }
+  function actionBtns(r){
+    return '<div style="display:flex;gap:4px;flex-wrap:wrap;">'+
+      (r.status!=='Confirmed'?'<button class="btn btn-sm btn-success" onclick="updateRenewal(''+r.renewalId+'','Confirmed')">✅</button>':'')+
+      (r.status!=='Lost'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-danger" onclick="updateRenewal(''+r.renewalId+'','Lost')">❌</button>':'')+
+      (r.status!=='Hold'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" onclick="updateRenewal(''+r.renewalId+'','Hold')">⏸</button>':'')+
+      '<button class="btn btn-sm btn-outline" onclick="openEditRenewal(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">✏️</button>'+
+      (isCRM?'<button class="btn btn-sm btn-secondary" onclick="openRenewalPayment(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">💰</button>':'')+
+    '</div>';
+  }
+  function statusBadge(s){
+    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};
+    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(s||'Pending')+'</span>';
+  }
+
+  var html = '<div class="kpi-grid">'+
+    '<div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">'+overdue.length+'</div></div>'+
+    '<div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">'+urgent.length+'</div></div>'+
+    '<div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">'+next30List.length+'</div></div>'+
+    '<div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Confirmed').length+'</div></div>'+
+    '<div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Hold').length+'</div></div>'+
+    (canSeeAmount&&stats?.totalValue?'<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹'+Number(stats.totalValue).toLocaleString('en-IN')+'</div></div>':'')+
+  '</div>';
+
+  // Next 30 Days section
+  html += '<div class="card" style="border-left:4px solid var(--amber);margin-bottom:12px;">'+
+    '<div class="card-header" style="background:#fef9e7;"><span class="card-title">📅 Next 30 Days ('+next30List.length+')</span></div>';
+  if(!next30List.length){
+    html += '<div class="card-body"><div class="empty-state"><div class="emoji">📅</div><h3>Next 30 days mein koi renewal nahi</h3></div></div>';
+  } else {
+    var rows30='';
+    next30List.sort(function(a,b){return a.daysLeft-b.daysLeft;}).forEach(function(r){
+      rows30+='<tr>'+
+        '<td><strong>'+r.clientName+'</strong>'+(r.crmComment?'<div style="font-size:11px;color:var(--secondary);margin-top:2px;">💬 '+r.crmComment+'</div>':'')+'</td>'+
+        '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+        (canSeeAmount?'<td><strong>'+amtCell(r)+'</strong></td>':'')+
+        '<td>'+r.renewalDate+'</td>'+
+        '<td><strong style="color:'+(r.daysLeft<=7?'var(--red)':'var(--amber)')+';">'+r.daysLeft+'d left</strong></td>'+
+        '<td style="font-size:12px;">'+r.owner+'</td>'+
+        '<td>'+statusBadge(r.status)+'</td>'+
+        '<td>'+actionBtns(r)+'</td>'+
+      '</tr>';
+    });
+    html+='<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+
+      '<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>'+
+      '<tbody>'+rows30+'</tbody></table></div></div>';
+  }
+  html += '</div>';
+
+  // All Renewals section
+  var allRows='';
+  allRenewals.forEach(function(r){
+    allRows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td>'+statusBadge(r.status)+'</td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+
+  html += '<div class="card">'+
+    '<div class="card-header"><span class="card-title">🔄 All Renewals ('+allRenewals.length+')</span>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+      '<select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">'+
+        '<option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option><option>Hold</option>'+
+      '</select>'+
+      (isAdmin?'<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>':'')+
+    '</div></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+
+      '<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead>'+
+      '<tbody id="renewals-tbody">'+allRows+'</tbody>'+
+    '</table></div></div></div>';
+
+  document.getElementById('page-content').innerHTML = html;
 }
 
 function filterRenewals(status){
-  const data = status ? (window._allRenewals||[]).filter(r=>r.status===status) : (window._allRenewals||[]);
-  document.getElementById('renewals-tbody').innerHTML = data.map(r=>`<tr>
-    <td><strong>${r.clientName}</strong></td><td>${r.servicePlan||'—'}</td>
-    <td>${r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'}</td>
-    <td>${r.renewalDate||'—'}</td>
-    <td>${r.daysLeft!==null?`<strong style="color:${r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)'};">${r.isOverdue?'OVERDUE':r.daysLeft+'d'}</strong>`:'—'}</td>
-    <td>${r.owner||'—'}</td>
-    <td><span class="badge ${r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':'badge-amber'}">${r.status}</span></td>
-    <td><div style="display:flex;gap:4px;">
-      ${r.status!=='Confirmed'?`<button class="btn btn-sm btn-success" onclick="updateRenewal('${r.renewalId}','Confirmed')">✅</button>`:''}
-      ${r.status!=='Lost'?`<button class="btn btn-sm btn-danger" onclick="updateRenewal('${r.renewalId}','Lost')">❌</button>`:''}
-      <button class="btn btn-sm btn-outline" onclick="openEditRenewal('${r.renewalId}','${r.clientName}')">✏️</button>
-    </div></td>
-  </tr>`).join('');
+  var u=APP.user;
+  var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+  var data=status?(window._allRenewals||[]).filter(function(r){return r.status===status;}):(window._allRenewals||[]);
+  function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
+  function actionBtns(r){
+    return '<div style="display:flex;gap:4px;flex-wrap:wrap;">'+
+      (r.status!=='Confirmed'?'<button class="btn btn-sm btn-success" onclick="updateRenewal(''+r.renewalId+'','Confirmed')">✅</button>':'')+
+      (r.status!=='Lost'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-danger" onclick="updateRenewal(''+r.renewalId+'','Lost')">❌</button>':'')+
+      (r.status!=='Hold'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" onclick="updateRenewal(''+r.renewalId+'','Hold')">⏸</button>':'')+
+      '<button class="btn btn-sm btn-outline" onclick="openEditRenewal(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">✏️</button>'+
+      (isCRM?'<button class="btn btn-sm btn-secondary" onclick="openRenewalPayment(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">💰</button>':'')+
+    '</div>';
+  }
+  var rows='';
+  data.forEach(function(r){
+    rows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td><span class="badge '+(r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber')+'">'+(r.status||'Pending')+'</span></td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+  var el=document.getElementById('renewals-tbody');
+  if(el) el.innerHTML=rows;
 }
 
 function openEditRenewal(id, name) {
-  openPanel(`✏️ Renewal Update — ${name}`, `
-    <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="er-date"></div>
-    <div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" placeholder="0"></div>
-    <div class="form-group"><label>Status</label>
-      <select class="form-control" id="er-status"><option>Pending</option><option>Confirmed</option><option>Lost</option></select>
-    </div>
-    <div class="form-group"><label>Notes</label><textarea class="form-control" id="er-notes" placeholder="Koi update..."></textarea></div>
-    <button class="btn btn-primary btn-full" onclick="submitEditRenewal('${id}')">💾 Save Update</button>`);
+  var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
+  var isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(APP.user.role);
+  var canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+  openPanel('✏️ Renewal — '+name,
+    '<div class="form-group"><label>Renewal Date (Seller ne bataya)</label>'+
+    '<input type="date" class="form-control" id="er-date" value="'+(renewal.renewalDate||'')+'"></div>'+
+    (canSeeAmount?'<div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>':'<input type="hidden" id="er-amount" value="">')+
+    '<div class="form-group"><label>Status</label>'+
+    '<select class="form-control" id="er-status">'+
+      '<option '+(renewal.status==='Pending'?'selected':'')+'>Pending</option>'+
+      '<option '+(renewal.status==='Confirmed'?'selected':'')+'>Confirmed</option>'+
+      '<option '+(renewal.status==='Hold'?'selected':'')+'>Hold</option>'+
+      '<option '+(renewal.status==='Lost'?'selected':'')+'>Lost</option>'+
+    '</select></div>'+
+    (isCRM?'<div class="form-group"><label>CRM Comment</label>'+
+    '<textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha?">'+(renewal.crmComment||'')+'</textarea></div>':'<input type="hidden" id="er-comment" value="">')+
+    '<div class="form-group"><label>Notes</label>'+
+    '<textarea class="form-control" id="er-notes" rows="2" placeholder="Koi aur update...">'+(renewal.notes||'')+'</textarea></div>'+
+    '<button class="btn btn-primary btn-full" onclick="submitEditRenewal(''+id+'')">💾 Save</button>'+
+    '<button class="btn btn-secondary btn-full" style="margin-top:8px;" onclick="openRenewalPayment(''+id+'',''+name+'')">💰 Payment Record</button>'
+  );
 }
 
 async function submitEditRenewal(id) {
-  const r = await api('PATCH', `/renewals/${id}`, {
+  var r = await api('PATCH', '/renewals/'+id, {
     status: document.getElementById('er-status').value,
-    amount: document.getElementById('er-amount').value || undefined,
-    renewalDate: document.getElementById('er-date').value || undefined,
+    amount: document.getElementById('er-amount').value||undefined,
+    renewalDate: document.getElementById('er-date').value||undefined,
     notes: document.getElementById('er-notes').value,
+    crmComment: document.getElementById('er-comment').value||undefined,
   });
-  if (r?.success) { showToast('✅ Renewal updated!', 'success'); closePanel(); renderRenewals(); }
+  if(r?.success){showToast('✅ Renewal updated!','success');closePanel();renderRenewals();}
+  else showToast('Update failed','error');
 }
 
 async function updateRenewal(id,status){
-  const r=await api('PATCH',`/renewals/${id}`,{status});
+  var r=await api('PATCH','/renewals/'+id,{status});
   if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}
 }
 
-async function triggerRenewalReminders() {
-  const btn = event.target; btn.disabled = true; btn.textContent = '⏳ Sending...';
-  const r = await api('POST', '/renewals/trigger-reminders', {});
-  btn.disabled = false; btn.textContent = '📨 Reminders';
-  if (r?.success) showToast(`✅ ${r.reminders_sent} reminders bheje gaye!`, 'success');
-  else showToast('Error sending reminders', 'error');
+function openRenewalPayment(id, name) {
+  var renewal=(window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
+  openPanel('💰 Payment — '+name,
+    '<div style="background:#d5f5e3;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">'+
+      '<strong>'+name+'</strong> · '+(renewal.servicePlan||'—')+(renewal.amount?' · ₹'+Number(renewal.amount).toLocaleString('en-IN'):'')+
+    '</div>'+
+    '<div class="form-group"><label>Payment Date *</label>'+
+    '<input type="date" class="form-control" id="pay-date" value="'+new Date().toISOString().split('T')[0]+'"></div>'+
+    '<div class="form-group"><label>Amount Received (₹) *</label>'+
+    '<input type="number" class="form-control" id="pay-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>'+
+    '<div class="form-group"><label>Payment Mode</label>'+
+    '<select class="form-control" id="pay-mode"><option>NEFT</option><option>RTGS</option><option>IMPS</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></div>'+
+    '<div class="form-group"><label>UTR / Transaction Number *</label>'+
+    '<input type="text" class="form-control" id="pay-utr" placeholder="UTR number daalo"></div>'+
+    '<div class="form-group"><label>Remarks</label>'+
+    '<textarea class="form-control" id="pay-remarks" rows="2"></textarea></div>'+
+    '<button class="btn btn-success btn-full" onclick="submitRenewalPayment(''+id+'',''+name+'')">💰 Save Payment</button>'
+  );
 }
+
+async function submitRenewalPayment(id, name) {
+  var utr=document.getElementById('pay-utr').value.trim();
+  var amount=document.getElementById('pay-amount').value;
+  var date=document.getElementById('pay-date').value;
+  if(!utr){showToast('UTR required!','error');return;}
+  if(!amount){showToast('Amount required!','error');return;}
+  var r=await api('PATCH','/renewals/'+id,{
+    status:'Confirmed', amount, renewalDate:date, paymentDate:date,
+    paymentMode:document.getElementById('pay-mode').value,
+    utrNumber:utr, paymentRemarks:document.getElementById('pay-remarks').value,
+    crmComment:'Payment received — UTR: '+utr+' via '+document.getElementById('pay-mode').value,
+  });
+  if(r?.success){showToast('✅ Payment saved! UTR: '+utr,'success');closePanel();renderRenewals();}
+  else showToast('Payment save failed','error');
+}
+
 
 // ── ADS ───────────────────────────────────────────────────────
 async function renderAds(){

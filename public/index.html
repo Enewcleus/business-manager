@@ -1418,11 +1418,12 @@ async function openAddClient(){
       <select class="form-control" id="nc-ops"><option value="">-- Select --</option>${allExecs.map(n=>`<option>${n}</option>`).join('')}</select>
     </div>
     <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
+    <div class="form-group"><label>📞 Phone Number</label><input type="tel" class="form-control" id="nc-phone" placeholder="e.g. 9876543210"></div>
     <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
 }
 async function submitAddClient(){
   const name=document.getElementById('nc-name').value.trim();if(!name){showToast('Name required','error');return;}
-  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:document.getElementById('nc-am').value,adsManager:document.getElementById('nc-ads').value,crmExecutive:document.getElementById('nc-crm').value,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null});
+  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:document.getElementById('nc-am').value,adsManager:document.getElementById('nc-ads').value,crmExecutive:document.getElementById('nc-crm').value,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null,phone:document.getElementById('nc-phone')?.value||null});
   if(r?.success){showToast('✅ '+r.clientCode+' added!','success');closePanel();renderClients();}
 }
 

@@ -1615,14 +1615,40 @@ function openCSIForClient(){
 async function renderCSI(){
   const [clients,csiData]=await Promise.all([getClients(),api('GET','/csi')]);
   if(clients) APP.clients=clients;
-  const csiMap={};(csiData||[]).forEach(r=>{if(!csiMap[r.clientCode])csiMap[r.clientCode]=r;});
+  const csiMap={};
+  (csiData||[]).forEach(function(r){ if(!csiMap[r.clientCode]) csiMap[r.clientCode]=r; });
   const canFill=['CRM Executive','Admin','CSI Lead'].includes(APP.user.role);
-  const reviewed=Object.keys(csiMap).length,lowScore=(csiData||[]).filter(r=>r.csiPercent<50).length;
-  const notDone=(clients||[]).filter(c=>!csiMap[c.clientCode]).length;
-  window._csiFilter=window._csiFilter||'all';
-  window._csiMap=csiMap;
-  window._csiClients=clients;
-  window._csiCanFill=canFill;
+  const reviewed=Object.keys(csiMap).length;
+  const lowScore=(csiData||[]).filter(function(r){return r.csiPercent<50;}).length;
+  const notDone=(clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
+  
+  var rows='';
+  var i=0;
+  (clients||[]).forEach(function(c){
+    i++;
+    var csi=csiMap[c.clientCode];
+    var score=csi?csi.csiPercent:null;
+    var health=score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
+    var isPending=!csi;
+    var phone=c.phone||'';
+    var scoreHtml=score!==null?'<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':'<span style="color:var(--red);">Not Done</span>';
+    var phoneHtml=phone?'<a href="tel:'+phone+'">📞 '+phone+'</a>':'—';
+    var actionHtml=canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" id="csibtn'+i+'" onclick="csiClick(this)">'+( isPending?'📝':'✏️')+'</button></td>':'';
+    rows+='<tr data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" style="'+(isPending?'background:#fdf2f2;':'')+'">'+
+      '<td>'+(i)+'</td>'+
+      '<td><strong>'+c.busyName+'</strong><br><small>'+c.clientCode+'</small></td>'+
+      '<td>'+phoneHtml+'</td>'+
+      '<td>'+c.marketplace+'</td>'+
+      '<td>'+scoreHtml+'</td>'+
+      '<td>'+healthBadge(health)+'</td>'+
+      '<td style="font-size:11px;">'+(csi?csi.reviewDate:'—')+'</td>'+
+      '<td style="font-size:11px;">'+(csi&&csi.reviewedBy?csi.reviewedBy:'—')+'</td>'+
+      actionHtml+
+    '</tr>';
+  });
+
+  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
+
   document.getElementById('page-content').innerHTML=
     '<div class="kpi-grid">'+
       '<div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
@@ -1632,100 +1658,51 @@ async function renderCSI(){
     '</div>'+
     '<div class="card">'+
       '<div class="card-header">'+
-        '<span class="card-title">📊 CSI Status</span>'+
-        '<div style="display:flex;gap:6px;align-items:center;">'+
-          '<button class="btn btn-sm btn-primary" onclick="setCsiFilter(\"all\")">All</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" onclick="setCsiFilter(\"pending\")">Pending</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" onclick="setCsiFilter(\"done\")">Done</button>'+
-          (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
-        '</div>'+
+        '<span class="card-title">📊 CSI Health</span>'+
+        (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
       '</div>'+
-      '<div class="card-body" style="padding:0;"><div class="table-wrap" id="csi-table-wrap"></div></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+thead+'<tbody>'+rows+'</tbody></table></div></div>'+
     '</div>';
-  buildCSITable();
 }
 
-function setCsiFilter(f){
-  window._csiFilter=f;
-  buildCSITable();
-}
-
-function buildCSITable(){
-  const clients=window._csiClients||[];
-  const csiMap=window._csiMap||{};
-  const canFill=window._csiCanFill||false;
-  const filter=window._csiFilter||'all';
-  const wrap=document.getElementById('csi-table-wrap');
-  if(!wrap) return;
-  const filtered=clients.filter(c=>{
-    if(filter==='pending') return !csiMap[c.clientCode];
-    if(filter==='done') return !!csiMap[c.clientCode];
-    return true;
-  });
-  let html='<table><thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead><tbody>';
-  filtered.forEach(function(c,i){
-    var csi=csiMap[c.clientCode];
-    var score=csi?csi.csiPercent:null;
-    var health=score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
-    var isPending=!csi;
-    var phone=c.phone||'';
-    var phoneCell=phone?'<a href="tel:'+phone+'" style="color:var(--primary);">📞 '+phone+'</a>':'—';
-    var scoreCell=score!==null?
-      '<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':
-      '<span style="color:var(--red);font-size:12px;">Not Done</span>';
-    var actionCell=canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" onclick="openCSIFormForClient(''+c.clientCode+'',''+c.busyName.replace(/'/g,'').replace(/"/g,'')+'')">'+( isPending?'📝':'✏️')+'</button></td>':'';
-    html+='<tr style="'+(isPending?'background:#fdf2f2;':'')+'">'+
-      '<td style="font-size:12px;">'+(i+1)+'</td>'+
-      '<td><strong>'+c.busyName+'</strong><br><span style="font-size:11px;color:var(--text-muted);">'+c.clientCode+'</span></td>'+
-      '<td>'+phoneCell+'</td>'+
-      '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
-      '<td>'+scoreCell+'</td>'+
-      '<td>'+healthBadge(health)+'</td>'+
-      '<td style="font-size:11px;color:var(--text-muted);">'+(csi?csi.reviewDate:'—')+'</td>'+
-      '<td style="font-size:12px;color:var(--text-muted);">'+(csi?csi.reviewedBy||'—':'—')+'</td>'+
-      actionCell+
-    '</tr>';
-  });
-  html+='</tbody></table>';
-  wrap.innerHTML=html;
-}
-
-function openCSIFormForClient(cc,cn){
-  openCSIForm(cc,cn);
+function csiClick(btn){
+  var row=btn.closest('tr');
+  if(row) openCSIForm(row.getAttribute('data-cc'), row.getAttribute('data-cn'));
 }
 
 
 function starRating(val){const n=parseInt(val)||0;return `<span title="${n}/5" style="font-size:12px;">${'⭐'.repeat(n)}${'☆'.repeat(5-n)}</span>`;}
 
 function openCSIForm(cc,cn){
-  const client = cc ? (APP.clients||[]).find(c=>c.clientCode===cc) : null;
-  const phone = client ? (client.phone||client.contactNumber||client.mobile||'') : '';
-  const opts=(APP.clients||[]).map(c=>'<option value="'+c.clientCode+'" '+(cc===c.clientCode?'selected':'')+'>'+c.busyName+' ('+c.clientCode+')</option>').join('');
-  const infoHtml = client ? ('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')) : '';
-
-  const qHtml = CSI_QUESTIONS.map(q=>{
-    const stars = [1,2,3,4,5].map(n=>
-    const stars = [1,2,3,4,5].map(n=>{
-      const onclick = 'selectStar(\'' + q.id + '\',' + n + ')';
-      return '<div style="flex:1;text-align:center;cursor:pointer;" onclick="' + onclick + '">' +
-        '<div id="star-' + q.id + '-' + n + '" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">' + n + '</span></div></div>';
-    }).join('');
+  var client=cc?(APP.clients||[]).find(function(c){return c.clientCode===cc;}):null;
+  var phone=client?(client.phone||''):'';
+  var opts='';
+  (APP.clients||[]).forEach(function(c){
+    opts+='<option value="'+c.clientCode+'"'+(cc===c.clientCode?' selected':'')+'>'+c.busyName+' ('+c.clientCode+')</option>';
+  });
+  var qHtml='';
+  CSI_QUESTIONS.forEach(function(q){
+    var stars='';
+    for(var n=1;n<=5;n++){
+      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(\'' +q.id+ '\','+n+')"><div id="star-'+q.id+'-'+n+'" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>';
+    }
+    qHtml+='<div class="form-group"><label>'+q.label+'</label>'+
       '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'+q.desc+'</div>'+
       '<div style="display:flex;gap:8px;">'+stars+'</div>'+
       '<input type="hidden" id="val-'+q.id+'" value="0"></div>';
-  }).join('');
-
+  });
+  var infoHtml=client?('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')):'';
   openPanel('📝 CSI Review Form',
-    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1 (Poor) to 5 (Excellent)</div>' +
-    '<div class="form-group"><label>Select Client *</label>' +
-    '<select class="form-control" id="csi-client" onchange="updateCSIClientInfo(this)">' +
+    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1-5</div>'+
+    '<div class="form-group"><label>Client *</label>'+
+    '<select class="form-control" id="csi-client" onchange="updateCSIClientInfo(this)">'+
     '<option value="">Select...</option>'+opts+
-    '</select></div>' +
-    '<div id="csi-client-info" style="display:'+(client?'':'none')+';background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>' +
-    qHtml +
-    '<div class="form-group"><label>Seller Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>' +
-    '<div class="form-group"><label>Next Review Date</label><input type="date" class="form-control" id="csi-next" value="'+dateAfterDays(15)+'"></div>' +
-    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>'
+    '</select></div>'+
+    (infoHtml?'<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>':'')+
+    qHtml+
+    '<div class="form-group"><label>Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>'+
+    '<div class="form-group"><label>Next Review</label><input type="date" class="form-control" id="csi-next" value="'+dateAfterDays(15)+'"></div>'+
+    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save</button>'
   );
 }
 

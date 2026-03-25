@@ -657,8 +657,11 @@ async function loadDSRPage() {
   // Role-based filtering
   let myClients = APP.clients || [];
   if (!isLead) {
+    const uname = u.name.trim().toLowerCase();
     myClients = myClients.filter(c =>
-      c.amName === u.name || c.adsManager === u.name || c.crmExecutive === u.name
+      (c.amName||'').trim().toLowerCase() === uname ||
+      (c.adsManager||'').trim().toLowerCase() === uname ||
+      (c.crmExecutive||'').trim().toLowerCase() === uname
     );
   }
 
@@ -853,10 +856,21 @@ async function saveDSR() {
     if(r.alerts?.alertOverspend) msg='⚠️ Saved! Ad spend budget se zyada!';
     else if(r.alerts?.alertHighReturns) msg='⚠️ Saved! High returns!';
     else if(r.alerts?.alertBudget80) msg='⚠️ Saved! Budget 80% used!';
-    showToast(msg, r.alerts?.alertOverspend||r.alerts?.alertHighReturns?'error':'success');
-    const f=document.getElementById('dsr-entry-form');
-    if(f) f.remove();
-    loadDSRPage();
+    // Big visible confirmation
+    const alertType = r.alerts?.alertOverspend||r.alerts?.alertHighReturns ? 'error' : 'success';
+    showToast(msg, alertType);
+    // Also show inline confirmation
+    const formEl = document.getElementById('dsr-entry-form');
+    if (formEl) {
+      formEl.innerHTML = '<div style="padding:20px;text-align:center;background:#d5f5e3;border-radius:10px;">' +
+        '<div style="font-size:32px;margin-bottom:8px;">✅</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#1e8449;">' + msg + '</div>' +
+        '<div style="font-size:12px;color:#27ae60;margin-top:4px;">DSR successfully saved!</div>' +
+        '</div>';
+      setTimeout(() => { if(formEl) formEl.remove(); loadDSRPage(); }, 1500);
+    } else {
+      loadDSRPage();
+    }
   }
 }
 
@@ -1040,6 +1054,91 @@ async function viewPersonTasks(personName, role) {
 }
 
 // Edit client team from 360 view
+async function openEditClient(cc) {
+  const client = (APP.clients||[]).find(c => c.clientCode === cc);
+  if (!client) { showToast('Client not found', 'error'); return; }
+
+  // Fetch ALL active users — show everyone regardless of role
+  const users = await api('GET', '/users');
+  const active = (users||[]).filter(u => u.isActive).sort((a,b) => a.name.localeCompare(b.name));
+
+  openPanel('✏️ Edit Client — ' + client.busyName, `
+    <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;">
+      <strong>${client.clientCode}</strong> · ${client.marketplace}
+    </div>
+    <div class="form-group"><label>Busy Name *</label>
+      <input type="text" class="form-control" id="ec-name" value="${(client.busyName||'').replace(/"/g,'&quot;')}">
+    </div>
+    <div class="form-group"><label>Marketplace</label>
+      <select class="form-control" id="ec-market">
+        ${['Amazon.in','Amazon.com','Amazon.uk','Amazon.ae','Amazon.ca','Flipkart','Meesho','Myntra','Snapdeal','Other'].map(m=>`<option ${client.marketplace===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="ec-am">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="ec-ads">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="ec-crm">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Service Plan</label>
+        <select class="form-control" id="ec-plan">
+          ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Renewal Date</label>
+        <input type="date" class="form-control" id="ec-renewal" value="${client.renewalDate||''}">
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select class="form-control" id="ec-status">
+          <option ${client.status==='Active'?'selected':''}>Active</option>
+          <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditClient('${cc}')">💾 Save Changes</button>
+  `);
+}
+
+async function submitEditClient(cc) {
+  const name = document.getElementById('ec-name').value.trim();
+  if (!name) { showToast('Name required', 'error'); return; }
+  const r = await api('PATCH', '/clients/' + cc, {
+    busyName: name,
+    marketplace: document.getElementById('ec-market').value,
+    amName: document.getElementById('ec-am').value,
+    adsManager: document.getElementById('ec-ads').value,
+    crmExecutive: document.getElementById('ec-crm').value,
+    servicePlan: document.getElementById('ec-plan').value,
+    renewalDate: document.getElementById('ec-renewal').value || null,
+    status: document.getElementById('ec-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    await getClients(true);
+    renderClients();
+  } else {
+    showToast(r?.error || 'Update failed', 'error');
+  }
+}
+
 async function openEditClient360(cc) {
   const client = APP.clients.find(c=>c.clientCode===cc);
   if (!client) return;
@@ -1412,8 +1511,11 @@ async function renderCRM(){
   const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
   let myClients = APP.clients || [];
   if (!isLead) {
+    const uname = u.name.trim().toLowerCase();
     myClients = myClients.filter(c =>
-      c.amName === u.name || c.adsManager === u.name || c.crmExecutive === u.name
+      (c.amName||'').trim().toLowerCase() === uname ||
+      (c.adsManager||'').trim().toLowerCase() === uname ||
+      (c.crmExecutive||'').trim().toLowerCase() === uname
     );
   }
 
@@ -2870,6 +2972,7 @@ async function renderAdmin(){
                 <th style="padding:10px 14px;text-align:left;color:#fff;font-weight:500;width:180px;">Module</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Admin</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Ops Lead</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Sr. Exec</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Team Lead</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">CRM Exec</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Ads Exec</th>
@@ -2902,7 +3005,7 @@ async function renderAdmin(){
 
   window._adminUsers=users;
   loadCloseRequests();
-  renderAccessMatrix();
+  renderAccessMatrix().catch(()=>{});
 }
 
 function showHierarchy(){
@@ -5705,44 +5808,53 @@ const ACCESS_MODULES = [
   { key:'admin',       label:'Admin Panel',          icon:'⚙️' },
 ];
 
-const ACCESS_ROLES = ['Admin','Ops Lead','Team Lead','CRM Executive','Ads Executive','Account Manager','SME','Executive'];
+const ACCESS_ROLES = ['Admin','Ops Lead','Senior Executive','Team Lead','CRM Executive','Ads Executive','Account Manager','SME','Executive'];
 
 // Default: 2=full, 1=view, 0=none
 const ACCESS_DEFAULTS = {
-  dashboard:   [2,2,2,2,2,2,2,2],
-  clients:     [2,2,2,1,1,1,1,1],
-  tasks:       [2,2,2,2,2,2,2,2],
-  tickets:     [2,2,2,2,1,1,1,1],
-  crm:         [2,2,2,2,0,1,1,1],
-  renewals:    [2,2,2,2,0,1,1,0],
-  renewal_amt: [2,2,1,0,0,0,0,0],
-  ads:         [2,2,1,0,2,1,1,0],
-  dsr:         [2,2,2,2,2,2,2,2],
-  reports:     [2,2,2,1,1,1,1,0],
-  seller360:   [2,2,2,2,2,2,2,1],
-  csi:         [2,2,2,1,0,1,2,1],
-  hurdles:     [2,2,2,1,1,1,1,1],
-  admin:       [2,2,0,0,0,0,0,0],
+  //            Admin OpsLd SrExc  TmLd  CRM   Ads   AM    SME  Exec
+  dashboard:   [2,    2,    2,     2,    2,    2,    2,    2,   2],
+  clients:     [2,    2,    1,     2,    1,    1,    1,    1,   1],
+  tasks:       [2,    2,    2,     2,    2,    2,    2,    2,   2],
+  tickets:     [2,    2,    2,     2,    2,    1,    1,    1,   1],
+  crm:         [2,    2,    1,     2,    2,    0,    1,    1,   1],
+  renewals:    [2,    2,    1,     2,    2,    0,    1,    1,   1],
+  renewal_amt: [2,    2,    1,     1,    0,    0,    0,    0,   0],
+  ads:         [2,    2,    1,     1,    0,    2,    1,    1,   1],
+  dsr:         [2,    2,    2,     2,    2,    2,    2,    2,   2],
+  reports:     [2,    2,    2,     2,    1,    1,    1,    1,   1],
+  seller360:   [2,    2,    2,     2,    2,    2,    2,    2,   2],
+  csi:         [2,    2,    1,     2,    1,    0,    1,    2,   1],
+  hurdles:     [2,    2,    2,     2,    1,    1,    1,    1,   1],
+  admin:       [2,    2,    0,     0,    0,    0,    0,    0,   0],
 };
 
 window._accessState = null;
 
-function getAccessState() {
-  if (!window._accessState) {
-    const saved = localStorage.getItem('en_access_matrix');
-    if (saved) {
-      try { window._accessState = JSON.parse(saved); }
-      catch(e) { window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS)); }
+async function loadAccessFromDB() {
+  try {
+    const r = await api('GET', '/settings/access-matrix');
+    if (r && r.value) {
+      window._accessState = JSON.parse(r.value);
     } else {
       window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
     }
+  } catch(e) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+  }
+}
+
+function getAccessState() {
+  if (!window._accessState) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
   }
   return window._accessState;
 }
 
-function renderAccessMatrix() {
+async function renderAccessMatrix() {
   const tbody = document.getElementById('access-matrix-body');
   if (!tbody) return;
+  await loadAccessFromDB();
   const state = getAccessState();
 
   tbody.innerHTML = ACCESS_MODULES.map(mod => {
@@ -5775,15 +5887,23 @@ function toggleAccess(moduleKey, roleIdx) {
   renderAccessMatrix();
 }
 
-function saveAccessMatrix() {
+async function saveAccessMatrix() {
   const state = getAccessState();
-  localStorage.setItem('en_access_matrix', JSON.stringify(state));
-  showToast('✅ Access Matrix saved! Changes applied immediately.', 'success');
+  // Save to DB
+  const r = await api('POST', '/settings/access-matrix', { value: JSON.stringify(state) });
+  if (r?.success) {
+    showToast('✅ Access Matrix saved! All browsers pe apply ho gaya.', 'success');
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem('en_access_matrix', JSON.stringify(state));
+    showToast('✅ Saved locally!', 'success');
+  }
 }
 
-function resetAccessMatrix() {
+async function resetAccessMatrix() {
   window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
   localStorage.removeItem('en_access_matrix');
+  await api('POST', '/settings/access-matrix', { value: JSON.stringify(window._accessState) });
   renderAccessMatrix();
   showToast('Access Matrix reset to defaults', 'success');
 }

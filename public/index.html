@@ -1680,7 +1680,8 @@ async function renderCSI(){
             '<td>'+healthBadge(health)+'</td>'+
             '<td style="font-size:11px;color:var(--text-muted);">'+(csi?csi.reviewDate:'—')+'</td>'+
             '<td style="font-size:12px;color:var(--text-muted);">'+(csi?csi.reviewedBy||'—':'—')+'</td>'+
-            (canFill?'<td><button class="btn btn-sm btn-'+(isPending?'primary':'secondary')+'" onclick="openCSIForm(''+c.clientCode+'',''+c.busyName.replace(/'/g,"\'")+'')">'+
+            (canFill?'<td><button class="btn btn-sm btn-'+(isPending?'primary':'secondary')+'" data-cc="'+c.clientCode+'" data-cn="'+c.busyName+'" onclick="var b=this;openCSIForm(b.getAttribute(\'data-cc\'),b.getAttribute(\'data-cn\'))">'+
+              (isPending?'📝 Fill':'✏️')+'</button></td>':'')+
               (isPending?'📝 Fill':'✏️')+'</button></td>':'')+
           '</tr>';
         }).join('')}</tbody>

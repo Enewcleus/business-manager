@@ -2777,8 +2777,8 @@ function openEditRenewal(id, name) {
     '<textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha?">'+(renewal.crmComment||'')+'</textarea></div>':'<input type="hidden" id="er-comment" value="">')+
     '<div class="form-group"><label>Notes</label>'+
     '<textarea class="form-control" id="er-notes" rows="2" placeholder="Koi aur update...">'+(renewal.notes||'')+'</textarea></div>'+
-    '<button class="btn btn-primary btn-full" onclick="submitEditRenewal(''+id+'')">💾 Save</button>'+
-    '<button class="btn btn-secondary btn-full" style="margin-top:8px;" onclick="openRenewalPayment(''+id+'',''+name+'')">💰 Payment Record</button>'
+    '<button class="btn btn-primary btn-full" data-id="'+id+'" onclick="var b=this;submitEditRenewal(b.getAttribute(\'data-id\'))">💾 Save</button>'+
+    '<button class="btn btn-secondary btn-full" style="margin-top:8px;" data-id="'+id+'" data-cn="'+name+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰 Payment Record</button>'
   );
 }
 

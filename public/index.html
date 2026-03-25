@@ -1537,7 +1537,11 @@ async function renderCRM(){
         };
       });
     }
-  }, 100);
+  }, 
+  'CSI Executive': [
+    {id:'dashboard', label:'Dashboard', icon:'🏠'},
+    {id:'csi', label:'CSI Health', icon:'📊'},
+  ],100);
 }
 
 function renderCRMPage(clients,todayCalls){
@@ -1618,7 +1622,7 @@ async function renderCSI(){
   if(clients) APP.clients=clients;
   const csiMap={};
   (csiData||[]).forEach(function(r){ if(!csiMap[r.clientCode]) csiMap[r.clientCode]=r; });
-  const canFill=['CRM Executive','Admin','CSI Lead'].includes(APP.user.role);
+  const canFill=['CRM Executive','Admin','CSI Lead','CSI Executive'].includes(APP.user.role);
   const reviewed=Object.keys(csiMap).length;
   const lowScore=(csiData||[]).filter(function(r){return r.csiPercent<50;}).length;
   const notDone=(clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
@@ -3162,6 +3166,7 @@ async function renderAdmin(){
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Ads Exec</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Acct Mgr</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">SME</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">CSI Exec</th>
                 <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Executive</th>
               </tr>
             </thead>
@@ -5992,25 +5997,25 @@ const ACCESS_MODULES = [
   { key:'admin',       label:'Admin Panel',          icon:'⚙️' },
 ];
 
-const ACCESS_ROLES = ['Admin','Ops Lead','Senior Executive','Team Lead','CRM Executive','Ads Executive','Account Manager','SME','Executive'];
+const ACCESS_ROLES = ['Admin','Ops Lead','Senior Executive','Team Lead','CRM Executive','Ads Executive','Account Manager','SME','CSI Executive','Executive'];
 
 // Default: 2=full, 1=view, 0=none
 const ACCESS_DEFAULTS = {
-  //            Admin OpsLd SrExc  TmLd  CRM   Ads   AM    SME  Exec
-  dashboard:   [2,    2,    2,     2,    2,    2,    2,    2,   2],
-  clients:     [2,    2,    1,     2,    1,    1,    1,    1,   1],
-  tasks:       [2,    2,    2,     2,    2,    2,    2,    2,   2],
-  tickets:     [2,    2,    2,     2,    2,    1,    1,    1,   1],
-  crm:         [2,    2,    1,     2,    2,    0,    1,    1,   1],
-  renewals:    [2,    2,    1,     2,    2,    0,    1,    1,   1],
-  renewal_amt: [2,    2,    1,     1,    0,    0,    0,    0,   0],
-  ads:         [2,    2,    1,     1,    0,    2,    1,    1,   1],
-  dsr:         [2,    2,    2,     2,    2,    2,    2,    2,   2],
-  reports:     [2,    2,    2,     2,    1,    1,    1,    1,   1],
-  seller360:   [2,    2,    2,     2,    2,    2,    2,    2,   2],
-  csi:         [2,    2,    1,     2,    1,    0,    1,    2,   1],
-  hurdles:     [2,    2,    2,     2,    1,    1,    1,    1,   1],
-  admin:       [2,    2,    0,     0,    0,    0,    0,    0,   0],
+  //            Admin OpsLd SrExc  TmLd  CRM   Ads   AM    SME  CSIEx  Exec
+  dashboard:   [2,    2,    2,     2,    2,    2,    2,    2,   2,     2],
+  clients:     [2,    2,    1,     2,    1,    1,    1,    1,   0,     1],
+  tasks:       [2,    2,    2,     2,    2,    2,    2,    2,   0,     2],
+  tickets:     [2,    2,    2,     2,    2,    1,    1,    1,   0,     1],
+  crm:         [2,    2,    1,     2,    2,    0,    1,    1,   0,     1],
+  renewals:    [2,    2,    1,     2,    2,    0,    1,    1,   0,     1],
+  renewal_amt: [2,    2,    1,     1,    0,    0,    0,    0,   0,     0],
+  ads:         [2,    2,    1,     1,    0,    2,    1,    1,   0,     1],
+  dsr:         [2,    2,    2,     2,    2,    2,    2,    2,   0,     2],
+  reports:     [2,    2,    2,     2,    1,    1,    1,    1,   0,     1],
+  seller360:   [2,    2,    2,     2,    2,    2,    2,    2,   0,     2],
+  csi:         [2,    2,    1,     2,    1,    0,    1,    2,   2,     1],
+  hurdles:     [2,    2,    2,     2,    1,    1,    1,    1,   0,     1],
+  admin:       [2,    2,    0,     0,    0,    0,    0,    0,   0,     0],
 };
 
 window._accessState = null;

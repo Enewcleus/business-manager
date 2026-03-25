@@ -2815,7 +2815,7 @@ function openRenewalPayment(id, name) {
     '<input type="text" class="form-control" id="pay-utr" placeholder="UTR number daalo"></div>'+
     '<div class="form-group"><label>Remarks</label>'+
     '<textarea class="form-control" id="pay-remarks" rows="2"></textarea></div>'+
-    '<button class="btn btn-success btn-full" onclick="submitRenewalPayment(''+id+'',''+name+'')">💰 Save Payment</button>'
+    '<button class="btn btn-success btn-full" data-id="'+id+'" data-cn="'+name+'" onclick="var b=this;submitRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰 Save Payment</button>'
   );
 }
 

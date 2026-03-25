@@ -1779,23 +1779,32 @@ function openCSIForm(cc,cn){
   const phone = client ? (client.phone||client.contactNumber||client.mobile||'') : '';
   const opts=(APP.clients||[]).map(c=>'<option value="'+c.clientCode+'" '+(cc===c.clientCode?'selected':'')+'>'+c.busyName+' ('+c.clientCode+')</option>').join('');
   const infoHtml = client ? ('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')) : '';
+
+  const qHtml = CSI_QUESTIONS.map(q=>{
+    const stars = [1,2,3,4,5].map(n=>
+      '<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(''+q.id+'','+n+')">'+
+      '<div id="star-'+q.id+'-'+n+'" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>'
+    ).join('');
+    return '<div class="form-group"><label>'+q.label+'</label>'+
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'+q.desc+'</div>'+
+      '<div style="display:flex;gap:8px;">'+stars+'</div>'+
+      '<input type="hidden" id="val-'+q.id+'" value="0"></div>';
+  }).join('');
+
   openPanel('📝 CSI Review Form',
     '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1 (Poor) to 5 (Excellent)</div>' +
     '<div class="form-group"><label>Select Client *</label>' +
     '<select class="form-control" id="csi-client" onchange="updateCSIClientInfo(this)">' +
     '<option value="">Select...</option>'+opts+
     '</select></div>' +
-    '<div id="csi-client-info" style="display:'+(client?'':'none')+';background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>
-    ${CSI_QUESTIONS.map(q=>`
-      <div class="form-group"><label>${q.label}</label>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">${q.desc}</div>
-        <div style="display:flex;gap:8px;">${[1,2,3,4,5].map(n=>`<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar('${q.id}',${n})"><div id="star-${q.id}-${n}" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">${n}</span></div></div>`).join('')}</div>
-        <input type="hidden" id="val-${q.id}" value="0">
-      </div>`).join('')}
-    <div class="form-group"><label>Seller Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>
-    <div class="form-group"><label>Next Review Date</label><input type="date" class="form-control" id="csi-next" value="${dateAfterDays(15)}"></div>
-    <button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>`);
+    '<div id="csi-client-info" style="display:'+(client?'':'none')+';background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>' +
+    qHtml +
+    '<div class="form-group"><label>Seller Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>' +
+    '<div class="form-group"><label>Next Review Date</label><input type="date" class="form-control" id="csi-next" value="'+dateAfterDays(15)+'"></div>' +
+    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>'
+  );
 }
+
 
 function selectStar(qId,val){
   for(let i=1;i<=5;i++){const el=document.getElementById(`star-${qId}-${i}`);if(el){el.style.background=i<=val?'var(--amber)':'white';el.style.borderColor=i<=val?'var(--amber)':'var(--border)';el.style.color=i<=val?'white':'var(--text)';el.innerHTML=(i<=val?'⭐':'☆')+`<br><span style="font-size:11px;font-weight:600;">${i}</span>`;}}

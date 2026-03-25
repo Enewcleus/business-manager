@@ -648,7 +648,7 @@ function dsrSetDate(val) {
 async function loadDSRPage() {
   const selDate = window._dsrDate || new Date().toISOString().split('T')[0];
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
 
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
 
@@ -1221,7 +1221,7 @@ function draw360Charts(dsrData) {
 async function renderDashboard() {
   const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
   if(!dash) return;
-  const u=APP.user,isLead=['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  const u=APP.user,isLead=['Admin','Ops Lead','CSI Lead','CSI Executive'].includes(u.role);
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash.totalClients}</div><div class="kpi-sub">${dash.active} Active</div></div>
@@ -1514,7 +1514,7 @@ async function renderCRM(){
 
   // Role-based filtering — CRM Executive sees only assigned sellers
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
   let myClients = APP.clients || [];
   if (!isLead) {
     const uname = u.name.trim().toLowerCase();
@@ -1765,7 +1765,7 @@ async function renderTasks() {
   _allTasksCache = tasks;
 
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
   const pending = tasks.filter(t => t.status === 'Pending');
   const inprog  = tasks.filter(t => t.status === 'In Progress');
   const done    = tasks.filter(t => t.status === 'Completed' && isToday(t.completedAt));
@@ -1842,7 +1842,7 @@ function switchTaskTab(tab) {
 
 function buildMyTasksTab(tasks) {
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
   const myTasks = tasks.filter(t => t.assignedTo === u.name || t.assignedBy === u.name);
 
   const overdue   = myTasks.filter(t => t.isOverdue && t.status !== 'Completed');
@@ -1990,7 +1990,7 @@ function twTaskCard(task, allTasks) {
           ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
           <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
           <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
-          ${['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
+          ${['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
         </div>
       ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
     </div>
@@ -2168,7 +2168,7 @@ async function viewPersonTasksFromOverview(name) {
   openPanel('📝 Tasks: ' + name, '<div class="loading"><div class="spinner"></div> Loading...</div>');
   const tasks = _allTasksCache.length ? _allTasksCache : await api('GET','/tasks');
   const myTasks = (tasks||[]).filter(t => t.assignedTo === name);
-  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead'].includes(APP.user.role);
+  const isLead = ['Admin','Ops Lead','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role);
 
   document.getElementById('panel-body').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
@@ -2628,7 +2628,7 @@ async function renderRenewals(){
 
   const u = APP.user;
   const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
-  const isAdmin = ['Admin','Ops Lead','CSI Lead'].includes(u.role);
+  const isAdmin = ['Admin','Ops Lead','CSI Lead','CSI Executive'].includes(u.role);
   const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
 
   const today = new Date(); today.setHours(0,0,0,0);

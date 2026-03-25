@@ -2640,13 +2640,16 @@ async function renderRenewals(){
 
   function amtCell(r){ return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—'; }
   function actionBtns(r){
-    return '<div style="display:flex;gap:4px;flex-wrap:wrap;">'+
-      (r.status!=='Confirmed'?'<button class="btn btn-sm btn-success" onclick="updateRenewal(''+r.renewalId+'','Confirmed')">✅</button>':'')+
-      (r.status!=='Lost'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-danger" onclick="updateRenewal(''+r.renewalId+'','Lost')">❌</button>':'')+
-      (r.status!=='Hold'&&r.status!=='Confirmed'?'<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" onclick="updateRenewal(''+r.renewalId+'','Hold')">⏸</button>':'')+
-      '<button class="btn btn-sm btn-outline" onclick="openEditRenewal(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">✏️</button>'+
-      (isCRM?'<button class="btn btn-sm btn-secondary" onclick="openRenewalPayment(''+r.renewalId+'',''+r.clientName.replace(/'/g,'').replace(/"/g,'')+'')">💰</button>':'')+
-    '</div>';
+    var rid = r.renewalId;
+    var rname = (r.clientName||"").replace(/['"]/g,"");
+    var html = '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    if(r.status!=="Confirmed") html += '<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
+    if(r.status!=="Lost"&&r.status!=="Confirmed") html += '<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
+    if(r.status!=="Hold"&&r.status!=="Confirmed") html += '<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
+    html += '<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
+    if(isCRM) html += '<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
+    html += '</div>';
+    return html;
   }
   function statusBadge(s){
     var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};

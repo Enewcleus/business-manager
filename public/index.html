@@ -1634,9 +1634,9 @@ async function renderCSI(){
       '<div class="card-header">'+
         '<span class="card-title">📊 CSI Status</span>'+
         '<div style="display:flex;gap:6px;align-items:center;">'+
-          '<button class="btn btn-sm btn-primary" onclick="setCsiFilter('all')">All</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" onclick="setCsiFilter('pending')">Pending</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" onclick="setCsiFilter('done')">Done</button>'+
+          '<button class="btn btn-sm btn-primary" onclick="setCsiFilter(\"all\")">All</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" onclick="setCsiFilter(\"pending\")">Pending</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" onclick="setCsiFilter(\"done\")">Done</button>'+
           (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
         '</div>'+
       '</div>'+

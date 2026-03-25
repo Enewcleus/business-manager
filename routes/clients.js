@@ -6,7 +6,7 @@ const { authMiddleware } = require('../middleware/auth');
 async function getFilteredClients(user) {
   const { role, name } = user;
 
-  if (['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+  if (['Admin', 'Ops Lead', 'CSI Lead', 'CSI Executive'].includes(role)) {
     const { data, error } = await supabase.from('clients').select('*').order('busy_name');
     if (error) throw error;
     return data || [];

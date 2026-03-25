@@ -425,6 +425,11 @@ const NAV_CONFIG = {
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
         {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
   ],
+  'CSI Executive': [
+    {id:'dashboard', label:'Dashboard', icon:'🏠'},
+    {id:'csi', label:'CSI Health', icon:'📊'},
+  ],
+
 };
 
 const QUICK_ACTIONS = {
@@ -1537,11 +1542,7 @@ async function renderCRM(){
         };
       });
     }
-  }, 
-  'CSI Executive': [
-    {id:'dashboard', label:'Dashboard', icon:'🏠'},
-    {id:'csi', label:'CSI Health', icon:'📊'},
-  ],
+  }
 }
 
 function renderCRMPage(clients,todayCalls){

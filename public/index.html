@@ -1349,7 +1349,7 @@ async function renderDashboard() {
         '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
         '<td>'+healthBadge(c.healthStatus)+'</td>'+
         '<td>'+renewalBadge(c.renewalDate)+'</td>'+
-        '<td><button class="btn btn-sm btn-outline" onclick="navigate('clients')">View</button></td>'+
+        '<td><button class="btn btn-sm btn-outline" onclick="navigate(\'clients\')">View</button></td>'+
       '</tr>';
     }).join('');
     alertCard.innerHTML = '<div class="card-header"><span class="card-title">⚠️ Attention Needed ('+( myAtRisk.length+myWarning.length)+')</span>'+

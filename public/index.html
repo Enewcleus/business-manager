@@ -1332,7 +1332,7 @@ async function renderDashboard() {
       '</tr>';
     }).join('');
     tasksCard.innerHTML = '<div class="card-header"><span class="card-title">📋 My Pending Tasks ('+myPendingTasks.length+')</span>'+
-      '<button class="btn btn-sm btn-outline" onclick="navigate('tasks')">View All</button></div>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigate(\'tasks\')">View All</button></div>'+
       '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
       '<thead><tr><th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th></tr></thead>'+
       '<tbody>'+taskRows+'</tbody></table></div></div>';
@@ -1353,7 +1353,7 @@ async function renderDashboard() {
       '</tr>';
     }).join('');
     alertCard.innerHTML = '<div class="card-header"><span class="card-title">⚠️ Attention Needed ('+( myAtRisk.length+myWarning.length)+')</span>'+
-      '<button class="btn btn-sm btn-outline" onclick="navigate('clients')">View All</button></div>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigate(\'clients\')">View All</button></div>'+
       '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
       '<thead><tr><th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th><th></th></tr></thead>'+
       '<tbody>'+alertRows+'</tbody></table></div></div>';

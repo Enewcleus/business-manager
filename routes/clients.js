@@ -10,12 +10,6 @@ async function getFilteredClients(user) {
   const marketplaceFilter = user.marketplaceAccess && user.marketplaceAccess.length > 0 
     ? user.marketplaceAccess : null;
 
-  async function applyMarketplaceFilter(query) {
-    if (!marketplaceFilter) return query;
-    // Filter by marketplace
-    return query.in('marketplace', marketplaceFilter);
-  }
-
   if (['Admin', 'Ops Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin'].includes(role)) {
     let query = supabase.from('clients').select('*').order('busy_name');
     if (marketplaceFilter) query = query.in('marketplace', marketplaceFilter);
@@ -29,9 +23,9 @@ async function getFilteredClients(user) {
   }
 
   if (role === 'Account Manager') {
-    let q = supabase.from('clients').select('*').ilike('am_name', name).order('busy_name');
-    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
-    const { data, error } = await q;
+    let amQ = supabase.from('clients').select('*').ilike('am_name', name).order('busy_name');
+    if (marketplaceFilter) amQ = amQ.in('marketplace', marketplaceFilter);
+    const { data, error } = await amQ;
     if (error) throw error;
     return data || [];
   }

@@ -1933,7 +1933,7 @@ function showCSIHistory(btn){
       '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
       '<td style="font-size:12px;">'+trend+'</td>'+
       '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
-      '<td style="font-size:11px;max-width:200px;">'+(r.remarks?'<span style="color:var(--text);cursor:pointer;" title="'+r.remarks+'">'+r.remarks.slice(0,50)+(r.remarks.length>50?'...':'')+'</span>':'—')+'</td>'+
+      '<td style="font-size:12px;max-width:250px;">'+( r.remarks?'<div style="line-height:1.5;white-space:pre-wrap;">'+r.remarks+'</div>':'—')+'</td>'+
     '</tr>';
   });
 

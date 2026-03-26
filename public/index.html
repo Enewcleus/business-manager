@@ -1231,38 +1231,260 @@ function draw360Charts(dsrData) {
 
 // ── DASHBOARD ────────────────────────────────────────────────
 async function renderDashboard() {
-  const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
+  const u = APP.user;
+  const isAdmin = ['Admin','Sub Admin','Ops Lead'].includes(u.role);
+
+  // Load user widget preferences from localStorage
+  const prefKey = 'dash_widgets_' + u.name;
+  const defaultWidgets = ['health','tasks','renewals','tickets','dsr','crm'];
+  let activeWidgets = JSON.parse(localStorage.getItem(prefKey) || 'null') || defaultWidgets;
+
+  // Load data
+  const [dash, allTasks, clients, dsrStatus] = await Promise.all([
+    api('GET','/dashboard'),
+    api('GET','/tasks'),
+    getClients(),
+    api('GET','/dsr/today-status'),
+  ]);
+  const team = isAdmin ? (await api('GET','/dashboard/team') || []) : [];
+  const crmCalls = await api('GET','/crm/today') || [];
+
   if(!dash) return;
-  const u=APP.user,isLead=['Admin','Ops Lead','Sub Admin','CSI Lead','CSI Executive'].includes(u.role);
-  document.getElementById('page-content').innerHTML=`
-    <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash.totalClients}</div><div class="kpi-sub">${dash.active} Active</div></div>
-      <div class="kpi-card green"><div class="kpi-label">🟢 Healthy</div><div class="kpi-value">${dash.healthy}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">🟡 Warning</div><div class="kpi-value">${dash.warning}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">🔴 At Risk</div><div class="kpi-value">${dash.atRisk}</div></div>
-      <div class="kpi-card orange"><div class="kpi-label">Open Tickets</div><div class="kpi-value">${dash.openTickets}</div></div>
-      <div class="kpi-card purple"><div class="kpi-label">Renewals Due</div><div class="kpi-value">${dash.renewalsDue}</div><div class="kpi-sub">≤15 days</div></div>
-    </div>
-    ${isLead&&team?.length?`
-    <div class="card">
-      <div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
-        <tbody>${team.map(e=>`<tr><td><strong>${e.name}</strong></td><td><span class="badge badge-blue">${e.role}</span></td><td><strong>${e.todayActivity}</strong></td><td>${e.ticketsClosed}</td><td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>'}</td></tr>`).join('')}</tbody>
-      </table></div></div>
-    </div>`:`
-    <div class="card">
-      <div class="card-header"><span class="card-title">⚡ Quick Start</span></div>
-      <div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="navigate('tasks')">📝 My Tasks</button>
-        <button class="btn btn-secondary" onclick="navigate('clients')">👥 My Clients</button>
-        <button class="btn btn-outline" onclick="navigate('crm')">📞 Log Call</button>
-        <button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>
-      </div></div>
-    </div>`}`;
+  if(clients && clients.length) APP.clients = clients;
+
+  const mySellers = isAdmin ? (clients||[]) : (clients||[]).filter(c =>
+    (c.amName||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.adsManager||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
+  const myTasks = (allTasks||[]).filter(t =>
+    t.status !== 'Completed' &&
+    ((t.assignedTo||'').toLowerCase().includes(u.name.toLowerCase()) ||
+     (t.assignedBy||'').toLowerCase().includes(u.name.toLowerCase()))
+  );
+  const myRenewals = mySellers.filter(c => {
+    if(!c.renewalDate) return false;
+    const d = new Date(c.renewalDate); const today = new Date();
+    return d >= today && (d-today)/(1000*60*60*24) <= 30;
+  });
+  const myAtRisk   = mySellers.filter(c => c.healthStatus === 'At Risk');
+  const myWarning  = mySellers.filter(c => c.healthStatus === 'Warning');
+  const myHealthy  = mySellers.filter(c => c.healthStatus === 'Healthy');
+  const dsrPending = (dsrStatus && dsrStatus.pending) ? dsrStatus.pending : [];
+  const myCrmToday = crmCalls.filter(c =>
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
+
+  const pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // ── Customize button ──
+  var topBar = document.createElement('div');
+  topBar.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:8px;';
+  var custBtn = document.createElement('button');
+  custBtn.className = 'btn btn-sm btn-outline';
+  custBtn.textContent = '⚙️ Customize Dashboard';
+  custBtn.onclick = function(){ openDashboardCustomize(activeWidgets, prefKey); };
+  topBar.appendChild(custBtn);
+  pc.appendChild(topBar);
+
+  // ── KPI Grid ──
+  var kpiDiv = document.createElement('div');
+  kpiDiv.className = 'kpi-grid';
+  var kpis = isAdmin ? [
+    {cls:'blue',  label:'Total Clients',  val:dash.totalClients, sub:dash.active+' Active'},
+    {cls:'green', label:'🟢 Healthy',      val:dash.healthy},
+    {cls:'amber', label:'🟡 Warning',      val:dash.warning},
+    {cls:'red',   label:'🔴 At Risk',      val:dash.atRisk},
+    {cls:'orange',label:'Open Tickets',   val:dash.openTickets},
+    {cls:'purple',label:'Renewals Due',   val:dash.renewalsDue, sub:'≤30 days'},
+  ] : [
+    {cls:'blue',  label:'My Sellers',     val:mySellers.length},
+    {cls:'green', label:'🟢 Healthy',      val:myHealthy.length},
+    {cls:'amber', label:'🟡 Warning',      val:myWarning.length},
+    {cls:'red',   label:'🔴 At Risk',      val:myAtRisk.length},
+    {cls:'orange',label:'⏳ Pending Tasks',val:myTasks.length},
+    {cls:'purple',label:'🔄 Renewals',     val:myRenewals.length, sub:'≤30 days'},
+  ];
+  kpis.forEach(function(k){
+    var d = document.createElement('div');
+    d.className = 'kpi-card ' + k.cls;
+    d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>'+(k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'');
+    kpiDiv.appendChild(d);
+  });
+  pc.appendChild(kpiDiv);
+
+  // ── Admin Team Performance ──
+  if(isAdmin && team.length) {
+    var teamCard = document.createElement('div');
+    teamCard.className = 'card';
+    teamCard.innerHTML = '<div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>'+
+      '<tbody>'+team.map(function(e){
+        return '<tr style="'+(e.performanceScore==='No Activity'?'background:#fdf2f2;':'')+'">'+
+          '<td><strong>'+e.name+'</strong></td>'+
+          '<td><span class="badge badge-blue">'+e.role+'</span></td>'+
+          '<td><strong>'+e.todayActivity+'</strong></td>'+
+          '<td>'+e.ticketsClosed+'</td>'+
+          '<td>'+(e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>')+'</td>'+
+        '</tr>';
+      }).join('')+'</tbody></table></div></div>';
+    pc.appendChild(teamCard);
+  }
+
+  // ── Widget: Sellers Health ──
+  if(activeWidgets.includes('health') && !isAdmin && (myAtRisk.length||myWarning.length)){
+    var w = dashWidget('⚠️ Attention Needed ('+(myAtRisk.length+myWarning.length)+')', 'View All Clients', 'clients');
+    var rows = [...myAtRisk,...myWarning].slice(0,6).map(function(c){
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+healthBadge(c.healthStatus)+'</td><td>'+renewalBadge(c.renewalDate)+'</td></tr>';
+    }).join('');
+    w.querySelector('tbody').innerHTML = rows;
+    w.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th>';
+    pc.appendChild(w);
+  }
+
+  // ── Widget: Pending Tasks ──
+  if(activeWidgets.includes('tasks') && myTasks.length){
+    var w2 = dashWidget('📋 My Pending Tasks ('+myTasks.length+')', 'View All Tasks', 'tasks');
+    var overdueCount = myTasks.filter(function(t){return t.isOverdue;}).length;
+    if(overdueCount) w2.querySelector('.card-title').innerHTML += ' <span class="badge badge-red">'+overdueCount+' overdue</span>';
+    var rows2 = myTasks.slice(0,5).map(function(t){
+      return '<tr style="'+(t.isOverdue?'background:#fdf2f2;':'')+'">'+
+        '<td><strong>'+t.title+'</strong>'+(t.clientName?'<br><small style="color:var(--text-muted);">'+t.clientName+'</small>':'')+'</td>'+
+        '<td><span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span></td>'+
+        '<td>'+(t.isOverdue?'<span style="color:var(--red);font-weight:600;">OVERDUE</span>':t.deadline||'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(t.assignedBy===u.name?'→ '+t.assignedTo:'From: '+t.assignedBy)+'</td>'+
+      '</tr>';
+    }).join('');
+    w2.querySelector('tbody').innerHTML = rows2;
+    w2.querySelector('thead tr').innerHTML = '<th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th>';
+    pc.appendChild(w2);
+  }
+
+  // ── Widget: Renewals Due ──
+  if(activeWidgets.includes('renewals') && myRenewals.length){
+    var w3 = dashWidget('🔄 Renewals Due in 30 Days ('+myRenewals.length+')', 'View Renewals', 'renewals');
+    var rows3 = myRenewals.slice(0,5).map(function(c){
+      var daysLeft = Math.ceil((new Date(c.renewalDate)-new Date())/(1000*60*60*24));
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+c.renewalDate+'</td><td><strong style="color:'+(daysLeft<=7?'var(--red)':'var(--amber)')+';">'+daysLeft+'d</strong></td></tr>';
+    }).join('');
+    w3.querySelector('tbody').innerHTML = rows3;
+    w3.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Renewal Date</th><th>Days Left</th>';
+    pc.appendChild(w3);
+  }
+
+  // ── Widget: DSR Alerts ──
+  if(activeWidgets.includes('dsr') && dsrPending.length){
+    var w4 = dashWidget('📈 DSR Pending Today ('+dsrPending.length+')', 'Fill DSR', 'dsr');
+    var rows4 = dsrPending.slice(0,5).map(function(c){
+      return '<tr><td><strong>'+(c.busy_name||c.client_code)+'</strong></td>'+
+        '<td><span class="badge badge-blue">'+(c.marketplace||'—')+'</span></td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(c.ads_manager||'—')+'</td></tr>';
+    }).join('');
+    w4.querySelector('tbody').innerHTML = rows4;
+    w4.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Ads Manager</th>';
+    pc.appendChild(w4);
+  }
+
+  // ── Widget: CRM Calls Today ──
+  if(activeWidgets.includes('crm')){
+    var connected = myCrmToday.filter(function(c){return (c.callOutcome||'').includes('Connected');}).length;
+    var w5 = dashWidget('📞 My CRM Calls Today ('+myCrmToday.length+')', 'Log Call', 'crm');
+    if(myCrmToday.length){
+      var rows5 = myCrmToday.slice(0,5).map(function(c){
+        return '<tr><td><strong>'+c.clientName+'</strong></td>'+
+          '<td><span class="badge '+(c.callOutcome&&c.callOutcome.includes('Connected')?'badge-green':'badge-amber')+'">'+( c.callOutcome||'—')+'</span></td>'+
+          '<td style="font-size:11px;color:var(--text-muted);">'+(c.notes||'—')+'</td></tr>';
+      }).join('');
+      w5.querySelector('tbody').innerHTML = rows5;
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+      w5.querySelector('.card-title').innerHTML += ' <span class="badge badge-green">'+connected+' connected</span>';
+    } else {
+      w5.querySelector('tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px;">Aaj koi call nahi ki abhi</td></tr>';
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+    }
+    pc.appendChild(w5);
+  }
+
+  // ── Quick Start (if no active widgets show content) ──
+  if(!myTasks.length && !myAtRisk.length && !myWarning.length && !myRenewals.length && !isAdmin){
+    var qc = document.createElement('div');
+    qc.className = 'card';
+    qc.innerHTML = '<div class="card-header"><span class="card-title">⚡ Quick Start</span></div>'+
+      '<div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">'+
+        '<button class="btn btn-primary" onclick="navigateTo(\'tasks\')">📝 My Tasks</button>'+
+        '<button class="btn btn-secondary" onclick="navigateTo(\'clients\')">👥 My Clients</button>'+
+        '<button class="btn btn-outline" onclick="navigateTo(\'crm\')">📞 Log Call</button>'+
+        '<button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>'+
+      '</div></div>';
+    pc.appendChild(qc);
+  }
 }
 
-// ── CLIENTS ──────────────────────────────────────────────────
+function dashWidget(title, linkLabel, linkPage) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginBottom = '12px';
+  card.innerHTML =
+    '<div class="card-header">'+
+      '<span class="card-title">'+title+'</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigateTo(\''+linkPage+'\')">'+linkLabel+' →</button>'+
+    '</div>'+
+    '<div class="card-body" style="padding:0;">'+
+      '<div class="table-wrap"><table>'+
+        '<thead><tr></tr></thead><tbody></tbody>'+
+      '</table></div>'+
+    '</div>';
+  return card;
+}
+
+function openDashboardCustomize(activeWidgets, prefKey) {
+  var allWidgets = [
+    {id:'health',   label:'⚠️ Sellers Health (At Risk/Warning)'},
+    {id:'tasks',    label:'📋 My Pending Tasks'},
+    {id:'renewals', label:'🔄 Renewals Due (30 days)'},
+    {id:'tickets',  label:'🎫 Open Tickets'},
+    {id:'dsr',      label:'📈 DSR Pending Today'},
+    {id:'crm',      label:'📞 CRM Calls Today'},
+  ];
+  openPanel('⚙️ Customize Dashboard',
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Jo widgets chahiye unhe select karo — sirf tumhara dashboard change hoga</div>'+
+    allWidgets.map(function(w){
+      var checked = activeWidgets.includes(w.id) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;cursor:pointer;">'+
+        '<input type="checkbox" id="dw-'+w.id+'" '+checked+' style="width:18px;height:18px;">'+
+        '<span style="font-size:14px;">'+w.label+'</span></label>';
+    }).join('')+
+    '<button class="btn btn-primary btn-full" style="margin-top:8px;" data-pk="'+prefKey+'" onclick="saveDashboardWidgets(this.getAttribute(\'data-pk\'))">💾 Save & Refresh</button>'+
+    '<button class="btn btn-outline btn-full" style="margin-top:8px;" data-pk="'+prefKey+'" onclick="resetDashboardWidgets(this.getAttribute(\'data-pk\'))">🔄 Reset Default</button>'
+  );
+}
+
+function saveDashboardWidgets(prefKey) {
+  var all = ['health','tasks','renewals','tickets','dsr','crm'];
+  var selected = all.filter(function(id){
+    var el = document.getElementById('dw-'+id);
+    return el && el.checked;
+  });
+  localStorage.setItem(prefKey, JSON.stringify(selected));
+  showToast('✅ Dashboard saved!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+function resetDashboardWidgets(prefKey) {
+  localStorage.removeItem(prefKey);
+  showToast('Dashboard reset!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+
+function navigateTo(page){ navigate(page); }
+
 async function renderClients() {
   const clients=await getClients();if(!clients) return;
   APP.clients=clients; renderClientsUI(clients);

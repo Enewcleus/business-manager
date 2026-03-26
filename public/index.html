@@ -1508,8 +1508,8 @@ function viewTicketDetail(el){
     (t.resolutionNote?'<div style="font-weight:600;margin-bottom:6px;">✅ Resolution:</div><div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;">'+t.resolutionNote+'</div>':'')+
     (t.status!=='Done'?
       '<div style="display:flex;gap:8px;margin-top:12px;">'+
-        (t.status==='Open'?'<button class="btn btn-outline" onclick="updateTicket(''+t.ticketId+'','In Progress');closePanel()">▶ Accept</button>':'')+
-        (t.status==='In Progress'?'<button class="btn btn-success" onclick="promptCloseTicket(''+t.ticketId+'',''+t.clientName.replace(/'/g,'')+'');closePanel()">✅ Mark Done</button>':'')+
+        (t.status==='Open'?'<button class="btn btn-outline" data-tid="'+t.ticketId+'" onclick="var b=this;updateTicket(b.getAttribute(\'data-tid\'),\'In Progress\');closePanel()">▶ Accept</button>':'')+
+        (t.status==='In Progress'?'<button class="btn btn-success" data-tid="'+t.ticketId+'" data-cn="'+t.clientName.replace(/['\'"]/g,'')+' " onclick="var b=this;promptCloseTicket(b.getAttribute(\'data-tid\'),b.getAttribute(\'data-cn\'));closePanel()">✅ Mark Done</button>':'')+
       '</div>':'')
   );
 }

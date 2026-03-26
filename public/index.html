@@ -1231,35 +1231,148 @@ function draw360Charts(dsrData) {
 
 // ── DASHBOARD ────────────────────────────────────────────────
 async function renderDashboard() {
-  const [dash,team]=await Promise.all([api('GET','/dashboard'),api('GET','/dashboard/team')]);
+  const u = APP.user;
+  const isAdmin = ['Admin','Sub Admin','Ops Lead'].includes(u.role);
+
+  // Load data in parallel
+  const promises = [api('GET','/dashboard'), api('GET','/tasks'), api('GET','/clients')];
+  if(isAdmin) promises.push(api('GET','/dashboard/team'));
+  const results = await Promise.all(promises);
+  const dash = results[0];
+  const allTasks = results[1] || [];
+  const clients = results[2] || [];
+  const team = isAdmin ? (results[3] || []) : [];
+
   if(!dash) return;
-  const u=APP.user,isLead=['Admin','Ops Lead','Sub Admin','CSI Lead','CSI Executive'].includes(u.role);
-  document.getElementById('page-content').innerHTML=`
-    <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">${dash.totalClients}</div><div class="kpi-sub">${dash.active} Active</div></div>
-      <div class="kpi-card green"><div class="kpi-label">🟢 Healthy</div><div class="kpi-value">${dash.healthy}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">🟡 Warning</div><div class="kpi-value">${dash.warning}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">🔴 At Risk</div><div class="kpi-value">${dash.atRisk}</div></div>
-      <div class="kpi-card orange"><div class="kpi-label">Open Tickets</div><div class="kpi-value">${dash.openTickets}</div></div>
-      <div class="kpi-card purple"><div class="kpi-label">Renewals Due</div><div class="kpi-value">${dash.renewalsDue}</div><div class="kpi-sub">≤15 days</div></div>
-    </div>
-    ${isLead&&team?.length?`
-    <div class="card">
-      <div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>
-        <tbody>${team.map(e=>`<tr><td><strong>${e.name}</strong></td><td><span class="badge badge-blue">${e.role}</span></td><td><strong>${e.todayActivity}</strong></td><td>${e.ticketsClosed}</td><td>${e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>'}</td></tr>`).join('')}</tbody>
-      </table></div></div>
-    </div>`:`
-    <div class="card">
-      <div class="card-header"><span class="card-title">⚡ Quick Start</span></div>
-      <div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="navigate('tasks')">📝 My Tasks</button>
-        <button class="btn btn-secondary" onclick="navigate('clients')">👥 My Clients</button>
-        <button class="btn btn-outline" onclick="navigate('crm')">📞 Log Call</button>
-        <button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>
-      </div></div>
-    </div>`}`;
+  if(clients.length) APP.clients = clients;
+
+  // My pending tasks
+  const myPendingTasks = allTasks.filter(t =>
+    t.status !== 'Completed' &&
+    ((t.assignedTo||'').toLowerCase().includes(u.name.toLowerCase()) ||
+     (t.assignedBy||'').toLowerCase().includes(u.name.toLowerCase()))
+  );
+  const overdueTask = myPendingTasks.filter(t => t.isOverdue);
+
+  // My sellers
+  const mySellers = isAdmin ? clients : clients.filter(c =>
+    (c.amName||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.adsManager||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
+  const myAtRisk   = mySellers.filter(c => c.healthStatus === 'At Risk');
+  const myWarning  = mySellers.filter(c => c.healthStatus === 'Warning');
+  const myRenewals = mySellers.filter(c => {
+    if(!c.renewalDate) return false;
+    const d = new Date(c.renewalDate); const today = new Date();
+    return d >= today && (d-today)/(1000*60*60*24) <= 30;
+  });
+  const myTickets = allTasks.filter ? [] : [];
+
+  const pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // ── KPI Grid ──
+  const kpiDiv = document.createElement('div');
+  kpiDiv.className = 'kpi-grid';
+
+  const kpis = isAdmin ? [
+    {cls:'blue',  label:'Total Clients',   val:dash.totalClients, sub:dash.active+' Active'},
+    {cls:'green', label:'🟢 Healthy',       val:dash.healthy},
+    {cls:'amber', label:'🟡 Warning',       val:dash.warning},
+    {cls:'red',   label:'🔴 At Risk',       val:dash.atRisk},
+    {cls:'orange',label:'Open Tickets',     val:dash.openTickets},
+    {cls:'purple',label:'Renewals Due',     val:dash.renewalsDue, sub:'≤30 days'},
+  ] : [
+    {cls:'blue',  label:'My Sellers',       val:mySellers.length, sub:'Assigned to me'},
+    {cls:'red',   label:'🔴 At Risk',        val:myAtRisk.length,  sub:'Need attention', link:'clients'},
+    {cls:'amber', label:'🟡 Warning',        val:myWarning.length, sub:'Monitor closely', link:'clients'},
+    {cls:'orange',label:'⏳ Pending Tasks',  val:myPendingTasks.length, sub:overdueTask.length+' overdue', link:'tasks'},
+    {cls:'purple',label:'🔄 Renewals (30d)', val:myRenewals.length, sub:'Due soon', link:'renewals'},
+  ];
+
+  kpis.forEach(function(k){
+    var d = document.createElement('div');
+    d.className = 'kpi-card ' + k.cls;
+    if(k.link){ d.style.cursor='pointer'; d.onclick=function(){navigate(k.link);}; }
+    d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>'+(k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'');
+    kpiDiv.appendChild(d);
+  });
+  pc.appendChild(kpiDiv);
+
+  // ── Admin: Team Performance ──
+  if(isAdmin && team.length) {
+    var teamCard = document.createElement('div');
+    teamCard.className = 'card';
+    teamCard.innerHTML = '<div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>'+
+      '<tbody>'+team.map(function(e){
+        return '<tr style="'+(e.performanceScore==='No Activity'?'background:#fdf2f2;':'')+'">'+
+          '<td><strong>'+e.name+'</strong></td>'+
+          '<td><span class="badge badge-blue">'+e.role+'</span></td>'+
+          '<td><strong>'+e.todayActivity+'</strong></td>'+
+          '<td>'+e.ticketsClosed+'</td>'+
+          '<td>'+(e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>')+'</td>'+
+        '</tr>';
+      }).join('')+'</tbody></table></div></div>';
+    pc.appendChild(teamCard);
+  }
+
+  // ── My Pending Tasks ──
+  if(myPendingTasks.length) {
+    var tasksCard = document.createElement('div');
+    tasksCard.className = 'card';
+    var taskRows = myPendingTasks.slice(0,5).map(function(t){
+      return '<tr style="'+(t.isOverdue?'background:#fdf2f2;':'')+'">'+
+        '<td><strong>'+t.title+'</strong>'+(t.clientName?'<br><small style="color:var(--text-muted);">'+t.clientName+'</small>':'')+'</td>'+
+        '<td><span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span></td>'+
+        '<td>'+(t.isOverdue?'<span style="color:var(--red);font-weight:600;">🔴 OVERDUE</span>':t.deadline?t.deadline:'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(t.assignedBy===u.name?'By me → '+t.assignedTo:'From: '+t.assignedBy)+'</td>'+
+      '</tr>';
+    }).join('');
+    tasksCard.innerHTML = '<div class="card-header"><span class="card-title">📋 My Pending Tasks ('+myPendingTasks.length+')</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigate('tasks')">View All</button></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th></tr></thead>'+
+      '<tbody>'+taskRows+'</tbody></table></div></div>';
+    pc.appendChild(tasksCard);
+  }
+
+  // ── My At Risk / Warning Sellers ──
+  if(!isAdmin && (myAtRisk.length || myWarning.length)) {
+    var alertCard = document.createElement('div');
+    alertCard.className = 'card';
+    var alertRows = [...myAtRisk, ...myWarning].slice(0,8).map(function(c){
+      return '<tr>'+
+        '<td><strong>'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
+        '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+healthBadge(c.healthStatus)+'</td>'+
+        '<td>'+renewalBadge(c.renewalDate)+'</td>'+
+        '<td><button class="btn btn-sm btn-outline" onclick="navigate('clients')">View</button></td>'+
+      '</tr>';
+    }).join('');
+    alertCard.innerHTML = '<div class="card-header"><span class="card-title">⚠️ Attention Needed ('+( myAtRisk.length+myWarning.length)+')</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigate('clients')">View All</button></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th><th></th></tr></thead>'+
+      '<tbody>'+alertRows+'</tbody></table></div></div>';
+    pc.appendChild(alertCard);
+  }
+
+  // ── Quick Start (if no tasks/sellers) ──
+  if(!myPendingTasks.length && !myAtRisk.length && !myWarning.length && !isAdmin) {
+    var quickCard = document.createElement('div');
+    quickCard.className = 'card';
+    quickCard.innerHTML = '<div class="card-header"><span class="card-title">⚡ Quick Start</span></div>'+
+      '<div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">'+
+        '<button class="btn btn-primary" onclick="navigate('tasks')">📝 My Tasks</button>'+
+        '<button class="btn btn-secondary" onclick="navigate('clients')">👥 My Clients</button>'+
+        '<button class="btn btn-outline" onclick="navigate('crm')">📞 Log Call</button>'+
+        '<button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>'+
+      '</div></div>';
+    pc.appendChild(quickCard);
+  }
 }
 
 // ── CLIENTS ──────────────────────────────────────────────────

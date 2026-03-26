@@ -1663,19 +1663,19 @@ async function renderCSI(){
 
   document.getElementById('page-content').innerHTML =
     '<div class="kpi-grid">'+
-      '<div class="kpi-card blue" style="cursor:pointer;" onclick="csiSetFilter('all')"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
-      '<div class="kpi-card green" style="cursor:pointer;" onclick="csiSetFilter('done')"><div class="kpi-label">✅ Done</div><div class="kpi-value">'+reviewed+'</div></div>'+
-      '<div class="kpi-card red" style="cursor:pointer;" onclick="csiSetFilter('pending')"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">'+notDone+'</div></div>'+
-      '<div class="kpi-card amber" style="cursor:pointer;" onclick="csiSetFilter('low')"><div class="kpi-label">⚠️ Low Score</div><div class="kpi-value">'+lowScore+'</div></div>'+
+      '<div class="kpi-card blue" style="cursor:pointer;" data-f="all" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
+      '<div class="kpi-card green" style="cursor:pointer;" data-f="done" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">✅ Done</div><div class="kpi-value">'+reviewed+'</div></div>'+
+      '<div class="kpi-card red" style="cursor:pointer;" data-f="pending" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">'+notDone+'</div></div>'+
+      '<div class="kpi-card amber" style="cursor:pointer;" data-f="low" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">⚠️ Low Score</div><div class="kpi-value">'+lowScore+'</div></div>'+
     '</div>'+
     '<div class="card">'+
       '<div class="card-header">'+
         '<span class="card-title">📊 CSI Health</span>'+
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-outline" id="csi-btn-all" onclick="csiSetFilter('all')">All</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="csi-btn-pending" onclick="csiSetFilter('pending')">⏳ Pending</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" id="csi-btn-done" onclick="csiSetFilter('done')">✅ Done</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="csi-btn-low" onclick="csiSetFilter('low')">⚠️ Low Score</button>'+
+          '<button class="btn btn-sm btn-outline" id="csi-btn-all" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="all">All</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="csi-btn-pending" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="pending">⏳ Pending</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" id="csi-btn-done" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="done">✅ Done</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="csi-btn-low" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="low">⚠️ Low Score</button>'+
           '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-from" value="'+monthAgo+'" onchange="window._csiDateFrom=this.value;buildCSITable()">'+
           '<span style="font-size:12px;">to</span>'+
           '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-to" value="'+today+'" onchange="window._csiDateTo=this.value;buildCSITable()">'+

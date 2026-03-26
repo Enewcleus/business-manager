@@ -2,69 +2,63 @@ const router = require('express').Router();
 const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
-// ── Role-based client filtering ───────────────────────────────
 async function getFilteredClients(user) {
   const { role, name } = user;
-
-  // Check marketplace_access restriction (for Sub Admin and their team)
-  const marketplaceFilter = user.marketplaceAccess && user.marketplaceAccess.length > 0 
+  const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
     ? user.marketplaceAccess : null;
 
   if (['Admin', 'Ops Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin'].includes(role)) {
-    let query = supabase.from('clients').select('*').order('busy_name');
-    if (marketplaceFilter) query = query.in('marketplace', marketplaceFilter);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  }
-    const { data, error } = await supabase.from('clients').select('*').order('busy_name');
+    let q = supabase.from('clients').select('*').order('busy_name');
+    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   }
 
   if (role === 'Account Manager') {
-    let amQ = supabase.from('clients').select('*').ilike('am_name', name).order('busy_name');
-    if (marketplaceFilter) amQ = amQ.in('marketplace', marketplaceFilter);
-    const { data, error } = await amQ;
+    let q = supabase.from('clients').select('*').ilike('am_name', `%${name}%`).order('busy_name');
+    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   }
 
   if (role === 'CRM Executive') {
-    const { data, error } = await supabase.from('clients').select('*')
-      .ilike('crm_executive', name).order('busy_name');
+    let q = supabase.from('clients').select('*').ilike('crm_executive', `%${name}%`).order('busy_name');
+    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   }
 
   if (role === 'Ads Executive') {
-    const { data, error } = await supabase.from('clients').select('*')
-      .ilike('ads_manager', name).order('busy_name');
+    let q = supabase.from('clients').select('*').ilike('ads_manager', `%${name}%`).order('busy_name');
+    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   }
 
   if (['SME', 'Team Lead', 'Senior Executive'].includes(role)) {
     const { data: teamMembers } = await supabase
-      .from('users')
-      .select('name, role')
-      .ilike('reporting_to_name', `%${name}%`)
-      .eq('is_active', true);
-
+      .from('users').select('name, role')
+      .ilike('reporting_to_name', `%${name}%`).eq('is_active', true);
     const teamNames = [name, ...(teamMembers || []).map(m => m.name)];
     const orFilter = teamNames.map(n =>
       `am_name.ilike.%${n}%,ads_manager.ilike.%${n}%,crm_executive.ilike.%${n}%`
     ).join(',');
-
-    const { data, error } = await supabase.from('clients').select('*')
-      .or(orFilter).order('busy_name');
+    let q = supabase.from('clients').select('*').or(orFilter).order('busy_name');
+    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   }
 
-  const { data, error } = await supabase.from('clients').select('*')
+  let q = supabase.from('clients').select('*')
     .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
     .order('busy_name');
+  if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
+  const { data, error } = await q;
   if (error) throw error;
   return data || [];
 }
@@ -86,12 +80,11 @@ function formatClient(c) {
     sellerBudget: c.seller_budget,
     lastUpdated: c.last_updated ? new Date(c.last_updated).toLocaleString('en-IN') : '',
     notes: c.notes,
-    phone: c.phone || '',       // ✅ NEW
-    contactNumber: c.phone || '', // ✅ alias for compatibility
+    phone: c.phone || '',
+    contactNumber: c.phone || '',
   };
 }
 
-// GET /api/clients
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const data = await getFilteredClients(req.user);
@@ -101,7 +94,6 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/clients
 router.post('/', authMiddleware, async (req, res) => {
   const d = req.body;
   const clientCode = 'CLT' + Date.now().toString().slice(-6);
@@ -110,33 +102,30 @@ router.post('/', authMiddleware, async (req, res) => {
     am_name: d.amName, ads_manager: d.adsManager, crm_executive: d.crmExecutive,
     status: 'Active', service_plan: d.servicePlan,
     renewal_date: d.renewalDate || null, health_status: 'Healthy',
-    phone: d.phone || null,   // ✅ NEW
-    added_by: req.user.name,
+    phone: d.phone || null, added_by: req.user.name,
   });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, clientCode });
 });
 
-// PATCH /api/clients/:code  ✅ full edit support
 router.patch('/:code', authMiddleware, async (req, res) => {
   const { busyName, marketplace, amName, adsManager, crmExecutive,
           servicePlan, renewalDate, status, phone } = req.body;
   const updates = { last_updated: new Date() };
-  if (busyName !== undefined)      updates.busy_name      = busyName;
-  if (marketplace !== undefined)   updates.marketplace    = marketplace;
-  if (amName !== undefined)        updates.am_name        = amName;
-  if (adsManager !== undefined)    updates.ads_manager    = adsManager;
-  if (crmExecutive !== undefined)  updates.crm_executive  = crmExecutive;
-  if (servicePlan !== undefined)   updates.service_plan   = servicePlan;
-  if (renewalDate !== undefined)   updates.renewal_date   = renewalDate || null;
-  if (status !== undefined)        updates.status         = status;
-  if (phone !== undefined)         updates.phone          = phone || null; // ✅ NEW
+  if (busyName !== undefined)     updates.busy_name     = busyName;
+  if (marketplace !== undefined)  updates.marketplace   = marketplace;
+  if (amName !== undefined)       updates.am_name       = amName;
+  if (adsManager !== undefined)   updates.ads_manager   = adsManager;
+  if (crmExecutive !== undefined) updates.crm_executive = crmExecutive;
+  if (servicePlan !== undefined)  updates.service_plan  = servicePlan;
+  if (renewalDate !== undefined)  updates.renewal_date  = renewalDate || null;
+  if (status !== undefined)       updates.status        = status;
+  if (phone !== undefined)        updates.phone         = phone || null;
   const { error } = await supabase.from('clients').update(updates).eq('client_code', req.params.code);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
-// PUT /api/clients/:code
 router.put('/:code', authMiddleware, async (req, res) => {
   const d = req.body;
   const { error } = await supabase.from('clients').update({
@@ -150,7 +139,6 @@ router.put('/:code', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/clients/:code/timeline
 router.get('/:code/timeline', authMiddleware, async (req, res) => {
   const cc = req.params.code;
   const [crmCalls, tickets, csiData, tasks] = await Promise.all([
@@ -160,19 +148,16 @@ router.get('/:code/timeline', authMiddleware, async (req, res) => {
     supabase.from('tasks').select('*').eq('client_code', cc).order('created_at', { ascending: false }).limit(10),
   ]);
   res.json({
-    crmCalls: crmCalls.data || [],
-    tickets: tickets.data || [],
-    csiData: csiData.data || [],
-    tasks: tasks.data || [],
+    crmCalls: crmCalls.data || [], tickets: tickets.data || [],
+    csiData: csiData.data || [], tasks: tasks.data || [],
   });
 });
 
-// POST /api/clients/:code/quick-action
 router.post('/:code/quick-action', authMiddleware, async (req, res) => {
   const { action } = req.body;
   const updates = {};
   if (action === 'mark-healthy') updates.health_status = 'Healthy';
-  if (action === 'mark-atrisk') updates.health_status = 'At Risk';
+  if (action === 'mark-atrisk')  updates.health_status = 'At Risk';
   if (action === 'mark-warning') updates.health_status = 'Warning';
   if (Object.keys(updates).length) {
     updates.last_updated = new Date();
@@ -181,39 +166,35 @@ router.post('/:code/quick-action', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// DELETE /api/clients/:code
 router.delete('/:code', authMiddleware, async (req, res) => {
   if (!['Admin', 'Ops Lead'].includes(req.user.role)) {
     return res.status(403).json({ error: 'Not authorized' });
   }
   const code = req.params.code;
-  await supabase.from('crm_calls').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('csi_data').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('tasks').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('tickets').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('renewals').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('dsr_data').delete().eq('client_code', code).catch(()=>{});
-  await supabase.from('activity_log').delete().eq('client_code', code).catch(()=>{});
+  await supabase.from('crm_calls').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('csi_data').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('tasks').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('tickets').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('renewals').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('dsr_data').delete().eq('client_code', code).catch(() => {});
+  await supabase.from('activity_log').delete().eq('client_code', code).catch(() => {});
   const { error } = await supabase.from('clients').delete().eq('client_code', code);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
-// GET /api/clients/:code/activity
 router.get('/:code/activity', authMiddleware, async (req, res) => {
   const cc = req.params.code;
-  const { data, error } = await supabase
-    .from('activity_log').select('*').eq('client_code', cc)
-    .order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await supabase.from('activity_log').select('*')
+    .eq('client_code', cc).order('created_at', { ascending: false }).limit(50);
   if (error) return res.status(500).json({ error: error.message });
-  res.json((data||[]).map(l => ({
+  res.json((data || []).map(l => ({
     actionType: l.action_type, actionDetail: l.action_detail,
     userName: l.user_name, userRole: l.user_role,
     timestamp: l.created_at ? new Date(l.created_at).toLocaleString('en-IN') : '—',
   })));
 });
 
-// POST /api/clients/quickaction
 router.post('/quickaction', authMiddleware, async (req, res) => {
   const { clientCode, clientName, action } = req.body;
   await supabase.from('activity_log').insert({

@@ -1679,13 +1679,23 @@ async function renderCSI(){
           '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-from" value="'+monthAgo+'" onchange="window._csiDateFrom=this.value;buildCSITable()">'+
           '<span style="font-size:12px;">to</span>'+
           '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-to" value="'+today+'" onchange="window._csiDateTo=this.value;buildCSITable()">'+
-          '<button class="btn btn-sm btn-outline" onclick="window._csiDateFrom=\"\";window._csiDateTo=\"\";document.getElementById('csi-from').value=\"\";document.getElementById('csi-to').value=\"\";buildCSITable()">Clear</button>'+
+          '<button class="btn btn-sm btn-outline" id="csi-clear-btn" onclick="csiClearDates()">Clear</button>'+
           (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
         '</div>'+
       '</div>'+
       '<div class="card-body" style="padding:0;"><div class="table-wrap" id="csi-table-wrap"></div></div>'+
     '</div>';
 
+  buildCSITable();
+}
+
+function csiClearDates(){
+  window._csiDateFrom='';
+  window._csiDateTo='';
+  var f=document.getElementById('csi-from');
+  var t=document.getElementById('csi-to');
+  if(f) f.value='';
+  if(t) t.value='';
   buildCSITable();
 }
 

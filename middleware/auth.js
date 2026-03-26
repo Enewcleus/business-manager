@@ -14,7 +14,14 @@ function authMiddleware(req, res, next) {
 
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, name: user.name, email: user.email, role: user.role, user_code: user.user_code },
+    {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      user_code: user.user_code,
+      marketplaceAccess: user.marketplace_access || null,  // ✅ NEW
+    },
     SECRET,
     { expiresIn: '12h' }
   );

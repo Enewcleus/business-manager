@@ -1619,57 +1619,190 @@ function openCSIForClient(){
 
 // ── CSI ───────────────────────────────────────────────────────
 async function renderCSI(){
-  const [clients,csiData]=await Promise.all([getClients(),api('GET','/csi')]);
-  if(clients) APP.clients=clients;
-  const csiMap={};
-  (csiData||[]).forEach(function(r){ if(!csiMap[r.clientCode]) csiMap[r.clientCode]=r; });
-  const canFill=['CRM Executive','Admin','CSI Lead','CSI Executive'].includes(APP.user.role);
-  const reviewed=Object.keys(csiMap).length;
-  const lowScore=(csiData||[]).filter(function(r){return r.csiPercent<50;}).length;
-  const notDone=(clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
-  
-  var rows='';
-  var i=0;
-  (clients||[]).forEach(function(c){
-    i++;
-    var csi=csiMap[c.clientCode];
-    var score=csi?csi.csiPercent:null;
-    var health=score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
-    var isPending=!csi;
-    var phone=c.phone||'';
-    var scoreHtml=score!==null?'<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':'<span style="color:var(--red);">Not Done</span>';
-    var phoneHtml=phone?'<a href="tel:'+phone+'">📞 '+phone+'</a>':'—';
-    var actionHtml=canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" id="csibtn'+i+'" onclick="csiClick(this)">'+( isPending?'📝':'✏️')+'</button></td>':'';
-    rows+='<tr data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" style="'+(isPending?'background:#fdf2f2;':'')+'">'+
-      '<td>'+(i)+'</td>'+
-      '<td><strong>'+c.busyName+'</strong><br><small>'+c.clientCode+'</small></td>'+
-      '<td>'+phoneHtml+'</td>'+
-      '<td>'+c.marketplace+'</td>'+
-      '<td>'+scoreHtml+'</td>'+
-      '<td>'+healthBadge(health)+'</td>'+
-      '<td style="font-size:11px;">'+(csi?csi.reviewDate:'—')+'</td>'+
-      '<td style="font-size:11px;">'+(csi&&csi.reviewedBy?csi.reviewedBy:'—')+'</td>'+
-      actionHtml+
-    '</tr>';
+  window._csiFilter = window._csiFilter || 'all';
+  window._csiDateFrom = window._csiDateFrom || '';
+  window._csiDateTo = window._csiDateTo || '';
+
+  const [clients, csiData] = await Promise.all([getClients(), api('GET','/csi')]);
+  if(clients) APP.clients = clients;
+
+  // Store ALL csi records per client for history
+  window._csiAllData = csiData || [];
+  window._csiClients = clients || [];
+
+  // Latest per client
+  var csiMap = {};
+  (csiData||[]).forEach(function(r){
+    if(!csiMap[r.clientCode] || r.reviewDate > csiMap[r.clientCode].reviewDate)
+      csiMap[r.clientCode] = r;
   });
+  window._csiMap = csiMap;
 
-  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
+  var canFill = ['CRM Executive','Admin','CSI Lead','CSI Executive'].includes(APP.user.role);
+  window._csiCanFill = canFill;
 
-  document.getElementById('page-content').innerHTML=
+  var reviewed = Object.keys(csiMap).length;
+  var lowScore = Object.values(csiMap).filter(function(r){return r.csiPercent < 50;}).length;
+  var notDone = (clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
+
+  // Date range defaults
+  var today = new Date().toISOString().split('T')[0];
+  var monthAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+
+  document.getElementById('page-content').innerHTML =
     '<div class="kpi-grid">'+
-      '<div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
-      '<div class="kpi-card green"><div class="kpi-label">Done</div><div class="kpi-value">'+reviewed+'</div></div>'+
-      '<div class="kpi-card red"><div class="kpi-label">Pending</div><div class="kpi-value">'+notDone+'</div></div>'+
-      '<div class="kpi-card amber"><div class="kpi-label">Low Score</div><div class="kpi-value">'+lowScore+'</div></div>'+
+      '<div class="kpi-card blue" style="cursor:pointer;" onclick="window._csiFilter='all';buildCSITable()"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
+      '<div class="kpi-card green" style="cursor:pointer;" onclick="window._csiFilter='done';buildCSITable()"><div class="kpi-label">✅ Done</div><div class="kpi-value">'+reviewed+'</div></div>'+
+      '<div class="kpi-card red" style="cursor:pointer;" onclick="window._csiFilter='pending';buildCSITable()"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">'+notDone+'</div></div>'+
+      '<div class="kpi-card amber" style="cursor:pointer;" onclick="window._csiFilter='low';buildCSITable()"><div class="kpi-label">⚠️ Low Score</div><div class="kpi-value">'+lowScore+'</div></div>'+
     '</div>'+
     '<div class="card">'+
       '<div class="card-header">'+
         '<span class="card-title">📊 CSI Health</span>'+
-        (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
+          '<button class="btn btn-sm btn-outline" id="csi-btn-all" onclick="window._csiFilter='all';buildCSITable()">All</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="csi-btn-pending" onclick="window._csiFilter='pending';buildCSITable()">⏳ Pending</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" id="csi-btn-done" onclick="window._csiFilter='done';buildCSITable()">✅ Done</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="csi-btn-low" onclick="window._csiFilter='low';buildCSITable()">⚠️ Low Score</button>'+
+          '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-from" value="'+monthAgo+'" onchange="window._csiDateFrom=this.value;buildCSITable()">'+
+          '<span style="font-size:12px;">to</span>'+
+          '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-to" value="'+today+'" onchange="window._csiDateTo=this.value;buildCSITable()">'+
+          '<button class="btn btn-sm btn-outline" onclick="window._csiDateFrom='';window._csiDateTo='';document.getElementById('csi-from').value='';document.getElementById('csi-to').value='';buildCSITable()">Clear</button>'+
+          (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
+        '</div>'+
       '</div>'+
-      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+thead+'<tbody>'+rows+'</tbody></table></div></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap" id="csi-table-wrap"></div></div>'+
     '</div>';
+
+  buildCSITable();
 }
+
+function buildCSITable(){
+  var clients = window._csiClients || [];
+  var csiMap = window._csiMap || {};
+  var allData = window._csiAllData || [];
+  var canFill = window._csiCanFill || false;
+  var filter = window._csiFilter || 'all';
+  var dateFrom = window._csiDateFrom || '';
+  var dateTo = window._csiDateTo || '';
+
+  // Update button styles
+  ['all','pending','done','low'].forEach(function(f){
+    var btn = document.getElementById('csi-btn-'+f);
+    if(btn){
+      if(f===filter) btn.className='btn btn-sm btn-primary';
+      else {
+        btn.className='btn btn-sm btn-outline';
+        if(f==='pending') btn.style.cssText='color:var(--red);border-color:var(--red);';
+        else if(f==='done') btn.style.cssText='color:var(--green);border-color:var(--green);';
+        else if(f==='low') btn.style.cssText='color:var(--amber);border-color:var(--amber);';
+        else btn.style.cssText='';
+      }
+    }
+  });
+
+  // Filter by date if set
+  var filteredCsiMap = csiMap;
+  if(dateFrom || dateTo) {
+    filteredCsiMap = {};
+    allData.forEach(function(r){
+      if(dateFrom && r.reviewDate < dateFrom) return;
+      if(dateTo && r.reviewDate > dateTo) return;
+      if(!filteredCsiMap[r.clientCode] || r.reviewDate > filteredCsiMap[r.clientCode].reviewDate)
+        filteredCsiMap[r.clientCode] = r;
+    });
+  }
+
+  var filtered = clients.filter(function(c){
+    var csi = filteredCsiMap[c.clientCode];
+    if(filter==='pending') return !csi;
+    if(filter==='done') return !!csi;
+    if(filter==='low') return csi && csi.csiPercent < 50;
+    return true;
+  });
+
+  var wrap = document.getElementById('csi-table-wrap');
+  if(!wrap) return;
+
+  if(!filtered.length){
+    wrap.innerHTML='<div class="empty-state"><div class="emoji">✅</div><h3>Koi seller nahi is filter mein</h3></div>';
+    return;
+  }
+
+  var rows='';
+  filtered.forEach(function(c, idx){
+    var csi = filteredCsiMap[c.clientCode];
+    var allHistory = allData.filter(function(r){return r.clientCode===c.clientCode;});
+    var score = csi ? csi.csiPercent : null;
+    var health = score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
+    var isPending = !csi;
+    var phone = c.phone||'';
+    var phoneHtml = phone?'<a href="tel:'+phone+'">📞 '+phone+'</a>':'—';
+    var scoreHtml = score!==null?'<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':'<span style="color:var(--red);">Not Done</span>';
+
+    // History indicator
+    var historyBtn = allHistory.length>1?
+      '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="showCSIHistory(this)">📈 '+allHistory.length+' records</button>':
+      '<span style="font-size:11px;color:var(--text-muted);">'+allHistory.length+' record</span>';
+
+    var actionHtml = canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="csiClick(this)">'+(isPending?'📝':'✏️')+'</button></td>':'';
+
+    rows+='<tr data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" style="'+(isPending?'background:#fdf2f2;':(score!==null&&score<50?'background:#fff9f0;':''))+'">'+
+      '<td style="font-size:12px;">'+(idx+1)+'</td>'+
+      '<td><strong>'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
+      '<td>'+phoneHtml+'</td>'+
+      '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+      '<td>'+scoreHtml+'</td>'+
+      '<td>'+healthBadge(health)+'</td>'+
+      '<td style="font-size:11px;">'+historyBtn+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(csi?csi.reviewDate:'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(csi&&csi.reviewedBy?csi.reviewedBy:'—')+'</td>'+
+      actionHtml+
+    '</tr>';
+  });
+
+  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>History</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
+  wrap.innerHTML='<table>'+thead+'<tbody>'+rows+'</tbody></table>';
+}
+
+function showCSIHistory(btn){
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var allData = window._csiAllData || [];
+  var history = allData.filter(function(r){return r.clientCode===cc;})
+    .sort(function(a,b){return b.reviewDate.localeCompare(a.reviewDate);});
+
+  var rows='';
+  history.forEach(function(r,i){
+    var prev = history[i+1];
+    var trend = '';
+    if(prev){
+      if(r.csiPercent > prev.csiPercent) trend='<span style="color:var(--green);">▲ +'+( r.csiPercent-prev.csiPercent)+'%</span>';
+      else if(r.csiPercent < prev.csiPercent) trend='<span style="color:var(--red);">▼ '+(r.csiPercent-prev.csiPercent)+'%</span>';
+      else trend='<span style="color:var(--text-muted);">→ Same</span>';
+    }
+    var col = r.csiPercent>=80?'var(--green)':r.csiPercent>=50?'var(--amber)':'var(--red)';
+    rows+='<tr>'+
+      '<td style="font-size:12px;">'+r.reviewDate+'</td>'+
+      '<td><strong style="color:'+col+';">'+r.csiPercent+'%</strong></td>'+
+      '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
+      '<td style="font-size:12px;">'+trend+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
+      '<td style="font-size:11px;max-width:150px;color:var(--text-muted);">'+(r.remarks||'—')+'</td>'+
+    '</tr>';
+  });
+
+  openPanel('📈 CSI History — '+cn,
+    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;">'+
+      '<strong>'+cn+'</strong> · Total '+history.length+' reviews'+
+    '</div>'+
+    '<div class="table-wrap">'+
+      '<table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Trend</th><th>By</th><th>Remarks</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table>'+
+    '</div>'
+  );
+}
+
 
 function csiClick(btn){
   var row=btn.closest('tr');

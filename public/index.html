@@ -1234,73 +1234,87 @@ async function renderDashboard() {
   const u = APP.user;
   const isAdmin = ['Admin','Sub Admin','Ops Lead'].includes(u.role);
 
-  // Load data in parallel
-  const promises = [api('GET','/dashboard'), api('GET','/tasks'), api('GET','/clients')];
-  if(isAdmin) promises.push(api('GET','/dashboard/team'));
-  const results = await Promise.all(promises);
-  const dash = results[0];
-  const allTasks = results[1] || [];
-  const clients = results[2] || [];
-  const team = isAdmin ? (results[3] || []) : [];
+  // Load user widget preferences from localStorage
+  const prefKey = 'dash_widgets_' + u.name;
+  const defaultWidgets = ['health','tasks','renewals','tickets','dsr','crm'];
+  let activeWidgets = JSON.parse(localStorage.getItem(prefKey) || 'null') || defaultWidgets;
+
+  // Load data
+  const [dash, allTasks, clients, dsrStatus] = await Promise.all([
+    api('GET','/dashboard'),
+    api('GET','/tasks'),
+    getClients(),
+    api('GET','/dsr/today-status'),
+  ]);
+  const team = isAdmin ? (await api('GET','/dashboard/team') || []) : [];
+  const crmCalls = await api('GET','/crm/today') || [];
 
   if(!dash) return;
-  if(clients.length) APP.clients = clients;
+  if(clients && clients.length) APP.clients = clients;
 
-  // My pending tasks
-  const myPendingTasks = allTasks.filter(t =>
-    t.status !== 'Completed' &&
-    ((t.assignedTo||'').toLowerCase().includes(u.name.toLowerCase()) ||
-     (t.assignedBy||'').toLowerCase().includes(u.name.toLowerCase()))
-  );
-  const overdueTask = myPendingTasks.filter(t => t.isOverdue);
-
-  // My sellers
-  const mySellers = isAdmin ? clients : clients.filter(c =>
+  const mySellers = isAdmin ? (clients||[]) : (clients||[]).filter(c =>
     (c.amName||'').toLowerCase().includes(u.name.toLowerCase()) ||
     (c.adsManager||'').toLowerCase().includes(u.name.toLowerCase()) ||
     (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
   );
-  const myAtRisk   = mySellers.filter(c => c.healthStatus === 'At Risk');
-  const myWarning  = mySellers.filter(c => c.healthStatus === 'Warning');
+  const myTasks = (allTasks||[]).filter(t =>
+    t.status !== 'Completed' &&
+    ((t.assignedTo||'').toLowerCase().includes(u.name.toLowerCase()) ||
+     (t.assignedBy||'').toLowerCase().includes(u.name.toLowerCase()))
+  );
   const myRenewals = mySellers.filter(c => {
     if(!c.renewalDate) return false;
     const d = new Date(c.renewalDate); const today = new Date();
     return d >= today && (d-today)/(1000*60*60*24) <= 30;
   });
-  const myTickets = allTasks.filter ? [] : [];
+  const myAtRisk   = mySellers.filter(c => c.healthStatus === 'At Risk');
+  const myWarning  = mySellers.filter(c => c.healthStatus === 'Warning');
+  const myHealthy  = mySellers.filter(c => c.healthStatus === 'Healthy');
+  const dsrPending = (dsrStatus && dsrStatus.pending) ? dsrStatus.pending : [];
+  const myCrmToday = crmCalls.filter(c =>
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
 
   const pc = document.getElementById('page-content');
   pc.innerHTML = '';
 
+  // ── Customize button ──
+  var topBar = document.createElement('div');
+  topBar.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:8px;';
+  var custBtn = document.createElement('button');
+  custBtn.className = 'btn btn-sm btn-outline';
+  custBtn.textContent = '⚙️ Customize Dashboard';
+  custBtn.onclick = function(){ openDashboardCustomize(activeWidgets, prefKey); };
+  topBar.appendChild(custBtn);
+  pc.appendChild(topBar);
+
   // ── KPI Grid ──
-  const kpiDiv = document.createElement('div');
+  var kpiDiv = document.createElement('div');
   kpiDiv.className = 'kpi-grid';
-
-  const kpis = isAdmin ? [
-    {cls:'blue',  label:'Total Clients',   val:dash.totalClients, sub:dash.active+' Active'},
-    {cls:'green', label:'🟢 Healthy',       val:dash.healthy},
-    {cls:'amber', label:'🟡 Warning',       val:dash.warning},
-    {cls:'red',   label:'🔴 At Risk',       val:dash.atRisk},
-    {cls:'orange',label:'Open Tickets',     val:dash.openTickets},
-    {cls:'purple',label:'Renewals Due',     val:dash.renewalsDue, sub:'≤30 days'},
+  var kpis = isAdmin ? [
+    {cls:'blue',  label:'Total Clients',  val:dash.totalClients, sub:dash.active+' Active'},
+    {cls:'green', label:'🟢 Healthy',      val:dash.healthy},
+    {cls:'amber', label:'🟡 Warning',      val:dash.warning},
+    {cls:'red',   label:'🔴 At Risk',      val:dash.atRisk},
+    {cls:'orange',label:'Open Tickets',   val:dash.openTickets},
+    {cls:'purple',label:'Renewals Due',   val:dash.renewalsDue, sub:'≤30 days'},
   ] : [
-    {cls:'blue',  label:'My Sellers',       val:mySellers.length, sub:'Assigned to me'},
-    {cls:'red',   label:'🔴 At Risk',        val:myAtRisk.length,  sub:'Need attention', link:'clients'},
-    {cls:'amber', label:'🟡 Warning',        val:myWarning.length, sub:'Monitor closely', link:'clients'},
-    {cls:'orange',label:'⏳ Pending Tasks',  val:myPendingTasks.length, sub:overdueTask.length+' overdue', link:'tasks'},
-    {cls:'purple',label:'🔄 Renewals (30d)', val:myRenewals.length, sub:'Due soon', link:'renewals'},
+    {cls:'blue',  label:'My Sellers',     val:mySellers.length},
+    {cls:'green', label:'🟢 Healthy',      val:myHealthy.length},
+    {cls:'amber', label:'🟡 Warning',      val:myWarning.length},
+    {cls:'red',   label:'🔴 At Risk',      val:myAtRisk.length},
+    {cls:'orange',label:'⏳ Pending Tasks',val:myTasks.length},
+    {cls:'purple',label:'🔄 Renewals',     val:myRenewals.length, sub:'≤30 days'},
   ];
-
   kpis.forEach(function(k){
     var d = document.createElement('div');
     d.className = 'kpi-card ' + k.cls;
-    if(k.link){ d.style.cursor='pointer'; d.onclick=function(){navigate(k.link);}; }
     d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>'+(k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'');
     kpiDiv.appendChild(d);
   });
   pc.appendChild(kpiDiv);
 
-  // ── Admin: Team Performance ──
+  // ── Admin Team Performance ──
   if(isAdmin && team.length) {
     var teamCard = document.createElement('div');
     teamCard.className = 'card';
@@ -1319,63 +1333,156 @@ async function renderDashboard() {
     pc.appendChild(teamCard);
   }
 
-  // ── My Pending Tasks ──
-  if(myPendingTasks.length) {
-    var tasksCard = document.createElement('div');
-    tasksCard.className = 'card';
-    var taskRows = myPendingTasks.slice(0,5).map(function(t){
+  // ── Widget: Sellers Health ──
+  if(activeWidgets.includes('health') && !isAdmin && (myAtRisk.length||myWarning.length)){
+    var w = dashWidget('⚠️ Attention Needed ('+(myAtRisk.length+myWarning.length)+')', 'View All Clients', 'clients');
+    var rows = [...myAtRisk,...myWarning].slice(0,6).map(function(c){
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+healthBadge(c.healthStatus)+'</td><td>'+renewalBadge(c.renewalDate)+'</td></tr>';
+    }).join('');
+    w.querySelector('tbody').innerHTML = rows;
+    w.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th>';
+    pc.appendChild(w);
+  }
+
+  // ── Widget: Pending Tasks ──
+  if(activeWidgets.includes('tasks') && myTasks.length){
+    var w2 = dashWidget('📋 My Pending Tasks ('+myTasks.length+')', 'View All Tasks', 'tasks');
+    var overdueCount = myTasks.filter(function(t){return t.isOverdue;}).length;
+    if(overdueCount) w2.querySelector('.card-title').innerHTML += ' <span class="badge badge-red">'+overdueCount+' overdue</span>';
+    var rows2 = myTasks.slice(0,5).map(function(t){
       return '<tr style="'+(t.isOverdue?'background:#fdf2f2;':'')+'">'+
         '<td><strong>'+t.title+'</strong>'+(t.clientName?'<br><small style="color:var(--text-muted);">'+t.clientName+'</small>':'')+'</td>'+
         '<td><span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span></td>'+
-        '<td>'+(t.isOverdue?'<span style="color:var(--red);font-weight:600;">🔴 OVERDUE</span>':t.deadline?t.deadline:'—')+'</td>'+
-        '<td style="font-size:11px;color:var(--text-muted);">'+(t.assignedBy===u.name?'By me → '+t.assignedTo:'From: '+t.assignedBy)+'</td>'+
+        '<td>'+(t.isOverdue?'<span style="color:var(--red);font-weight:600;">OVERDUE</span>':t.deadline||'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(t.assignedBy===u.name?'→ '+t.assignedTo:'From: '+t.assignedBy)+'</td>'+
       '</tr>';
     }).join('');
-    tasksCard.innerHTML = '<div class="card-header"><span class="card-title">📋 My Pending Tasks ('+myPendingTasks.length+')</span>'+
-      '<button class="btn btn-sm btn-outline" onclick="navigate(\'tasks\')">View All</button></div>'+
-      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
-      '<thead><tr><th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th></tr></thead>'+
-      '<tbody>'+taskRows+'</tbody></table></div></div>';
-    pc.appendChild(tasksCard);
+    w2.querySelector('tbody').innerHTML = rows2;
+    w2.querySelector('thead tr').innerHTML = '<th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th>';
+    pc.appendChild(w2);
   }
 
-  // ── My At Risk / Warning Sellers ──
-  if(!isAdmin && (myAtRisk.length || myWarning.length)) {
-    var alertCard = document.createElement('div');
-    alertCard.className = 'card';
-    var alertRows = [...myAtRisk, ...myWarning].slice(0,8).map(function(c){
-      return '<tr>'+
-        '<td><strong>'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
-        '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
-        '<td>'+healthBadge(c.healthStatus)+'</td>'+
-        '<td>'+renewalBadge(c.renewalDate)+'</td>'+
-        '<td><button class="btn btn-sm btn-outline" onclick="navigate(\'clients\')">View</button></td>'+
-      '</tr>';
+  // ── Widget: Renewals Due ──
+  if(activeWidgets.includes('renewals') && myRenewals.length){
+    var w3 = dashWidget('🔄 Renewals Due in 30 Days ('+myRenewals.length+')', 'View Renewals', 'renewals');
+    var rows3 = myRenewals.slice(0,5).map(function(c){
+      var daysLeft = Math.ceil((new Date(c.renewalDate)-new Date())/(1000*60*60*24));
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+c.renewalDate+'</td><td><strong style="color:'+(daysLeft<=7?'var(--red)':'var(--amber)')+';">'+daysLeft+'d</strong></td></tr>';
     }).join('');
-    alertCard.innerHTML = '<div class="card-header"><span class="card-title">⚠️ Attention Needed ('+( myAtRisk.length+myWarning.length)+')</span>'+
-      '<button class="btn btn-sm btn-outline" onclick="navigate(\'clients\')">View All</button></div>'+
-      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
-      '<thead><tr><th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th><th></th></tr></thead>'+
-      '<tbody>'+alertRows+'</tbody></table></div></div>';
-    pc.appendChild(alertCard);
+    w3.querySelector('tbody').innerHTML = rows3;
+    w3.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Renewal Date</th><th>Days Left</th>';
+    pc.appendChild(w3);
   }
 
-  // ── Quick Start (if no tasks/sellers) ──
-  if(!myPendingTasks.length && !myAtRisk.length && !myWarning.length && !isAdmin) {
-    var quickCard = document.createElement('div');
-    quickCard.className = 'card';
-    quickCard.innerHTML = '<div class="card-header"><span class="card-title">⚡ Quick Start</span></div>'+
+  // ── Widget: DSR Alerts ──
+  if(activeWidgets.includes('dsr') && dsrPending.length){
+    var w4 = dashWidget('📈 DSR Pending Today ('+dsrPending.length+')', 'Fill DSR', 'dsr');
+    var rows4 = dsrPending.slice(0,5).map(function(c){
+      return '<tr><td><strong>'+(c.busy_name||c.client_code)+'</strong></td>'+
+        '<td><span class="badge badge-blue">'+(c.marketplace||'—')+'</span></td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(c.ads_manager||'—')+'</td></tr>';
+    }).join('');
+    w4.querySelector('tbody').innerHTML = rows4;
+    w4.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Ads Manager</th>';
+    pc.appendChild(w4);
+  }
+
+  // ── Widget: CRM Calls Today ──
+  if(activeWidgets.includes('crm')){
+    var connected = myCrmToday.filter(function(c){return (c.callOutcome||'').includes('Connected');}).length;
+    var w5 = dashWidget('📞 My CRM Calls Today ('+myCrmToday.length+')', 'Log Call', 'crm');
+    if(myCrmToday.length){
+      var rows5 = myCrmToday.slice(0,5).map(function(c){
+        return '<tr><td><strong>'+c.clientName+'</strong></td>'+
+          '<td><span class="badge '+(c.callOutcome&&c.callOutcome.includes('Connected')?'badge-green':'badge-amber')+'">'+( c.callOutcome||'—')+'</span></td>'+
+          '<td style="font-size:11px;color:var(--text-muted);">'+(c.notes||'—')+'</td></tr>';
+      }).join('');
+      w5.querySelector('tbody').innerHTML = rows5;
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+      w5.querySelector('.card-title').innerHTML += ' <span class="badge badge-green">'+connected+' connected</span>';
+    } else {
+      w5.querySelector('tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px;">Aaj koi call nahi ki abhi</td></tr>';
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+    }
+    pc.appendChild(w5);
+  }
+
+  // ── Quick Start (if no active widgets show content) ──
+  if(!myTasks.length && !myAtRisk.length && !myWarning.length && !myRenewals.length && !isAdmin){
+    var qc = document.createElement('div');
+    qc.className = 'card';
+    qc.innerHTML = '<div class="card-header"><span class="card-title">⚡ Quick Start</span></div>'+
       '<div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">'+
-        '<button class="btn btn-primary" onclick="navigateTo(\'tasks\')">📝 My Tasks</button>'+
-        '<button class="btn btn-secondary" onclick="navigateTo(\'clients\')">👥 My Clients</button>'+
-        '<button class="btn btn-outline" onclick="navigateTo(\'crm\')">📞 Log Call</button>'+
+        '<button class="btn btn-primary" onclick="navigateTo('tasks')">📝 My Tasks</button>'+
+        '<button class="btn btn-secondary" onclick="navigateTo('clients')">👥 My Clients</button>'+
+        '<button class="btn btn-outline" onclick="navigateTo('crm')">📞 Log Call</button>'+
         '<button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>'+
       '</div></div>';
-    pc.appendChild(quickCard);
+    pc.appendChild(qc);
   }
 }
 
-// ── CLIENTS ──────────────────────────────────────────────────
+function dashWidget(title, linkLabel, linkPage) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginBottom = '12px';
+  card.innerHTML =
+    '<div class="card-header">'+
+      '<span class="card-title">'+title+'</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigateTo(''+linkPage+'')">'+linkLabel+' →</button>'+
+    '</div>'+
+    '<div class="card-body" style="padding:0;">'+
+      '<div class="table-wrap"><table>'+
+        '<thead><tr></tr></thead><tbody></tbody>'+
+      '</table></div>'+
+    '</div>';
+  return card;
+}
+
+function openDashboardCustomize(activeWidgets, prefKey) {
+  var allWidgets = [
+    {id:'health',   label:'⚠️ Sellers Health (At Risk/Warning)'},
+    {id:'tasks',    label:'📋 My Pending Tasks'},
+    {id:'renewals', label:'🔄 Renewals Due (30 days)'},
+    {id:'tickets',  label:'🎫 Open Tickets'},
+    {id:'dsr',      label:'📈 DSR Pending Today'},
+    {id:'crm',      label:'📞 CRM Calls Today'},
+  ];
+  openPanel('⚙️ Customize Dashboard',
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Jo widgets chahiye unhe select karo — sirf tumhara dashboard change hoga</div>'+
+    allWidgets.map(function(w){
+      var checked = activeWidgets.includes(w.id) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;cursor:pointer;">'+
+        '<input type="checkbox" id="dw-'+w.id+'" '+checked+' style="width:18px;height:18px;">'+
+        '<span style="font-size:14px;">'+w.label+'</span></label>';
+    }).join('')+
+    '<button class="btn btn-primary btn-full" style="margin-top:8px;" onclick="saveDashboardWidgets(''+prefKey+'')">💾 Save & Refresh</button>'+
+    '<button class="btn btn-outline btn-full" style="margin-top:8px;" onclick="resetDashboardWidgets(''+prefKey+'')">🔄 Reset Default</button>'
+  );
+}
+
+function saveDashboardWidgets(prefKey) {
+  var all = ['health','tasks','renewals','tickets','dsr','crm'];
+  var selected = all.filter(function(id){
+    var el = document.getElementById('dw-'+id);
+    return el && el.checked;
+  });
+  localStorage.setItem(prefKey, JSON.stringify(selected));
+  showToast('✅ Dashboard saved!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+function resetDashboardWidgets(prefKey) {
+  localStorage.removeItem(prefKey);
+  showToast('Dashboard reset!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+
 function navigateTo(page){ navigate(page); }
 
 async function renderClients() {

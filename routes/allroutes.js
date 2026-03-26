@@ -193,8 +193,9 @@ tasksRouter.get('/ads', authMiddleware, async (req, res) => {
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
-  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
-    query = query.or(`assigned_to.eq.${name},assigned_by.eq.${name}`);
+  if (!['Admin', 'Ops Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
+    // Use ilike for names with spaces
+    query = query.or(`assigned_to.ilike.%${name}%,assigned_by.ilike.%${name}%`);
   }
   const { data, error } = await query.limit(200);
   if (error) return res.status(500).json({ error: error.message });

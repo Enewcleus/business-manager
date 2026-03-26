@@ -3454,13 +3454,16 @@ function openAddUser(){
       <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="Sub Admin">Sub Admin</option><option value="CSI Lead">CSI Lead</option><option value="CSI Executive">CSI Executive</option><option value="Admin">Admin</option></select></div>
     </div>
     <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
+    <div class="form-group"><label>🛒 Marketplace Access <small style="color:var(--text-muted);">(Sub Admin ke liye select karo — khali = sab)</small></label><select class="form-control" id="nu-marketplace" multiple style="height:110px;"><option value="Amazon.in">Amazon.in</option><option value="Amazon.com">Amazon.com</option><option value="Amazon.uk">Amazon.uk</option><option value="Amazon.ae">Amazon.ae</option><option value="Amazon.ca">Amazon.ca</option><option value="Flipkart">Flipkart</option><option value="Meesho">Meesho</option><option value="Myntra">Myntra</option><option value="Snapdeal">Snapdeal</option><option value="Other">Other</option></select><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Ctrl/Cmd + click se multiple select karo</div></div>
     <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
 }
 
 async function submitAddUser(){
   const name=document.getElementById('nu-name').value.trim(),email=document.getElementById('nu-email').value.trim(),pass=document.getElementById('nu-pass').value,role=document.getElementById('nu-role').value,designation=document.getElementById('nu-designation').value.trim(),department=document.getElementById('nu-dept').value,reportingTo=document.getElementById('nu-manager').value;
   if(!name||!email||!pass){showToast('Name, email, password required','error');return;}
-  const r=await api('POST','/users',{name,email,password:pass,role,designation,department,reportingTo});
+  const mktSel = document.getElementById('nu-marketplace');
+  const marketplaceAccess = mktSel ? Array.from(mktSel.selectedOptions).map(function(o){return o.value;}) : [];
+  const r=await api('POST','/users',{name,email,password:pass,role,designation,department,reportingTo,marketplaceAccess:marketplaceAccess.length?marketplaceAccess:null});
   if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
 }
 

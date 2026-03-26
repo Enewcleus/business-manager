@@ -2,10 +2,10 @@ const router = require('express').Router();
 const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
-// GET all users with hierarchy
+// GET all users
 router.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('users')
-    .select('id, user_code, name, email, role, department, designation, reporting_to, is_active, last_login, permissions')
+    .select('id, user_code, name, email, role, department, designation, reporting_to, is_active, last_login, permissions, marketplace_access')
     .order('name');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(u => ({
@@ -13,17 +13,16 @@ router.get('/', authMiddleware, async (req, res) => {
     role: u.role, department: u.department, designation: u.designation,
     reportingTo: u.reporting_to, isActive: u.is_active,
     permissions: u.permissions || {},
+    marketplaceAccess: u.marketplace_access || null,
   })));
 });
 
-// GET hierarchy — who reports to whom
+// GET hierarchy
 router.get('/hierarchy', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('users')
     .select('id, user_code, name, role, department, designation, reporting_to, is_active')
     .eq('is_active', true).order('name');
   if (error) return res.status(500).json({ error: error.message });
-  
-  // Build tree
   const users = data || [];
   const tree = users.map(u => ({
     ...u,
@@ -32,12 +31,11 @@ router.get('/hierarchy', authMiddleware, async (req, res) => {
   res.json(tree);
 });
 
-// GET my team (for leads)
+// GET my team
 router.get('/my-team', authMiddleware, async (req, res) => {
   const { data: me } = await supabase.from('users')
     .select('id').eq('user_code', req.user.userCode).single();
   if (!me) return res.json([]);
-  
   const { data, error } = await supabase.from('users')
     .select('id, user_code, name, email, role, department, designation, is_active')
     .eq('reporting_to', me.id).eq('is_active', true);
@@ -48,23 +46,23 @@ router.get('/my-team', authMiddleware, async (req, res) => {
 // POST — create user
 router.post('/', authMiddleware, async (req, res) => {
   if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin only' });
-  const { name, email, password, role, department, designation, reportingTo } = req.body;
+  const { name, email, password, role, department, designation, reportingTo, marketplaceAccess } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
-  
+
   const userCode = 'USR' + Date.now().toString().slice(-5);
-  
-  // Get reporting_to UUID if provided
+
   let reportingToId = null;
   if (reportingTo) {
     const { data: mgr } = await supabase.from('users').select('id').eq('user_code', reportingTo).single();
     if (mgr) reportingToId = mgr.id;
   }
-  
+
   const { error } = await supabase.from('users').insert({
     user_code: userCode, name, email: email.toLowerCase(),
     password_hash: password, role: role || 'Executive',
     department: department || null, designation: designation || null,
     reporting_to: reportingToId, is_active: true,
+    marketplace_access: marketplaceAccess || null,  // ✅ NEW
   });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, userId: userCode });
@@ -73,8 +71,8 @@ router.post('/', authMiddleware, async (req, res) => {
 // PATCH update user
 router.patch('/:code', authMiddleware, async (req, res) => {
   if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin only' });
-  const { name, email, role, department, designation, reportingTo, isActive } = req.body;
-  
+  const { name, email, role, department, designation, reportingTo, isActive, marketplaceAccess } = req.body;
+
   let reportingToId = undefined;
   if (reportingTo !== undefined) {
     if (!reportingTo) { reportingToId = null; }
@@ -83,16 +81,17 @@ router.patch('/:code', authMiddleware, async (req, res) => {
       reportingToId = mgr?.id || null;
     }
   }
-  
+
   const updates = {};
-  if (name !== undefined) updates.name = name;
-  if (email !== undefined) updates.email = email.toLowerCase();
-  if (role !== undefined) updates.role = role;
-  if (department !== undefined) updates.department = department;
+  if (name !== undefined)       updates.name         = name;
+  if (email !== undefined)      updates.email        = email.toLowerCase();
+  if (role !== undefined)       updates.role         = role;
+  if (department !== undefined) updates.department   = department;
   if (designation !== undefined) updates.designation = designation;
   if (reportingToId !== undefined) updates.reporting_to = reportingToId;
-  if (isActive !== undefined) updates.is_active = isActive;
-  
+  if (isActive !== undefined)   updates.is_active    = isActive;
+  if (marketplaceAccess !== undefined) updates.marketplace_access = marketplaceAccess || null; // ✅ NEW
+
   const { error } = await supabase.from('users').update(updates).eq('user_code', req.params.code);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });

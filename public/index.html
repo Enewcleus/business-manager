@@ -1479,13 +1479,61 @@ function ticketCards(tickets){
           <span class="badge badge-gray">${t.status}</span>
         </div>
       </div>
-      <div class="ticket-desc">${t.category} — ${t.description.slice(0,80)}</div>
+      <div class="ticket-desc" style="cursor:pointer;" onclick="viewTicketDetail(this)" data-tid="${t.ticketId}">${t.category} — ${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);font-size:11px;"> ...read more</span>':''}</div>
       <div class="ticket-footer">
         <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">${t.status==='Done'?'✅ Resolved':t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}</span>
         <span style="font-size:11px;color:var(--text-muted);">→ ${t.assignedTo}</span>
         ${t.status!=='Done'?`<div style="margin-left:auto;display:flex;gap:4px;">${t.status==='Open'?`<button class="btn btn-sm btn-outline" onclick="updateTicket('${t.ticketId}','In Progress')">▶ Accept</button>`:''}${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCloseTicket('${t.ticketId}','${t.clientName}')">✅ Done</button>`:''}</div>`:''}
       </div>
     </div>`).join('');
+}
+
+function viewTicketDetail(el){
+  const tid = el.getAttribute('data-tid');
+  const t = (APP.tickets||[]).find(x=>x.ticketId===tid);
+  if(!t) return;
+  openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
+    '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+        '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span>'+
+        '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
+        '<span class="badge badge-blue">'+t.category+'</span>'+
+      '</div>'+
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">Client: '+t.clientName+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+t.assignedTo+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Raised By: '+t.raisedBy+' · '+t.createdAt+'</div>'+
+    '</div>'+
+    '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
+    '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>'+
+    (t.resolutionNote?'<div style="font-weight:600;margin-bottom:6px;">✅ Resolution:</div><div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;">'+t.resolutionNote+'</div>':'')+
+    (t.status!=='Done'?
+      '<div style="display:flex;gap:8px;margin-top:12px;">'+
+        (t.status==='Open'?'<button class="btn btn-outline" data-tid="'+t.ticketId+'" onclick="var b=this;updateTicket(b.getAttribute(\'data-tid\'),\'In Progress\');closePanel()">▶ Accept</button>':'')+
+        (t.status==='In Progress'?'<button class="btn btn-success" data-tid="'+t.ticketId+'" data-cn="'+t.clientName.replace(/['\'"]/g,'')+' " onclick="var b=this;promptCloseTicket(b.getAttribute(\'data-tid\'),b.getAttribute(\'data-cn\'));closePanel()">✅ Mark Done</button>':'')+
+      '</div>':'')
+  );
+}
+
+function viewTaskDetail(tid){
+  const t = (_allTasksCache||[]).find(x=>x.taskId===tid) || (APP.tasks||[]).find(x=>x.taskId===tid);
+  if(!t) return;
+  openPanel('📋 Task — '+(t.clientName||'General'),
+    '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+        '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green')+'">'+t.priority+'</span>'+
+        '<span class="badge '+(t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber')+'">'+t.status+'</span>'+
+        (t.category?'<span class="badge badge-blue">'+t.category+'</span>':'')+
+      '</div>'+
+      '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">'+t.title+'</div>'+
+      (t.clientName?'<div style="font-size:12px;color:var(--text-muted);">Client: '+t.clientName+'</div>':'')+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+(t.assignedTo||'—')+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned By: '+(t.assignedBy||'—')+' · '+t.createdAt+'</div>'+
+      (t.deadline?'<div style="font-size:12px;color:'+(t.isOverdue?'var(--red)':'var(--text-muted)')+';">Deadline: '+t.deadline+(t.isOverdue?' 🔴 OVERDUE':'')+'</div>':'')+
+    '</div>'+
+    (t.description?
+      '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
+      '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>':'')
+  );
 }
 
 function filterTickets(s){const f=s?APP.tickets.filter(t=>t.status===s):APP.tickets;document.getElementById('tickets-body').innerHTML=ticketCards(f);}
@@ -1838,9 +1886,9 @@ function buildCSITable(){
     var scoreHtml = score!==null?'<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':'<span style="color:var(--red);">Not Done</span>';
 
     // History indicator
-    var historyBtn = allHistory.length>1?
-      '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="showCSIHistory(this)">📈 '+allHistory.length+' records</button>':
-      '<span style="font-size:11px;color:var(--text-muted);">'+allHistory.length+' record</span>';
+    var historyBtn = allHistory.length>0?
+      '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="showCSIHistory(this)">📈 '+allHistory.length+' record'+(allHistory.length>1?'s':'')+'</button>':
+      '<span style="font-size:11px;color:var(--text-muted);">—</span>';
 
     var actionHtml = canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="csiClick(this)">'+(isPending?'📝':'✏️')+'</button></td>':'';
 
@@ -1885,7 +1933,7 @@ function showCSIHistory(btn){
       '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
       '<td style="font-size:12px;">'+trend+'</td>'+
       '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
-      '<td style="font-size:11px;max-width:150px;color:var(--text-muted);">'+(r.remarks||'—')+'</td>'+
+      '<td style="font-size:12px;max-width:250px;">'+( r.remarks?'<div style="line-height:1.5;white-space:pre-wrap;">'+r.remarks+'</div>':'—')+'</td>'+
     '</tr>';
   });
 
@@ -2188,7 +2236,7 @@ function twTaskCard(task, allTasks) {
             ${t.deadline ? `<span style="color:${t.isOverdue ? 'var(--red)' : 'var(--text-muted)'};">📅 ${t.deadline}</span>` : ''}
             ${t.category ? `<span class="badge badge-gray" style="font-size:10px;">${t.category}</span>` : ''}
           </div>
-          ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;">${t.description.slice(0,120)}${t.description.length>120?'...':''}</div>` : ''}
+          ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;cursor:pointer;" onclick="viewTaskDetail('${t.taskId}')">${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);"> ...read more</span>':''}</div>` : ''}
         </div>
         <!-- Right: status + priority -->
         <!-- Right: status + priority -->

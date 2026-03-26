@@ -1638,11 +1638,9 @@ async function renderCSI(){
   const [clients, csiData] = await Promise.all([getClients(), api('GET','/csi')]);
   if(clients) APP.clients = clients;
 
-  // Store ALL csi records per client for history
   window._csiAllData = csiData || [];
   window._csiClients = clients || [];
 
-  // Latest per client
   var csiMap = {};
   (csiData||[]).forEach(function(r){
     if(!csiMap[r.clientCode] || r.reviewDate > csiMap[r.clientCode].reviewDate)
@@ -1656,38 +1654,110 @@ async function renderCSI(){
   var reviewed = Object.keys(csiMap).length;
   var lowScore = Object.values(csiMap).filter(function(r){return r.csiPercent < 50;}).length;
   var notDone = (clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
-
-  // Date range defaults
   var today = new Date().toISOString().split('T')[0];
   var monthAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
 
-  document.getElementById('page-content').innerHTML =
-    '<div class="kpi-grid">'+
-      '<div class="kpi-card blue" style="cursor:pointer;" data-f="all" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">Total</div><div class="kpi-value">'+(clients||[]).length+'</div></div>'+
-      '<div class="kpi-card green" style="cursor:pointer;" data-f="done" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">✅ Done</div><div class="kpi-value">'+reviewed+'</div></div>'+
-      '<div class="kpi-card red" style="cursor:pointer;" data-f="pending" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">'+notDone+'</div></div>'+
-      '<div class="kpi-card amber" style="cursor:pointer;" data-f="low" onclick="csiSetFilter(this.getAttribute('data-f'))"><div class="kpi-label">⚠️ Low Score</div><div class="kpi-value">'+lowScore+'</div></div>'+
-    '</div>'+
-    '<div class="card">'+
-      '<div class="card-header">'+
-        '<span class="card-title">📊 CSI Health</span>'+
-        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-outline" id="csi-btn-all" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="all">All</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="csi-btn-pending" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="pending">⏳ Pending</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--green);border-color:var(--green);" id="csi-btn-done" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="done">✅ Done</button>'+
-          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="csi-btn-low" onclick="csiSetFilter(this.getAttribute('data-f'))" data-f="low">⚠️ Low Score</button>'+
-          '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-from" value="'+monthAgo+'" onchange="window._csiDateFrom=this.value;buildCSITable()">'+
-          '<span style="font-size:12px;">to</span>'+
-          '<input type="date" class="form-control" style="width:130px;padding:4px 8px;font-size:12px;" id="csi-to" value="'+today+'" onchange="window._csiDateTo=this.value;buildCSITable()">'+
-          '<button class="btn btn-sm btn-outline" id="csi-clear-btn" onclick="csiClearDates()">Clear</button>'+
-          (canFill?'<button class="btn btn-primary btn-sm" onclick="openCSIForm()">📝 Fill CSI</button>':'')+
-        '</div>'+
-      '</div>'+
-      '<div class="card-body" style="padding:0;"><div class="table-wrap" id="csi-table-wrap"></div></div>'+
-    '</div>';
+  var pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // KPI Grid
+  var kpiDiv = document.createElement('div');
+  kpiDiv.className = 'kpi-grid';
+  var kpis = [
+    {cls:'blue', label:'Total', val:(clients||[]).length, f:'all'},
+    {cls:'green', label:'✅ Done', val:reviewed, f:'done'},
+    {cls:'red', label:'⏳ Pending', val:notDone, f:'pending'},
+    {cls:'amber', label:'⚠️ Low Score', val:lowScore, f:'low'},
+  ];
+  kpis.forEach(function(k){
+    var d = document.createElement('div');
+    d.className = 'kpi-card ' + k.cls;
+    d.style.cursor = 'pointer';
+    d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>';
+    d.onclick = (function(f){ return function(){ csiSetFilter(f); }; })(k.f);
+    kpiDiv.appendChild(d);
+  });
+  pc.appendChild(kpiDiv);
+
+  // Card
+  var card = document.createElement('div');
+  card.className = 'card';
+
+  // Card Header
+  var header = document.createElement('div');
+  header.className = 'card-header';
+
+  var title = document.createElement('span');
+  title.className = 'card-title';
+  title.textContent = '📊 CSI Health';
+  header.appendChild(title);
+
+  var controls = document.createElement('div');
+  controls.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+
+  // Filter buttons
+  var filters = [{f:'all',label:'All'},{f:'pending',label:'⏳ Pending',color:'var(--red)'},{f:'done',label:'✅ Done',color:'var(--green)'},{f:'low',label:'⚠️ Low Score',color:'var(--amber)'}];
+  filters.forEach(function(fb){
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-sm btn-outline';
+    btn.id = 'csi-btn-' + fb.f;
+    btn.textContent = fb.label;
+    if(fb.color) btn.style.cssText = 'color:'+fb.color+';border-color:'+fb.color+';';
+    btn.onclick = (function(f){ return function(){ csiSetFilter(f); }; })(fb.f);
+    controls.appendChild(btn);
+  });
+
+  // Date from
+  var fromInput = document.createElement('input');
+  fromInput.type = 'date'; fromInput.id = 'csi-from';
+  fromInput.className = 'form-control';
+  fromInput.style.cssText = 'width:130px;padding:4px 8px;font-size:12px;';
+  fromInput.value = monthAgo;
+  fromInput.onchange = function(){ window._csiDateFrom = this.value; buildCSITable(); };
+  controls.appendChild(fromInput);
+
+  var toSpan = document.createElement('span');
+  toSpan.style.fontSize = '12px'; toSpan.textContent = 'to';
+  controls.appendChild(toSpan);
+
+  var toInput = document.createElement('input');
+  toInput.type = 'date'; toInput.id = 'csi-to';
+  toInput.className = 'form-control';
+  toInput.style.cssText = 'width:130px;padding:4px 8px;font-size:12px;';
+  toInput.value = today;
+  toInput.onchange = function(){ window._csiDateTo = this.value; buildCSITable(); };
+  controls.appendChild(toInput);
+
+  var clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-sm btn-outline';
+  clearBtn.textContent = 'Clear';
+  clearBtn.onclick = csiClearDates;
+  controls.appendChild(clearBtn);
+
+  if(canFill){
+    var fillBtn = document.createElement('button');
+    fillBtn.className = 'btn btn-primary btn-sm';
+    fillBtn.textContent = '📝 Fill CSI';
+    fillBtn.onclick = function(){ openCSIForm(); };
+    controls.appendChild(fillBtn);
+  }
+
+  header.appendChild(controls);
+  card.appendChild(header);
+
+  var body = document.createElement('div');
+  body.className = 'card-body';
+  body.style.padding = '0';
+  var wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
+  wrap.id = 'csi-table-wrap';
+  body.appendChild(wrap);
+  card.appendChild(body);
+  pc.appendChild(card);
 
   buildCSITable();
 }
+
 
 function csiSetFilter(f){
   window._csiFilter = f;

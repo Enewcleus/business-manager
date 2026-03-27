@@ -2155,21 +2155,83 @@ function showCSIHistory(btn){
       '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
       '<td style="font-size:12px;">'+trend+'</td>'+
       '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
-      '<td style="font-size:12px;max-width:250px;">'+( r.remarks?'<div style="line-height:1.5;white-space:pre-wrap;">'+r.remarks+'</div>':'—')+'</td>'+
+      '<td style="font-size:12px;max-width:200px;">'+( r.remarks?'<div style="line-height:1.5;">'+r.remarks+'</div>':'—')+'</td>'+
+      '<td style="font-size:12px;max-width:200px;">'+(r.actionTaken?'<div style="color:var(--secondary);line-height:1.5;">'+r.actionTaken+'</div>':'—')+'</td>'+
+      '<td>'+(r.actionStatus?'<span class="badge badge-blue" style="font-size:11px;">'+r.actionStatus+'</span>':'—')+'</td>'+
     '</tr>';
   });
 
+  // Add note button
+  var addNoteHtml = canFill ? '<button class="btn btn-sm btn-primary" onclick="openCSINote(\''+cc+'\',\''+cn.replace(/'/g,'')+'\')">➕ Add Action Note</button>' : '';
   openPanel('📈 CSI History — '+cn,
-    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;">'+
-      '<strong>'+cn+'</strong> · Total '+history.length+' reviews'+
+    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'+
+      '<span><strong>'+cn+'</strong> · Total '+history.length+' reviews</span>'+
+      addNoteHtml+
     '</div>'+
     '<div class="table-wrap">'+
-      '<table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Trend</th><th>By</th><th>Remarks</th></tr></thead>'+
+      '<table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Trend</th><th>By</th><th>Remarks</th><th>Action Taken</th><th>Status</th></tr></thead>'+
       '<tbody>'+rows+'</tbody></table>'+
     '</div>'
   );
 }
 
+
+function openCSINote(cc, cn) {
+  closePanel();
+  setTimeout(function(){
+    openPanel('📝 Add Action Note — ' + cn,
+      '<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+
+        '<strong>'+cn+'</strong> — seller pe action note add karo (bina CSI score bhare)'+
+      '</div>'+
+      '<div class="form-group"><label>✅ Action Taken</label>'+
+        '<textarea class="form-control" id="note-action" rows="3" placeholder="Kya step liya? Seller ko kya bataya?"></textarea></div>'+
+      '<div class="form-group"><label>📊 Current Status</label>'+
+        '<select class="form-control" id="note-status">'+
+          '<option value="">-- Select --</option>'+
+          '<option>Issue Identified — Working on it</option>'+
+          '<option>Explained to Seller</option>'+
+          '<option>Escalated to AM</option>'+
+          '<option>Escalated to Ops Lead</option>'+
+          '<option>Resolved</option>'+
+          '<option>Follow-up Scheduled</option>'+
+          '<option>No Action Needed</option>'+
+        '</select></div>'+
+      '<div class="form-group"><label>💬 Additional Remarks</label>'+
+        '<textarea class="form-control" id="note-remarks" rows="2" placeholder="Koi aur update..."></textarea></div>'+
+      '<button class="btn btn-primary btn-full" id="save-note-btn" '+
+        'data-cc="'+cc+'" data-cn="'+cn+'" '+
+        'onclick="submitCSINote(this)">💾 Save Note</button>'
+    );
+  }, 200);
+}
+
+async function submitCSINote(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var action = document.getElementById('note-action').value.trim();
+  var status = document.getElementById('note-status').value;
+  var remarks = document.getElementById('note-remarks').value.trim();
+  if(!action && !status) { showToast('Action ya status zaroor bharo', 'error'); return; }
+  // Save as a note-only CSI entry (no scores)
+  var r = await api('POST', '/csi', {
+    clientCode: cc, clientName: cn,
+    q1:0,q2:0,q3:0,q4:0,q5:0,
+    csiScore:0, csiPercent:0,
+    healthStatus:'Note Only',
+    remarks: remarks,
+    actionTaken: action,
+    actionStatus: status,
+    nextReviewDate: null,
+    isNote: true,
+  });
+  if(r?.success) {
+    showToast('✅ Action note saved!', 'success');
+    closePanel();
+    renderCSI();
+  } else {
+    showToast('Save failed', 'error');
+  }
+}
 
 function csiClick(btn){
   var row=btn.closest('tr');
@@ -2206,9 +2268,11 @@ function openCSIForm(cc,cn){
     '</select></div>'+
     (infoHtml?'<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>':'')+
     qHtml+
-    '<div class="form-group"><label>Remarks</label><textarea class="form-control" id="csi-remarks" placeholder="Feedback..."></textarea></div>'+
+    '<div class="form-group"><label>💬 Seller Remarks / Feedback</label><textarea class="form-control" id="csi-remarks" rows="2" placeholder="Seller ne kya kaha..."></textarea></div>'+
+    '<div class="form-group"><label>✅ Action Taken (CSI Team)</label><textarea class="form-control" id="csi-action" rows="3" placeholder="Kya step liya? Seller ko kya bataya? Follow-up plan kya hai?"></textarea></div>'+
+    '<div class="form-group"><label>📊 Current Status</label><select class="form-control" id="csi-status-action"><option value="">-- Select Status --</option><option>Issue Identified — Working on it</option><option>Explained to Seller</option><option>Escalated to AM</option><option>Escalated to Ops Lead</option><option>Resolved</option><option>Follow-up Scheduled</option><option>No Action Needed</option></select></div>'+
     '<div class="form-group"><label>Next Review</label><input type="date" class="form-control" id="csi-next" value="'+dateAfterDays(15)+'"></div>'+
-    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save</button>'
+    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>'
   );
 }
 
@@ -2240,7 +2304,9 @@ async function submitCSI(){
   CSI_QUESTIONS.forEach(q=>{const v=parseInt(document.getElementById('val-'+q.id).value);if(!v||v<1)allFilled=false;else scores[q.id]=v;});
   if(!allFilled){showToast('Please rate all 5 questions','error');return;}
   const total=Object.values(scores).reduce((a,b)=>a+b,0),percent=Math.round((total/25)*100);
-  const r=await api('POST','/csi',{clientCode:cc,clientName:cn,...scores,csiScore:total,csiPercent:percent,remarks:document.getElementById('csi-remarks').value,nextReviewDate:document.getElementById('csi-next').value,healthStatus:percent>=80?'Healthy':percent>=50?'Warning':'At Risk'});
+  const actionTaken = document.getElementById('csi-action')?.value||'';
+  const actionStatus = document.getElementById('csi-status-action')?.value||'';
+  const r=await api('POST','/csi',{clientCode:cc,clientName:cn,...scores,csiScore:total,csiPercent:percent,remarks:document.getElementById('csi-remarks').value,actionTaken,actionStatus,nextReviewDate:document.getElementById('csi-next').value,healthStatus:percent>=80?'Healthy':percent>=50?'Warning':'At Risk'});
   if(r?.success){showToast(`✅ CSI Saved! ${percent}% — ${percent>=80?'Healthy':percent>=50?'Warning':'At Risk'}`,'success');closePanel();renderCSI();}
 }
 

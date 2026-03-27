@@ -1727,7 +1727,9 @@ function viewTicketDetail(el){
     '</div>'+
     '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
     '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>'+
-    (t.resolutionNote?'<div style="font-weight:600;margin-bottom:6px;">✅ Resolution:</div><div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;">'+t.resolutionNote+'</div>':'')+
+    (t.resolutionNote?'<div style="font-weight:600;margin-bottom:6px;">✅ Resolution:</div>'+
+    '<div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;margin-bottom:8px;">'+t.resolutionNote+'</div>'+
+    (t.resolvedAt?'<div style="font-size:12px;color:var(--text-muted);">✅ Closed by: '+(t.resolvedBy||'—')+' · '+t.resolvedAt+'</div>':''):'')+
     (t.status!=='Done'?
       '<div style="display:flex;gap:8px;margin-top:12px;">'+
         (t.status==='Open'?'<button class="btn btn-outline" data-tid="'+t.ticketId+'" onclick="var b=this;updateTicket(b.getAttribute(\'data-tid\'),\'In Progress\');closePanel()">▶ Accept</button>':'')+
@@ -1760,7 +1762,36 @@ function viewTaskDetail(tid){
 
 function filterTickets(s){const f=s?APP.tickets.filter(t=>t.status===s):APP.tickets;document.getElementById('tickets-body').innerHTML=ticketCards(f);}
 async function updateTicket(id,status,note){const r=await api('PATCH',`/tickets/${id}`,{status,resolutionNote:note||''});if(r?.success){showToast('Ticket: '+status,'success');renderTickets();}}
-function promptCloseTicket(id,cn){const n=prompt(`Close ticket for ${cn}\nResolution note:`);if(n!==null)updateTicket(id,'Done',n);}
+function promptCloseTicket(id,cn){
+  openPanel('✅ Close Ticket — '+cn,
+    '<div style="background:#eafaf1;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">'+
+      '<strong>Ticket ID:</strong> '+id+'<br><strong>Client:</strong> '+cn+
+    '</div>'+
+    '<div class="form-group"><label>✅ Resolution / Action Taken *</label>'+
+      '<textarea class="form-control" id="close-note" rows="4" placeholder="Kya kiya? Problem kaise solve ki? Detail mein likho..."></textarea></div>'+
+    '<div class="form-group"><label>Closed By</label>'+
+      '<input type="text" class="form-control" value="'+(APP.user?APP.user.name:'—')+'" disabled></div>'+
+    '<div class="form-group"><label>Closed At</label>'+
+      '<input type="text" class="form-control" value="'+new Date().toLocaleString('en-IN')+'" disabled></div>'+
+    '<button class="btn btn-success btn-full" id="close-ticket-btn" data-tid="'+id+'" data-cn="'+cn.replace(/['"]/g,'')+'" onclick="submitCloseTicket(this)">✅ Close Ticket</button>'
+  );
+}
+
+async function submitCloseTicket(btn){
+  var id = btn.getAttribute('data-tid');
+  var note = document.getElementById('close-note').value.trim();
+  if(!note){ showToast('Resolution note zaroor likho!', 'error'); return; }
+  var r = await api('PATCH', '/tickets/'+id, {
+    status: 'Done',
+    resolutionNote: note,
+    resolvedBy: APP.user ? APP.user.name : '',
+  });
+  if(r?.success){
+    showToast('✅ Ticket closed!', 'success');
+    closePanel();
+    renderTickets();
+  }
+}
 
 function openRaiseTicket(){
   if(!APP.clients.length){getClients().then(c=>{if(c){APP.clients=c;openRaiseTicket();}});return;}
@@ -2244,34 +2275,63 @@ function starRating(val){const n=parseInt(val)||0;return `<span title="${n}/5" s
 function openCSIForm(cc,cn){
   var client=cc?(APP.clients||[]).find(function(c){return c.clientCode===cc;}):null;
   var phone=client?(client.phone||''):'';
+  
+  // Get existing CSI data for pre-fill
+  var existingCSI = cc && window._csiMap ? window._csiMap[cc] : null;
+  
   var opts='';
   (APP.clients||[]).forEach(function(c){
     opts+='<option value="'+c.clientCode+'"'+(cc===c.clientCode?' selected':'')+'>'+c.busyName+' ('+c.clientCode+')</option>';
   });
+  
   var qHtml='';
   CSI_QUESTIONS.forEach(function(q){
+    var existingVal = existingCSI ? (existingCSI[q.id]||0) : 0;
     var stars='';
     for(var n=1;n<=5;n++){
-      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(\'' +q.id+ '\','+n+')"><div id="star-'+q.id+'-'+n+'" class="star-box">☆<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>';
+      var isSelected = n <= existingVal;
+      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(''+q.id+'','+n+')">'+
+        '<div id="star-'+q.id+'-'+n+'" class="star-box" style="'+(isSelected?'background:var(--amber);border-color:var(--amber);color:#fff;':'')+'">'+
+        (isSelected?'⭐':'☆')+'<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>';
     }
     qHtml+='<div class="form-group"><label>'+q.label+'</label>'+
       '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'+q.desc+'</div>'+
       '<div style="display:flex;gap:8px;">'+stars+'</div>'+
-      '<input type="hidden" id="val-'+q.id+'" value="0"></div>';
+      '<input type="hidden" id="val-'+q.id+'" value="'+existingVal+'"></div>';
   });
-  var infoHtml=client?('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')):'';
-  openPanel('📝 CSI Review Form',
-    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">Rate 1-5</div>'+
+  
+  var infoHtml=client?('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')):' ';
+  var isEdit = !!existingCSI;
+  
+  openPanel((isEdit?'✏️ Edit':'📝 Fill')+' CSI Review'+(cn?' — '+cn:''),
+    '<div style="background:'+(isEdit?'#fef9e7':'var(--bg)')+';border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">'+
+      (isEdit?'⚠️ Editing existing CSI — purana data pre-filled hai':'Rate 1 (Poor) to 5 (Excellent)')+
+    '</div>'+
     '<div class="form-group"><label>Client *</label>'+
     '<select class="form-control" id="csi-client" onchange="updateCSIClientInfo(this)">'+
     '<option value="">Select...</option>'+opts+
     '</select></div>'+
     (infoHtml?'<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>':'')+
     qHtml+
-    '<div class="form-group"><label>💬 Seller Remarks / Feedback</label><textarea class="form-control" id="csi-remarks" rows="2" placeholder="Seller ne kya kaha..."></textarea></div>'+
-    '<div class="form-group"><label>✅ Action Taken (CSI Team)</label><textarea class="form-control" id="csi-action" rows="3" placeholder="Kya step liya? Seller ko kya bataya? Follow-up plan kya hai?"></textarea></div>'+
-    '<div class="form-group"><label>📊 Current Status</label><select class="form-control" id="csi-status-action"><option value="">-- Select Status --</option><option>Issue Identified — Working on it</option><option>Explained to Seller</option><option>Escalated to AM</option><option>Escalated to Ops Lead</option><option>Resolved</option><option>Follow-up Scheduled</option><option>No Action Needed</option></select></div>'+
-    '<div class="form-group"><label>Next Review</label><input type="date" class="form-control" id="csi-next" value="'+dateAfterDays(15)+'"></div>'+
+    '<div class="form-group"><label>💬 Seller Remarks / Feedback</label>'+
+      '<textarea class="form-control" id="csi-remarks" rows="2" placeholder="Seller ne kya kaha...">'+(existingCSI&&existingCSI.remarks?existingCSI.remarks:'')+'</textarea></div>'+
+    '<hr style="margin:16px 0;border-color:var(--border);">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--secondary);margin-bottom:8px;">📋 ACTION TRACKING (Optional — baad mein bhi add kar sakte ho)</div>'+
+    '<div class="form-group"><label>✅ Action Taken</label>'+
+      '<textarea class="form-control" id="csi-action" rows="2" placeholder="Kya step liya? Seller ko kya bataya?"></textarea></div>'+
+    '<div class="form-group"><label>📊 Current Status</label>'+
+      '<select class="form-control" id="csi-status-action">'+
+        '<option value="">-- Select Status (Optional) --</option>'+
+        '<option>Issue Identified — Working on it</option>'+
+        '<option>Explained to Seller</option>'+
+        '<option>Escalated to AM</option>'+
+        '<option>Escalated to Ops Lead</option>'+
+        '<option>Resolved</option>'+
+        '<option>Follow-up Scheduled</option>'+
+        '<option>No Action Needed</option>'+
+      '</select></div>'+
+    '<div class="form-group"><label>Next Review Date</label>'+
+      '<input type="date" class="form-control" id="csi-next" value="'+(existingCSI&&existingCSI.nextReviewDate?existingCSI.nextReviewDate:dateAfterDays(15))+'"></div>'+
     '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>'
   );
 }

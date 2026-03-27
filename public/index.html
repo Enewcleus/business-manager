@@ -2290,7 +2290,7 @@ function openCSIForm(cc,cn){
     var stars='';
     for(var n=1;n<=5;n++){
       var isSelected = n <= existingVal;
-      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(''+q.id+'','+n+')">'+
+      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(\''+q.id+'\','+n+')">'+
         '<div id="star-'+q.id+'-'+n+'" class="star-box" style="'+(isSelected?'background:var(--amber);border-color:var(--amber);color:#fff;':'')+'">'+
         (isSelected?'⭐':'☆')+'<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>';
     }

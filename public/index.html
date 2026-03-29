@@ -1633,7 +1633,7 @@ function renderPaySellerList() {
     else if(isDue30) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#FAEEDA;color:#854F0B;">Due '+daysLeft+'d</span>';
     else if(rd) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#EAF3DE;color:#3B6D11;">Paid</span>';
 
-    return '<div style="padding:10px;border-radius:8px;border:'+(isSelected?'2px solid var(--primary)':'0.5px solid var(--border)')+';margin-bottom:6px;cursor:pointer;background:'+(isOverdue?'#FCEBEB22':isDue30?'#FAEEDA22':'var(--bg)')+';" onclick="selectPaySeller(''+c.clientCode+'')">'+
+    return '<div style="padding:10px;border-radius:8px;border:'+(isSelected?'2px solid var(--primary)':'0.5px solid var(--border)')+';margin-bottom:6px;cursor:pointer;background:'+(isOverdue?'#FCEBEB22':isDue30?'#FAEEDA22':'var(--bg)')+';" data-cc="'+c.clientCode+'" onclick="selectPaySeller(this.getAttribute(\'data-cc\'))">'+ 
       '<div style="font-weight:500;font-size:13px;">'+c.busyName+'</div>'+
       '<div style="font-size:11px;color:var(--text-muted);">'+c.clientCode+' · '+c.marketplace+' · '+cycleLabel(c.paymentCycle||1)+'</div>'+
       '<div style="margin-top:4px;">'+badge+'</div>'+

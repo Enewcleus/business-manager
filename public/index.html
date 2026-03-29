@@ -436,6 +436,7 @@ const NAV_CONFIG = {
     {id:'dsr', label:'Daily Sales Report', icon:'📈'},
     {id:'reports', label:'Reports', icon:'📊'},
     {id:'seller360', label:'Seller 360 View', icon:'🔍'},
+    {id:'payments', label:'Payment Manager', icon:'💰'},
   ],
   'CSI Executive': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
@@ -635,7 +636,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -1480,6 +1481,288 @@ function resetDashboardWidgets(prefKey) {
   showToast('Dashboard reset!', 'success');
   closePanel();
   renderDashboard();
+}
+
+
+
+function cycleLabel(months) {
+  var m = parseInt(months) || 1;
+  if(m===1) return 'Monthly';
+  if(m===2) return '2-Monthly';
+  if(m===3) return 'Quarterly';
+  if(m===6) return 'Half-Yearly';
+  if(m===12) return 'Annual';
+  return m+' Months';
+}
+
+function calcNextDue(renewalDate, cycleMonths) {
+  if(!renewalDate) return null;
+  var d = new Date(renewalDate);
+  d.setMonth(d.getMonth() + (parseInt(cycleMonths)||1));
+  return d.toISOString().split('T')[0];
+}
+
+
+async function renderPayments() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Payment Manager...</div>';
+  const clients = await getClients(true);
+  if(clients) APP.clients = clients;
+  window._payClients = clients || [];
+  window._paySelected = null;
+  window._payHistory = [];
+  buildPaymentLayout();
+}
+
+function buildPaymentLayout() {
+  const u = APP.user;
+  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(u.role);
+  const pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // Stats
+  const today = new Date();
+  const due30 = (window._payClients||[]).filter(c => {
+    if(!c.renewalDate) return false;
+    const d = new Date(c.renewalDate);
+    const diff = (d-today)/(1000*60*60*24);
+    return diff >= 0 && diff <= 30;
+  });
+  const overdue = (window._payClients||[]).filter(c => {
+    if(!c.renewalDate) return false;
+    return new Date(c.renewalDate) < today;
+  });
+
+  // KPI row
+  const kpi = document.createElement('div');
+  kpi.className = 'kpi-grid';
+  kpi.style.marginBottom = '14px';
+  kpi.innerHTML =
+    '<div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">'+(window._payClients||[]).length+'</div></div>'+
+    '<div class="kpi-card amber"><div class="kpi-label">Due in 30 Days</div><div class="kpi-value" style="color:var(--amber);">'+due30.length+'</div></div>'+
+    '<div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--red);">'+overdue.length+'</div></div>'+
+    '<div class="kpi-card green"><div class="kpi-label">All Sellers</div><div class="kpi-value">'+( window._payClients||[]).length+'</div></div>';
+  pc.appendChild(kpi);
+
+  // Main layout
+  const main = document.createElement('div');
+  main.style.cssText = 'display:flex;gap:12px;';
+
+  // LEFT: Seller list
+  const left = document.createElement('div');
+  left.style.cssText = 'flex:0 0 320px;';
+  left.innerHTML =
+    '<div class="card" style="height:600px;display:flex;flex-direction:column;">'+
+      '<div class="card-header"><span class="card-title">💰 Sellers</span></div>'+
+      '<div style="padding:8px 12px;">'+
+        '<input type="text" class="form-control" id="pay-search" placeholder="Search seller..." oninput="filterPaySellers(this.value)" style="font-size:13px;">'+
+        '<div style="display:flex;gap:6px;margin-top:6px;">'+
+          '<button class="btn btn-sm btn-outline" id="pay-f-all" onclick="payFilter('all')">All</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="pay-f-due" onclick="payFilter('due')">Due 30d</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="pay-f-over" onclick="payFilter('over')">Overdue</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="pay-seller-list" style="flex:1;overflow-y:auto;padding:0 8px 8px;"></div>'+
+    '</div>';
+  main.appendChild(left);
+
+  // RIGHT: Detail
+  const right = document.createElement('div');
+  right.style.cssText = 'flex:1;';
+  right.innerHTML =
+    '<div id="pay-detail" class="card" style="min-height:500px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">'+
+      '<div style="text-align:center;"><div style="font-size:40px;margin-bottom:8px;">💰</div><div>Seller select karo payment history dekhne ke liye</div></div>'+
+    '</div>';
+  main.appendChild(right);
+  pc.appendChild(main);
+
+  window._payFilter = 'all';
+  renderPaySellerList();
+}
+
+function payFilter(f) {
+  window._payFilter = f;
+  ['all','due','over'].forEach(function(x){
+    var btn = document.getElementById('pay-f-'+x);
+    if(!btn) return;
+    if(x===f){ btn.className='btn btn-sm btn-primary'; btn.style.cssText=''; }
+    else {
+      btn.className='btn btn-sm btn-outline';
+      if(x==='due') btn.style.cssText='color:var(--amber);border-color:var(--amber);';
+      else if(x==='over') btn.style.cssText='color:var(--red);border-color:var(--red);';
+      else btn.style.cssText='';
+    }
+  });
+  renderPaySellerList();
+}
+
+function filterPaySellers(q) {
+  window._paySearch = q;
+  renderPaySellerList();
+}
+
+function renderPaySellerList() {
+  var list = document.getElementById('pay-seller-list');
+  if(!list) return;
+  var clients = window._payClients || [];
+  var today = new Date();
+  var q = (window._paySearch||'').toLowerCase();
+  var f = window._payFilter || 'all';
+
+  if(q) clients = clients.filter(function(c){ return c.busyName.toLowerCase().includes(q) || c.clientCode.toLowerCase().includes(q); });
+  if(f==='due') clients = clients.filter(function(c){
+    if(!c.renewalDate) return false;
+    var diff=(new Date(c.renewalDate)-today)/(1000*60*60*24);
+    return diff>=0&&diff<=30;
+  });
+  if(f==='over') clients = clients.filter(function(c){
+    if(!c.renewalDate) return false;
+    return new Date(c.renewalDate)<today;
+  });
+
+  if(!clients.length){ list.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Koi seller nahi</div>'; return; }
+
+  list.innerHTML = clients.map(function(c){
+    var rd = c.renewalDate ? new Date(c.renewalDate) : null;
+    var isOverdue = rd && rd < today;
+    var daysLeft = rd ? Math.ceil((rd-today)/(1000*60*60*24)) : null;
+    var isDue30 = daysLeft !== null && daysLeft >= 0 && daysLeft <= 30;
+    var isSelected = window._paySelected === c.clientCode;
+
+    var badge = '';
+    if(isOverdue) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#FCEBEB;color:#A32D2D;">Overdue '+Math.abs(daysLeft)+'d</span>';
+    else if(isDue30) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#FAEEDA;color:#854F0B;">Due '+daysLeft+'d</span>';
+    else if(rd) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#EAF3DE;color:#3B6D11;">Paid</span>';
+
+    return '<div style="padding:10px;border-radius:8px;border:'+(isSelected?'2px solid var(--primary)':'0.5px solid var(--border)')+';margin-bottom:6px;cursor:pointer;background:'+(isOverdue?'#FCEBEB22':isDue30?'#FAEEDA22':'var(--bg)')+';" onclick="selectPaySeller(''+c.clientCode+'')">'+
+      '<div style="font-weight:500;font-size:13px;">'+c.busyName+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);">'+c.clientCode+' · '+c.marketplace+' · '+cycleLabel(c.paymentCycle||1)+'</div>'+
+      '<div style="margin-top:4px;">'+badge+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function selectPaySeller(cc) {
+  window._paySelected = cc;
+  renderPaySellerList();
+  const client = (window._payClients||[]).find(function(c){return c.clientCode===cc;});
+  if(!client) return;
+  const detail = document.getElementById('pay-detail');
+  detail.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const history = await api('GET', '/payments?clientCode='+cc) || [];
+  window._payHistory = history;
+  renderPayDetail(client, history);
+}
+
+function renderPayDetail(client, history) {
+  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(APP.user.role);
+  const today = new Date();
+  const rd = client.renewalDate ? new Date(client.renewalDate) : null;
+  const daysLeft = rd ? Math.ceil((rd-today)/(1000*60*60*24)) : null;
+  const cycle = client.paymentCycle || 1;
+  const aging = client.sellerAging || 0;
+  const isOverdue = rd && rd < today;
+
+  let histHtml = '';
+  if(history.length) {
+    histHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+      '<thead><tr style="border-bottom:0.5px solid var(--border);">'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">#</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Date</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Amount</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Mode</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">UTR</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Period</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">By</th>'+
+      '</tr></thead><tbody>'+
+      history.map(function(p,i){
+        return '<tr style="border-bottom:0.5px solid var(--border);">'+
+          '<td style="padding:8px;color:var(--text-muted);">'+(history.length-i)+'</td>'+
+          '<td style="padding:8px;">'+( p.paymentDate||'—')+'</td>'+
+          '<td style="padding:8px;font-weight:500;">₹'+Number(p.amount||0).toLocaleString('en-IN')+'</td>'+
+          '<td style="padding:8px;">'+( p.paymentMode||'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;color:var(--text-muted);">'+(p.utrNumber||'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;">'+(p.periodFrom&&p.periodTo?p.periodFrom+' to '+p.periodTo:'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;color:var(--text-muted);">'+(p.recordedBy||'—')+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  } else {
+    histHtml = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi payment record nahi abhi tak</div>';
+  }
+
+  const detail = document.getElementById('pay-detail');
+  detail.innerHTML =
+    '<div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+      '<div>'+
+        '<div style="font-size:17px;font-weight:600;">'+client.busyName+'</div>'+
+        '<div style="font-size:12px;color:var(--text-muted);">'+client.clientCode+' · '+client.marketplace+(client.phone?' · 📞 '+client.phone:'')+'</div>'+
+      '</div>'+
+      (canRecord?'<button class="btn btn-primary btn-sm" id="rec-pay-btn" data-cc="'+client.clientCode+'" data-cn="'+client.busyName.replace(/['"]/g,'')+'" onclick="openRecordPayment(this)">+ Record Payment</button>':'')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:12px 0;border-bottom:0.5px solid var(--border);margin-bottom:12px;">'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Plan</div><div style="font-weight:500;font-size:14px;">'+(client.servicePlan||'—')+'</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Cycle</div><div style="font-weight:500;font-size:14px;">'+cycleLabel(cycle)+'</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Seller Aging</div><div style="font-weight:500;font-size:14px;">'+aging+' days</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Total Payments</div><div style="font-weight:500;font-size:14px;">'+history.length+'</div></div>'+
+      '<div style="background:'+(isOverdue?'#FCEBEB':'daysLeft!==null&&daysLeft<=7?'#FAEEDA':'var(--bg-secondary,var(--bg))'')+';border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Next Due</div><div style="font-weight:500;font-size:14px;color:'+(isOverdue?'var(--red)':daysLeft!==null&&daysLeft<=7?'var(--amber)':'inherit')+';">'+(rd?client.renewalDate+' ('+(isOverdue?'OVERDUE':daysLeft+'d')+')'  :'—')+'</div></div>'+
+    '</div>'+
+    '<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:8px;">PAYMENT HISTORY</div>'+
+    histHtml;
+}
+
+function openRecordPayment(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var client = (window._payClients||[]).find(function(c){return c.clientCode===cc;});
+  var cycle = client ? (client.paymentCycle||1) : 1;
+  var today = new Date().toISOString().split('T')[0];
+  var periodFrom = today;
+  var periodTo = new Date();
+  periodTo.setMonth(periodTo.getMonth() + cycle);
+  var periodToStr = periodTo.toISOString().split('T')[0];
+
+  openPanel('💰 Record Payment — '+cn,
+    '<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">'+
+      '<strong>'+cn+'</strong> · '+cycleLabel(cycle)+' cycle'+
+    '</div>'+
+    '<div class="form-group"><label>Payment Date *</label><input type="date" class="form-control" id="rp-date" value="'+today+'"></div>'+
+    '<div class="form-group"><label>Amount (₹) *</label><input type="number" class="form-control" id="rp-amount" placeholder="0"></div>'+
+    '<div class="form-group"><label>Payment Mode</label>'+
+      '<select class="form-control" id="rp-mode">'+
+        '<option>UPI</option><option>NEFT</option><option>RTGS</option><option>IMPS</option><option>Cheque</option><option>Cash</option>'+
+      '</select></div>'+
+    '<div class="form-group"><label>UTR / Transaction Number</label><input type="text" class="form-control" id="rp-utr" placeholder="UTR or TXN number"></div>'+
+    '<div class="form-row">'+
+      '<div class="form-group"><label>Period From</label><input type="date" class="form-control" id="rp-from" value="'+periodFrom+'"></div>'+
+      '<div class="form-group"><label>Period To (Next Renewal)</label><input type="date" class="form-control" id="rp-to" value="'+periodToStr+'"></div>'+
+    '</div>'+
+    '<div class="form-group"><label>Notes</label><textarea class="form-control" id="rp-notes" rows="2" placeholder="Koi aur detail..."></textarea></div>'+
+    '<button class="btn btn-success btn-full" data-cc="'+cc+'" data-cn="'+cn+'" onclick="submitPayment(this)">💾 Save Payment</button>'
+  );
+}
+
+async function submitPayment(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var amount = document.getElementById('rp-amount').value;
+  var date = document.getElementById('rp-date').value;
+  if(!amount || !date) { showToast('Amount aur date required!','error'); return; }
+  var r = await api('POST','/payments',{
+    clientCode:cc, clientName:cn,
+    amount:amount, paymentDate:date,
+    paymentMode:document.getElementById('rp-mode').value,
+    utrNumber:document.getElementById('rp-utr').value||null,
+    periodFrom:document.getElementById('rp-from').value||null,
+    periodTo:document.getElementById('rp-to').value||null,
+    notes:document.getElementById('rp-notes').value||null,
+  });
+  if(r?.success){
+    showToast('✅ Payment recorded!','success');
+    closePanel();
+    selectPaySeller(cc);
+  } else {
+    showToast(r?.error||'Failed','error');
+  }
 }
 
 

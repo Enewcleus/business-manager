@@ -595,3 +595,23 @@ hurdleRouter.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter, clientsRouter, hurdleRouter };
+
+// ── RENEWAL HISTORY REPORTS ─────────────────────────────────
+const renewalHistoryRouter = require('express').Router();
+
+renewalHistoryRouter.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { from, to, executive, marketplace, mis } = req.query;
+    let q = supabase.from('renewal_history').select('*').order('service_start_date', { ascending: false });
+    if (from) q = q.gte('service_start_date', from);
+    if (to)   q = q.lte('service_start_date', to);
+    if (executive) q = q.ilike('am_name', `%${executive}%`);
+    if (marketplace) q = q.ilike('marketplace', `%${marketplace}%`);
+    if (mis) q = q.eq('mis_status', mis);
+    const { data, error } = await q.limit(3000);
+    if (error) throw error;
+    res.json(data || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+module.exports.renewalHistoryRouter = renewalHistoryRouter;

@@ -4284,7 +4284,8 @@ async function generateReport(){
     const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='marketplace_retention';
     renderMarketplaceRetention(data,el);return;
   } else if(type==='am_performance'){
-    const [hist,usersData,clientsData]=await Promise.all([api('GET','/renewal-history'),api('GET','/users'),api('GET','/clients')]);
+    const ts=Date.now();
+    const [hist,usersData,clientsData]=await Promise.all([api('GET','/renewal-history?_='+ts),api('GET','/users?_='+ts),api('GET','/clients?_='+ts)]);
     const processed=buildAMPerformanceData(hist||[],usersData||[],clientsData||[]);
     window._reportData=processed;window._reportType='am_performance';
     renderAMPerformanceReport(processed,el);return;

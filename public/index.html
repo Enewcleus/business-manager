@@ -3769,6 +3769,123 @@ async function renderAds(){
 }
 
 // ── REPORTS ──────────────────────────────────────────────────
+
+function renderRenewalAnalysis(data, el) {
+  // Group by month of service_start_date
+  const months = {};
+  data.forEach(function(r) {
+    if(!r.service_start_date) return;
+    const m = r.service_start_date.slice(0,7); // YYYY-MM
+    if(!months[m]) months[m] = {expected:0, active:0, inactive:0, paused:0, revenue:0, buckets:{}};
+    months[m].expected++;
+    const mis = (r.mis_status||'').toLowerCase();
+    if(mis==='active') months[m].active++;
+    else if(mis==='inactive') months[m].inactive++;
+    else months[m].paused++;
+    months[m].revenue += parseFloat(r.amount_with_gst||0);
+    // Closing reason bucket
+    if(r.closing_reason && r.closing_reason.length > 3) {
+      const bucket = r.closing_reason.slice(0,40);
+      months[m].buckets[bucket] = (months[m].buckets[bucket]||0)+1;
+    }
+  });
+
+  const sorted = Object.keys(months).sort().reverse().slice(0,12);
+  const rows = sorted.map(function(m) {
+    const d = months[m];
+    const renewalPct = d.expected ? Math.round(d.active/d.expected*100) : 0;
+    const topBucket = Object.entries(d.buckets).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+m+'</strong></td>'+
+      '<td>'+d.expected+'</td>'+
+      '<td style="color:var(--green);font-weight:600;">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(renewalPct>=70?'badge-green':renewalPct>=50?'badge-amber':'badge-red')+'">'+renewalPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(topBucket?topBucket[0]+'('+topBucket[1]+')':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">📈 Renewal Analysis — Month Wise ('+data.length+' records)</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Month</th><th>Expected</th><th>Active</th><th>Inactive</th><th>Renewal %</th><th>Revenue (w/GST)</th><th>Top Closing Reason</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
+function renderExecutiveRetention(data, el) {
+  // Group by AM name
+  const execs = {};
+  data.forEach(function(r) {
+    const am = r.am_name || 'Unknown';
+    if(!execs[am]) execs[am] = {total:0, active:0, inactive:0, revenue:0, marketplaces:{}};
+    execs[am].total++;
+    if((r.mis_status||'').toLowerCase()==='active') execs[am].active++;
+    else execs[am].inactive++;
+    execs[am].revenue += parseFloat(r.amount_with_gst||0);
+    const mp = r.marketplace||'Other';
+    execs[am].marketplaces[mp] = (execs[am].marketplaces[mp]||0)+1;
+  });
+
+  const sorted = Object.entries(execs).sort((a,b)=>b[1].total-a[1].total);
+  const rows = sorted.map(function(entry) {
+    const am = entry[0], d = entry[1];
+    const retPct = d.total ? Math.round(d.active/d.total*100) : 0;
+    const topMp = Object.entries(d.marketplaces).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+am+'</strong></td>'+
+      '<td>'+d.total+'</td>'+
+      '<td style="color:var(--green);">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(retPct>=70?'badge-green':retPct>=50?'badge-amber':'badge-red')+'">'+retPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;">'+(topMp?topMp[0]:'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">👤 Executive Retention Report ('+Object.keys(execs).length+' executives)</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Account Manager</th><th>Total Sellers</th><th>Active</th><th>Inactive</th><th>Retention %</th><th>Revenue (w/GST)</th><th>Top Market</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
+function renderMarketplaceRetention(data, el) {
+  const mps = {};
+  data.forEach(function(r) {
+    const mp = (r.marketplace||'Other').trim();
+    if(!mps[mp]) mps[mp] = {total:0, active:0, inactive:0, revenue:0, plans:{}};
+    mps[mp].total++;
+    if((r.mis_status||'').toLowerCase()==='active') mps[mp].active++;
+    else mps[mp].inactive++;
+    mps[mp].revenue += parseFloat(r.amount_with_gst||0);
+    const plan = r.service_plan||'Unknown';
+    mps[mp].plans[plan] = (mps[mp].plans[plan]||0)+1;
+  });
+
+  const sorted = Object.entries(mps).sort((a,b)=>b[1].total-a[1].total);
+  const rows = sorted.map(function(entry) {
+    const mp = entry[0], d = entry[1];
+    const retPct = d.total ? Math.round(d.active/d.total*100) : 0;
+    const topPlan = Object.entries(d.plans).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+mp+'</strong></td>'+
+      '<td>'+d.total+'</td>'+
+      '<td style="color:var(--green);">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(retPct>=70?'badge-green':retPct>=50?'badge-amber':'badge-red')+'">'+retPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;">'+(topPlan?topPlan[0].replace('Enewcleus ',''):'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">🛒 Marketplace Retention Report</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Marketplace</th><th>Total Sellers</th><th>Active</th><th>Inactive</th><th>Retention %</th><th>Revenue (w/GST)</th><th>Top Plan</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
 async function renderReports(){
   const clients=await getClients();if(clients) APP.clients=clients;
   const today=new Date().toISOString().split('T')[0],monthStart=today.slice(0,7)+'-01';
@@ -3784,6 +3901,9 @@ async function renderReports(){
           <button class="btn btn-secondary" onclick="window._currentReport='ticket';generateReport()">🎫 Ticket Report</button>
           <button class="btn btn-secondary" onclick="window._currentReport='team';generateReport()">👥 Team Report</button>
           <button class="btn btn-secondary" style="background:var(--primary);color:#fff;" onclick="window._currentReport='executive';generateReport()">🧑‍💼 Executive Summary</button>
+          <button class="btn btn-secondary" style="background:#8e44ad;color:#fff;" onclick="window._currentReport='renewal_analysis';generateReport()">📈 Renewal Analysis</button>
+          <button class="btn btn-secondary" style="background:#16a085;color:#fff;" onclick="window._currentReport='executive_retention';generateReport()">👤 Executive Retention</button>
+          <button class="btn btn-secondary" style="background:#2980b9;color:#fff;" onclick="window._currentReport='marketplace_retention';generateReport()">🛒 Marketplace Retention</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -3988,6 +4108,15 @@ async function generateReport(){
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-size:11px;">${d.ticketId||'—'}</td><td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.clientName||'—'}</strong></td><td>${d.subject||'—'}</td><td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td><td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td><td>${d.assignedTo||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   } else if(type==='team'){
     const data=await api('GET','/dashboard/team')||[];window._reportData=data;window._reportType='team';
+  } else if(type==='renewal_analysis'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='renewal_analysis';
+    renderRenewalAnalysis(data,el);return;
+  } else if(type==='executive_retention'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='executive_retention';
+    renderExecutiveRetention(data,el);return;
+  } else if(type==='marketplace_retention'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='marketplace_retention';
+    renderMarketplaceRetention(data,el);return;
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   }
 }
@@ -4011,6 +4140,16 @@ function exportExcel(){
       r.inProgress,
       r.overdue
     ].join(',')).join('\n');
+  }
+  else if(type==='renewal_analysis'||type==='executive_retention'||type==='marketplace_retention'){
+    // Extract table data from rendered HTML
+    const tbl = document.querySelector('#report-output table');
+    if(!tbl) { showToast('Pehle report generate karo','error'); return; }
+    const headers = Array.from(tbl.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+    const rowData = Array.from(tbl.querySelectorAll('tbody tr')).map(tr=>
+      Array.from(tr.querySelectorAll('td')).map(td=>'"'+td.textContent.trim().replace(/"/g,'')+'"')
+    );
+    csv = headers.join(',') + '\n' + rowData.map(r=>r.join(',')).join('\n');
   }
   else if(type==='dsr'){csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');}
   else if(type==='crm'){csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');}
@@ -4135,6 +4274,7 @@ function openAddUser(){
       <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="Sub Admin">Sub Admin</option><option value="CSI Lead">CSI Lead</option><option value="CSI Executive">CSI Executive</option><option value="Admin">Admin</option></select></div>
     </div>
     <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
+    <div class="form-group"><label>📅 Joining Date</label><input type="date" class="form-control" id="nu-joining"></div>
     <div class="form-group"><label>🛒 Marketplace Access <small style="color:var(--text-muted);">(Sub Admin ke liye select karo — khali = sab)</small></label><select class="form-control" id="nu-marketplace" multiple style="height:110px;"><option value="Amazon.in">Amazon.in</option><option value="Amazon.com">Amazon.com</option><option value="Amazon.uk">Amazon.uk</option><option value="Amazon.ae">Amazon.ae</option><option value="Amazon.ca">Amazon.ca</option><option value="Flipkart">Flipkart</option><option value="Meesho">Meesho</option><option value="Myntra">Myntra</option><option value="Snapdeal">Snapdeal</option><option value="Other">Other</option></select><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Ctrl/Cmd + click se multiple select karo</div></div>
     <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
 }

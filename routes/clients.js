@@ -82,6 +82,8 @@ function formatClient(c) {
     notes: c.notes,
     phone: c.phone || '',
     contactNumber: c.phone || '',
+    paymentCycle: c.payment_cycle || 1,
+    sellerAging: c.seller_aging || 0,
   };
 }
 

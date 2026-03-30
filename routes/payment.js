@@ -12,7 +12,7 @@ router.get('/', authMiddleware, async (req, res) => {
     if (error) throw error;
     res.json((data || []).map(p => ({
       id: p.id,
-      clientCode: p.client_code, 
+      clientCode: p.client_code,
       clientName: p.client_name,
       amount: p.amount,
       paymentDate: p.payment_date,

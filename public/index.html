@@ -536,14 +536,27 @@ function getSearchableVal(id) {
 async function api(method, path, body) {
   try {
     const res = await fetch(API + path, {
-      method, headers: {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      method,
+      headers: {
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+TOKEN,
+        'Cache-Control':'no-cache, no-store, must-revalidate',
+        'Pragma':'no-cache'
+      },
       body: body ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     });
     if (res.status === 401) { doLogout(); return null; }
-    if (res.status === 304 || !res.ok && res.status !== 200) { return null; }
+    if (res.status === 304) { return []; }
+    if (!res.ok) {
+      const errText = await res.text().catch(()=>'');
+      console.error('API Error', res.status, path, errText);
+      showToast('Server error ('+res.status+'): '+path, 'error');
+      return null;
+    }
     return await res.json();
   } catch(e) {
+    console.error('API fetch error:', path, e);
     showToast('Network error — check connection', 'error');
     return null;
   }

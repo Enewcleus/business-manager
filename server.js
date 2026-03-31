@@ -5,6 +5,11 @@ const compression = require('compression');
 require('dotenv').config();
 
 const app = express();
+app.set('etag', false);  //
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
 const PORT = process.env.PORT || 3001;
 
 // ── PERFORMANCE: Compression (saves 60-70% bandwidth) ────────

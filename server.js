@@ -5,6 +5,12 @@ const compression = require('compression');
 require('dotenv').config();
 
 const app = express();
+app.set('etag', false);
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
+
 const PORT = process.env.PORT || 3001;
 
 // ── PERFORMANCE: Compression (saves 60-70% bandwidth) ────────
@@ -51,10 +57,10 @@ app.use('/api/notifications',   require('./routes/notifications'));
 app.use('/api/users',           require('./routes/users'));
 app.use('/api/dsr',             require('./routes/dsr'));
 app.use('/api/close-requests',  require('./routes/close_requests'));
-app.use('/api/settings',        require('./routes/settings'));  // ✅ NEW
-
+app.use('/api/settings',        require('./routes/settings'));
+app.use('/api/payments',        require('./routes/payment'));
 app.use('/api/hurdles',         require('./routes/allroutes').hurdleRouter);
-app.use('/api/renewal-history', require('./routes/allroutes').renewalHistoryRouter);
+app.use('/api/renewal-history', require('./routes/allroutes').renewalHistoryRouter); // ← FIXED
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

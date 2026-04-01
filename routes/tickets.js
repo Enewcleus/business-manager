@@ -53,6 +53,7 @@ router.get('/', authMiddleware, async (req, res) => {
       hoursOpen, hoursRemaining: Math.max(0, slaHours - hoursOpen),
       createdAt: new Date(t.created_at).toLocaleString('en-IN'),
       resolvedAt: t.resolved_at ? new Date(t.resolved_at).toLocaleString('en-IN') : '',
+      resolvedBy: t.resolved_by || '',
     };
   }));
 });
@@ -91,6 +92,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   if (status === 'Done') {
     updates.resolved_at = new Date();
     updates.resolution_note = resolutionNote || '';
+    updates.resolved_by = req.user.name;
   }
   const { error } = await supabase.from('tickets').update(updates).eq('ticket_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });

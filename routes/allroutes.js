@@ -194,7 +194,6 @@ tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
   if (!['Admin', 'Ops Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
-    // Use ilike for names with spaces
     query = query.or(`assigned_to.ilike.%${name}%,assigned_by.ilike.%${name}%`);
   }
   const { data, error } = await query.limit(200);
@@ -229,7 +228,6 @@ tasksRouter.post('/', authMiddleware, async (req, res) => {
       parent_task_id: d.parentTaskId || null,
     });
     if (error) return res.status(500).json({ error: error.message });
-    // Notification — fire and forget, don't block response
     if (d.assignedTo && d.assignedTo !== req.user.name) {
       supabase.from('notifications').insert({
         notif_id: 'NTF' + Date.now(),
@@ -380,12 +378,13 @@ notifRouter.patch('/:id/read', authMiddleware, async (req, res) => {
 const usersRouter = require('express').Router();
 
 usersRouter.get('/', authMiddleware, async (req, res) => {
-  const { data, error } = await supabase.from('users').select('user_code, name, email, role, designation, department, reporting_to_name, is_active, last_login').order('name');
+  const { data, error } = await supabase.from('users').select('user_code, name, email, role, designation, department, reporting_to_name, is_active, last_login, joining_date').order('name');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(u => ({
     userId: u.user_code, name: u.name, email: u.email, role: u.role,
     designation: u.designation, department: u.department,
     reportingToName: u.reporting_to_name, isActive: u.is_active,
+    joiningDate: u.joining_date || null,
   })));
 });
 
@@ -594,9 +593,7 @@ hurdleRouter.delete('/:id', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter, usersRouter, renewalsRouter, adsRouter, clientsRouter, hurdleRouter };
-
-// ── RENEWAL HISTORY REPORTS ─────────────────────────────────
+// ── RENEWAL HISTORY REPORTS ───────────────────────────────────
 const renewalHistoryRouter = require('express').Router();
 
 renewalHistoryRouter.get('/', authMiddleware, async (req, res) => {
@@ -614,4 +611,17 @@ renewalHistoryRouter.get('/', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-module.exports.renewalHistoryRouter = renewalHistoryRouter;
+// ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
+module.exports = {
+  crmRouter,
+  csiRouter,
+  tasksRouter,
+  dashRouter,
+  notifRouter,
+  usersRouter,
+  renewalsRouter,
+  adsRouter,
+  clientsRouter,
+  hurdleRouter,
+  renewalHistoryRouter,  // ← FIX: ab properly export ho raha hai
+};

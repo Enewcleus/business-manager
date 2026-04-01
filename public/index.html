@@ -536,12 +536,27 @@ function getSearchableVal(id) {
 async function api(method, path, body) {
   try {
     const res = await fetch(API + path, {
-      method, headers: {'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
+      method,
+      headers: {
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+TOKEN,
+        'Cache-Control':'no-cache, no-store, must-revalidate',
+        'Pragma':'no-cache'
+      },
       body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
     });
     if (res.status === 401) { doLogout(); return null; }
+    if (res.status === 304) { return []; }
+    if (!res.ok) {
+      const errText = await res.text().catch(()=>'');
+      console.error('API Error', res.status, path, errText);
+      showToast('Server error ('+res.status+'): '+path, 'error');
+      return null;
+    }
     return await res.json();
   } catch(e) {
+    console.error('API fetch error:', path, e);
     showToast('Network error — check connection', 'error');
     return null;
   }
@@ -3886,6 +3901,171 @@ function renderMarketplaceRetention(data, el) {
   window._reportData = data;
 }
 
+function calcAMTenure(joiningDate){
+  if(!joiningDate) return '—';
+  try{
+    const jd=new Date(joiningDate),now=new Date();
+    const months=(now.getFullYear()-jd.getFullYear())*12+(now.getMonth()-jd.getMonth());
+    if(months<1) return '<1m';
+    if(months<12) return months+'m';
+    return Math.floor(months/12)+'y '+(months%12)+'m';
+  }catch(e){return '—';}
+}
+
+function buildAMPerformanceData(hist,users,clients){
+  // Build per-store data
+  const stores={};
+  hist.forEach(function(r){
+    const key=r.client_code||(r.busy_name||'').toLowerCase().trim();
+    if(!stores[key]){
+      stores[key]={
+        busy_name:r.busy_name||'—',client_code:r.client_code,
+        marketplace:r.marketplace||'—',am_name:r.am_name||'Unknown',
+        total:0,active:0,total_rev:0,active_rev:0
+      };
+    }
+    stores[key].total++;
+    stores[key].total_rev+=parseFloat(r.amount||0);
+    if((r.mis_status||'').toLowerCase()==='active'){
+      stores[key].active++;
+      stores[key].active_rev+=parseFloat(r.amount_with_gst||0);
+    }
+  });
+  // Count stores per AM
+  const amCount={};
+  Object.values(stores).forEach(function(s){
+    const am=s.am_name||'Unknown';
+    amCount[am]=(amCount[am]||0)+1;
+  });
+  // Build final rows
+  return Object.values(stores).map(function(s){
+    const cl=clients.find(function(c){return c.clientCode===s.client_code||c.busyName===s.busy_name;});
+    const usr=users.find(function(u){return u.name&&u.name.toLowerCase()===(s.am_name||'').toLowerCase();});
+    const renewal_pct=s.total?Math.round(s.active/s.total*100):0;
+    return {
+      busy_name:s.busy_name,
+      store_aging:cl?(cl.sellerAging||cl.seller_aging||'—'):'—',
+      am_name:s.am_name,
+      am_aging:usr?calcAMTenure(usr.joiningDate):'—',
+      no_of_stores:amCount[s.am_name||'Unknown']||1,
+      eligible:s.active,
+      marketplace:s.marketplace,
+      total_rev:Math.round(s.total_rev),
+      renewal_count:s.total,
+      renewal_pct:renewal_pct,
+      active_rev:Math.round(s.active_rev)
+    };
+  }).sort(function(a,b){return a.am_name.localeCompare(b.am_name);});
+}
+
+function renderAMPerformanceReport(data,el){
+  if(!data||!data.length){el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><div class="emoji">📋</div><h3>No data found</h3></div></div></div>';return;}
+  // Get unique AMs for filter
+  const ams=[...new Set(data.map(function(r){return r.am_name;}))].sort();
+  const mps=[...new Set(data.map(function(r){return r.marketplace;}))].sort();
+  window._amPerfData=data;
+
+  function buildTable(rows){
+    if(!rows.length) return '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No matching records</td></tr>';
+    return rows.map(function(r){
+      const pctColor=r.renewal_pct>=70?'badge-green':r.renewal_pct>=50?'badge-amber':'badge-red';
+      return '<tr>'+
+        '<td><strong style="font-size:12px;">'+r.busy_name+'</strong></td>'+
+        '<td style="text-align:center;">'+r.store_aging+'</td>'+
+        '<td>'+r.am_name+'</td>'+
+        '<td style="text-align:center;color:var(--primary);font-weight:600;">'+r.am_aging+'</td>'+
+        '<td style="text-align:center;">'+r.no_of_stores+'</td>'+
+        '<td style="text-align:center;color:var(--green);font-weight:600;">'+r.eligible+'</td>'+
+        '<td style="text-align:center;"><span class="badge badge-blue" style="font-size:10px;">'+r.marketplace+'</span></td>'+
+        '<td style="text-align:right;">₹'+r.total_rev.toLocaleString('en-IN')+'</td>'+
+        '<td style="text-align:center;">'+r.renewal_count+'</td>'+
+        '<td style="text-align:center;"><span class="badge '+pctColor+'">'+r.renewal_pct+'%</span></td>'+
+        '<td style="text-align:right;color:var(--green);font-weight:600;">₹'+r.active_rev.toLocaleString('en-IN')+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  // Summary KPIs
+  const totalStores=data.length;
+  const totalEligible=data.reduce(function(s,r){return s+r.eligible;},0);
+  const totalRev=data.reduce(function(s,r){return s+r.total_rev;},0);
+  const totalActiveRev=data.reduce(function(s,r){return s+r.active_rev;},0);
+  const avgRenPct=totalStores?Math.round(data.reduce(function(s,r){return s+r.renewal_pct;},0)/totalStores):0;
+
+  el.innerHTML=
+    '<div class="kpi-grid" style="margin-bottom:16px;">'+
+      '<div class="kpi-card blue"><div class="kpi-label">Total Stores</div><div class="kpi-value">'+totalStores+'</div></div>'+
+      '<div class="kpi-card green"><div class="kpi-label">Eligible for Renewal</div><div class="kpi-value">'+totalEligible+'</div></div>'+
+      '<div class="kpi-card amber"><div class="kpi-label">Avg Renewal %</div><div class="kpi-value">'+avgRenPct+'%</div></div>'+
+      '<div class="kpi-card red"><div class="kpi-label">Total Revenue</div><div class="kpi-value" style="font-size:18px;">₹'+Math.round(totalRev/100000)+'L</div></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-header">'+
+        '<span class="card-title">📋 AM Performance Report ('+data.length+' stores)</span>'+
+        '<button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Download Excel</button>'+
+      '</div>'+
+      '<div class="card-body" style="padding:12px 16px;">'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+
+          '<select class="form-control" style="width:200px;" id="amp-am-filter" onchange="filterAMPerfReport()">'+
+            '<option value="">— All Account Managers —</option>'+
+            ams.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('')+
+          '</select>'+
+          '<select class="form-control" style="width:160px;" id="amp-mp-filter" onchange="filterAMPerfReport()">'+
+            '<option value="">— All Marketplaces —</option>'+
+            mps.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('')+
+          '</select>'+
+          '<input type="text" class="form-control" style="width:200px;" id="amp-search" placeholder="🔍 Search store..." oninput="filterAMPerfReport()">'+
+          '<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'amp-am-filter\').value=\'\';document.getElementById(\'amp-mp-filter\').value=\'\';document.getElementById(\'amp-search\').value=\'\';filterAMPerfReport();">✕ Clear</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="table-wrap"><table id="amp-table">'+
+        '<thead><tr>'+
+          '<th>Store Name</th><th style="text-align:center;">Store Ageing</th>'+
+          '<th>Account Manager</th><th style="text-align:center;">AM Ageing</th>'+
+          '<th style="text-align:center;">No. of Stores</th><th style="text-align:center;">Eligible</th>'+
+          '<th style="text-align:center;">Marketplace</th><th style="text-align:right;">Total Revenue</th>'+
+          '<th style="text-align:center;">Renewal Count</th><th style="text-align:center;">Renewal %</th>'+
+          '<th style="text-align:right;">Revenue After Renewal</th>'+
+        '</tr></thead>'+
+        '<tbody id="amp-tbody">'+buildTable(data)+'</tbody>'+
+      '</table></div>'+
+    '</div>';
+  window._reportData=data;
+}
+
+function filterAMPerfReport(){
+  const data=window._amPerfData||[];
+  const amF=(document.getElementById('amp-am-filter')||{}).value||'';
+  const mpF=(document.getElementById('amp-mp-filter')||{}).value||'';
+  const srch=((document.getElementById('amp-search')||{}).value||'').toLowerCase();
+  const filtered=data.filter(function(r){
+    if(amF && r.am_name!==amF) return false;
+    if(mpF && r.marketplace!==mpF) return false;
+    if(srch && !r.busy_name.toLowerCase().includes(srch)) return false;
+    return true;
+  });
+  window._reportData=filtered;
+  const tbody=document.getElementById('amp-tbody');
+  if(tbody){
+    const pctColor=function(p){return p>=70?'badge-green':p>=50?'badge-amber':'badge-red';};
+    tbody.innerHTML=filtered.length?filtered.map(function(r){
+      return '<tr>'+
+        '<td><strong style="font-size:12px;">'+r.busy_name+'</strong></td>'+
+        '<td style="text-align:center;">'+r.store_aging+'</td>'+
+        '<td>'+r.am_name+'</td>'+
+        '<td style="text-align:center;color:var(--primary);font-weight:600;">'+r.am_aging+'</td>'+
+        '<td style="text-align:center;">'+r.no_of_stores+'</td>'+
+        '<td style="text-align:center;color:var(--green);font-weight:600;">'+r.eligible+'</td>'+
+        '<td style="text-align:center;"><span class="badge badge-blue" style="font-size:10px;">'+r.marketplace+'</span></td>'+
+        '<td style="text-align:right;">₹'+r.total_rev.toLocaleString('en-IN')+'</td>'+
+        '<td style="text-align:center;">'+r.renewal_count+'</td>'+
+        '<td style="text-align:center;"><span class="badge '+pctColor(r.renewal_pct)+'">'+r.renewal_pct+'%</span></td>'+
+        '<td style="text-align:right;color:var(--green);font-weight:600;">₹'+r.active_rev.toLocaleString('en-IN')+'</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No matching records</td></tr>';
+  }
+}
+
 async function renderReports(){
   const clients=await getClients();if(clients) APP.clients=clients;
   const today=new Date().toISOString().split('T')[0],monthStart=today.slice(0,7)+'-01';
@@ -3904,6 +4084,7 @@ async function renderReports(){
           <button class="btn btn-secondary" style="background:#8e44ad;color:#fff;" onclick="window._currentReport='renewal_analysis';generateReport()">📈 Renewal Analysis</button>
           <button class="btn btn-secondary" style="background:#16a085;color:#fff;" onclick="window._currentReport='executive_retention';generateReport()">👤 Executive Retention</button>
           <button class="btn btn-secondary" style="background:#2980b9;color:#fff;" onclick="window._currentReport='marketplace_retention';generateReport()">🛒 Marketplace Retention</button>
+          <button class="btn btn-secondary" style="background:#c0392b;color:#fff;" onclick="window._currentReport='am_performance';generateReport()">📋 AM Performance</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -4117,6 +4298,12 @@ async function generateReport(){
   } else if(type==='marketplace_retention'){
     const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='marketplace_retention';
     renderMarketplaceRetention(data,el);return;
+  } else if(type==='am_performance'){
+    const ts=Date.now();
+    const [hist,usersData,clientsData]=await Promise.all([api('GET','/renewal-history?_='+ts),api('GET','/users?_='+ts),api('GET','/clients?_='+ts)]);
+    const processed=buildAMPerformanceData(hist||[],usersData||[],clientsData||[]);
+    window._reportData=processed;window._reportType='am_performance';
+    renderAMPerformanceReport(processed,el);return;
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   }
 }
@@ -4156,6 +4343,7 @@ function exportExcel(){
   else if(type==='renewal'){csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');}
   else if(type==='ticket'){csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');}
   else if(type==='team'){csv='Name,Role,ActionsToday,TicketsClosed,Status\n';csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');}
+  else if(type==='am_performance'){csv='Store Name,Store Ageing,Account Manager,AM Ageing,No. of Stores,Eligible for Renewal,Marketplace,Total Revenue (Sales),Renewal Count,Renewal %,Revenue After Renewal\n';csv+=data.map(function(r){return['"'+(r.busy_name||'').replace(/"/g,'')+ '"',r.store_aging||'—','"'+(r.am_name||'').replace(/"/g,'')+'"',r.am_aging||'—',r.no_of_stores||0,r.eligible||0,r.marketplace||'—',r.total_rev||0,r.renewal_count||0,(r.renewal_pct||0)+'%',r.active_rev||0].join(',');}).join('\n');}
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
   showToast('Excel download ho raha hai!','success');

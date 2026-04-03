@@ -4971,10 +4971,11 @@ async function navigateClientPage(cc) {
   document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading client data...</div>';
 
-  const [timeline, dsrData, actLogs] = await Promise.all([
+  const [timeline, dsrData, actLogs, expectations] = await Promise.all([
     api('GET', '/clients/'+cc+'/timeline'),
     api('GET', '/dsr/trend/'+cc),
     api('GET', '/clients/'+cc+'/activity'),
+    api('GET', '/expectations/'+cc+'?_='+Date.now()),
   ]);
 
   const crmCalls = timeline?.crmCalls||[];
@@ -5119,6 +5120,45 @@ async function navigateClientPage(cc) {
       </div>
     </div>
 
+    <!-- Seller Expectations -->
+    <div class="card" id="cd-expectations" style="margin-bottom:12px;border-left:4px solid #8e44ad;">
+      <div class="card-header" style="background:#f5eef8;">
+        <span class="card-title">🎯 Seller Expectations</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-outline" onclick="openExpectationHistory('${cc}')">📋 History</button>
+          <button class="btn btn-sm" style="background:#8e44ad;color:#fff;" onclick="openExpectationForm('${cc}','${(client?.busyName||'').replace(/'/g,"\\'")}','${expectations?'update':'new'}')">
+            ${expectations ? '✏️ Update' : '➕ Add Expectations'}
+          </button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:14px;">
+        ${expectations ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+            ${expectations.revenue_target ? `<div style="background:#fef9e7;border-radius:8px;padding:10px;border-left:3px solid #f39c12;"><div style="font-size:10px;font-weight:700;color:#7d6608;text-transform:uppercase;">💰 Revenue Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.revenue_target}</div></div>` : ''}
+            ${expectations.sales_growth_target ? `<div style="background:#eafaf1;border-radius:8px;padding:10px;border-left:3px solid #27ae60;"><div style="font-size:10px;font-weight:700;color:#1e8449;text-transform:uppercase;">📈 Sales Growth</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.sales_growth_target}</div></div>` : ''}
+            ${expectations.ads_acos_target ? `<div style="background:#eaf4fd;border-radius:8px;padding:10px;border-left:3px solid #2980b9;"><div style="font-size:10px;font-weight:700;color:#1a5276;text-transform:uppercase;">📢 Ads ACOS Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.ads_acos_target}</div></div>` : ''}
+            ${expectations.listing_improvement ? `<div style="background:#fdf2f8;border-radius:8px;padding:10px;border-left:3px solid #8e44ad;"><div style="font-size:10px;font-weight:700;color:#6c3483;text-transform:uppercase;">📝 Listing</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.listing_improvement}</div></div>` : ''}
+            ${expectations.inventory_management ? `<div style="background:#fef5e7;border-radius:8px;padding:10px;border-left:3px solid #e67e22;"><div style="font-size:10px;font-weight:700;color:#a04000;text-transform:uppercase;">📦 Inventory</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.inventory_management}</div></div>` : ''}
+            ${expectations.customer_rating_target ? `<div style="background:#fdfefe;border-radius:8px;padding:10px;border-left:3px solid #17a589;"><div style="font-size:10px;font-weight:700;color:#148f77;text-transform:uppercase;">⭐ Rating Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.customer_rating_target}</div></div>` : ''}
+            ${expectations.brand_building ? `<div style="background:#f9ebea;border-radius:8px;padding:10px;border-left:3px solid #e74c3c;"><div style="font-size:10px;font-weight:700;color:#922b21;text-transform:uppercase;">🏷️ Brand Building</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.brand_building}</div></div>` : ''}
+          </div>
+          ${expectations.additional_notes ? `<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px;"><strong>📌 Additional Notes:</strong><br><span style="color:var(--text-muted);">${expectations.additional_notes}</span></div>` : ''}
+          ${expectations.special_requests ? `<div style="background:#fff3cd;border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px;border-left:3px solid #ffc107;"><strong>⚠️ Special Requests:</strong><br>${expectations.special_requests}</div>` : ''}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+            ✍️ Added by: <strong>${expectations.filled_by||'—'}</strong> (${expectations.filled_by_role||'—'}) · 
+            Type: <span class="badge ${expectations.fill_type==='renewal'?'badge-blue':'badge-green'}" style="font-size:10px;">${expectations.fill_type||'onboarding'}</span>
+            ${expectations.updated_by ? ` · Last updated by: <strong>${expectations.updated_by}</strong>` : ''}
+          </div>
+        ` : `
+          <div style="text-align:center;padding:20px;color:var(--text-muted);">
+            <div style="font-size:32px;margin-bottom:8px;">🎯</div>
+            <div style="font-weight:600;margin-bottom:4px;">Abhi tak koi expectation note nahi ki</div>
+            <div style="font-size:13px;">Seller ki expectations record karein taaki team aligned rahe</div>
+          </div>
+        `}
+      </div>
+    </div>
+
     <!-- Activity Log -->
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">📋 Activity Log (${actLogs?.length||0})</span></div>
@@ -5138,6 +5178,106 @@ async function navigateClientPage(cc) {
 
 function navigateBack() {
   navigate('clients');
+}
+
+function openExpectationForm(cc, cn, mode) {
+  openPanel((mode==='new'?'➕ Add':'✏️ Update')+' Expectations — '+cn, `
+    <div style="background:#f5eef8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">
+      🎯 Seller: <strong>${cn}</strong>
+    </div>
+    <div class="form-group">
+      <label>Fill Type</label>
+      <select class="form-control" id="exp-filltype">
+        <option value="onboarding">🆕 Onboarding</option>
+        <option value="renewal">🔄 Renewal Update</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label>💰 Revenue Target</label>
+        <input type="text" class="form-control" id="exp-revenue" placeholder="e.g. ₹10L/month">
+      </div>
+      <div class="form-group">
+        <label>📈 Sales Growth Target</label>
+        <input type="text" class="form-control" id="exp-sales" placeholder="e.g. 2x in 6 months">
+      </div>
+      <div class="form-group">
+        <label>📢 Ads ACOS Target</label>
+        <input type="text" class="form-control" id="exp-acos" placeholder="e.g. Below 15%">
+      </div>
+      <div class="form-group">
+        <label>⭐ Customer Rating Target</label>
+        <input type="text" class="form-control" id="exp-rating" placeholder="e.g. Maintain 4.5+">
+      </div>
+      <div class="form-group">
+        <label>📝 Listing Improvement</label>
+        <input type="text" class="form-control" id="exp-listing" placeholder="e.g. All ASINs A+ content">
+      </div>
+      <div class="form-group">
+        <label>📦 Inventory Management</label>
+        <input type="text" class="form-control" id="exp-inventory" placeholder="e.g. Never go OOS">
+      </div>
+      <div class="form-group">
+        <label>🏷️ Brand Building</label>
+        <input type="text" class="form-control" id="exp-brand" placeholder="e.g. Launch 5 new products">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>📌 Additional Notes</label>
+      <textarea class="form-control" id="exp-notes" rows="3" placeholder="Seller ne kya kaha? Koi specific request?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>⚠️ Special Requests</label>
+      <textarea class="form-control" id="exp-special" rows="2" placeholder="Koi special demand ya concern?"></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" data-cc="${cc}" data-cn="${cn.replace(/"/g,'&quot;')}" onclick="submitExpectation(this)">
+      ✅ Save Expectations
+    </button>
+  `);
+}
+
+async function submitExpectation(btn) {
+  const cc = btn.getAttribute('data-cc');
+  const cn = btn.getAttribute('data-cn');
+  const r = await api('POST', '/expectations', {
+    clientCode: cc,
+    clientName: cn,
+    fillType: document.getElementById('exp-filltype').value,
+    revenueTarget: document.getElementById('exp-revenue').value.trim(),
+    salesGrowthTarget: document.getElementById('exp-sales').value.trim(),
+    adsAcosTarget: document.getElementById('exp-acos').value.trim(),
+    customerRatingTarget: document.getElementById('exp-rating').value.trim(),
+    listingImprovement: document.getElementById('exp-listing').value.trim(),
+    inventoryManagement: document.getElementById('exp-inventory').value.trim(),
+    brandBuilding: document.getElementById('exp-brand').value.trim(),
+    additionalNotes: document.getElementById('exp-notes').value.trim(),
+    specialRequests: document.getElementById('exp-special').value.trim(),
+  });
+  if (r?.success) {
+    showToast('✅ Expectations save ho gayi!', 'success');
+    closePanel();
+    navigateClientPage(cc);
+  } else {
+    showToast('Error: '+(r?.error||'Failed'), 'error');
+  }
+}
+
+async function openExpectationHistory(cc) {
+  const hist = await api('GET', '/expectations/'+cc+'/history?_='+Date.now()) || [];
+  openPanel('📋 Expectation History', hist.length
+    ? hist.map(h => `
+        <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span class="badge ${h.change_type==='created'?'badge-green':'badge-blue'}" style="font-size:11px;">
+              ${h.change_type==='created'?'➕ Created':'✏️ Updated'}
+            </span>
+            <span style="font-size:11px;color:var(--text-muted);">${new Date(h.changed_at).toLocaleString('en-IN')}</span>
+          </div>
+          <div style="font-size:13px;">${h.changes_summary||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">by <strong>${h.changed_by}</strong> (${h.changed_by_role||'—'})</div>
+        </div>`).join('')
+    : '<div class="empty-state"><div class="emoji">📋</div><h3>Koi history nahi</h3></div>'
+  );
 }
 
 // Log CRM call directly from client detail page

@@ -6558,11 +6558,49 @@ var _ra = {
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 async function renderReportAnalyzer() {
-  const clients = await getClients();
+  const [clients, recentLogs] = await Promise.all([
+    getClients(),
+    api('GET', '/report-analyzer/logs?_='+Date.now()),
+  ]);
   if (clients) APP.clients = clients;
+  const logs = recentLogs || [];
+  const isLead = ['Admin','Ops Lead','Sub Admin','SME','Team Lead','Senior Executive'].includes(APP.user.role);
+
+  // Last 5 logs panel
+  let logsHtml = '';
+  if (logs.length) {
+    logsHtml = '<div class="card" style="margin-bottom:16px;">'
+      + '<div class="card-header"><span class="card-title">🕐 Recent Analyses</span>'
+      + '<span style="font-size:12px;color:var(--text-muted);">Last '+logs.length+' analyses</span></div>'
+      + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+      + '<thead><tr><th>#</th><th>Seller</th><th>Analyzed By</th><th>Reports</th><th>Date</th><th>Tasks</th><th></th></tr></thead><tbody>'
+      + logs.map((l,i) => {
+          const reports = (l.reports_uploaded||[]).join(', ') || '—';
+          const taskCount = (l.tasks_generated||[]).length;
+          const doneCount = (l.tasks_generated||[]).filter(t=>t.status==='done').length;
+          const date = new Date(l.analyzed_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+          const time = new Date(l.analyzed_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+          return '<tr>'
+            + '<td>'+(i+1)+'</td>'
+            + '<td><strong>'+l.client_name+'</strong></td>'
+            + '<td><span style="font-size:12px;">'+l.analyzed_by+'</span><br><span style="font-size:10px;color:var(--text-muted);">'+l.analyzed_by_role+'</span></td>'
+            + '<td style="font-size:11px;color:var(--text-muted);">'+reports+'</td>'
+            + '<td style="font-size:12px;">'+date+'<br><span style="color:var(--text-muted);">'+time+'</span></td>'
+            + '<td>'
+              + (taskCount ? '<span class="badge badge-blue">'+taskCount+' tasks</span> '
+                + '<span class="badge badge-green">'+doneCount+' done</span> '
+                + (taskCount-doneCount > 0 ? '<span class="badge badge-red">'+(taskCount-doneCount)+' pending</span>' : '')
+                : '<span style="color:var(--text-muted);font-size:12px;">—</span>')
+            + '</td>'
+            + '<td><button class="btn btn-sm btn-outline" data-lid="'+l.log_id+'" onclick="viewRALog(this.getAttribute(\'data-lid\'))">👁 View</button></td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div></div></div>';
+  }
 
   document.getElementById('page-content').innerHTML =
-    '<div class="card" style="margin-bottom:16px;">'
+    logsHtml
+    + '<div class="card" style="margin-bottom:16px;">'
     + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
     + '<span style="font-size:12px;color:var(--text-muted);">ASIN-level insights + AI tasks + Sales Projection</span></div>'
     + '<div class="card-body">'
@@ -6651,6 +6689,24 @@ async function raRunAnalysis() {
   // Generate tasks per ASIN
   _ra.tasks = [];
   raGenerateTasks();
+
+  // Save log to DB (fire & forget)
+  const reportsUploaded = ['business','targeting','advertised','searchterm','inventory','returns'].filter(k => _ra[k]);
+  const tasksForLog = _ra.tasks.map((t,i) => ({
+    index: i,
+    asin: t.asin || '',
+    issue: t.issue || '',
+    task: t.task || '',
+    priority: t.priority || 'medium',
+    dept: t.dept || '',
+    status: 'pending',
+  }));
+  api('POST', '/report-analyzer/log', {
+    clientCode: _ra.client,
+    clientName: _ra.clientName,
+    reportsUploaded,
+    tasksGenerated: tasksForLog,
+  }).catch(() => {});
 
   // Render results
   raRenderResults();
@@ -7142,7 +7198,71 @@ function raRenderResults() {
   document.getElementById('ra-results').innerHTML = html;
 }
 
-function raSummaryCard(icon, label, val, color) {
+async function viewRALog(logId) {
+  const log = await api('GET', '/report-analyzer/log/'+logId);
+  if (!log) { showToast('Log nahi mila!','error'); return; }
+
+  const tasks = log.tasks_generated || [];
+  const doneCount = tasks.filter(t=>t.status==='done').length;
+  const pendingCount = tasks.length - doneCount;
+  const date = new Date(log.analyzed_at).toLocaleString('en-IN');
+
+  let tasksHtml = '';
+  if (tasks.length) {
+    tasksHtml = '<div style="margin-top:12px;">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">📋 Tasks ('
+      + '<span style="color:var(--green);">'+doneCount+' done</span> / '
+      + '<span style="color:var(--red);">'+pendingCount+' pending</span>)</div>';
+    tasks.forEach((t,i) => {
+      const isDone = t.status === 'done';
+      const pColor = t.priority==='urgent'?'var(--red)':t.priority==='high'?'var(--orange)':'var(--amber)';
+      tasksHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:'+(isDone?'#f0fff4':'var(--bg)')+';opacity:'+(isDone?'0.7':'1')+'">'
+        + '<input type="checkbox" '+(isDone?'checked':'')+' style="margin-top:3px;width:16px;height:16px;cursor:pointer;" data-lid="'+logId+'" data-tidx="'+i+'" onchange="toggleRATask(this)">'
+        + '<div style="flex:1;">'
+        + '<div style="font-size:12px;font-weight:700;color:'+pColor+';margin-bottom:2px;">'+(t.issue||t.priority?.toUpperCase()||'Task')+'</div>'
+        + '<div style="font-size:13px;'+(isDone?'text-decoration:line-through;color:var(--text-muted);':'')+'">'+t.task+'</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'
+        + '<span class="badge '+(t.dept==='Ads'?'badge-blue':'badge-green')+'" style="font-size:10px;">'+t.dept+'</span>'
+        + (t.asin ? ' · ASIN: '+t.asin : '')
+        + (isDone && t.updatedBy ? ' · ✅ Done by: '+t.updatedBy : '')
+        + '</div>'
+        + '</div></div>';
+    });
+    tasksHtml += '</div>';
+  } else {
+    tasksHtml = '<div style="color:var(--text-muted);font-size:13px;margin-top:12px;">Koi tasks nahi mili thi</div>';
+  }
+
+  openPanel('📊 Analysis Log — '+log.client_name,
+    '<div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;">'
+    + '<strong>Seller:</strong> '+log.client_name+'<br>'
+    + '<strong>Analyzed By:</strong> '+log.analyzed_by+' ('+log.analyzed_by_role+')<br>'
+    + '<strong>Date:</strong> '+date+'<br>'
+    + '<strong>Reports:</strong> '+(log.reports_uploaded||[]).join(', ')||'—'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    + '<span class="badge badge-blue" style="font-size:12px;">'+tasks.length+' Total Tasks</span>'
+    + '<span class="badge badge-green" style="font-size:12px;">'+doneCount+' Done</span>'
+    + '<span class="badge badge-red" style="font-size:12px;">'+pendingCount+' Pending</span>'
+    + '</div>'
+    + tasksHtml
+  );
+}
+
+async function toggleRATask(checkbox) {
+  const logId = checkbox.getAttribute('data-lid');
+  const taskIndex = parseInt(checkbox.getAttribute('data-tidx'));
+  const status = checkbox.checked ? 'done' : 'pending';
+  const r = await api('PATCH', '/report-analyzer/log/'+logId+'/task', { taskIndex, status });
+  if (r?.success) {
+    showToast(status==='done'?'✅ Task done!':'Task pending mark kiya','success');
+    // Refresh panel
+    viewRALog(logId);
+  } else {
+    checkbox.checked = !checkbox.checked; // revert
+    showToast('Update failed!','error');
+  }
+}
   return '<div style="background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'
     + '<div style="font-size:22px;">'+icon+'</div>'
     + '<div style="font-size:22px;font-weight:800;color:var(--'+color+');">'+val+'</div>'

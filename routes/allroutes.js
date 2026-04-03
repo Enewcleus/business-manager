@@ -611,6 +611,78 @@ renewalHistoryRouter.get('/', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── REPORT ANALYZER LOGS ─────────────────────────────────────
+const reportAnalyzerRouter = require('express').Router();
+
+// POST /api/report-analyzer/log — save analysis log
+reportAnalyzerRouter.post('/log', authMiddleware, async (req, res) => {
+  try {
+    const { clientCode, clientName, reportsUploaded, tasksGenerated } = req.body;
+    if (!clientCode) return res.status(400).json({ error: 'clientCode required' });
+
+    const logId = 'RAL' + Date.now().toString();
+    const { error } = await supabase.from('report_analyzer_logs').insert({
+      log_id: logId,
+      client_code: clientCode,
+      client_name: clientName || clientCode,
+      analyzed_by: req.user.name,
+      analyzed_by_role: req.user.role,
+      reports_uploaded: reportsUploaded || [],
+      tasks_generated: tasksGenerated || [],
+    });
+    if (error) throw error;
+    res.json({ success: true, logId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/report-analyzer/logs — last 5 analyses (for header display)
+reportAnalyzerRouter.get('/logs', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.query;
+    const isLead = ['Admin','Ops Lead','Sub Admin','SME','Team Lead','Senior Executive'].includes(req.user.role);
+    let q = supabase.from('report_analyzer_logs')
+      .select('log_id, client_code, client_name, analyzed_by, analyzed_by_role, reports_uploaded, analyzed_at')
+      .order('analyzed_at', { ascending: false })
+      .limit(10);
+    if (!isLead) q = q.eq('analyzed_by', req.user.name);
+    const { data, error } = await q;
+    if (error) throw error;
+    res.json(data || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/report-analyzer/log/:logId — full log with tasks
+reportAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('report_analyzer_logs')
+      .select('*').eq('log_id', req.params.logId).single();
+    if (error) throw error;
+    res.json(data);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/report-analyzer/log/:logId/task — update task status (done/pending)
+reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) => {
+  try {
+    const { taskIndex, status } = req.body;
+    const { data, error } = await supabase.from('report_analyzer_logs')
+      .select('tasks_generated').eq('log_id', req.params.logId).single();
+    if (error) throw error;
+
+    const tasks = data.tasks_generated || [];
+    if (tasks[taskIndex] !== undefined) {
+      tasks[taskIndex].status = status; // 'pending' or 'done'
+      tasks[taskIndex].updatedBy = req.user.name;
+      tasks[taskIndex].updatedAt = new Date().toISOString();
+    }
+
+    const { error: upErr } = await supabase.from('report_analyzer_logs')
+      .update({ tasks_generated: tasks }).eq('log_id', req.params.logId);
+    if (upErr) throw upErr;
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter,
@@ -623,5 +695,6 @@ module.exports = {
   adsRouter,
   clientsRouter,
   hurdleRouter,
-  renewalHistoryRouter,  // ← FIX: ab properly export ho raha hai
+  renewalHistoryRouter,
+  reportAnalyzerRouter,
 };

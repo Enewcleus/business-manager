@@ -59,9 +59,10 @@ app.use('/api/dsr',             require('./routes/dsr'));
 app.use('/api/close-requests',  require('./routes/close_requests'));
 app.use('/api/settings',        require('./routes/settings'));
 app.use('/api/payments',        require('./routes/payment'));
-app.use('/api/hurdles',         require('./routes/allroutes').hurdleRouter);
-app.use('/api/renewal-history', require('./routes/allroutes').renewalHistoryRouter);
-app.use('/api/chat',            require('./routes/chat'));
+app.use('/api/hurdles',          require('./routes/allroutes').hurdleRouter);
+app.use('/api/renewal-history',  require('./routes/allroutes').renewalHistoryRouter);
+app.use('/api/report-analyzer',  require('./routes/allroutes').reportAnalyzerRouter);
+app.use('/api/chat',             require('./routes/chat'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

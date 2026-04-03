@@ -7263,6 +7263,8 @@ async function toggleRATask(checkbox) {
     showToast('Update failed!','error');
   }
 }
+
+function raSummaryCard(icon, label, val, color) {
   return '<div style="background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'
     + '<div style="font-size:22px;">'+icon+'</div>'
     + '<div style="font-size:22px;font-weight:800;color:var(--'+color+');">'+val+'</div>'

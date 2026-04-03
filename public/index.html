@@ -326,6 +326,7 @@ const NAV_CONFIG = {
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ops Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -338,7 +339,8 @@ const NAV_CONFIG = {
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -349,7 +351,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Account Manager': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -358,9 +361,9 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
-    {id:'worklog',icon:'📋',label:'Work Log'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ads Executive': [
     {id:'tasks',icon:'📋',label:'Task Manager',badge:'tasks'},
@@ -371,7 +374,8 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -382,7 +386,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'SME': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -394,8 +399,9 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
-      ],
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
   'Senior Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
@@ -404,7 +410,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Team Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -416,7 +423,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -425,7 +433,8 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Sub Admin': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
@@ -439,10 +448,12 @@ const NAV_CONFIG = {
     {id:'reports', label:'Reports', icon:'📊'},
     {id:'seller360', label:'Seller 360 View', icon:'🔍'},
     {id:'payments', label:'Payment Manager', icon:'💰'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Executive': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
     {id:'csi', label:'CSI Health', icon:'📊'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
 
 };
@@ -653,7 +664,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -693,11 +704,14 @@ async function loadDSRPage() {
   let myClients = APP.clients || [];
   if (!isLead) {
     const uname = u.name.trim().toLowerCase();
-    myClients = myClients.filter(c =>
-      (c.amName||'').trim().toLowerCase() === uname ||
-      (c.adsManager||'').trim().toLowerCase() === uname ||
-      (c.crmExecutive||'').trim().toLowerCase() === uname
-    );
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
   }
 
   const filedCodes = new Set((dsrData||[]).map(d => d.client_code || d.clientCode));
@@ -2131,11 +2145,14 @@ async function renderCRM(){
   let myClients = APP.clients || [];
   if (!isLead) {
     const uname = u.name.trim().toLowerCase();
-    myClients = myClients.filter(c =>
-      (c.amName||'').trim().toLowerCase() === uname ||
-      (c.adsManager||'').trim().toLowerCase() === uname ||
-      (c.crmExecutive||'').trim().toLowerCase() === uname
-    );
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
   }
 
   renderCRMPage(myClients, todayCalls||[]);
@@ -7350,6 +7367,369 @@ function checkModuleAccess(moduleKey) {
   const state = getAccessState();
   const vals = state[moduleKey] || ACCESS_DEFAULTS[moduleKey] || [2,2,2,2,2,2,2,2];
   return (vals[roleIdx] || 0) > 0;
+}
+
+// ── CHAT ─────────────────────────────────────────────────────
+let _chatPollTimer = null;
+let _chatLastTs = null;
+let _chatCurrentRoom = null;
+
+async function renderChat() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Chat...</div>';
+  if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
+
+  const [rooms, users] = await Promise.all([
+    api('GET', '/chat/rooms?_='+Date.now()),
+    api('GET', '/users?_='+Date.now()),
+  ]);
+  window._chatAllRooms = rooms || [];
+  window._chatAllUsers = (users || []).filter(u => u.isActive);
+  const totalUnread = (rooms||[]).reduce((s,r) => s+(r.unread||0), 0);
+  const canCreateGroup = ['Admin','Ops Lead','Sub Admin','SME','Team Lead','Senior Executive'].includes(APP.user.role);
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;height:calc(100vh - 120px);gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);">
+      <!-- LEFT: Room List -->
+      <div id="chat-rooms" style="width:290px;min-width:220px;border-right:1px solid var(--border);display:flex;flex-direction:column;">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">
+          💬 Chat
+          ${totalUnread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;">${totalUnread}</span>` : ''}
+          ${canCreateGroup ? `<button onclick="openCreateGroup()" style="margin-left:auto;padding:4px 10px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">➕ Group</button>` : ''}
+        </div>
+        <div style="padding:8px 10px;border-bottom:1px solid var(--border);">
+          <input type="text" id="chat-room-search" placeholder="🔍 Search..."
+            style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);outline:none;box-sizing:border-box;"
+            oninput="filterChatRooms(this.value)">
+        </div>
+        <div id="chat-room-list" style="overflow-y:auto;flex:1;">
+          ${buildChatRoomList(rooms||[])}
+        </div>
+      </div>
+      <!-- RIGHT: Chat Window -->
+      <div id="chat-window" style="flex:1;display:flex;flex-direction:column;background:var(--bg);">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:12px;">
+          <div style="font-size:48px;">💬</div>
+          <div style="font-size:16px;font-weight:600;">Koi room select karo</div>
+          <div style="font-size:13px;">Left mein client, group ya Team chat choose karo</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildChatRoomList(rooms) {
+  if (!rooms.length) return '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">Koi room nahi</div>';
+
+  // Separate by type
+  const team = rooms.filter(r => r.roomType === 'team');
+  const groups = rooms.filter(r => r.roomType === 'group');
+  const clients = rooms.filter(r => r.roomType === 'client');
+
+  let html = '';
+
+  if (team.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">Team</div>`;
+    html += team.map(r => roomItem(r)).join('');
+  }
+  if (groups.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">My Groups</div>`;
+    html += groups.map(r => roomItem(r)).join('');
+  }
+  if (clients.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">Clients (${clients.length})</div>`;
+    html += clients.map(r => roomItem(r)).join('');
+  }
+  return html;
+}
+
+function roomItem(r) {
+  const icon = r.roomType==='team' ? '👥' : r.roomType==='group' ? '👥' : r.roomName.charAt(0).toUpperCase();
+  const bg = r.roomType==='team' ? '#3498db' : r.roomType==='group' ? '#8e44ad' : '#27ae60';
+  const lastMsg = r.lastMessage ? ((r.lastSender ? r.lastSender.split(' ')[0]+': ' : '') + r.lastMessage) : '<em style="opacity:0.6;">No messages</em>';
+  return `<div class="chat-room-item" data-rid="${r.roomId}" data-rname="${(r.roomName||'').replace(/"/g,'&quot;')}" data-rtype="${r.roomType}"
+    onclick="openChatRoom(this)"
+    style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.1s;">
+    <div style="width:36px;height:36px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+    <div style="flex:1;overflow:hidden;">
+      <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.roomName}</div>
+      <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lastMsg}</div>
+    </div>
+    ${r.unread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700;flex-shrink:0;">${r.unread}</span>` : ''}
+  </div>`;
+}
+
+function filterChatRooms(q) {
+  const filtered = q.trim()
+    ? (window._chatAllRooms||[]).filter(r => r.roomName.toLowerCase().includes(q.toLowerCase()))
+    : (window._chatAllRooms||[]);
+  const list = document.getElementById('chat-room-list');
+  if (list) list.innerHTML = buildChatRoomList(filtered);
+}
+
+async function openChatRoom(el) {
+  const roomId = el.getAttribute('data-rid');
+  const roomName = el.getAttribute('data-rname');
+  const roomType = el.getAttribute('data-rtype');
+
+  document.querySelectorAll('.chat-room-item').forEach(e => e.style.background = '');
+  el.style.background = 'var(--primary-light,#eef2ff)';
+  // Remove unread badge
+  const badge = el.querySelector('span[style*="background:var(--red)"]');
+  if (badge) badge.remove();
+
+  _chatCurrentRoom = { roomId, roomName, roomType };
+  if (_chatPollTimer) clearInterval(_chatPollTimer);
+
+  const isGroup = roomType === 'group';
+  const canManage = isGroup && ['Admin','Ops Lead'].includes(APP.user.role) ||
+                    (isGroup && (window._chatAllRooms||[]).find(r=>r.roomId===roomId)?.createdBy === APP.user.name);
+
+  const win = document.getElementById('chat-window');
+  const iconBg = roomType==='team'?'#3498db':roomType==='group'?'#8e44ad':'#27ae60';
+  const icon = roomType==='team'?'👥':roomType==='group'?'👥':roomName.charAt(0).toUpperCase();
+
+  win.innerHTML = `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;background:var(--bg-card);">
+      <span style="width:32px;height:32px;border-radius:50%;background:${iconBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</span>
+      <div>
+        <div>${roomName}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:400;">${roomType==='team'?'Team General':roomType==='group'?'Group Chat':'Client Chat'}</div>
+      </div>
+      ${canManage ? `<button onclick="openGroupSettings('${roomId}')" style="margin-left:auto;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;">⚙️ Manage</button>` : ''}
+    </div>
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px;"></div>
+    <div id="chat-input-area" style="padding:10px 12px;border-top:1px solid var(--border);background:var(--bg-card);">
+      <div id="chat-file-preview" style="display:none;margin-bottom:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px;align-items:center;gap:8px;"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <label style="cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);display:flex;align-items:center;flex-shrink:0;" title="Attach file">
+          📎<input type="file" id="chat-file-input" style="display:none;" accept="image/*,.pdf,.xlsx,.xls,.csv" onchange="previewChatFile(this)">
+        </label>
+        <textarea id="chat-msg-input" rows="1" placeholder="Message likho... (Enter = send)"
+          style="flex:1;resize:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:var(--bg);color:var(--text);font-family:inherit;outline:none;min-height:40px;"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+        <button onclick="sendChatMessage()" style="padding:10px 16px;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;flex-shrink:0;">➤</button>
+      </div>
+    </div>
+  `;
+  win.style.display = 'flex';
+  win.style.flexDirection = 'column';
+
+  const msgs = await api('GET', '/chat/messages/'+roomId+'?_='+Date.now()) || [];
+  _chatLastTs = msgs.length ? msgs[msgs.length-1].created_at : new Date().toISOString();
+  renderChatMessages(msgs);
+
+  _chatPollTimer = setInterval(pollChatMessages, 4000);
+}
+
+function renderChatMessages(msgs, append=false) {
+  const container = document.getElementById('chat-msgs');
+  if (!container) return;
+  const me = APP.user.name;
+  if (!append) container.innerHTML = '';
+
+  if (!msgs.length && !append) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:40px;">Abhi koi message nahi 👋</div>';
+    return;
+  }
+
+  msgs.forEach(m => {
+    const isMe = m.sender_name === me;
+    const time = new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    const date = new Date(m.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+
+    let fileHtml = '';
+    if (m.file_url) {
+      if (m.file_type === 'image') {
+        fileHtml = `<img src="${m.file_url}" style="max-width:220px;max-height:180px;border-radius:8px;display:block;margin-top:6px;cursor:pointer;" onclick="window.open('${m.file_url}','_blank')">`;
+      } else {
+        const icon = m.file_type==='pdf'?'📄':m.file_type==='excel'?'📊':'📎';
+        fileHtml = `<a href="${m.file_url}" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px;background:rgba(0,0,0,0.08);border-radius:6px;margin-top:6px;text-decoration:none;color:inherit;font-size:12px;">${icon} ${m.file_name||'File'}</a>`;
+      }
+    }
+
+    const div = document.createElement('div');
+    div.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};`;
+    div.innerHTML = `
+      ${!isMe ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;margin-left:4px;">${m.sender_name}<span style="opacity:0.6;"> · ${m.sender_role||''}</span></div>` : ''}
+      <div style="max-width:68%;padding:10px 14px;border-radius:${isMe?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${isMe?'var(--primary)':'var(--bg-card)'};color:${isMe?'#fff':'var(--text)'};border:${isMe?'none':'1px solid var(--border)'};font-size:14px;line-height:1.5;word-break:break-word;">
+        ${m.message ? `<div>${m.message.replace(/\n/g,'<br>')}</div>` : ''}
+        ${fileHtml}
+        <div style="font-size:10px;opacity:0.6;margin-top:4px;text-align:right;">${time} · ${date}</div>
+      </div>`;
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+async function pollChatMessages() {
+  if (!_chatCurrentRoom || !_chatLastTs) return;
+  const msgs = await api('GET', `/chat/poll/${_chatCurrentRoom.roomId}?after=${encodeURIComponent(_chatLastTs)}&_=${Date.now()}`);
+  if (msgs && msgs.length) {
+    _chatLastTs = msgs[msgs.length-1].created_at;
+    renderChatMessages(msgs, true);
+  }
+}
+
+function previewChatFile(input) {
+  const preview = document.getElementById('chat-file-preview');
+  if (!preview || !input.files.length) return;
+  const file = input.files[0];
+  const icon = file.type.startsWith('image/')? '🖼️' : file.name.endsWith('.pdf')? '📄' : '📊';
+  preview.style.display = 'flex';
+  preview.innerHTML = `${icon} <strong>${file.name}</strong> <span style="color:var(--text-muted);">(${(file.size/1024).toFixed(0)} KB)</span><button onclick="clearChatFile()" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>`;
+}
+
+function clearChatFile() {
+  const i = document.getElementById('chat-file-input');
+  const p = document.getElementById('chat-file-preview');
+  if (i) i.value = '';
+  if (p) { p.style.display='none'; p.innerHTML=''; }
+}
+
+async function sendChatMessage() {
+  if (!_chatCurrentRoom) return;
+  const msgInput = document.getElementById('chat-msg-input');
+  const fileInput = document.getElementById('chat-file-input');
+  const msg = (msgInput?.value||'').trim();
+  const file = fileInput?.files?.[0];
+  if (!msg && !file) { showToast('Message ya file zaroor chahiye!','error'); return; }
+
+  const btn = document.querySelector('#chat-input-area button[onclick="sendChatMessage()"]');
+  if (btn) { btn.disabled=true; btn.textContent='...'; }
+
+  try {
+    if (file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('roomId', _chatCurrentRoom.roomId);
+      fd.append('roomName', _chatCurrentRoom.roomName);
+      fd.append('roomType', _chatCurrentRoom.roomType);
+      if (msg) fd.append('message', msg);
+      const res = await fetch(API+'/chat/upload', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error||'Upload failed');
+      clearChatFile();
+    } else {
+      const r = await api('POST', '/chat/messages', { roomId:_chatCurrentRoom.roomId, roomName:_chatCurrentRoom.roomName, roomType:_chatCurrentRoom.roomType, message:msg });
+      if (!r?.success) throw new Error('Send failed');
+    }
+    if (msgInput) { msgInput.value=''; msgInput.style.height='auto'; }
+    await pollChatMessages();
+  } catch(e) {
+    showToast('Error: '+e.message,'error');
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='➤'; }
+  }
+}
+
+// ── GROUP CREATE ──────────────────────────────────────────────
+function openCreateGroup() {
+  const users = window._chatAllUsers || [];
+  const me = APP.user.name;
+  openPanel('➕ New Group', `
+    <div class="form-group"><label>Group Name *</label>
+      <input type="text" class="form-control" id="grp-name" placeholder="e.g. Amazon Team, Flipkart Discussion..."></div>
+    <div class="form-group"><label>Members add karo *</label>
+      <input type="text" id="grp-member-search" class="form-control" placeholder="🔍 Name search karo..." oninput="filterGroupMembers(this.value)" style="margin-bottom:8px;">
+      <div id="grp-member-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+        ${users.filter(u=>u.name!==me).map(u=>`
+          <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+            <input type="checkbox" class="grp-member-cb" value="${u.name}" style="width:16px;height:16px;">
+            <div>
+              <div style="font-weight:600;font-size:13px;">${u.name}</div>
+              <div style="font-size:11px;color:var(--text-muted);">${u.role||''}</div>
+            </div>
+          </label>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitCreateGroup()">✅ Create Group</button>
+  `);
+}
+
+function filterGroupMembers(q) {
+  const users = window._chatAllUsers || [];
+  const me = APP.user.name;
+  const filtered = q.trim() ? users.filter(u => u.name !== me && u.name.toLowerCase().includes(q.toLowerCase())) : users.filter(u => u.name !== me);
+  const list = document.getElementById('grp-member-list');
+  if (!list) return;
+  list.innerHTML = filtered.map(u => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+      <input type="checkbox" class="grp-member-cb" value="${u.name}" style="width:16px;height:16px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${u.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${u.role||''}</div>
+      </div>
+    </label>`).join('');
+}
+
+async function submitCreateGroup() {
+  const name = (document.getElementById('grp-name')?.value||'').trim();
+  if (!name) { showToast('Group name dalo!','error'); return; }
+  const members = [...document.querySelectorAll('.grp-member-cb:checked')].map(cb => cb.value);
+  if (!members.length) { showToast('Kam se kam 1 member add karo!','error'); return; }
+
+  const r = await api('POST', '/chat/groups', { groupName: name, members });
+  if (r?.success) {
+    showToast('Group "'+name+'" ban gaya!','success');
+    closePanel();
+    renderChat();
+  } else {
+    showToast('Error: '+(r?.error||'Failed'),'error');
+  }
+}
+
+// ── GROUP SETTINGS ────────────────────────────────────────────
+async function openGroupSettings(groupId) {
+  const [members, users] = await Promise.all([
+    api('GET', '/chat/groups/'+groupId+'/members'),
+    api('GET', '/users'),
+  ]);
+  const memberNames = new Set((members||[]).map(m => m.user_name));
+  const nonMembers = (users||[]).filter(u => u.isActive && !memberNames.has(u.name));
+
+  openPanel('⚙️ Group Settings', `
+    <div class="form-group">
+      <label>Current Members (${(members||[]).length})</label>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;">
+        ${(members||[]).map(m=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);">
+            <div style="flex:1;font-size:13px;font-weight:600;">${m.user_name}</div>
+            ${m.user_name !== APP.user.name ? `<button onclick="removeGroupMember('${groupId}','${m.user_name}')" style="padding:3px 8px;background:var(--red);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">Remove</button>` : '<span style="font-size:11px;color:var(--text-muted);">You</span>'}
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Member Add Karo</label>
+      <select class="form-control" id="grp-add-member">
+        <option value="">-- Select user --</option>
+        ${nonMembers.map(u=>`<option value="${u.name}">${u.name} (${u.role})</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="addGroupMember('${groupId}')">➕ Add Member</button>
+    </div>
+    <hr>
+    <button class="btn btn-sm" style="background:var(--red);color:#fff;width:100%;" onclick="deleteGroup('${groupId}')">🗑️ Delete Group</button>
+  `);
+}
+
+async function addGroupMember(groupId) {
+  const userName = document.getElementById('grp-add-member')?.value;
+  if (!userName) { showToast('User select karo!','error'); return; }
+  const r = await api('POST', '/chat/groups/'+groupId+'/members', { userName });
+  if (r?.success) { showToast(userName+' add ho gaya!','success'); closePanel(); openGroupSettings(groupId); }
+  else showToast('Error: '+(r?.error||'Failed'),'error');
+}
+
+async function removeGroupMember(groupId, userName) {
+  if (!confirm(userName+' ko remove karein?')) return;
+  const r = await api('DELETE', '/chat/groups/'+groupId+'/members/'+userName);
+  if (r?.success) { showToast(userName+' removed!','success'); closePanel(); openGroupSettings(groupId); }
+}
+
+async function deleteGroup(groupId) {
+  if (!confirm('Group aur saare messages delete ho jayenge. Sure?')) return;
+  const r = await api('DELETE', '/chat/groups/'+groupId);
+  if (r?.success) { showToast('Group delete ho gaya!','success'); closePanel(); renderChat(); }
 }
 
 </script>

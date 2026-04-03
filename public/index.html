@@ -326,6 +326,7 @@ const NAV_CONFIG = {
     {id:'admin',icon:'⚙️',label:'Admin Panel'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ops Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -338,7 +339,8 @@ const NAV_CONFIG = {
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -349,7 +351,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Account Manager': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -358,9 +361,9 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
-    {id:'worklog',icon:'📋',label:'Work Log'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ads Executive': [
     {id:'tasks',icon:'📋',label:'Task Manager',badge:'tasks'},
@@ -371,7 +374,8 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -382,7 +386,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'SME': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -394,8 +399,9 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
-      ],
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
   'Senior Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
@@ -404,7 +410,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Team Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
@@ -416,7 +423,8 @@ const NAV_CONFIG = {
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Executive': [
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
@@ -425,7 +433,8 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
-        {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Sub Admin': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
@@ -439,10 +448,13 @@ const NAV_CONFIG = {
     {id:'reports', label:'Reports', icon:'📊'},
     {id:'seller360', label:'Seller 360 View', icon:'🔍'},
     {id:'payments', label:'Payment Manager', icon:'💰'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Executive': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
     {id:'csi', label:'CSI Health', icon:'📊'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
   ],
 
 };
@@ -653,7 +665,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -7356,6 +7368,226 @@ function checkModuleAccess(moduleKey) {
   const state = getAccessState();
   const vals = state[moduleKey] || ACCESS_DEFAULTS[moduleKey] || [2,2,2,2,2,2,2,2];
   return (vals[roleIdx] || 0) > 0;
+}
+
+// ── CHAT ─────────────────────────────────────────────────────
+let _chatPollTimer = null;
+let _chatLastTs = null;
+let _chatCurrentRoom = null;
+
+async function renderChat() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Chat...</div>';
+  if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
+
+  const rooms = await api('GET', '/chat/rooms?_='+Date.now()) || [];
+  const totalUnread = rooms.reduce((s,r) => s + (r.unread||0), 0);
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;height:calc(100vh - 120px);gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);">
+      <!-- LEFT: Room List -->
+      <div id="chat-rooms" style="width:280px;min-width:220px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-sidebar,var(--bg-card));">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">
+          💬 Team Chat
+          ${totalUnread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;">${totalUnread}</span>` : ''}
+        </div>
+        <div style="overflow-y:auto;flex:1;">
+          ${rooms.map(r => `
+            <div class="chat-room-item" data-rid="${r.roomId}" data-rname="${(r.roomName||'').replace(/"/g,'&quot;')}" data-rtype="${r.roomType}"
+              onclick="openChatRoom(this)"
+              style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.15s;display:flex;align-items:center;gap:10px;">
+              <div style="width:36px;height:36px;border-radius:50%;background:${r.roomType==='team'?'#3498db':'#27ae60'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">
+                ${r.roomType==='team'?'👥':r.roomName.charAt(0).toUpperCase()}
+              </div>
+              <div style="flex:1;overflow:hidden;">
+                <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.roomName}</div>
+                <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  ${r.lastMessage ? (r.lastSender ? r.lastSender.split(' ')[0]+': ' : '') + r.lastMessage : '<em>No messages yet</em>'}
+                </div>
+              </div>
+              ${r.unread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700;flex-shrink:0;">${r.unread}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <!-- RIGHT: Chat Window -->
+      <div id="chat-window" style="flex:1;display:flex;flex-direction:column;background:var(--bg);">
+        <div id="chat-placeholder" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:12px;">
+          <div style="font-size:48px;">💬</div>
+          <div style="font-size:16px;font-weight:600;">Koi room select karo</div>
+          <div style="font-size:13px;">Left side se client ya Team chat choose karo</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function openChatRoom(el) {
+  const roomId = el.getAttribute('data-rid');
+  const roomName = el.getAttribute('data-rname');
+  const roomType = el.getAttribute('data-rtype');
+
+  // Active highlight
+  document.querySelectorAll('.chat-room-item').forEach(e => e.style.background = '');
+  el.style.background = 'var(--primary-light, #eef2ff)';
+  el.querySelector('span[style*="background:var(--red)"]') && (el.querySelector('span[style*="background:var(--red)"]').remove());
+
+  _chatCurrentRoom = { roomId, roomName, roomType };
+  if (_chatPollTimer) clearInterval(_chatPollTimer);
+
+  const win = document.getElementById('chat-window');
+  win.innerHTML = `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;background:var(--bg-card);">
+      <span style="width:32px;height:32px;border-radius:50%;background:${roomType==='team'?'#3498db':'#27ae60'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;">${roomType==='team'?'👥':roomName.charAt(0).toUpperCase()}</span>
+      <span>${roomName}</span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:4px;">${roomType==='team'?'Team General':'Client Chat'}</span>
+    </div>
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="chat-input-area" style="padding:12px;border-top:1px solid var(--border);background:var(--bg-card);">
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <label style="cursor:pointer;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);display:flex;align-items:center;" title="Attach file">
+          📎 <input type="file" id="chat-file-input" style="display:none;" accept="image/*,.pdf,.xlsx,.xls,.csv" onchange="previewChatFile(this)">
+        </label>
+        <div style="flex:1;position:relative;">
+          <textarea id="chat-msg-input" rows="1" placeholder="Message likho... (Enter = send, Shift+Enter = new line)"
+            style="width:100%;resize:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:var(--bg);color:var(--text);font-family:inherit;outline:none;"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+        </div>
+        <button onclick="sendChatMessage()" style="padding:10px 18px;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;">Send ➤</button>
+      </div>
+      <div id="chat-file-preview" style="display:none;margin-top:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px;display:flex;align-items:center;gap:8px;"></div>
+    </div>
+  `;
+  win.style.display = 'flex';
+  win.style.flexDirection = 'column';
+
+  // Load messages
+  const msgs = await api('GET', '/chat/messages/'+roomId+'?_='+Date.now()) || [];
+  _chatLastTs = msgs.length ? msgs[msgs.length-1].created_at : new Date().toISOString();
+  renderChatMessages(msgs);
+
+  // Start polling every 4 seconds
+  _chatPollTimer = setInterval(pollChatMessages, 4000);
+}
+
+function renderChatMessages(msgs, append=false) {
+  const container = document.getElementById('chat-msgs');
+  if (!container) return;
+  const me = APP.user.name;
+
+  if (!append) container.innerHTML = '';
+
+  if (!msgs.length && !append) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;margin-top:40px;">Abhi tak koi message nahi 👋<br>Pehla message bhejo!</div>';
+    return;
+  }
+
+  msgs.forEach(m => {
+    const isMe = m.sender_name === me;
+    const time = new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    const date = new Date(m.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+
+    let fileHtml = '';
+    if (m.file_url) {
+      if (m.file_type === 'image') {
+        fileHtml = `<img src="${m.file_url}" style="max-width:240px;max-height:200px;border-radius:8px;display:block;margin-top:4px;cursor:pointer;" onclick="window.open('${m.file_url}','_blank')">`;
+      } else {
+        const icon = m.file_type==='pdf'?'📄':m.file_type==='excel'?'📊':'📎';
+        fileHtml = `<a href="${m.file_url}" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px;background:rgba(0,0,0,0.05);border-radius:6px;margin-top:4px;text-decoration:none;color:inherit;font-size:12px;">${icon} ${m.file_name||'File'}</a>`;
+      }
+    }
+
+    const bubble = document.createElement('div');
+    bubble.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};margin-bottom:2px;`;
+    bubble.innerHTML = `
+      ${!isMe ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;margin-left:4px;">${m.sender_name} <span style="font-size:10px;opacity:0.7;">(${m.sender_role||''})</span></div>` : ''}
+      <div style="max-width:70%;padding:10px 14px;border-radius:${isMe?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${isMe?'var(--primary)':'var(--bg-card)'};color:${isMe?'#fff':'var(--text)'};border:${isMe?'none':'1px solid var(--border)'};font-size:14px;line-height:1.5;word-break:break-word;">
+        ${m.message ? `<div>${m.message.replace(/\n/g,'<br>')}</div>` : ''}
+        ${fileHtml}
+        <div style="font-size:10px;opacity:0.65;margin-top:4px;text-align:right;">${time} · ${date}</div>
+      </div>
+    `;
+    container.appendChild(bubble);
+  });
+
+  // Scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+
+async function pollChatMessages() {
+  if (!_chatCurrentRoom || !_chatLastTs) return;
+  const msgs = await api('GET', '/chat/poll/'+_chatCurrentRoom.roomId+'?after='+encodeURIComponent(_chatLastTs)+'&_='+Date.now());
+  if (msgs && msgs.length) {
+    _chatLastTs = msgs[msgs.length-1].created_at;
+    renderChatMessages(msgs, true);
+  }
+}
+
+function previewChatFile(input) {
+  const preview = document.getElementById('chat-file-preview');
+  if (!preview) return;
+  if (!input.files.length) { preview.style.display='none'; return; }
+  const file = input.files[0];
+  const size = (file.size/1024).toFixed(0) + ' KB';
+  const icon = file.type.startsWith('image/')? '🖼️' : file.name.endsWith('.pdf')? '📄' : '📊';
+  preview.style.display = 'flex';
+  preview.innerHTML = `${icon} <strong>${file.name}</strong> <span style="color:var(--text-muted);">(${size})</span> <button onclick="clearChatFile()" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>`;
+}
+
+function clearChatFile() {
+  const input = document.getElementById('chat-file-input');
+  const preview = document.getElementById('chat-file-preview');
+  if (input) input.value = '';
+  if (preview) preview.style.display = 'none';
+}
+
+async function sendChatMessage() {
+  if (!_chatCurrentRoom) return;
+  const msgInput = document.getElementById('chat-msg-input');
+  const fileInput = document.getElementById('chat-file-input');
+  const msg = (msgInput?.value || '').trim();
+  const file = fileInput?.files?.[0];
+
+  if (!msg && !file) { showToast('Message ya file zaroor chahiye!', 'error'); return; }
+
+  const btn = document.querySelector('#chat-input-area button');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('roomId', _chatCurrentRoom.roomId);
+      formData.append('roomName', _chatCurrentRoom.roomName);
+      formData.append('roomType', _chatCurrentRoom.roomType);
+      if (msg) formData.append('message', msg);
+
+      const res = await fetch(API+'/chat/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+TOKEN },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Upload failed');
+      clearChatFile();
+    } else {
+      const r = await api('POST', '/chat/messages', {
+        roomId: _chatCurrentRoom.roomId,
+        roomName: _chatCurrentRoom.roomName,
+        roomType: _chatCurrentRoom.roomType,
+        message: msg,
+      });
+      if (!r?.success) throw new Error('Send failed');
+    }
+
+    if (msgInput) { msgInput.value = ''; msgInput.style.height = 'auto'; }
+    // Immediately poll for new messages
+    await pollChatMessages();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send ➤'; }
+  }
 }
 
 </script>

@@ -9,7 +9,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false }); 
   if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
     query = query.eq('crm_executive', name);
   }
@@ -611,6 +611,82 @@ renewalHistoryRouter.get('/', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── SELLER EXPECTATIONS ──────────────────────────────────────
+const expectationsRouter = require('express').Router();
+
+// GET /api/expectations/:clientCode
+expectationsRouter.get('/:clientCode', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('seller_expectations')
+      .select('*').eq('client_code', req.params.clientCode)
+      .order('created_at', { ascending: false }).limit(1).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    res.json(data || null);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/expectations/:clientCode/history
+expectationsRouter.get('/:clientCode/history', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('seller_expectations_history')
+      .select('*').eq('client_code', req.params.clientCode)
+      .order('changed_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    res.json(data || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/expectations — create or update
+expectationsRouter.post('/', authMiddleware, async (req, res) => {
+  try {
+    const d = req.body;
+    if (!d.clientCode) return res.status(400).json({ error: 'clientCode required' });
+
+    // Check existing
+    const { data: existing } = await supabase.from('seller_expectations')
+      .select('id').eq('client_code', d.clientCode).single();
+
+    const payload = {
+      client_code: d.clientCode,
+      client_name: d.clientName || d.clientCode,
+      sales_growth_target: d.salesGrowthTarget || null,
+      ads_acos_target: d.adsAcosTarget || null,
+      listing_improvement: d.listingImprovement || null,
+      inventory_management: d.inventoryManagement || null,
+      brand_building: d.brandBuilding || null,
+      customer_rating_target: d.customerRatingTarget || null,
+      revenue_target: d.revenueTarget || null,
+      additional_notes: d.additionalNotes || null,
+      special_requests: d.specialRequests || null,
+      fill_type: d.fillType || 'onboarding',
+      updated_at: new Date().toISOString(),
+      updated_by: req.user.name,
+      updated_by_role: req.user.role,
+    };
+
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from('seller_expectations').update(payload).eq('client_code', d.clientCode));
+    } else {
+      payload.filled_by = req.user.name;
+      payload.filled_by_role = req.user.role;
+      ({ error } = await supabase.from('seller_expectations').insert(payload));
+    }
+    if (error) throw error;
+
+    // Save history
+    await supabase.from('seller_expectations_history').insert({
+      client_code: d.clientCode,
+      changed_by: req.user.name,
+      changed_by_role: req.user.role,
+      change_type: existing ? 'updated' : 'created',
+      changes_summary: d.fillType === 'renewal' ? 'Renewal pe update kiya' : existing ? 'Expectation update ki' : 'Naya onboarding expectation add kiya',
+    });
+
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── REPORT ANALYZER LOGS ─────────────────────────────────────
 const reportAnalyzerRouter = require('express').Router();
 
@@ -685,16 +761,8 @@ reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) 
 
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
-  crmRouter,
-  csiRouter,
-  tasksRouter,
-  dashRouter,
-  notifRouter,
-  usersRouter,
-  renewalsRouter,
-  adsRouter,
-  clientsRouter,
-  hurdleRouter,
-  renewalHistoryRouter,
-  reportAnalyzerRouter,
+  crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
+  usersRouter, renewalsRouter, adsRouter, clientsRouter,
+  hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
+  expectationsRouter,
 };

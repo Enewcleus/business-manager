@@ -693,11 +693,14 @@ async function loadDSRPage() {
   let myClients = APP.clients || [];
   if (!isLead) {
     const uname = u.name.trim().toLowerCase();
-    myClients = myClients.filter(c =>
-      (c.amName||'').trim().toLowerCase() === uname ||
-      (c.adsManager||'').trim().toLowerCase() === uname ||
-      (c.crmExecutive||'').trim().toLowerCase() === uname
-    );
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
   }
 
   const filedCodes = new Set((dsrData||[]).map(d => d.client_code || d.clientCode));
@@ -2131,11 +2134,14 @@ async function renderCRM(){
   let myClients = APP.clients || [];
   if (!isLead) {
     const uname = u.name.trim().toLowerCase();
-    myClients = myClients.filter(c =>
-      (c.amName||'').trim().toLowerCase() === uname ||
-      (c.adsManager||'').trim().toLowerCase() === uname ||
-      (c.crmExecutive||'').trim().toLowerCase() === uname
-    );
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
   }
 
   renderCRMPage(myClients, todayCalls||[]);

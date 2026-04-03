@@ -9,7 +9,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false }); 
   if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
     query = query.eq('crm_executive', name);
   }

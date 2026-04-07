@@ -1,269 +1,8079 @@
-const router = require('express').Router();
-const supabase = require('../db');
-const { authMiddleware } = require('../middleware/auth');
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eNewcleus Business Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary:#1C2B2D; --secondary:#D4A03D; --accent:#C8903A;
+    --green:#27ae60; --amber:#f39c12; --red:#e74c3c; --purple:#8e44ad;
+    --teal:#16a085; --orange:#d35400;
+    --bg:#F0F4F8; --card:#FFFFFF; --text:#2c3e50; --text-muted:#7f8c8d;
+    --border:#e0e6ed; --sidebar-w:240px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { height:100%; overflow:hidden; }
+  body { height:100%; width:100%; overflow:hidden; max-width:100vw; }
+  body { font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
 
-const SLA_HOURS = { Critical: 4, High: 12, Medium: 24, Low: 48 };
+  .theme-btn { width:24px; height:24px; border-radius:50%; border:3px solid #fff; cursor:pointer; display:inline-block; transition:transform 0.2s; }
+  .theme-btn:hover { transform:scale(1.2); }
+  .theme-panel { position:fixed; bottom:70px; left:8px; background:#fff; border-radius:12px; padding:12px; box-shadow:0 4px 20px rgba(0,0,0,0.2); display:none; z-index:200; width:224px; }
+  .theme-panel.show { display:block; }
+  .theme-panel h4 { font-size:12px; color:#666; margin-bottom:8px; text-transform:uppercase; }
+  .theme-colors { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
 
-// CSI Lead / Devendra who can approve ticket closure
-const APPROVAL_ROLES = ['Admin', 'Ops Lead', 'CSI Lead'];
+  #auth-screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0d1a1c 0%,#1C2B2D 60%,#2C3E3F 100%); z-index:9999; }
+  .auth-card { background:#1C2B2D; border:1px solid #2e4042; box-shadow:0 20px 60px rgba(0,0,0,0.5); border-radius:20px; padding:40px; width:380px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+  .auth-logo { text-align:center; margin-bottom:24px; }
+  .auth-logo h1 { font-size:28px; font-weight:800; color:#D4A03D; }
+  .auth-logo p { color:var(--text-muted); font-size:13px; margin-top:4px; }
 
-function assignTicket(category) {
-  if (category === 'Ads / Campaign') return { to: 'Ads Executive', role: 'Ads Executive' };
-  if (category === 'CSI Review Due') return { to: 'CRM Executive', role: 'CRM Executive' };
-  if (['Escalation', 'Seller Complaint'].includes(category)) return { to: 'Ops Lead', role: 'Ops Lead' };
-  return { to: 'Account Manager', role: 'Account Manager' };
+  #app { display:none; height:100vh; overflow:hidden; }
+  .sidebar { width:var(--sidebar-w); height:100vh; background:var(--primary); display:flex; flex-direction:column; position:fixed; left:0; top:0; z-index:100; transition:transform 0.3s; overflow:hidden; }
+  .sidebar-header { padding:20px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo { font-size:20px; font-weight:800; color:#fff; }
+  .sidebar-logo span { color:#D4A03D; }
+  .sidebar-user { display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .user-avatar { width:36px; height:36px; border-radius:50%; background:#D4A03D; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0; }
+  .user-info .name { color:#fff; font-size:13px; font-weight:600; }
+  .user-info .role { color:#90CAF9; font-size:11px; }
+  #sidebar-nav { flex:1; padding:12px 8px; overflow-y:auto; overflow-x:hidden; }
+  .nav-section-label { color:rgba(255,255,255,0.4); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:8px 8px 4px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer; color:rgba(255,255,255,0.7); font-size:13px; font-weight:500; margin-bottom:2px; position:relative; transition:all 0.15s; }
+  .nav-item:hover { background:rgba(255,255,255,0.1); color:#fff; }
+  .nav-item.active { background:var(--secondary); color:#fff; }
+  .nav-icon { font-size:16px; width:20px; text-align:center; flex-shrink:0; }
+  .nav-badge { background:var(--red); color:#fff; border-radius:10px; font-size:10px; padding:1px 6px; margin-left:auto; font-weight:700; }
+  .logout-btn { padding:16px; border-top:1px solid rgba(255,255,255,0.1); }
+
+  .main { margin-left:var(--sidebar-w); height:100vh; width:calc(100% - var(--sidebar-w)); display:flex; flex-direction:column; overflow:hidden; position:relative; }
+  .topbar { background:#fff; border-bottom:1px solid var(--border); padding:0 20px; height:56px; display:flex; align-items:center; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; flex-direction:column; gap:4px; }
+  .hamburger span { display:block; width:22px; height:2px; background:var(--text); border-radius:2px; }
+  .page-title { font-size:16px; font-weight:700; color:var(--primary); flex:1; }
+  .topbar-search { flex:1; max-width:280px; }
+  .topbar-search input { width:100%; padding:7px 14px; border:1px solid var(--border); border-radius:20px; font-size:13px; outline:none; background:var(--bg); }
+  .notif-btn { position:relative; background:none; border:none; cursor:pointer; padding:6px; font-size:20px; }
+  .notif-count { position:absolute; top:0; right:0; background:var(--red); color:#fff; border-radius:50%; width:16px; height:16px; font-size:9px; display:none; align-items:center; justify-content:center; font-weight:700; }
+  .notif-dropdown { position:absolute; top:52px; right:12px; background:#fff; border:1px solid var(--border); border-radius:12px; width:320px; max-height:400px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.15); display:none; z-index:200; }
+  .notif-dropdown.show { display:block; }
+  .notif-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .notif-item { padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .notif-item:hover { background:var(--bg); }
+  .notif-type { font-size:10px; font-weight:700; color:var(--secondary); text-transform:uppercase; }
+  .notif-msg { font-size:13px; color:var(--text); margin-top:2px; }
+  .notif-time { font-size:11px; color:var(--text-muted); margin-top:2px; }
+  .page-content { flex:1; overflow-y:auto; overflow-x:hidden; padding:20px; max-width:100%; }
+
+  .card { background:#fff; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); margin-bottom:16px; }
+  .card-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .card-title { font-size:15px; font-weight:700; color:var(--primary); }
+  .card-body { padding:16px 20px; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--primary); color:#fff; padding:10px 12px; text-align:left; font-size:12px; font-weight:600; white-space:nowrap; }
+  td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tr:hover td { background:#f8fafc; }
+
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+  .kpi-card { background:#fff; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-top:3px solid var(--primary); }
+  .kpi-card.blue { border-color:var(--secondary); }
+  .kpi-card.green { border-color:var(--green); }
+  .kpi-card.amber { border-color:var(--amber); }
+  .kpi-card.red { border-color:var(--red); }
+  .kpi-card.orange { border-color:var(--orange); }
+  .kpi-card.purple { border-color:var(--purple); }
+  .kpi-card.teal { border-color:var(--teal); }
+  .kpi-label { font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+  .kpi-value { font-size:28px; font-weight:800; color:var(--primary); line-height:1.1; margin-top:4px; }
+  .kpi-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+  .form-control { width:100%; padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; transition:border 0.2s; background:#fff; font-family:inherit; }
+  .form-control:focus { border-color:var(--secondary); }
+  textarea.form-control { min-height:80px; resize:vertical; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; transition:all 0.15s; font-family:inherit; }
+  .btn-primary { background:var(--secondary); color:#fff; }
+  .btn-primary:hover { background:#1a5fa8; }
+  .btn-secondary { background:#ecf0f1; color:var(--text); }
+  .btn-success { background:var(--green); color:#fff; }
+  .btn-danger { background:var(--red); color:#fff; }
+  .btn-warning { background:var(--amber); color:#fff; }
+  .btn-outline { background:#fff; color:var(--primary); border:1.5px solid var(--border); }
+  .btn-sm { padding:5px 10px; font-size:12px; }
+  .btn-full { width:100%; padding:12px; font-size:14px; margin-top:8px; }
+  .btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; }
+  .badge-green { background:#d5f5e3; color:#1e8449; }
+  .badge-amber { background:#fef9e7; color:#b7950b; }
+  .badge-red { background:#fadbd8; color:#922b21; }
+  .badge-blue { background:#d6eaf8; color:#1a5276; }
+  .badge-orange { background:#fdebd0; color:#a04000; }
+  .badge-gray { background:#f2f3f4; color:#566573; }
+  .badge-purple { background:#e8daef; color:#6c3483; }
+
+  .ticket-card { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; border-left:4px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+  .ticket-card.critical { border-left-color:var(--red); }
+  .ticket-card.high { border-left-color:var(--orange); }
+  .ticket-card.medium { border-left-color:var(--amber); }
+  .ticket-card.low { border-left-color:var(--green); }
+  .ticket-card.breached { background:#fff8f8; }
+  .ticket-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+  .ticket-id { font-size:11px; color:var(--text-muted); font-weight:600; }
+  .ticket-client { font-size:13px; font-weight:700; color:var(--primary); }
+  .ticket-desc { font-size:12px; color:var(--text-muted); margin:6px 0; }
+  .ticket-footer { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .sla-timer { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  .sla-ok { background:#d5f5e3; color:#1e8449; }
+  .sla-warn { background:#fef9e7; color:#b7950b; }
+  .sla-breach { background:#fadbd8; color:#922b21; }
+
+  .quick-actions { display:flex; gap:4px; flex-wrap:wrap; }
+  .qa-btn { padding:3px 8px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:600; }
+  .qa-btn.green { background:#d5f5e3; color:#1e8449; }
+  .qa-btn.blue { background:#d6eaf8; color:#1a5276; }
+  .qa-btn.orange { background:#fdebd0; color:#a04000; }
+  .qa-btn.amber { background:#fef9e7; color:#b7950b; }
+  .qa-btn.red { background:#fadbd8; color:#922b21; }
+
+  .star-box { padding:8px 4px; border-radius:8px; border:2px solid var(--border); font-size:18px; text-align:center; cursor:pointer; transition:all 0.15s; }
+
+  .progress { background:#ecf0f1; border-radius:4px; height:6px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:4px; background:var(--secondary); transition:width 0.5s; }
+  .progress-fill.green { background:var(--green); }
+  .progress-fill.amber { background:var(--amber); }
+  .progress-fill.red { background:var(--red); }
+
+  #overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:300; display:none; align-items:flex-start; justify-content:flex-end; }
+  #overlay.show { display:flex; }
+  .panel { background:#fff; width:480px; max-width:100vw; height:100vh; overflow-y:auto; overflow-x:hidden; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,0.15); box-sizing:border-box; }
+  .panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .panel-title { font-size:17px; font-weight:700; color:var(--primary); }
+  .panel-close { background:none; border:none; cursor:pointer; font-size:22px; color:var(--text-muted); }
+
+  .task-section { margin-bottom:16px; }
+  .task-section-header { padding:8px 14px; border-radius:8px; font-size:13px; font-weight:700; margin-bottom:8px; }
+  .task-section-header.urgent { background:#fadbd8; color:#922b21; }
+  .task-section-header.today { background:#fef9e7; color:#b7950b; }
+  .task-section-header.done { background:#d5f5e3; color:#1e8449; }
+
+  .report-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .report-tab { padding:8px 16px; border-radius:8px; border:1.5px solid var(--border); background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-muted); }
+  .report-tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  .report-block { margin-top:16px; }
+  .report-block h4 { font-size:14px; font-weight:700; color:var(--primary); margin-bottom:10px; }
+
+  .mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); z-index:100; }
+  .mobile-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; padding:8px 4px; cursor:pointer; font-size:10px; color:var(--text-muted); gap:2px; }
+  .mobile-nav-item.active { color:var(--secondary); }
+  .mobile-nav-item .icon { font-size:20px; }
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+
+  .loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:40px; color:var(--text-muted); }
+  .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--secondary); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty-state { text-align:center; padding:48px 20px; color:var(--text-muted); }
+  .empty-state .emoji { font-size:48px; margin-bottom:12px; }
+  .empty-state h3 { font-size:16px; font-weight:600; }
+  .auth-error { background:#fadbd8; color:#922b21; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:12px; display:none; }
+  .toast { padding:12px 16px; border-radius:10px; font-size:13px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); margin-bottom:8px; animation:slideIn 0.3s; }
+  .toast.success { background:#d5f5e3; color:#1e8449; }
+  .toast.error { background:#fadbd8; color:#922b21; }
+  .toast.info { background:#d6eaf8; color:#1a5276; }
+  @keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  #toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; min-width:250px; }
+  .client-card { background:#fff; border-radius:12px; padding:14px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); border-left:4px solid var(--green); }
+  .client-card.warning { border-left-color:var(--amber); }
+  .client-card.at-risk { border-left-color:var(--red); }
+  .client-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .client-name { font-size:14px; font-weight:700; color:var(--primary); }
+  .client-meta { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .mobile-cards { display:none; }
+  .searchable-select-wrap { position:relative; }
+  .searchable-select-wrap input.search-input { width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px 8px 0 0; font-size:13px; outline:none; }
+  .searchable-select-wrap .dropdown-list { position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid var(--secondary); border-top:none; border-radius:0 0 8px 8px; max-height:200px; overflow-y:auto; z-index:500; display:none; }
+  .searchable-select-wrap .dropdown-list.open { display:block; }
+  .searchable-select-wrap .dropdown-item { padding:8px 12px; font-size:13px; cursor:pointer; }
+  .searchable-select-wrap .dropdown-item:hover { background:var(--bg); }
+  .searchable-select-wrap .dropdown-item.selected { background:#d6eaf8; font-weight:600; }
+  .hidden-select { display:none; }
+
+  @media (max-width:768px) {
+    .sidebar { transform:translateX(-100%); }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-overlay.show { display:block; }
+    .main { margin-left:0; padding-bottom:60px; }
+    .hamburger { display:flex; }
+    .mobile-nav { display:flex; }
+    .mobile-cards { display:block; }
+    .table-wrap { display:none; }
+    .form-row { grid-template-columns:1fr; }
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .panel { width:100vw; }
+    .topbar-search { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABcASADASIAAhEBAxEB/8QAHAABAAICAwEAAAAAAAAAAAAAAAYHBAUBAwgC/8QAPhAAAQMDAgQDBAYJAwUAAAAAAQIDBAAFEQYSBxMhMUFRYRQVcYEIIjKRscEjNkJSYnJzobIXJNEzgqLC4f/EABoBAQADAQEBAAAAAAAAAAAAAAABAgMEBQb/xAAvEQACAQIEBAMJAAMAAAAAAAAAAQIDEQQSITETQVFhBZHwFCIjcYGhscHRMkLx/9oADAMBAAIRAxEAPwDxlSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlfbLTr7oaZbW64rslCSSfkKA+K9J/RK0TaZNkl6sucBmVJMksQy8gKDSUpG5SQemSVYz/DVK6R4e6w1U+EWeySXG9+xb7idjTZ8dyj5eXf0q7GeLGmeFWn4+iLLEdv8AMtoUiVJQsNMKfKiV4Vgk4USO3h3rxvFZzrU+Bh9ZPe3Jd+h3YOMYS4lXRL8kh+lBo2wyuH0zUaIkaJc7eptSX20BKnUqWElCsd/tZHqPjXkmrI4ncU9VcQ4fsjsRES0sKDqo8VClAqHZTiz3x18h6VW9beFYerh6GSq7u/l2KYyrCrUzQWgpSsm2wZdymIiQmVPPL7JHgPM+Qr0zkMalWHb+Gqi0FT7kELPdDKMgfM/8Vh6l0C5brc7OhTDISykqcbWjCto7kEd6nKymeJCKVvdJ6ZmageXylpYjtdFvKGRnyA8TUu/00ibMe9H93nyhj7s0UWyXNIrSlb3VemZmn3UF1aXo7hw26kY6+RHgaaU0xN1A4tTSksxmzhbyhkZ8gPE0s9icytc0VKsv/TSJsx71f3+fKGPuzUP1Vpubp99AfKXWHP8ApvIHQ+h8jRxaIU09jSUqbT9CJRp83WFcVP4YD4bU3jcnGT1z3xWk0fYF6guK4wfDDbbe9a9u498AAUsxmVrmkpUh1pppenXo4En2hp8Haoo2kEYyD19RW005oYXKyt3OVcDGS4CtKUt7sJGepOfSlmMytchVK2FntMq8XL2K3o3nqdyugSnzPlU2Y4aJ5Q592PMx1CGeg+80SbDkluVzUgsmkrpeLWZ8NUcoCikIUshRI+WP712ar0hPsTftPMTJiZwXUjBSfDcPD41OOFP6qD+uv8qlLWzIlLS6KlWlSFqQsEKScEHwNfNbNNvlXPUL0KG3zHXH148gMnJJ8BU0icNGuUDKui+Z4hpsYHzPeoSbJcktyuKVMtTaElWyGubCke1stjLiSjatI8/UVg6J00jURlBctUfkBOMI3Zzn1HlSz2GZWuRulZ9/tq7Rd5FvW4HSyoDeBjIIBHT51I9M6J97WRNzenlkL3bEJb3dASOpz5g0syXJJXIbStnp2yzL5P8AZIgSMDc44r7KB5mpu1w1ihsB26uleP2WgB+NEmyHJLcrWlSjVmjZljj+2NvCVEzhSwnCkZ7ZHl61tbND0tNs9h9ut0eLz3JXvCSzIcLqWmG0q3BCl7dysq6Y6kYGKyq1OFuvW5pTjn2ZAqVKNaWG12S2WxEO5Mz5qnH0zVsr3NggNqb2+mxYyfPcPCovU05qpHMthKLi7MV63+ifYLRE4dN35lhtdznPOJffIytCULKUoB8Bjr656+GPJFTLhvxK1RoJTyLLIZcivnc5FkoK2ir94AEEH1BGemc4FcPimFqYrDunTdn+ex0YOtGjUzSR7E1XYbasuX1u5HT9wZQd1zaUlA2+ToV9RxP83bwIrz3oPhRoK86oVGk8SYV32ryIsVHJcf6/vKJz/wBufiK6rFxvi3K9tSdf2JV0ZSsctDTv+3j/AMQjkYWr1UonyxWl1Vwf1NHkJvejWVXyxSSJECRDWC6lB6pBR0VuHbI8vDtXkYTDVcKnSq1Mja0elvlffT6djtrVYVmpwjmtutfx/wBPXNkstpslrRbLTb48OGhO0NNoAB+PmfMnqa8gfSXsdpsPFGQxZ2m2GpEduS6w2MJbcVnIA8AcBWP4qz4XGfihpSGqx3NCVvtp2oVc4ivaGx4dSRu+KgarC+XW43y7SLrdpbkubIVvddX3UfyGOgA6Ct/CvDa+GryqTldPvv3M8ZiqdWmoRWv4MKri4fWNFosiH1oBmSkhxwnwB6pT6evrVVWFlEm9wY7uNjkhCVZ8ioVb+t03ZViULKXRJDiSeUcK2+OP7V9JHqePUfIjV40vq+6TlSn7pFSc/UQ28tKUDyA21JdSSDbdGyTKdC3RF5JUT9tZTt+fXrUUslq1xPJVKusuA0PF1ZKifROfxqNaxclN3EwH709c+T9pSidqVeIAyeo86XsRa7tcsbhy2mPouM4gDcvmOK9TuI/ACqzTqG8i5e3e8ZHN37scw7fhjtj0qz9BfqPD/puf5Kqmx9r50lsi0FdsuHiU2l7RklxQGUFtafQ7gPwJrJ0VHMXR0JLCUBxbPMGexUrr1+8V0cQ/1Imfyt/5pr60PJTcdGR22nihxDRYUpPdCh0B+OMGrczP/UjrelNXouYuHveOX9+8kvLwevbG3t6VI+IcdEjSEzmAbmglxJ8iCPyJHzqHex8QDOMQSJ/RWOaXf0ePPPlXbrSzXaBYy/c9SOyklaUpYIVhavv8Bk9vCq8i1tVqSThtKRcNIojOkLLBUwsH93uP7HHyrX8OYItMe+SXgRyH1NZPk2CT+Navg/N5dylwFK6PNhxI9Un/AIP9qlmtnGrZpO5OMp2KkZBx4qWQCfuqVtciWja6mn18j31oy33JlP1yttYA/jGCPvIra6pdRZNDOsNnaUx0xm8eZG38Mmsfhu41cNHtR3khYjvFBB8woLT+I+6tVxinYag25KuqiXlj4dE/+1OVwt8pm8I4aGrC9MwOY+8Rn+FI6D7yah+pdTXiRfZC2Z8hhpp1SWkNrKQADgdB3PTxqXcIpqHbI/BJHMYd3Y/hV/8AQai+pNI3pu+SPZYTkhh10rbWjqME5wfLHrUPbQsrZnc7ZGvJ8q0uQJkKK+HGi2tZyCcjvjtnxqW8Kf1UH9df5VF5egnoNnduE65tMlporWgNlWD+7nPU56VKOFP6qD+uv8qK99SJWtoa7hfGQbrephAKw7y0nyBUon8BWTrDTuorzdC7GnsNREABpsurSR06kgDvnP8AasPhhMQi+XiCogKccLiB57VEH8RX1rWNq5q8retL81yI6AUpZX9g4wRjw8/nU8iNcxK9NxbhFszcS7PNyX0ZSVpJVuT4ZJHXp0qL8MWExrxf4yMbGnkoTjyClivmJYdVu24yLhqV+F9UqWgqKilPqQaxOEL7abncowc3laErSo9CoJJGf/IUvqhbRmg4i/rlP+KP8E1YXD79RYv8rv8AmqodxCsd2d1PIlR4Eh9l8JKFNIKh0SAQcduoqbaZYcs+iGkTk8pbLDjjgP7OSpWD64NRHcmT91EZ4Py4yHZ0NakpkO7VoB/aAzkD4ZrZ6r0dNud0VcoV0U24rGEOk4Rgfskdh8qiWjNMKvrDspi5+yPMOAbQ2SRkZByCPX7q2jk/XdmnGMpD89tKsJUWC4lY8DuAz/ei21Ja966Z36iuWrLdY3IV1t0WRGW1yVSU5VnIwCevQ+pA61XlXsl1crTanrrGEcrjqL7ROdowc/2qiaiSJpu4pSlVNBSlKAV67+iXefeHDBVuW7vdtsxxoJJ6pbXhaflkr+6vIlb3RertQaPuSrhp+4LiOrTtcTgKQ4PJST0P5V5/ieDeMoOnF67o6cJXVCpmex6p+lLbrTK4UzJs9LaZcN1tUJwj629SwCkeYKSrI9M+FeOalOu+IGqtbLa9/wByLzLJ3NMNoDbST57R3PqcmotVfC8HPCUOHN3d7/InGV41qmaKPpta23EuNqKVpIKVA9QR41ObfxImtMJRNt7UlYGN6V7CfiMGoJVkXjQulbDa4TV/1VMi3mbbkzmkN28uRgFpKkIK92ST0BIGATXbUrxpNJ7vtc51SdT6GkvmvLvcGVMR0ohNKGDyySsj+bw+VRI9Tk0pWzdyiSWxKLZrWfbrEi1RozACEqSl1WSepJzjt41F6kmvNMp0w9Z2kzDK942mPcCS3t2F0E7O5zjHfxrjiHplOlL83a0zDL3w2JJcLezq4gKxjJ7ZxWMa8J2s99voXdJxvodt11pPuVhXapMZg70pCnU5BO0g5x28K1mnb9cLFIU7CWkpXjmNrGUrx+frWBCZ9pmsR923muJRuxnGTjNWFxB0NozSb9ytitcyZN6hJGIfulSUrWQFBPM3EDoe9KmIjCai73fZv8fMRouUW1sdH+pb3Kx7ob5nnzzj7sfnUS1FfZ99lJemrTtQCG20DCUD0H51q6Vs22ZqKWxmWa4yLVcmZ8XbzWicBQyCCMEH5GtvqjV0+/Q0RHWWWGUr3kN5yo+GSfCo6QR3HeuKXJsr3N9pXVE3T6Xm2GmnmnSFFK89CPEEVhahu8q93JU6UEJUUhKUoHRKR4fjWupS4sr3My0XKZapyJkJ3lup6dshQ8QR4ippH4lvhoB+1Nrcx3Q8Ug/Ig1ruHekoeoYl5u12uT0G1WZhDslUdjnPK3q2pCUZHTuSrsK0+q4dih3FCdO3d65wnGgvmPRuS42rJBQpOSMjAOQcdayjXi5umt12089i0qPuqTMjU+q7jfkhl4IYjJO4NN9ifMnxrt0xq+fYoa4jTDL7JVvSF5BST36io3Uk0rphN703qS8KmFg2WK2+Gw3u5pWvbjOemO/jVp1FBZpP09CI083upGlbnSGbl7wjrLL4cLiSnwJOamUHiTMbaCZluafWB9tDhRn5YNaWxaaTctFai1GZhaNmVGSGeXnm85ZT9rPTGM9jmo7SFRNtJ7b+V/2JU9FdEn1LrS5XmMqIlCIkZX20oJKlDyJ8q0NtnSrdNbmQ3S082cpUPwPmK3Ns0nPuOhbpqqKCti2SWmX0AdQlYP1/kdoP82a50lpK4ahtN+ukcFEWzQjKeXtyFHPRHxI3H4JNVdeCu29nZ/P0yypPRJbm6jcSpaWgmRbGXVgfaQ4Ug/LBrTal1jc71HMVSW40YnKm285V8Se9Rula5mZqCRn2O7zrNM9qgu7FEYUkjKVjyIqYNcS5Abw7aWlL80vED7sGoBSibQcU9yS6j1ldbzHVFIbjRlfaQ3nKvQk+FRqpRw30s1q27zYT1wMJEW3Pzd4b37uWAdvcYznv6VF6oqilJx5r9l8mWKfJilKVYgUpSgFKUoBSlKAVfmhLBqhyyMWjXseBN0CYa3m7k9JbJggt7kqZczvCgcDZjHfpVB19b17Nm5W3Oduelc2KoOtFRTt9NfmtVZmtKoqbu1f1zLH4ER7S9qO7c3Y7dG4KzZkOJbJW/uHVId+oXNudoV0znyrnjkqUVWVN2s0qFdktuh+TLUwH5SNw2FaGuidv1gCepHwqta5USo5JJPmar7L8fjX9W6327W3J4vw8liweN7rTs3ShadQ4E6XgJVtUDghKsg47GuOPjrT2uWFtOIcT7qhDKFAjIZTkdKr6lWp4bI46/wCKa87fwiVXNfTexl2YgXeESQAJDeSf5hV7fSCjawuEq/PR7dp9zTqSh1MxsxfailKUkndu5h+sCMY7elefqVFbDcSrGomtOqv07roTCrlg49S2OFTFwPD25ydEsR39YpuKEuBSG1vNwuWerQc6dV9FEdcYrD42NNMcXGBHhwVq5MNTjDYQlpxwoSVA7fqjKs5+NVoCQcgkH0riqxwrVZ1b735a62535W0Jda8FCxeHH1m4ytJx7tPcudrSbhsbstxSwrl5QSVRnG+pZHbB6dRXRol+xXDhxB1ZdGovtmiVuoUypsf73mDMUK88OdOvgk1S5Uo4yScdsmtuvUU06QRpdtmMzCEszHVtpIdfc27U7yTghIzgADuT1NY+wtUo009ny005/b+l/aE5ubXL7nTarbddSXdxiAwZUx0OPrAKUDCQVrUScAAAE1ra2divc+youCYCm0KnxFw3llGVBpZG4JPgTjGfIkeNayu+ObM77cjndrdyccI4OuHblLuWhHUmdEQlL0fmoCnm1k5GxfRafq9R4ZFZ/HS2Wy33S0Otw4VsvUqHzbzb4TgUzHe3YGACQkkdSkHp88muUKUhQUhRSR4g4NcHqcmsXQbr8W/21+rvquexfiLh5LHo+/sMxLBIRZbK9ctFm04aLaoiIueSCXVuH9IHkrycH6xUMAY6VWfDN1pHDziGhbqEqXbo4QlSgCo87wHjVe5O3bk474risaeByQcHLdp+Tvrru+bNJ4jNJSt1+5YGinGk8G+IDanEJWty27ElQBVh5ecDxqv6Urqp08kpPq7/AGS/RjKeZJdP6XRoHUkDR/DGxtzi1IgX67ykXaNkFSovLS0cjuME7h8Kklhk2XTt8XwoslxjyYMm2TlXCaopSmTIdZJaGc4whsJHQ9yfGvOdK4qnh0ZtvNvfz5P6fzobxxTjZW29PzLM4Jpd936nVYkxlavTGZ9zh0IK8b/03KC+nM24x498U42hQt2mFXxMdOsFRnjeg1s3Y5mGebs6czbnPj2zVaAkHIODQkk5JyTW/svx+Lf+7Wtfpzt1M+N8PJb1e/n+izuON6J90afhtW5uALbClOKjsIDi3uTtJWsdTgEjFWDa2o8XTdoXp+yPXfS6rWg3BpgxEx3nSg872hxf6RKwr4YwNteb65BIBSCcHuKyngE6cYJ7ffvvv3LxxLUnJrclHDeRdI92uarPCXLdctExtaUrSkobU0oKXk99uc479Ki1cgkdiRXFdqhaTl1MHK6SFKUq5UUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKA/9k=" alt="eNewcleus" style="width:200px;margin-bottom:8px;filter:brightness(1.1);">
+      <p style="color:#D4A03D;font-weight:600;font-size:13px;margin-top:4px;letter-spacing:1px;">BUSINESS MANAGER v2.0</p>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" class="form-control" id="login-email" placeholder="you@enewcleus.in" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" class="form-control" id="login-pass" placeholder="Password">
+    </div>
+    <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div id="app">
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo"><img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABcASADASIAAhEBAxEB/8QAHAABAAICAwEAAAAAAAAAAAAAAAYHBAUBAwgC/8QAPhAAAQMDAgQDBAYJAwUAAAAAAQIDBAAFEQYSBxMhMUFRYRQVcYEIIjKRscEjNkJSYnJzobIXJNEzgqLC4f/EABoBAQADAQEBAAAAAAAAAAAAAAABAgMEBQb/xAAvEQACAQIEBAMJAAMAAAAAAAAAAQIDEQQSITETQVFhBZHwFCIjcYGhscHRMkLx/9oADAMBAAIRAxEAPwDxlSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlfbLTr7oaZbW64rslCSSfkKA+K9J/RK0TaZNkl6sucBmVJMksQy8gKDSUpG5SQemSVYz/DVK6R4e6w1U+EWeySXG9+xb7idjTZ8dyj5eXf0q7GeLGmeFWn4+iLLEdv8AMtoUiVJQsNMKfKiV4Vgk4USO3h3rxvFZzrU+Bh9ZPe3Jd+h3YOMYS4lXRL8kh+lBo2wyuH0zUaIkaJc7eptSX20BKnUqWElCsd/tZHqPjXkmrI4ncU9VcQ4fsjsRES0sKDqo8VClAqHZTiz3x18h6VW9beFYerh6GSq7u/l2KYyrCrUzQWgpSsm2wZdymIiQmVPPL7JHgPM+Qr0zkMalWHb+Gqi0FT7kELPdDKMgfM/8Vh6l0C5brc7OhTDISykqcbWjCto7kEd6nKymeJCKVvdJ6ZmageXylpYjtdFvKGRnyA8TUu/00ibMe9H93nyhj7s0UWyXNIrSlb3VemZmn3UF1aXo7hw26kY6+RHgaaU0xN1A4tTSksxmzhbyhkZ8gPE0s9icytc0VKsv/TSJsx71f3+fKGPuzUP1Vpubp99AfKXWHP8ApvIHQ+h8jRxaIU09jSUqbT9CJRp83WFcVP4YD4bU3jcnGT1z3xWk0fYF6guK4wfDDbbe9a9u498AAUsxmVrmkpUh1pppenXo4En2hp8Haoo2kEYyD19RW005oYXKyt3OVcDGS4CtKUt7sJGepOfSlmMytchVK2FntMq8XL2K3o3nqdyugSnzPlU2Y4aJ5Q592PMx1CGeg+80SbDkluVzUgsmkrpeLWZ8NUcoCikIUshRI+WP712ar0hPsTftPMTJiZwXUjBSfDcPD41OOFP6qD+uv8qlLWzIlLS6KlWlSFqQsEKScEHwNfNbNNvlXPUL0KG3zHXH148gMnJJ8BU0icNGuUDKui+Z4hpsYHzPeoSbJcktyuKVMtTaElWyGubCke1stjLiSjatI8/UVg6J00jURlBctUfkBOMI3Zzn1HlSz2GZWuRulZ9/tq7Rd5FvW4HSyoDeBjIIBHT51I9M6J97WRNzenlkL3bEJb3dASOpz5g0syXJJXIbStnp2yzL5P8AZIgSMDc44r7KB5mpu1w1ihsB26uleP2WgB+NEmyHJLcrWlSjVmjZljj+2NvCVEzhSwnCkZ7ZHl61tbND0tNs9h9ut0eLz3JXvCSzIcLqWmG0q3BCl7dysq6Y6kYGKyq1OFuvW5pTjn2ZAqVKNaWG12S2WxEO5Mz5qnH0zVsr3NggNqb2+mxYyfPcPCovU05qpHMthKLi7MV63+ifYLRE4dN35lhtdznPOJffIytCULKUoB8Bjr656+GPJFTLhvxK1RoJTyLLIZcivnc5FkoK2ir94AEEH1BGemc4FcPimFqYrDunTdn+ex0YOtGjUzSR7E1XYbasuX1u5HT9wZQd1zaUlA2+ToV9RxP83bwIrz3oPhRoK86oVGk8SYV32ryIsVHJcf6/vKJz/wBufiK6rFxvi3K9tSdf2JV0ZSsctDTv+3j/AMQjkYWr1UonyxWl1Vwf1NHkJvejWVXyxSSJECRDWC6lB6pBR0VuHbI8vDtXkYTDVcKnSq1Mja0elvlffT6djtrVYVmpwjmtutfx/wBPXNkstpslrRbLTb48OGhO0NNoAB+PmfMnqa8gfSXsdpsPFGQxZ2m2GpEduS6w2MJbcVnIA8AcBWP4qz4XGfihpSGqx3NCVvtp2oVc4ivaGx4dSRu+KgarC+XW43y7SLrdpbkubIVvddX3UfyGOgA6Ct/CvDa+GryqTldPvv3M8ZiqdWmoRWv4MKri4fWNFosiH1oBmSkhxwnwB6pT6evrVVWFlEm9wY7uNjkhCVZ8ioVb+t03ZViULKXRJDiSeUcK2+OP7V9JHqePUfIjV40vq+6TlSn7pFSc/UQ28tKUDyA21JdSSDbdGyTKdC3RF5JUT9tZTt+fXrUUslq1xPJVKusuA0PF1ZKifROfxqNaxclN3EwH709c+T9pSidqVeIAyeo86XsRa7tcsbhy2mPouM4gDcvmOK9TuI/ACqzTqG8i5e3e8ZHN37scw7fhjtj0qz9BfqPD/puf5Kqmx9r50lsi0FdsuHiU2l7RklxQGUFtafQ7gPwJrJ0VHMXR0JLCUBxbPMGexUrr1+8V0cQ/1Imfyt/5pr60PJTcdGR22nihxDRYUpPdCh0B+OMGrczP/UjrelNXouYuHveOX9+8kvLwevbG3t6VI+IcdEjSEzmAbmglxJ8iCPyJHzqHex8QDOMQSJ/RWOaXf0ePPPlXbrSzXaBYy/c9SOyklaUpYIVhavv8Bk9vCq8i1tVqSThtKRcNIojOkLLBUwsH93uP7HHyrX8OYItMe+SXgRyH1NZPk2CT+Navg/N5dylwFK6PNhxI9Un/AIP9qlmtnGrZpO5OMp2KkZBx4qWQCfuqVtciWja6mn18j31oy33JlP1yttYA/jGCPvIra6pdRZNDOsNnaUx0xm8eZG38Mmsfhu41cNHtR3khYjvFBB8woLT+I+6tVxinYag25KuqiXlj4dE/+1OVwt8pm8I4aGrC9MwOY+8Rn+FI6D7yah+pdTXiRfZC2Z8hhpp1SWkNrKQADgdB3PTxqXcIpqHbI/BJHMYd3Y/hV/8AQai+pNI3pu+SPZYTkhh10rbWjqME5wfLHrUPbQsrZnc7ZGvJ8q0uQJkKK+HGi2tZyCcjvjtnxqW8Kf1UH9df5VF5egnoNnduE65tMlporWgNlWD+7nPU56VKOFP6qD+uv8qK99SJWtoa7hfGQbrephAKw7y0nyBUon8BWTrDTuorzdC7GnsNREABpsurSR06kgDvnP8AasPhhMQi+XiCogKccLiB57VEH8RX1rWNq5q8retL81yI6AUpZX9g4wRjw8/nU8iNcxK9NxbhFszcS7PNyX0ZSVpJVuT4ZJHXp0qL8MWExrxf4yMbGnkoTjyClivmJYdVu24yLhqV+F9UqWgqKilPqQaxOEL7abncowc3laErSo9CoJJGf/IUvqhbRmg4i/rlP+KP8E1YXD79RYv8rv8AmqodxCsd2d1PIlR4Eh9l8JKFNIKh0SAQcduoqbaZYcs+iGkTk8pbLDjjgP7OSpWD64NRHcmT91EZ4Py4yHZ0NakpkO7VoB/aAzkD4ZrZ6r0dNud0VcoV0U24rGEOk4Rgfskdh8qiWjNMKvrDspi5+yPMOAbQ2SRkZByCPX7q2jk/XdmnGMpD89tKsJUWC4lY8DuAz/ei21Ja966Z36iuWrLdY3IV1t0WRGW1yVSU5VnIwCevQ+pA61XlXsl1crTanrrGEcrjqL7ROdowc/2qiaiSJpu4pSlVNBSlKAV67+iXefeHDBVuW7vdtsxxoJJ6pbXhaflkr+6vIlb3RertQaPuSrhp+4LiOrTtcTgKQ4PJST0P5V5/ieDeMoOnF67o6cJXVCpmex6p+lLbrTK4UzJs9LaZcN1tUJwj629SwCkeYKSrI9M+FeOalOu+IGqtbLa9/wByLzLJ3NMNoDbST57R3PqcmotVfC8HPCUOHN3d7/InGV41qmaKPpta23EuNqKVpIKVA9QR41ObfxImtMJRNt7UlYGN6V7CfiMGoJVkXjQulbDa4TV/1VMi3mbbkzmkN28uRgFpKkIK92ST0BIGATXbUrxpNJ7vtc51SdT6GkvmvLvcGVMR0ohNKGDyySsj+bw+VRI9Tk0pWzdyiSWxKLZrWfbrEi1RozACEqSl1WSepJzjt41F6kmvNMp0w9Z2kzDK942mPcCS3t2F0E7O5zjHfxrjiHplOlL83a0zDL3w2JJcLezq4gKxjJ7ZxWMa8J2s99voXdJxvodt11pPuVhXapMZg70pCnU5BO0g5x28K1mnb9cLFIU7CWkpXjmNrGUrx+frWBCZ9pmsR923muJRuxnGTjNWFxB0NozSb9ytitcyZN6hJGIfulSUrWQFBPM3EDoe9KmIjCai73fZv8fMRouUW1sdH+pb3Kx7ob5nnzzj7sfnUS1FfZ99lJemrTtQCG20DCUD0H51q6Vs22ZqKWxmWa4yLVcmZ8XbzWicBQyCCMEH5GtvqjV0+/Q0RHWWWGUr3kN5yo+GSfCo6QR3HeuKXJsr3N9pXVE3T6Xm2GmnmnSFFK89CPEEVhahu8q93JU6UEJUUhKUoHRKR4fjWupS4sr3My0XKZapyJkJ3lup6dshQ8QR4ippH4lvhoB+1Nrcx3Q8Ug/Ig1ruHekoeoYl5u12uT0G1WZhDslUdjnPK3q2pCUZHTuSrsK0+q4dih3FCdO3d65wnGgvmPRuS42rJBQpOSMjAOQcdayjXi5umt12089i0qPuqTMjU+q7jfkhl4IYjJO4NN9ifMnxrt0xq+fYoa4jTDL7JVvSF5BST36io3Uk0rphN703qS8KmFg2WK2+Gw3u5pWvbjOemO/jVp1FBZpP09CI083upGlbnSGbl7wjrLL4cLiSnwJOamUHiTMbaCZluafWB9tDhRn5YNaWxaaTctFai1GZhaNmVGSGeXnm85ZT9rPTGM9jmo7SFRNtJ7b+V/2JU9FdEn1LrS5XmMqIlCIkZX20oJKlDyJ8q0NtnSrdNbmQ3S082cpUPwPmK3Ns0nPuOhbpqqKCti2SWmX0AdQlYP1/kdoP82a50lpK4ahtN+ukcFEWzQjKeXtyFHPRHxI3H4JNVdeCu29nZ/P0yypPRJbm6jcSpaWgmRbGXVgfaQ4Ug/LBrTal1jc71HMVSW40YnKm285V8Se9Rula5mZqCRn2O7zrNM9qgu7FEYUkjKVjyIqYNcS5Abw7aWlL80vED7sGoBSibQcU9yS6j1ldbzHVFIbjRlfaQ3nKvQk+FRqpRw30s1q27zYT1wMJEW3Pzd4b37uWAdvcYznv6VF6oqilJx5r9l8mWKfJilKVYgUpSgFKUoBSlKAVfmhLBqhyyMWjXseBN0CYa3m7k9JbJggt7kqZczvCgcDZjHfpVB19b17Nm5W3Oduelc2KoOtFRTt9NfmtVZmtKoqbu1f1zLH4ER7S9qO7c3Y7dG4KzZkOJbJW/uHVId+oXNudoV0znyrnjkqUVWVN2s0qFdktuh+TLUwH5SNw2FaGuidv1gCepHwqta5USo5JJPmar7L8fjX9W6327W3J4vw8liweN7rTs3ShadQ4E6XgJVtUDghKsg47GuOPjrT2uWFtOIcT7qhDKFAjIZTkdKr6lWp4bI46/wCKa87fwiVXNfTexl2YgXeESQAJDeSf5hV7fSCjawuEq/PR7dp9zTqSh1MxsxfailKUkndu5h+sCMY7elefqVFbDcSrGomtOqv07roTCrlg49S2OFTFwPD25ydEsR39YpuKEuBSG1vNwuWerQc6dV9FEdcYrD42NNMcXGBHhwVq5MNTjDYQlpxwoSVA7fqjKs5+NVoCQcgkH0riqxwrVZ1b735a62535W0Jda8FCxeHH1m4ytJx7tPcudrSbhsbstxSwrl5QSVRnG+pZHbB6dRXRol+xXDhxB1ZdGovtmiVuoUypsf73mDMUK88OdOvgk1S5Uo4yScdsmtuvUU06QRpdtmMzCEszHVtpIdfc27U7yTghIzgADuT1NY+wtUo009ny005/b+l/aE5ubXL7nTarbddSXdxiAwZUx0OPrAKUDCQVrUScAAAE1ra2divc+youCYCm0KnxFw3llGVBpZG4JPgTjGfIkeNayu+ObM77cjndrdyccI4OuHblLuWhHUmdEQlL0fmoCnm1k5GxfRafq9R4ZFZ/HS2Wy33S0Otw4VsvUqHzbzb4TgUzHe3YGACQkkdSkHp88muUKUhQUhRSR4g4NcHqcmsXQbr8W/21+rvquexfiLh5LHo+/sMxLBIRZbK9ctFm04aLaoiIueSCXVuH9IHkrycH6xUMAY6VWfDN1pHDziGhbqEqXbo4QlSgCo87wHjVe5O3bk474risaeByQcHLdp+Tvrru+bNJ4jNJSt1+5YGinGk8G+IDanEJWty27ElQBVh5ecDxqv6Urqp08kpPq7/AGS/RjKeZJdP6XRoHUkDR/DGxtzi1IgX67ykXaNkFSovLS0cjuME7h8Kklhk2XTt8XwoslxjyYMm2TlXCaopSmTIdZJaGc4whsJHQ9yfGvOdK4qnh0ZtvNvfz5P6fzobxxTjZW29PzLM4Jpd936nVYkxlavTGZ9zh0IK8b/03KC+nM24x498U42hQt2mFXxMdOsFRnjeg1s3Y5mGebs6czbnPj2zVaAkHIODQkk5JyTW/svx+Lf+7Wtfpzt1M+N8PJb1e/n+izuON6J90afhtW5uALbClOKjsIDi3uTtJWsdTgEjFWDa2o8XTdoXp+yPXfS6rWg3BpgxEx3nSg872hxf6RKwr4YwNteb65BIBSCcHuKyngE6cYJ7ffvvv3LxxLUnJrclHDeRdI92uarPCXLdctExtaUrSkobU0oKXk99uc479Ki1cgkdiRXFdqhaTl1MHK6SFKUq5UUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKAUpSgFKUoBSlKA/9k=" alt="eNewcleus" style="width:140px;height:auto;filter:brightness(1.15);"></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="user-avatar">A</div>
+      <div class="user-info">
+        <div class="name" id="sidebar-username">Loading...</div>
+        <div class="role" id="sidebar-role">—</div>
+      </div>
+    </div>
+    <div id="sidebar-nav"></div>
+    <div class="logout-btn" style="flex-shrink:0;">
+      <button onclick="toggleThemePanel()" style="background:rgba(255,255,255,0.1);border:none;cursor:pointer;color:rgba(255,255,255,0.8);font-size:12px;width:100%;text-align:left;padding:8px 12px;border-radius:8px;margin-bottom:8px;">🎨 Theme Change</button>
+      <div id="theme-panel" class="theme-panel"><h4>Color Theme</h4><div class="theme-colors" id="theme-colors"></div></div>
+      <button class="btn btn-outline btn-full" onclick="doLogout()" style="color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.2);">🚪 Logout</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="topbar-search">
+        <input type="text" placeholder="🔍 Search clients..." oninput="globalSearch(this.value)">
+      </div>
+      <div style="position:relative;">
+        <button class="notif-btn" id="notif-btn" onclick="toggleNotifications()">
+          🔔<span class="notif-count" id="notif-count">0</span>
+        </button>
+        <div class="notif-dropdown" id="notif-dropdown">
+          <div class="notif-header">
+            <span style="font-weight:700;font-size:13px;">Notifications</span>
+            <button class="btn btn-sm btn-outline" onclick="markAllRead()">Mark all read</button>
+          </div>
+          <div id="notif-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="page-content" id="page-content">
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    </div>
+  </div>
+
+  <div class="mobile-nav" id="mobile-nav"></div>
+</div>
+
+<div id="overlay" onclick="closePanel(event)">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title" id="panel-title">Panel</div>
+      <button class="panel-close" onclick="document.getElementById('overlay').classList.remove('show')">✕</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+const API = window.location.origin + '/api';
+let TOKEN = localStorage.getItem('en_token') || '';
+let APP = { user: null, page: '', clients: [], tickets: [], tasks: [] };
+
+const NAV_CONFIG = {
+  'Admin': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'adstasks',icon:'📋',label:'Ads Tasks'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'payments',icon:'💰',label:'Payment Manager'},
+    {id:'admin',icon:'⚙️',label:'Admin Panel'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Ops Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'payments',icon:'💰',label:'Payment Manager'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'CSI Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Account Manager': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'clients',icon:'👥',label:'My Clients'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Ads Executive': [
+    {id:'tasks',icon:'📋',label:'Task Manager',badge:'tasks'},
+    {id:'adstasks',icon:'📋',label:'Ads Tasks',badge:'tasks'},
+    {id:'ads',icon:'📢',label:'Ads Manager'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'CRM Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Forms'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'SME': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Senior Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Team Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Executive': [
+    {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
+    {id:'mycalls',icon:'📞',label:'My Call Log'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'Sub Admin': [
+    {id:'dashboard', label:'Dashboard', icon:'🏠'},
+    {id:'clients', label:'Client Manager', icon:'👥'},
+    {id:'tasks', label:'Task Manager', icon:'📋'},
+    {id:'tickets', label:'Tickets', icon:'🎫'},
+    {id:'crm', label:'CRM Log', icon:'📞'},
+    {id:'csi', label:'CSI Health', icon:'📊'},
+    {id:'renewals', label:'Renewals', icon:'🔄'},
+    {id:'dsr', label:'Daily Sales Report', icon:'📈'},
+    {id:'reports', label:'Reports', icon:'📊'},
+    {id:'seller360', label:'Seller 360 View', icon:'🔍'},
+    {id:'payments', label:'Payment Manager', icon:'💰'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+  'CSI Executive': [
+    {id:'dashboard', label:'Dashboard', icon:'🏠'},
+    {id:'csi', label:'CSI Health', icon:'📊'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
+
+};
+
+const QUICK_ACTIONS = {
+  'Account Manager': [
+    {label:'✅ Order Done',type:'green',action:'Order Processed'},
+    {label:'📋 Listing Updated',type:'blue',action:'Listing Updated'},
+    {label:'🩺 Health Fixed',type:'green',action:'Account Health Fixed'},
+    {label:'📞 Called Seller',type:'orange',action:'Called Seller'},
+    {label:'⏳ Awaiting',type:'amber',action:'Awaiting Seller Response'},
+    {label:'🚨 Escalated',type:'red',action:'Issue Escalated'},
+  ],
+  'Ads Executive': [
+    {label:'💰 Budget Updated',type:'blue',action:'Budget Updated'},
+    {label:'⚡ Optimized',type:'green',action:'Campaign Optimized'},
+    {label:'🚀 Campaign Live',type:'orange',action:'New Campaign Live'},
+    {label:'⏸ Paused',type:'amber',action:'Campaign Paused'},
+  ],
+  'CRM Executive': [
+    {label:'✅ Connected',type:'green',action:'Called — Connected'},
+    {label:'📵 No Response',type:'amber',action:'Called — No Response'},
+    {label:'🔁 Callback',type:'orange',action:'Callback Requested'},
+    {label:'📋 CSI Done',type:'blue',action:'CSI Form Submitted'},
+  ],
+};
+
+const CSI_QUESTIONS = [
+  {id:'q1',label:'Q1: Service Quality',desc:'How satisfied are you with our overall service quality?'},
+  {id:'q2',label:'Q2: Communication',desc:'How would you rate our communication and responsiveness?'},
+  {id:'q3',label:'Q3: Issue Resolution',desc:'How effectively do we resolve your issues?'},
+  {id:'q4',label:'Q4: Account Growth',desc:'How satisfied are you with your account growth and results?'},
+  {id:'q5',label:'Q5: Overall Satisfaction',desc:'Overall, how satisfied are you with eNewcleus services?'},
+];
+
+// ── API HELPER ───────────────────────────────────────────────
+// ── CLIENT CACHE HELPER (avoid repeat fetches) ───────────────
+let _clientCacheTs = 0;
+async function getClients(force = false) {
+  const AGE = 60000; // 60 seconds
+  if (!force && APP.clients.length && (Date.now() - _clientCacheTs) < AGE) return APP.clients;
+  const data = await api('GET', '/clients');
+  if (data) { APP.clients = data; _clientCacheTs = Date.now(); }
+  return APP.clients;
 }
 
-// GET /api/tickets
-router.get('/', authMiddleware, async (req, res) => {
-  const { role, name } = req.user;
-  const isAdmin = ['Admin', 'Ops Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'SME'].includes(role);
-
-  let query = supabase.from('tickets').select('*').order('created_at', { ascending: false });
-
-  if (!isAdmin) {
-    const clientQ = await supabase.from('clients').select('client_code')
-      .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`);
-    const codes = (clientQ.data || []).map(c => c.client_code);
-
-    if (codes.length) {
-      query = query.or(`assigned_to.ilike.%${name}%,raised_by.ilike.%${name}%,client_code.in.(${codes.join(',')})`);
-    } else {
-      query = query.or(`assigned_to.ilike.%${name}%,raised_by.ilike.%${name}%`);
-    }
-  }
-
-  const { data, error } = await query.limit(300);
-  if (error) return res.status(500).json({ error: error.message });
-
-  const now = new Date();
-  res.json(data.map(t => {
-    const created = new Date(t.created_at);
-    const slaHours = SLA_HOURS[t.priority] || 24;
-    const hoursOpen = Math.round((now - created) / 3600000);
-
-    // Hours to close — use actual or running count
-    let hoursToClose = t.hours_to_close || null;
-    if (!hoursToClose && t.approved_at) {
-      hoursToClose = Math.round((new Date(t.approved_at) - created) / 3600000);
-    }
-
-    return {
-      ticketId: t.ticket_id,
-      clientCode: t.client_code,
-      clientName: t.client_name,
-      raisedBy: t.raised_by,
-      assignedTo: t.assigned_to,
-      assignedToRole: t.assigned_to_role,
-      category: t.category,
-      priority: t.priority,
-      description: t.description,
-      status: t.status,
-      resolutionNote: t.resolution_note,
-      slaBreached: t.status !== 'Done' && hoursOpen > slaHours,
-      hoursOpen,
-      hoursRemaining: Math.max(0, slaHours - hoursOpen),
-      hoursToClose,
-      createdAt: new Date(t.created_at).toLocaleString('en-IN'),
-      resolvedAt: t.resolved_at ? new Date(t.resolved_at).toLocaleString('en-IN') : '',
-      resolvedBy: t.resolved_by || '',
-      // Approval workflow fields
-      closeRequestedAt: t.close_requested_at ? new Date(t.close_requested_at).toLocaleString('en-IN') : '',
-      closeRequestedBy: t.close_requested_by || '',
-      approvedBy: t.approved_by || '',
-      approvedAt: t.approved_at ? new Date(t.approved_at).toLocaleString('en-IN') : '',
-    };
-  }));
-});
-
-// POST /api/tickets
-router.post('/', authMiddleware, async (req, res) => {
-  const d = req.body;
-  const ticketId = 'TKT' + Date.now().toString().slice(-7);
-  const assigned = assignTicket(d.category);
-
-  const { error } = await supabase.from('tickets').insert({
-    ticket_id: ticketId,
-    client_code: d.clientCode,
-    client_name: d.clientName,
-    raised_by: req.user.name,
-    raised_by_role: req.user.role,
-    assigned_to: d.assignedTo || assigned.to,
-    assigned_to_role: d.assignedToRole || assigned.role,
-    category: d.category,
-    priority: d.priority,
-    description: d.description,
-    status: 'Open',
-    sla_hours: SLA_HOURS[d.priority] || 24,
+// ── SEARCHABLE CLIENT SELECT ─────────────────────────────────
+function buildSearchableSelect(containerId, clients, selectedCode='', placeholder='Search client...') {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const selected = clients.find(c => c.clientCode === selectedCode);
+  container.innerHTML = `
+    <div class="searchable-select-wrap">
+      <input type="text" class="search-input form-control" placeholder="${placeholder}" 
+        id="${containerId}_search" value="${selected ? selected.busyName + ' (' + selected.clientCode + ')' : ''}"
+        autocomplete="off" oninput="filterSearchableSelect('${containerId}', this.value)"
+        onfocus="openSearchableSelect('${containerId}')" onblur="setTimeout(()=>closeSearchableSelect('${containerId}'),200)">
+      <input type="hidden" id="${containerId}_val" value="${selectedCode}">
+      <div class="dropdown-list" id="${containerId}_list">
+        ${clients.map(c => `<div class="dropdown-item${c.clientCode===selectedCode?' selected':''}" 
+          onmousedown="selectSearchableItem('${containerId}','${c.clientCode}','${c.busyName.replace(/'/g,"\'")}')">
+          ${c.busyName} <span style="font-size:11px;color:var(--text-muted);">(${c.marketplace})</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+function openSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.add('open');
+}
+function closeSearchableSelect(id) {
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function filterSearchableSelect(id, q) {
+  const list = document.getElementById(id+'_list');
+  if (!list) return;
+  list.classList.add('open');
+  const lq = q.toLowerCase();
+  list.querySelectorAll('.dropdown-item').forEach(item => {
+    item.style.display = item.textContent.toLowerCase().includes(lq) ? '' : 'none';
   });
-  if (error) return res.status(500).json({ error: error.message });
+}
+function selectSearchableItem(id, code, name) {
+  document.getElementById(id+'_val').value = code;
+  document.getElementById(id+'_search').value = name;
+  document.getElementById(id+'_list')?.classList.remove('open');
+}
+function getSearchableVal(id) {
+  return document.getElementById(id+'_val')?.value || '';
+}
 
-  await supabase.from('notifications').insert({
-    notif_id: 'NTF' + Date.now(),
-    assigned_to: assigned.to,
-    assigned_role: assigned.role,
-    type: 'NEW_TICKET',
-    message: `New ${d.priority} ticket: ${d.clientName} — ${d.category}`,
-    related_id: ticketId,
-  }).catch(() => {});
-
-  res.json({ success: true, ticketId, assignedTo: assigned.to });
-});
-
-// PATCH /api/tickets/:id — handles 3 actions:
-// 1. status change (Open → In Progress)
-// 2. request_close — executive requests closure
-// 3. approve_close — CSI Lead/Admin approves and marks Done
-router.patch('/:id', authMiddleware, async (req, res) => {
-  const { status, resolutionNote, action } = req.body;
-  const { role, name } = req.user;
-
-  // ── Action: Executive requests closure ──────────────────────
-  if (action === 'request_close') {
-    if (!resolutionNote?.trim()) return res.status(400).json({ error: 'Resolution note required' });
-
-    const updates = {
-      status: 'Pending Approval',
-      resolution_note: resolutionNote,
-      resolved_by: name,
-      resolved_at: new Date(),
-      close_requested_at: new Date(),
-      close_requested_by: name,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from('tickets').update(updates).eq('ticket_id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-
-    // Notify CSI Lead / Ops Lead / Admin
-    await supabase.from('notifications').insert({
-      notif_id: 'NTF' + Date.now(),
-      assigned_role: 'CSI Lead',
-      type: 'TICKET_APPROVAL',
-      message: `Ticket closure approval chahiye: ${req.params.id} — by ${name}`,
-      related_id: req.params.id,
-    }).catch(() => {});
-
-    // Also notify Admin
-    await supabase.from('notifications').insert({
-      notif_id: 'NTF' + Date.now() + '1',
-      assigned_role: 'Admin',
-      type: 'TICKET_APPROVAL',
-      message: `Ticket closure approval chahiye: ${req.params.id} — by ${name}`,
-      related_id: req.params.id,
-    }).catch(() => {});
-
-    return res.json({ success: true, newStatus: 'Pending Approval' });
-  }
-
-  // ── Action: CSI Lead / Admin approves closure ────────────────
-  if (action === 'approve_close') {
-    if (!APPROVAL_ROLES.includes(role)) {
-      return res.status(403).json({ error: 'Sirf CSI Lead / Admin approve kar sakte hain' });
-    }
-
-    // Get ticket to calculate hours_to_close
-    const { data: ticket } = await supabase.from('tickets')
-      .select('created_at').eq('ticket_id', req.params.id).single();
-
-    const hoursToClose = ticket?.created_at
-      ? Math.round((new Date() - new Date(ticket.created_at)) / 3600000)
-      : null;
-
-    const updates = {
-      status: 'Done',
-      approved_by: name,
-      approved_at: new Date(),
-      hours_to_close: hoursToClose,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from('tickets').update(updates).eq('ticket_id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-
-    return res.json({ success: true, newStatus: 'Done', hoursToClose });
-  }
-
-  // ── Action: Reject close request ─────────────────────────────
-  if (action === 'reject_close') {
-    if (!APPROVAL_ROLES.includes(role)) {
-      return res.status(403).json({ error: 'Sirf CSI Lead / Admin reject kar sakte hain' });
-    }
-
-    const updates = {
-      status: 'In Progress',
-      close_requested_at: null,
-      close_requested_by: null,
-      updated_at: new Date(),
-    };
-
-    const { error } = await supabase.from('tickets').update(updates).eq('ticket_id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-
-    return res.json({ success: true, newStatus: 'In Progress' });
-  }
-
-  // ── Default: Simple status update (Open → In Progress) ───────
-  const updates = { status, updated_at: new Date() };
-  if (status === 'Done') {
-    // Direct done — only for Admin/Ops Lead
-    if (!APPROVAL_ROLES.includes(role)) {
-      return res.status(403).json({ error: 'Seedha close nahi kar sakte — pehle request_close karo' });
-    }
-    updates.resolved_at = new Date();
-    updates.resolution_note = resolutionNote || '';
-    updates.resolved_by = name;
-    updates.approved_by = name;
-    updates.approved_at = new Date();
-    const { data: ticket } = await supabase.from('tickets').select('created_at').eq('ticket_id', req.params.id).single();
-    if (ticket?.created_at) {
-      updates.hours_to_close = Math.round((new Date() - new Date(ticket.created_at)) / 3600000);
-    }
-  }
-
-  const { error } = await supabase.from('tickets').update(updates).eq('ticket_id', req.params.id);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
-});
-
-// GET /api/tickets/stats/time — hours to close stats per executive
-router.get('/stats/time', authMiddleware, async (req, res) => {
+async function api(method, path, body) {
   try {
-    const { data, error } = await supabase.from('tickets')
-      .select('ticket_id, resolved_by, approved_by, hours_to_close, priority, category, created_at, approved_at, client_name')
-      .eq('status', 'Done')
-      .not('hours_to_close', 'is', null)
-      .order('approved_at', { ascending: false })
-      .limit(500);
-    if (error) throw error;
+    const res = await fetch(API + path, {
+      method,
+      headers: {
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+TOKEN,
+        'Cache-Control':'no-cache, no-store, must-revalidate',
+        'Pragma':'no-cache'
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+    });
+    if (res.status === 401) { doLogout(); return null; }
+    if (res.status === 304) { return []; }
+    if (!res.ok) {
+      const errText = await res.text().catch(()=>'');
+      console.error('API Error', res.status, path, errText);
+      showToast('Server error ('+res.status+'): '+path, 'error');
+      return null;
+    }
+    return await res.json();
+  } catch(e) {
+    console.error('API fetch error:', path, e);
+    showToast('Network error — check connection', 'error');
+    return null;
+  }
+}
 
-    // Group by executive
-    const execMap = {};
-    (data || []).forEach(t => {
-      const exec = t.resolved_by || 'Unknown';
-      if (!execMap[exec]) execMap[exec] = { name: exec, tickets: [], totalHours: 0, count: 0 };
-      execMap[exec].tickets.push(t);
-      execMap[exec].totalHours += t.hours_to_close || 0;
-      execMap[exec].count++;
+// ── AUTH ─────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('auth-error');
+  if (!email || !pass) { showError(err,'Email and password required'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in...'; err.style.display='none';
+  const res = await fetch(API+'/auth/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password:pass}),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (data.token) {
+    TOKEN = data.token;
+    localStorage.setItem('en_token', TOKEN);
+    APP.user = data.user;
+    initApp();
+  } else {
+    showError(err, data.error || data.message || 'Login failed');
+  }
+}
+
+function doLogout() {
+  TOKEN = ''; localStorage.removeItem('en_token');
+  APP = {user:null,page:'',clients:[],tickets:[],tasks:[]};
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-pass').addEventListener('keypress', e => { if(e.key==='Enter') doLogin(); });
+
+window.addEventListener('load', async () => {
+  if (TOKEN) {
+    const res = await api('GET', '/auth/me');
+    if (res?.success) {
+      APP.user = res.user;
+      APP.user.name = res.user.name;
+      APP.user.role = res.user.role;
+      initApp();
+    } else {
+      TOKEN = ''; localStorage.removeItem('en_token');
+    }
+  }
+});
+
+// ── INIT ─────────────────────────────────────────────────────
+function initApp() {
+  const u = APP.user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-avatar').textContent = u.name.charAt(0).toUpperCase();
+  document.getElementById('sidebar-username').textContent = u.name;
+  document.getElementById('sidebar-role').textContent = u.role;
+  buildNav(u.role); buildMobileNav(u.role);
+  if(window.innerWidth<768) document.querySelector('.hamburger').style.display='flex';
+  loadNotifications();
+  const firstPage = NAV_CONFIG[u.role]?.[0]?.id || 'dashboard';
+  navigate(firstPage);
+  setInterval(loadNotifications, 90000);
+}
+
+function buildNav(role) {
+  const items = NAV_CONFIG[role] || [];
+  document.getElementById('sidebar-nav').innerHTML = '<div class="nav-section-label">Navigation</div>' +
+    items.map(i=>`<div class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')">
+      <span class="nav-icon">${i.icon}</span><span>${i.label}</span>
+      ${i.badge?`<span class="nav-badge" id="badge-${i.badge}" style="display:none;">0</span>`:''}
+    </div>`).join('');
+}
+
+function buildMobileNav(role) {
+  const items = (NAV_CONFIG[role]||[]).slice(0,4);
+  document.getElementById('mobile-nav').innerHTML = items.map(i=>`
+    <div class="mobile-nav-item" id="mnav-${i.id}" onclick="navigate('${i.id}')">
+      <span class="icon">${i.icon}</span><span>${i.label.split(' ')[0]}</span>
+    </div>`).join('');
+}
+
+// ── NAVIGATE ─────────────────────────────────────────────────
+function navigate(page) {
+  APP.page = page;
+  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  document.getElementById('mnav-'+page)?.classList.add('active');
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks'};
+  document.getElementById('page-title').textContent = titles[page]||page;
+  closeSidebar();
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat};
+  (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
+}
+
+// ── DSR ──────────────────────────────────────────────────────
+async function renderDSR() {
+  window._dsrDate = window._dsrDate || new Date().toISOString().split('T')[0];
+  await loadDSRPage();
+}
+
+function dsrSetDate(val) {
+  if (val === 'today') {
+    window._dsrDate = new Date().toISOString().split('T')[0];
+  } else if (val === 'yesterday') {
+    const d = new Date(); d.setDate(d.getDate()-1);
+    window._dsrDate = d.toISOString().split('T')[0];
+  } else {
+    window._dsrDate = val;
+  }
+  loadDSRPage();
+}
+
+async function loadDSRPage() {
+  const selDate = window._dsrDate || new Date().toISOString().split('T')[0];
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
+
+  const [clients, alerts, dsrData] = await Promise.all([
+    getClients(),
+    api('GET', '/dsr/alerts'),
+    api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate)
+  ]);
+  if (clients) APP.clients = clients;
+
+  // Role-based filtering
+  let myClients = APP.clients || [];
+  if (!isLead) {
+    const uname = u.name.trim().toLowerCase();
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
+  }
+
+  const filedCodes = new Set((dsrData||[]).map(d => d.client_code || d.clientCode));
+  const pending = myClients.filter(c => !filedCodes.has(c.clientCode));
+  const filed   = myClients.filter(c =>  filedCodes.has(c.clientCode));
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+  const isToday = selDate === today;
+  const isYest  = selDate === yesterday;
+
+  // Executive filter (admin only)
+  const execFilter = isLead ? (window._dsrExecFilter || '') : '';
+
+  // Filter by exec if set
+  const pendingShow = execFilter
+    ? pending.filter(c => c.amName===execFilter || c.adsManager===execFilter || c.crmExecutive===execFilter)
+    : pending;
+  const filedShow = execFilter
+    ? filed.filter(c => c.amName===execFilter || c.adsManager===execFilter || c.crmExecutive===execFilter)
+    : filed;
+
+  const allExecs = isLead
+    ? [...new Set(myClients.map(c => c.amName).filter(Boolean))].sort()
+    : [];
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-body" style="padding:12px 16px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:13px;font-weight:700;">📅 Date:</span>
+          <button class="btn btn-sm ${isToday?'btn-primary':'btn-outline'}" onclick="dsrSetDate('today')">Today</button>
+          <button class="btn btn-sm ${isYest?'btn-primary':'btn-outline'}" onclick="dsrSetDate('yesterday')">Yesterday</button>
+          <input type="date" class="form-control" value="${selDate}" style="width:160px;" onchange="dsrSetDate(this.value)">
+          ${isLead ? `
+          <select class="form-control" style="width:190px;" onchange="window._dsrExecFilter=this.value;loadDSRPage()">
+            <option value="">All Executives</option>
+            ${allExecs.map(n=>`<option value="${n}" ${n===execFilter?'selected':''}>${n}</option>`).join('')}
+          </select>` : ''}
+          <span style="margin-left:auto;font-size:12px;color:var(--text-muted);">${selDate}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">My Sellers</div><div class="kpi-value">${myClients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Filed</div><div class="kpi-value">${filed.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">${pending.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">🚨 Alerts</div><div class="kpi-value">${(alerts||[]).length}</div></div>
+    </div>
+
+    ${(alerts||[]).length ? `
+    <div class="card" style="border-left:4px solid var(--red);margin-bottom:12px;">
+      <div class="card-header" style="background:#fdf2f2;"><span class="card-title">🚨 Active Alerts (${alerts.length})</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th><th>Date</th><th>Alert</th></tr></thead>
+        <tbody>${alerts.map(a=>{
+          const al=[];
+          if(a.alert_overspend) al.push('<span class="badge badge-red">Over Budget</span>');
+          if(a.alert_budget_80) al.push('<span class="badge badge-amber">80% Used</span>');
+          if(a.alert_high_returns) al.push('<span class="badge badge-red">High Returns</span>');
+          if(a.alert_sales_drop) al.push('<span class="badge badge-amber">Sales Drop</span>');
+          return '<tr><td><strong>'+a.client_name+'</strong></td><td>'+a.report_date+'</td><td>'+al.join(' ')+'</td></tr>';
+        }).join('')}</tbody>
+      </table></div></div>
+    </div>` : ''}
+
+    ${pendingShow.length ? `
+    <div class="card" style="border-left:4px solid var(--red);margin-bottom:12px;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">⏳ Pending — ${pendingShow.length} sellers</span>
+      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th><th>Market</th>${isLead?'<th>Executive</th>':''}<th>Action</th></tr></thead>
+        <tbody>${pendingShow.map(c=>`
+          <tr style="background:#fff8f8;">
+            <td><strong>${c.busyName}</strong></td>
+            <td><span class="badge badge-blue" style="font-size:11px;">${c.marketplace}</span></td>
+            ${isLead?`<td style="font-size:12px;color:var(--text-muted);">${c.amName||'—'}</td>`:''}
+            <td><button class="btn btn-primary btn-sm" data-cc="${c.clientCode}" data-cn="${c.busyName.replace(/"/g,'&quot;')}" onclick="var b=this;openDSRForm(b.getAttribute('data-cc'),b.getAttribute('data-cn'),false)">+ DSR Bharo</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+    </div>` : `<div class="card" style="margin-bottom:12px;"><div class="card-body" style="text-align:center;color:var(--green);font-weight:700;padding:20px;">✅ ${selDate} ka sab DSR filed ho gaya!</div></div>`}
+
+    ${filedShow.length ? `
+    <div class="card" style="border-left:4px solid var(--green);margin-bottom:12px;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">✅ Filed — ${filedShow.length} sellers</span>
+      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Seller</th>${isLead?'<th>By</th>':''}<th>Orders</th><th>Sales (₹)</th><th>Returns</th><th>Ad Spend</th><th>Alert</th><th>Action</th></tr></thead>
+        <tbody>${filedShow.map(c=>{
+          const d=(dsrData||[]).find(x=>(x.client_code||x.clientCode)===c.clientCode)||{};
+          const al=[];
+          if(d.alert_overspend) al.push('<span class="badge badge-red" style="font-size:10px;">Over Budget</span>');
+          if(d.alert_high_returns) al.push('<span class="badge badge-red" style="font-size:10px;">High Returns</span>');
+          const isZero = !d.orders_count && !d.sales_amount;
+          return '<tr style="'+(isZero?'background:#fdf2f2;':'')+'">'+
+            '<td><strong>'+c.busyName+'</strong></td>'+
+            (isLead?'<td style="font-size:12px;color:var(--text-muted);">'+(d.entered_by||'—')+'</td>':'')+
+            '<td style="text-align:right;'+(isZero?'color:var(--red);font-weight:700;':'')+'">'+( d.orders_count||0)+'</td>'+
+            '<td style="text-align:right;'+(isZero?'color:var(--red);font-weight:700;':'')+'">₹'+( d.sales_amount||0).toLocaleString('en-IN')+'</td>'+
+            '<td style="text-align:right;">'+(d.returns_count||0)+'</td>'+
+            '<td style="text-align:right;">₹'+(d.ad_spend||0).toLocaleString('en-IN')+'</td>'+
+            '<td>'+(al.length?al.join(' '):'<span class="badge badge-green" style="font-size:10px;">OK</span>')+'</td>'+
+            '<td><button class="btn btn-sm btn-outline" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/"/g,'&quot;')+'" onclick="var b=this;openDSRForm(b.getAttribute(\'data-cc\'),b.getAttribute(\'data-cn\'),true)">Edit</button></td>'+
+          '</tr>';
+        }).join('')}
+        </tbody>
+      </table></div></div>
+    </div>` : ''}
+
+    <div id="dsr-form-wrap"></div>
+  `;
+}
+
+function openDSRForm(cc, cname, isEdit) {
+  const selDate = window._dsrDate || new Date().toISOString().split('T')[0];
+  const client = (APP.clients||[]).find(c=>c.clientCode===cc) || {};
+  const dsrData = window._dsrCurrentData || [];
+  const existing = dsrData.find(d=>(d.client_code||d.clientCode)===cc) || {};
+
+  const wrap = document.getElementById('dsr-form-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="card" style="border-left:4px solid var(--secondary);" id="dsr-entry-form">
+      <div class="card-header" style="background:#fff8e7;">
+        <span class="card-title">${isEdit?'✏️ Edit':'➕ Enter'} DSR — ${cname} (${selDate})</span>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('dsr-entry-form').remove()">✕</button>
+      </div>
+      <div class="card-body">
+        <input type="hidden" id="dsr-cc" value="${cc}">
+        <input type="hidden" id="dsr-cn" value="${cname}">
+        <input type="hidden" id="dsr-date" value="${selDate}">
+        <div class="form-row">
+          <div class="form-group"><label>📦 Orders Count</label><input type="number" class="form-control" id="dsr-orders" value="${existing.orders_count||''}" placeholder="0" min="0"></div>
+          <div class="form-group"><label>💰 Sales Amount (₹)</label><input type="number" class="form-control" id="dsr-sales" value="${existing.sales_amount||''}" placeholder="0.00" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>🔄 Returns Count</label><input type="number" class="form-control" id="dsr-ret-count" value="${existing.returns_count||''}" placeholder="0" min="0"></div>
+          <div class="form-group"><label>🔄 Returns Amount (₹)</label><input type="number" class="form-control" id="dsr-ret-amount" value="${existing.returns_amount||''}" placeholder="0.00" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>📢 Ad Spend (₹)</label><input type="number" class="form-control" id="dsr-spend" value="${existing.ad_spend||''}" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+          <div class="form-group"><label>🎯 Seller Budget (₹)</label><input type="number" class="form-control" id="dsr-budget" value="${existing.seller_budget||client.sellerBudget||''}" placeholder="0.00" min="0" oninput="checkBudget()"></div>
+        </div>
+        <div id="dsr-budget-warning" style="display:none;background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:12px;color:#e74c3c;font-weight:600;">⚠️ Ad Spend budget se zyada!</div>
+        <div class="form-group"><label>Notes</label><textarea class="form-control" id="dsr-notes" placeholder="Koi special note...">${existing.notes||''}</textarea></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="saveDSR()">💾 Save DSR</button>
+          <button class="btn btn-outline" onclick="document.getElementById('dsr-entry-form').remove()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  wrap.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function checkBudget() {
+  const spend=parseFloat(document.getElementById('dsr-spend')?.value)||0;
+  const budget=parseFloat(document.getElementById('dsr-budget')?.value)||0;
+  const warn=document.getElementById('dsr-budget-warning');
+  if(warn) warn.style.display=(budget>0&&spend>budget)?'block':'none';
+}
+
+function selectDSRClient(cc,name) {
+  openDSRForm(cc, name, false);
+}
+
+async function loadDSRTrend(cc) {
+  if(!cc) return;
+}
+
+async function saveDSR() {
+  const cc = document.getElementById('dsr-cc')?.value;
+  const cn = document.getElementById('dsr-cn')?.value;
+  const date = document.getElementById('dsr-date')?.value;
+  if(!cc){showToast('Seller select karo','error');return;}
+  const r=await api('POST','/dsr',{
+    clientCode:cc, clientName:cn, reportDate:date,
+    ordersCount:document.getElementById('dsr-orders')?.value||0,
+    salesAmount:document.getElementById('dsr-sales')?.value||0,
+    returnsCount:document.getElementById('dsr-ret-count')?.value||0,
+    returnsAmount:document.getElementById('dsr-ret-amount')?.value||0,
+    adSpend:document.getElementById('dsr-spend')?.value||0,
+    sellerBudget:document.getElementById('dsr-budget')?.value||0,
+    notes:document.getElementById('dsr-notes')?.value||''
+  });
+  if(r?.success){
+    let msg='✅ DSR saved!';
+    if(r.alerts?.alertOverspend) msg='⚠️ Saved! Ad spend budget se zyada!';
+    else if(r.alerts?.alertHighReturns) msg='⚠️ Saved! High returns!';
+    else if(r.alerts?.alertBudget80) msg='⚠️ Saved! Budget 80% used!';
+    // Big visible confirmation
+    const alertType = r.alerts?.alertOverspend||r.alerts?.alertHighReturns ? 'error' : 'success';
+    showToast(msg, alertType);
+    // Also show inline confirmation
+    const formEl = document.getElementById('dsr-entry-form');
+    if (formEl) {
+      formEl.innerHTML = '<div style="padding:20px;text-align:center;background:#d5f5e3;border-radius:10px;">' +
+        '<div style="font-size:32px;margin-bottom:8px;">✅</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#1e8449;">' + msg + '</div>' +
+        '<div style="font-size:12px;color:#27ae60;margin-top:4px;">DSR successfully saved!</div>' +
+        '</div>';
+      setTimeout(() => { if(formEl) formEl.remove(); loadDSRPage(); }, 1500);
+    } else {
+      loadDSRPage();
+    }
+  }
+}
+
+// ── SELLER 360 ───────────────────────────────────────────────
+async function renderSeller360() {
+  const clients=await getClients();
+  if(clients) APP.clients=clients;
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">🔍 Seller 360° View — Sab Ek Jagah</span></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label>Seller Select Karo</label>
+            <select class="form-control" id="s360-client" onchange="load360(this.value)">
+              <option value="">-- Seller Choose Karo --</option>
+              ${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.marketplace})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;">
+            <div id="s360-health-badge" style="padding:8px 16px;border-radius:8px;font-weight:700;background:#eee;">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="s360-content"></div>`;
+}
+
+let _charts={};
+function destroyCharts(){Object.values(_charts).forEach(c=>{try{c.destroy();}catch(e){}});_charts={};}
+
+async function load360(cc) {
+  if(!cc) return;
+  const client=APP.clients.find(c=>c.clientCode===cc);
+  if(!client) return;
+  destroyCharts();
+  const hColor=client.healthStatus==='Healthy'?'#27ae60':client.healthStatus==='Warning'?'#f39c12':'#e74c3c';
+  document.getElementById('s360-health-badge').textContent='🩺 '+(client.healthStatus||'Unknown');
+  document.getElementById('s360-health-badge').style.background=hColor;
+  document.getElementById('s360-health-badge').style.color='#fff';
+  document.getElementById('s360-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading seller data...</div>';
+  const [data,dsrData]=await Promise.all([api('GET','/clients/'+cc+'/timeline'),api('GET','/dsr/trend/'+cc)]);
+  if(!data) return;
+  document.getElementById('s360-content').innerHTML=`
+    <!-- Team Info + Quick Actions -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Client Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">
+          <div style="background:#d6eaf8;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.amName||''}','Account Manager')">
+            <div style="font-size:11px;font-weight:700;color:#1a5276;text-transform:uppercase;">📋 Account Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.amName||'—'}</div>
+            ${client.amName?'<div style="font-size:11px;color:#2E75B6;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#fdebd0;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;font-weight:700;color:#a04000;text-transform:uppercase;">📢 Ads Manager</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.adsManager||'—'}</div>
+            ${client.adsManager?'<div style="font-size:11px;color:#d35400;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#d5f5e3;border-radius:10px;padding:12px;cursor:pointer;" onclick="viewPersonTasks('${client.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;font-weight:700;color:#1e8449;text-transform:uppercase;">📞 CRM Executive</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.crmExecutive||'—'}</div>
+            ${client.crmExecutive?'<div style="font-size:11px;color:#27ae60;margin-top:4px;">👆 Tasks dekhne click karo</div>':''}
+          </div>
+          <div style="background:#f4f0fb;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#6c3483;text-transform:uppercase;">📦 Marketplace</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.marketplace||'—'}</div>
+            <div style="font-size:11px;color:#8e44ad;margin-top:4px;">${client.servicePlan||''}</div>
+          </div>
+          <div style="background:#fef9e7;border-radius:10px;padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#b7950b;text-transform:uppercase;">🔄 Renewal</div>
+            <div style="font-size:15px;font-weight:700;color:#1F3864;margin-top:4px;">${client.renewalDate||'—'}</div>
+            ${client.renewalDate?`<div style="font-size:11px;margin-top:4px;">${renewalBadge(client.renewalDate)}</div>`:''}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#e8f4fd;"><span class="card-title">📞 CRM Calls (${data.crmCalls.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="navigate('crm')">+ Log Call</button></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.crmCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${data.crmCalls.map(c=>`<tr><td>${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</td><td>${c.crm_executive||'—'}</td><td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td><td style="max-width:200px;font-size:12px;">${c.seller_comment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#fef9e7;"><span class="card-title">🎫 Tickets (${data.tickets.length})</span><button class="btn btn-primary" style="font-size:12px;" onclick="openRaiseTicket()">+ Raise Ticket</button></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tickets.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+        <tbody>${data.tickets.map(t=>`<tr><td>${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'—'}</td><td>${t.subject||'—'}</td><td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td><td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Resolved'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td><td>${t.assigned_to||'—'}</td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#eafaf1;"><span class="card-title">📊 CSI Reviews (${data.csiData.length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.csiData.length?'<div class="empty-state"><div class="emoji">📝</div><h3>No CSI reviews yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Reviewer</th><th>Notes</th></tr></thead>
+        <tbody>${data.csiData.map(c=>`<tr><td>${c.review_date||'—'}</td><td><strong>${c.total_score||0}/25</strong> (${Math.round((c.total_score||0)/25*100)}%)</td><td><span class="badge ${c.health_status==='Healthy'?'badge-green':c.health_status==='Warning'?'badge-amber':'badge-red'}">${c.health_status||'—'}</span></td><td>${c.reviewed_by||'—'}</td><td style="font-size:12px;">${c.notes||'—'}</td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#f4f0fb;"><span class="card-title">📝 Tasks (${data.tasks.filter(t=>t.task_type!=='ads'&&t.category!=='Campaign Optimization'&&t.category!=='New Campaign Live'&&t.category!=='Campaign Paused'&&t.category!=='Keyword Research'&&t.category!=='A/B Testing'&&t.category!=='Report Review'&&t.category!=='Client Approval Pending').length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tasks.filter(t=>!['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${data.tasks.filter(t=>!['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).map(t=>`<tr><td>${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td>${t.due_date||'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" style="background:#fff3cd;"><span class="card-title">📢 Ads Tasks (${data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length})</span><button class="btn btn-sm" style="background:#D4A03D;color:#fff;font-size:12px;" onclick="navigate('adstasks')">View All</button></div>
+      <div class="card-body" style="padding:0;">
+        ${!data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).length?'<div class="empty-state"><div class="emoji">📢</div><h3>No ads tasks</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Category</th><th>Task</th><th>Assigned To</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${data.tasks.filter(t=>['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'].includes(t.category)).map(t=>`<tr><td><span class="badge badge-blue" style="font-size:11px;">${t.category||'—'}</span></td><td style="max-width:160px;font-size:13px;">${t.title||'—'}</td><td>${t.assigned_to||'—'}</td><td style="font-size:12px;">${t.due_date?new Date(t.due_date).toLocaleDateString('en-IN'):'—'}</td><td><span class="badge ${t.status==='Done'?'badge-green':t.status==='In Progress'?'badge-blue':t.status==='Blocked'?'badge-red':'badge-amber'}">${t.status||'—'}</span></td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    ${dsrData&&dsrData.length?`
+    <div class="card">
+      <div class="card-header" style="background:#f0f4ff;"><span class="card-title">📈 Sales & Ads Performance (Last ${dsrData.length} Days)</span></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📦 Daily Orders & Sales (₹)</div><canvas id="chart-sales" height="180"></canvas></div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">💰 Ad Spend vs Budget (₹)</div><canvas id="chart-spend" height="180"></canvas></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">🔄 Returns Count & Rate (%)</div><canvas id="chart-returns" height="180"></canvas></div>
+          <div><div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1F3864;">📊 Orders Count Trend</div><canvas id="chart-orders" height="180"></canvas></div>
+        </div>
+        ${dsrData.some(d=>d.sales_amount===0||d.orders_count===0)?`
+        <div style="background:#fdf2f2;border:1px solid #e74c3c;border-radius:8px;padding:12px;margin-top:12px;">
+          <strong style="color:#e74c3c;">⚠️ Zero Sale Days:</strong>
+          ${dsrData.filter(d=>d.sales_amount===0||d.orders_count===0).map(d=>`<span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;margin:2px;font-size:12px;">${d.report_date}</span>`).join('')}
+        </div>`:''}
+      </div>
+    </div>`:'<div class="card"><div class="card-body" style="text-align:center;color:#999;">📊 DSR data nahi hai — pehle Daily Sales Report enter karo!</div></div>'}`;
+  if(dsrData&&dsrData.length) setTimeout(()=>draw360Charts(dsrData),100);
+}
+
+// View tasks of a specific person from Seller 360
+async function viewPersonTasks(personName, role) {
+  if (!personName || personName === '—') { showToast('Koi assign nahi hai', 'error'); return; }
+  openPanel('📝 Tasks: '+personName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const tasks = await api('GET', '/tasks');
+  const myTasks = (tasks||[]).filter(t => t.assignedTo === personName || t.assignedBy === personName);
+  const pending = myTasks.filter(t=>t.status==='Pending');
+  const inprog = myTasks.filter(t=>t.status==='In Progress');
+  const done = myTasks.filter(t=>t.status==='Completed');
+  const overdue = myTasks.filter(t=>t.isOverdue&&t.status!=='Completed');
+  document.getElementById('panel-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#e74c3c;">${overdue.length}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#f39c12;">${pending.length}</div>
+        <div style="font-size:11px;color:#b7950b;">Pending</div>
+      </div>
+      <div style="background:#d6eaf8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#2E75B6;">${inprog.length}</div>
+        <div style="font-size:11px;color:#1a5276;">In Progress</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#27ae60;">${done.length}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+    </div>
+    ${!myTasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>' :
+    [...myTasks].sort((a,b)=>{
+      const order = {'Pending':0,'In Progress':1,'Completed':2};
+      return (order[a.status]||0)-(order[b.status]||0);
+    }).map(t=>`
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;border-left:4px solid ${t.status==='Completed'?'#27ae60':t.isOverdue?'#e74c3c':t.status==='In Progress'?'#2E75B6':'#f39c12'};">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${t.title||'—'}</div>
+          ${t.clientName?`<div style="font-size:12px;color:var(--text-muted);">👥 ${t.clientName}</div>`:''}
+          ${t.deadline?`<div style="font-size:11px;color:${t.isOverdue?'var(--red)':'var(--text-muted)'};">📅 ${t.deadline}${t.isOverdue?' 🔴 OVERDUE':''}</div>`:''}
+        </div>
+        <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+      </div>
+    </div>`).join('')}`;
+}
+
+// Edit client team from 360 view
+async function openEditClient(cc) {
+  const client = (APP.clients||[]).find(c => c.clientCode === cc);
+  if (!client) { showToast('Client not found', 'error'); return; }
+
+  // Fetch ALL active users — show everyone regardless of role
+  const users = await api('GET', '/users');
+  const active = (users||[]).filter(u => u.isActive).sort((a,b) => a.name.localeCompare(b.name));
+
+  openPanel('✏️ Edit Client — ' + client.busyName, `
+    <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;">
+      <strong>${client.clientCode}</strong> · ${client.marketplace}
+    </div>
+    <div class="form-group"><label>Busy Name *</label>
+      <input type="text" class="form-control" id="ec-name" value="${(client.busyName||'').replace(/"/g,'&quot;')}">
+    </div>
+    <div class="form-group"><label>Marketplace</label>
+      <select class="form-control" id="ec-market">
+        ${['Amazon.in','Amazon.com','Amazon.uk','Amazon.ae','Amazon.ca','Flipkart','Meesho','Myntra','Snapdeal','Other'].map(m=>`<option ${client.marketplace===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="ec-am">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="ec-ads">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="ec-crm">
+          <option value="">-- Select --</option>
+          ${active.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name} (${u.role})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Service Plan</label>
+        <select class="form-control" id="ec-plan">
+          ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Renewal Date</label>
+        <input type="date" class="form-control" id="ec-renewal" value="${client.renewalDate||''}">
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select class="form-control" id="ec-status">
+          <option ${client.status==='Active'?'selected':''}>Active</option>
+          <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditClient('${cc}')">💾 Save Changes</button>
+  `);
+}
+
+async function submitEditClient(cc) {
+  const name = document.getElementById('ec-name').value.trim();
+  if (!name) { showToast('Name required', 'error'); return; }
+  const r = await api('PATCH', '/clients/' + cc, {
+    busyName: name,
+    marketplace: document.getElementById('ec-market').value,
+    amName: document.getElementById('ec-am').value,
+    adsManager: document.getElementById('ec-ads').value,
+    crmExecutive: document.getElementById('ec-crm').value,
+    servicePlan: document.getElementById('ec-plan').value,
+    renewalDate: document.getElementById('ec-renewal').value || null,
+    status: document.getElementById('ec-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    await getClients(true);
+    renderClients();
+  } else {
+    showToast(r?.error || 'Update failed', 'error');
+  }
+}
+
+async function openEditClient360(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  const users = await api('GET','/users');
+  const active = (users||[]).filter(u=>u.isActive);
+  const ams = active.filter(u=>u.role==='Account Manager');
+  const ads = active.filter(u=>u.role==='Ads Executive');
+  const crms = active.filter(u=>u.role==='CRM Executive');
+  openPanel('✏️ Edit Team — '+client.busyName, `
+    <div class="form-group"><label>Account Manager</label>
+      <select class="form-control" id="e360-am">
+        <option value="">-- Select --</option>
+        ${ams.map(u=>`<option value="${u.name}" ${client.amName===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Ads Manager</label>
+      <select class="form-control" id="e360-ads">
+        <option value="">-- Select --</option>
+        ${ads.map(u=>`<option value="${u.name}" ${client.adsManager===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>CRM Executive</label>
+      <select class="form-control" id="e360-crm">
+        <option value="">-- Select --</option>
+        ${crms.map(u=>`<option value="${u.name}" ${client.crmExecutive===u.name?'selected':''}>${u.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Service Plan</label>
+      <select class="form-control" id="e360-plan">
+        ${['Basic','Standard','Premium','Enterprise','Enewcleus Exclusive Service'].map(p=>`<option ${client.servicePlan===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Renewal Date</label>
+      <input type="date" class="form-control" id="e360-renewal" value="${client.renewalDate||''}">
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="e360-status">
+        <option ${client.status==='Active'?'selected':''}>Active</option>
+        <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEdit360('${cc}')">💾 Save Changes</button>`);
+}
+
+async function submitEdit360(cc) {
+  const r = await api('PUT', '/clients/'+cc, {
+    busyName: APP.clients.find(c=>c.clientCode===cc)?.busyName,
+    marketplace: APP.clients.find(c=>c.clientCode===cc)?.marketplace,
+    amName: document.getElementById('e360-am').value,
+    adsManager: document.getElementById('e360-ads').value,
+    crmExecutive: document.getElementById('e360-crm').value,
+    servicePlan: document.getElementById('e360-plan').value,
+    renewalDate: document.getElementById('e360-renewal').value||null,
+    status: document.getElementById('e360-status').value,
+  });
+  if (r?.success) {
+    showToast('✅ Client updated!', 'success');
+    closePanel();
+    const clients = await getClients(true);
+    load360(cc);
+  } else {
+    showToast('Update failed', 'error');
+  }
+}
+
+function draw360Charts(dsrData) {
+  const labels=dsrData.map(d=>d.report_date),sales=dsrData.map(d=>d.sales_amount||0),orders=dsrData.map(d=>d.orders_count||0),spend=dsrData.map(d=>d.ad_spend||0),budget=dsrData.map(d=>d.seller_budget||0),returns=dsrData.map(d=>d.returns_count||0),returnRate=dsrData.map(d=>d.return_rate||0);
+  const sc=document.getElementById('chart-sales');if(sc)_charts.sales=new Chart(sc,{type:'bar',data:{labels,datasets:[{label:'Sales (₹)',data:sales,backgroundColor:sales.map(s=>s===0?'#e74c3c':'#2E75B6'),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  const spc=document.getElementById('chart-spend');if(spc)_charts.spend=new Chart(spc,{type:'line',data:{labels,datasets:[{label:'Ad Spend (₹)',data:spend,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.1)',fill:true,tension:0.3},{label:'Budget (₹)',data:budget,borderColor:'#27ae60',borderDash:[5,5],backgroundColor:'transparent',tension:0.3}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}});
+  const rc=document.getElementById('chart-returns');if(rc)_charts.returns=new Chart(rc,{type:'bar',data:{labels,datasets:[{label:'Returns Count',data:returns,backgroundColor:'#f39c12',borderRadius:4,yAxisID:'y'},{label:'Return Rate %',data:returnRate,type:'line',borderColor:'#e74c3c',yAxisID:'y1',tension:0.3}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,position:'left'},y1:{beginAtZero:true,position:'right',max:100,grid:{drawOnChartArea:false}}}}});
+  const oc=document.getElementById('chart-orders');if(oc)_charts.orders=new Chart(oc,{type:'line',data:{labels,datasets:[{label:'Orders',data:orders,borderColor:'#8e44ad',backgroundColor:'rgba(142,68,173,0.1)',fill:true,tension:0.3,pointBackgroundColor:orders.map(o=>o===0?'#e74c3c':'#8e44ad'),pointRadius:orders.map(o=>o===0?8:4)}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────
+async function renderDashboard() {
+  const u = APP.user;
+  const isAdmin = ['Admin','Sub Admin','Ops Lead'].includes(u.role);
+
+  // Load user widget preferences from localStorage
+  const prefKey = 'dash_widgets_' + u.name;
+  const defaultWidgets = ['health','tasks','renewals','tickets','dsr','crm'];
+  let activeWidgets = JSON.parse(localStorage.getItem(prefKey) || 'null') || defaultWidgets;
+
+  // Load data
+  const [dash, allTasks, clients, dsrStatus] = await Promise.all([
+    api('GET','/dashboard'),
+    api('GET','/tasks'),
+    getClients(),
+    api('GET','/dsr/today-status'),
+  ]);
+  const team = isAdmin ? (await api('GET','/dashboard/team') || []) : [];
+  const crmCalls = await api('GET','/crm/today') || [];
+
+  if(!dash) return;
+  if(clients && clients.length) APP.clients = clients;
+
+  const mySellers = isAdmin ? (clients||[]) : (clients||[]).filter(c =>
+    (c.amName||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.adsManager||'').toLowerCase().includes(u.name.toLowerCase()) ||
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
+  const myTasks = (allTasks||[]).filter(t =>
+    t.status !== 'Completed' &&
+    ((t.assignedTo||'').toLowerCase().includes(u.name.toLowerCase()) ||
+     (t.assignedBy||'').toLowerCase().includes(u.name.toLowerCase()))
+  );
+  const myRenewals = mySellers.filter(c => {
+    if(!c.renewalDate) return false;
+    const d = new Date(c.renewalDate); const today = new Date();
+    return d >= today && (d-today)/(1000*60*60*24) <= 30;
+  });
+  const myAtRisk   = mySellers.filter(c => c.healthStatus === 'At Risk');
+  const myWarning  = mySellers.filter(c => c.healthStatus === 'Warning');
+  const myHealthy  = mySellers.filter(c => c.healthStatus === 'Healthy');
+  const dsrPending = (dsrStatus && dsrStatus.pending) ? dsrStatus.pending : [];
+  const myCrmToday = crmCalls.filter(c =>
+    (c.crmExecutive||'').toLowerCase().includes(u.name.toLowerCase())
+  );
+
+  const pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // ── Customize button ──
+  var topBar = document.createElement('div');
+  topBar.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:8px;';
+  var custBtn = document.createElement('button');
+  custBtn.className = 'btn btn-sm btn-outline';
+  custBtn.textContent = '⚙️ Customize Dashboard';
+  custBtn.onclick = function(){ openDashboardCustomize(activeWidgets, prefKey); };
+  topBar.appendChild(custBtn);
+  pc.appendChild(topBar);
+
+  // ── KPI Grid ──
+  var kpiDiv = document.createElement('div');
+  kpiDiv.className = 'kpi-grid';
+  var kpis = isAdmin ? [
+    {cls:'blue',  label:'Total Clients',  val:dash.totalClients, sub:dash.active+' Active'},
+    {cls:'green', label:'🟢 Healthy',      val:dash.healthy},
+    {cls:'amber', label:'🟡 Warning',      val:dash.warning},
+    {cls:'red',   label:'🔴 At Risk',      val:dash.atRisk},
+    {cls:'orange',label:'Open Tickets',   val:dash.openTickets},
+    {cls:'purple',label:'Renewals Due',   val:dash.renewalsDue, sub:'≤30 days'},
+  ] : [
+    {cls:'blue',  label:'My Sellers',     val:mySellers.length},
+    {cls:'green', label:'🟢 Healthy',      val:myHealthy.length},
+    {cls:'amber', label:'🟡 Warning',      val:myWarning.length},
+    {cls:'red',   label:'🔴 At Risk',      val:myAtRisk.length},
+    {cls:'orange',label:'⏳ Pending Tasks',val:myTasks.length},
+    {cls:'purple',label:'🔄 Renewals',     val:myRenewals.length, sub:'≤30 days'},
+  ];
+  kpis.forEach(function(k){
+    var d = document.createElement('div');
+    d.className = 'kpi-card ' + k.cls;
+    d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>'+(k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'');
+    kpiDiv.appendChild(d);
+  });
+  pc.appendChild(kpiDiv);
+
+  // ── Admin Team Performance ──
+  if(isAdmin && team.length) {
+    var teamCard = document.createElement('div');
+    teamCard.className = 'card';
+    teamCard.innerHTML = '<div class="card-header"><span class="card-title">👥 Team Performance Today</span></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead>'+
+      '<tbody>'+team.map(function(e){
+        return '<tr style="'+(e.performanceScore==='No Activity'?'background:#fdf2f2;':'')+'">'+
+          '<td><strong>'+e.name+'</strong></td>'+
+          '<td><span class="badge badge-blue">'+e.role+'</span></td>'+
+          '<td><strong>'+e.todayActivity+'</strong></td>'+
+          '<td>'+e.ticketsClosed+'</td>'+
+          '<td>'+(e.performanceScore==='No Activity'?'<span class="badge badge-red">🔴 No Activity</span>':'<span class="badge badge-green">🟢 Active</span>')+'</td>'+
+        '</tr>';
+      }).join('')+'</tbody></table></div></div>';
+    pc.appendChild(teamCard);
+  }
+
+  // ── Widget: Sellers Health ──
+  if(activeWidgets.includes('health') && !isAdmin && (myAtRisk.length||myWarning.length)){
+    var w = dashWidget('⚠️ Attention Needed ('+(myAtRisk.length+myWarning.length)+')', 'View All Clients', 'clients');
+    var rows = [...myAtRisk,...myWarning].slice(0,6).map(function(c){
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+healthBadge(c.healthStatus)+'</td><td>'+renewalBadge(c.renewalDate)+'</td></tr>';
+    }).join('');
+    w.querySelector('tbody').innerHTML = rows;
+    w.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th>';
+    pc.appendChild(w);
+  }
+
+  // ── Widget: Pending Tasks ──
+  if(activeWidgets.includes('tasks') && myTasks.length){
+    var w2 = dashWidget('📋 My Pending Tasks ('+myTasks.length+')', 'View All Tasks', 'tasks');
+    var overdueCount = myTasks.filter(function(t){return t.isOverdue;}).length;
+    if(overdueCount) w2.querySelector('.card-title').innerHTML += ' <span class="badge badge-red">'+overdueCount+' overdue</span>';
+    var rows2 = myTasks.slice(0,5).map(function(t){
+      return '<tr style="'+(t.isOverdue?'background:#fdf2f2;':'')+'">'+
+        '<td><strong>'+t.title+'</strong>'+(t.clientName?'<br><small style="color:var(--text-muted);">'+t.clientName+'</small>':'')+'</td>'+
+        '<td><span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span></td>'+
+        '<td>'+(t.isOverdue?'<span style="color:var(--red);font-weight:600;">OVERDUE</span>':t.deadline||'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(t.assignedBy===u.name?'→ '+t.assignedTo:'From: '+t.assignedBy)+'</td>'+
+      '</tr>';
+    }).join('');
+    w2.querySelector('tbody').innerHTML = rows2;
+    w2.querySelector('thead tr').innerHTML = '<th>Task</th><th>Priority</th><th>Deadline</th><th>Assigned</th>';
+    pc.appendChild(w2);
+  }
+
+  // ── Widget: Renewals Due ──
+  if(activeWidgets.includes('renewals') && myRenewals.length){
+    var w3 = dashWidget('🔄 Renewals Due in 30 Days ('+myRenewals.length+')', 'View Renewals', 'renewals');
+    var rows3 = myRenewals.slice(0,5).map(function(c){
+      var daysLeft = Math.ceil((new Date(c.renewalDate)-new Date())/(1000*60*60*24));
+      return '<tr><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+        '<td>'+c.renewalDate+'</td><td><strong style="color:'+(daysLeft<=7?'var(--red)':'var(--amber)')+';">'+daysLeft+'d</strong></td></tr>';
+    }).join('');
+    w3.querySelector('tbody').innerHTML = rows3;
+    w3.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Renewal Date</th><th>Days Left</th>';
+    pc.appendChild(w3);
+  }
+
+  // ── Widget: DSR Alerts ──
+  if(activeWidgets.includes('dsr') && dsrPending.length){
+    var w4 = dashWidget('📈 DSR Pending Today ('+dsrPending.length+')', 'Fill DSR', 'dsr');
+    var rows4 = dsrPending.slice(0,5).map(function(c){
+      return '<tr><td><strong>'+(c.busy_name||c.client_code)+'</strong></td>'+
+        '<td><span class="badge badge-blue">'+(c.marketplace||'—')+'</span></td>'+
+        '<td style="font-size:11px;color:var(--text-muted);">'+(c.ads_manager||'—')+'</td></tr>';
+    }).join('');
+    w4.querySelector('tbody').innerHTML = rows4;
+    w4.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Market</th><th>Ads Manager</th>';
+    pc.appendChild(w4);
+  }
+
+  // ── Widget: CRM Calls Today ──
+  if(activeWidgets.includes('crm')){
+    var connected = myCrmToday.filter(function(c){return (c.callOutcome||'').includes('Connected');}).length;
+    var w5 = dashWidget('📞 My CRM Calls Today ('+myCrmToday.length+')', 'Log Call', 'crm');
+    if(myCrmToday.length){
+      var rows5 = myCrmToday.slice(0,5).map(function(c){
+        return '<tr><td><strong>'+c.clientName+'</strong></td>'+
+          '<td><span class="badge '+(c.callOutcome&&c.callOutcome.includes('Connected')?'badge-green':'badge-amber')+'">'+( c.callOutcome||'—')+'</span></td>'+
+          '<td style="font-size:11px;color:var(--text-muted);">'+(c.notes||'—')+'</td></tr>';
+      }).join('');
+      w5.querySelector('tbody').innerHTML = rows5;
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+      w5.querySelector('.card-title').innerHTML += ' <span class="badge badge-green">'+connected+' connected</span>';
+    } else {
+      w5.querySelector('tbody').innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px;">Aaj koi call nahi ki abhi</td></tr>';
+      w5.querySelector('thead tr').innerHTML = '<th>Seller</th><th>Outcome</th><th>Notes</th>';
+    }
+    pc.appendChild(w5);
+  }
+
+  // ── Quick Start (if no active widgets show content) ──
+  if(!myTasks.length && !myAtRisk.length && !myWarning.length && !myRenewals.length && !isAdmin){
+    var qc = document.createElement('div');
+    qc.className = 'card';
+    qc.innerHTML = '<div class="card-header"><span class="card-title">⚡ Quick Start</span></div>'+
+      '<div class="card-body"><div style="display:flex;gap:10px;flex-wrap:wrap;">'+
+        '<button class="btn btn-primary" onclick="navigateTo(\'tasks\')">📝 My Tasks</button>'+
+        '<button class="btn btn-secondary" onclick="navigateTo(\'clients\')">👥 My Clients</button>'+
+        '<button class="btn btn-outline" onclick="navigateTo(\'crm\')">📞 Log Call</button>'+
+        '<button class="btn btn-danger" onclick="openRaiseTicket()">🎫 Raise Ticket</button>'+
+      '</div></div>';
+    pc.appendChild(qc);
+  }
+}
+
+function dashWidget(title, linkLabel, linkPage) {
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginBottom = '12px';
+  card.innerHTML =
+    '<div class="card-header">'+
+      '<span class="card-title">'+title+'</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="navigateTo(\''+linkPage+'\')">'+linkLabel+' →</button>'+
+    '</div>'+
+    '<div class="card-body" style="padding:0;">'+
+      '<div class="table-wrap"><table>'+
+        '<thead><tr></tr></thead><tbody></tbody>'+
+      '</table></div>'+
+    '</div>';
+  return card;
+}
+
+function openDashboardCustomize(activeWidgets, prefKey) {
+  var allWidgets = [
+    {id:'health',   label:'⚠️ Sellers Health (At Risk/Warning)'},
+    {id:'tasks',    label:'📋 My Pending Tasks'},
+    {id:'renewals', label:'🔄 Renewals Due (30 days)'},
+    {id:'tickets',  label:'🎫 Open Tickets'},
+    {id:'dsr',      label:'📈 DSR Pending Today'},
+    {id:'crm',      label:'📞 CRM Calls Today'},
+  ];
+  openPanel('⚙️ Customize Dashboard',
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Jo widgets chahiye unhe select karo — sirf tumhara dashboard change hoga</div>'+
+    allWidgets.map(function(w){
+      var checked = activeWidgets.includes(w.id) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;cursor:pointer;">'+
+        '<input type="checkbox" id="dw-'+w.id+'" '+checked+' style="width:18px;height:18px;">'+
+        '<span style="font-size:14px;">'+w.label+'</span></label>';
+    }).join('')+
+    '<button class="btn btn-primary btn-full" style="margin-top:8px;" data-pk="'+prefKey+'" onclick="saveDashboardWidgets(this.getAttribute(\'data-pk\'))">💾 Save & Refresh</button>'+
+    '<button class="btn btn-outline btn-full" style="margin-top:8px;" data-pk="'+prefKey+'" onclick="resetDashboardWidgets(this.getAttribute(\'data-pk\'))">🔄 Reset Default</button>'
+  );
+}
+
+function saveDashboardWidgets(prefKey) {
+  var all = ['health','tasks','renewals','tickets','dsr','crm'];
+  var selected = all.filter(function(id){
+    var el = document.getElementById('dw-'+id);
+    return el && el.checked;
+  });
+  localStorage.setItem(prefKey, JSON.stringify(selected));
+  showToast('✅ Dashboard saved!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+function resetDashboardWidgets(prefKey) {
+  localStorage.removeItem(prefKey);
+  showToast('Dashboard reset!', 'success');
+  closePanel();
+  renderDashboard();
+}
+
+
+
+function cycleLabel(months) {
+  var m = parseInt(months) || 1;
+  if(m===1) return 'Monthly';
+  if(m===2) return '2-Monthly';
+  if(m===3) return 'Quarterly';
+  if(m===6) return 'Half-Yearly';
+  if(m===12) return 'Annual';
+  return m+' Months';
+}
+
+function calcNextDue(renewalDate, cycleMonths) {
+  if(!renewalDate) return null;
+  var d = new Date(renewalDate);
+  d.setMonth(d.getMonth() + (parseInt(cycleMonths)||1));
+  return d.toISOString().split('T')[0];
+}
+
+
+async function renderPayments() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Payment Manager...</div>';
+  const clients = await getClients(true);
+  if(clients) APP.clients = clients;
+  window._payClients = clients || [];
+  window._paySelected = null;
+  window._payHistory = [];
+  buildPaymentLayout();
+}
+
+function buildPaymentLayout() {
+  const u = APP.user;
+  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(u.role);
+  const pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // Stats
+  const today = new Date();
+  const due30 = (window._payClients||[]).filter(c => {
+    if(!c.renewalDate) return false;
+    const d = new Date(c.renewalDate);
+    const diff = (d-today)/(1000*60*60*24);
+    return diff >= 0 && diff <= 30;
+  });
+  const overdue = (window._payClients||[]).filter(c => {
+    if(!c.renewalDate) return false;
+    return new Date(c.renewalDate) < today;
+  });
+
+  // KPI row
+  const kpi = document.createElement('div');
+  kpi.className = 'kpi-grid';
+  kpi.style.marginBottom = '14px';
+  kpi.innerHTML =
+    '<div class="kpi-card blue"><div class="kpi-label">Total Sellers</div><div class="kpi-value">'+(window._payClients||[]).length+'</div></div>'+
+    '<div class="kpi-card amber"><div class="kpi-label">Due in 30 Days</div><div class="kpi-value" style="color:var(--amber);">'+due30.length+'</div></div>'+
+    '<div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value" style="color:var(--red);">'+overdue.length+'</div></div>'+
+    '<div class="kpi-card green"><div class="kpi-label">All Sellers</div><div class="kpi-value">'+( window._payClients||[]).length+'</div></div>';
+  pc.appendChild(kpi);
+
+  // Main layout
+  const main = document.createElement('div');
+  main.style.cssText = 'display:flex;gap:12px;';
+
+  // LEFT: Seller list
+  const left = document.createElement('div');
+  left.style.cssText = 'flex:0 0 320px;';
+  left.innerHTML =
+    '<div class="card" style="height:600px;display:flex;flex-direction:column;">'+
+      '<div class="card-header"><span class="card-title">💰 Sellers</span></div>'+
+      '<div style="padding:8px 12px;">'+
+        '<input type="text" class="form-control" id="pay-search" placeholder="Search seller..." oninput="filterPaySellers(this.value)" style="font-size:13px;">'+
+        '<div style="display:flex;gap:6px;margin-top:6px;">'+
+          '<button class="btn btn-sm btn-outline" id="pay-f-all" onclick="payFilter(\'all\')">All</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--amber);border-color:var(--amber);" id="pay-f-due" onclick="payFilter(\'due\')">Due 30d</button>'+
+          '<button class="btn btn-sm btn-outline" style="color:var(--red);border-color:var(--red);" id="pay-f-over" onclick="payFilter(\'over\')">Overdue</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="pay-seller-list" style="flex:1;overflow-y:auto;padding:0 8px 8px;"></div>'+
+    '</div>';
+  main.appendChild(left);
+
+  // RIGHT: Detail
+  const right = document.createElement('div');
+  right.style.cssText = 'flex:1;';
+  right.innerHTML =
+    '<div id="pay-detail" class="card" style="min-height:500px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);">'+
+      '<div style="text-align:center;"><div style="font-size:40px;margin-bottom:8px;">💰</div><div>Seller select karo payment history dekhne ke liye</div></div>'+
+    '</div>';
+  main.appendChild(right);
+  pc.appendChild(main);
+
+  window._payFilter = 'all';
+  renderPaySellerList();
+}
+
+function payFilter(f) {
+  window._payFilter = f;
+  ['all','due','over'].forEach(function(x){
+    var btn = document.getElementById('pay-f-'+x);
+    if(!btn) return;
+    if(x===f){ btn.className='btn btn-sm btn-primary'; btn.style.cssText=''; }
+    else {
+      btn.className='btn btn-sm btn-outline';
+      if(x==='due') btn.style.cssText='color:var(--amber);border-color:var(--amber);';
+      else if(x==='over') btn.style.cssText='color:var(--red);border-color:var(--red);';
+      else btn.style.cssText='';
+    }
+  });
+  renderPaySellerList();
+}
+
+function filterPaySellers(q) {
+  window._paySearch = q;
+  renderPaySellerList();
+}
+
+function renderPaySellerList() {
+  var list = document.getElementById('pay-seller-list');
+  if(!list) return;
+  var clients = window._payClients || [];
+  var today = new Date();
+  var q = (window._paySearch||'').toLowerCase();
+  var f = window._payFilter || 'all';
+
+  if(q) clients = clients.filter(function(c){ return c.busyName.toLowerCase().includes(q) || c.clientCode.toLowerCase().includes(q); });
+  if(f==='due') clients = clients.filter(function(c){
+    if(!c.renewalDate) return false;
+    var diff=(new Date(c.renewalDate)-today)/(1000*60*60*24);
+    return diff>=0&&diff<=30;
+  });
+  if(f==='over') clients = clients.filter(function(c){
+    if(!c.renewalDate) return false;
+    return new Date(c.renewalDate)<today;
+  });
+
+  if(!clients.length){ list.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Koi seller nahi</div>'; return; }
+
+  list.innerHTML = clients.map(function(c){
+    var rd = c.renewalDate ? new Date(c.renewalDate) : null;
+    var isOverdue = rd && rd < today;
+    var daysLeft = rd ? Math.ceil((rd-today)/(1000*60*60*24)) : null;
+    var isDue30 = daysLeft !== null && daysLeft >= 0 && daysLeft <= 30;
+    var isSelected = window._paySelected === c.clientCode;
+
+    var badge = '';
+    if(isOverdue) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#FCEBEB;color:#A32D2D;">Overdue '+Math.abs(daysLeft)+'d</span>';
+    else if(isDue30) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#FAEEDA;color:#854F0B;">Due '+daysLeft+'d</span>';
+    else if(rd) badge='<span style="font-size:11px;padding:1px 6px;border-radius:3px;background:#EAF3DE;color:#3B6D11;">Paid</span>';
+
+    return '<div style="padding:10px;border-radius:8px;border:'+(isSelected?'2px solid var(--primary)':'0.5px solid var(--border)')+';margin-bottom:6px;cursor:pointer;background:'+(isOverdue?'#FCEBEB22':isDue30?'#FAEEDA22':'var(--bg)')+';" data-cc="'+c.clientCode+'" onclick="selectPaySeller(this.getAttribute(\'data-cc\'))">'+ 
+      '<div style="font-weight:500;font-size:13px;">'+c.busyName+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);">'+c.clientCode+' · '+c.marketplace+' · '+cycleLabel(c.paymentCycle||1)+'</div>'+
+      '<div style="margin-top:4px;">'+badge+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function selectPaySeller(cc) {
+  window._paySelected = cc;
+  renderPaySellerList();
+  const client = (window._payClients||[]).find(function(c){return c.clientCode===cc;});
+  if(!client) return;
+  const detail = document.getElementById('pay-detail');
+  detail.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const history = await api('GET', '/payments?clientCode='+cc) || [];
+  window._payHistory = history;
+  renderPayDetail(client, history);
+}
+
+function renderPayDetail(client, history) {
+  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(APP.user.role);
+  const today = new Date();
+  const rd = client.renewalDate ? new Date(client.renewalDate) : null;
+  const daysLeft = rd ? Math.ceil((rd-today)/(1000*60*60*24)) : null;
+  const cycle = client.paymentCycle || 1;
+  const aging = client.sellerAging || 0;
+  const isOverdue = rd && rd < today;
+
+  let histHtml = '';
+  if(history.length) {
+    histHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+      '<thead><tr style="border-bottom:0.5px solid var(--border);">'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">#</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Date</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Amount</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Mode</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">UTR</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">Period</th>'+
+        '<th style="padding:8px;text-align:left;font-size:12px;color:var(--text-muted);">By</th>'+
+      '</tr></thead><tbody>'+
+      history.map(function(p,i){
+        return '<tr style="border-bottom:0.5px solid var(--border);">'+
+          '<td style="padding:8px;color:var(--text-muted);">'+(history.length-i)+'</td>'+
+          '<td style="padding:8px;">'+( p.paymentDate||'—')+'</td>'+
+          '<td style="padding:8px;font-weight:500;">₹'+Number(p.amount||0).toLocaleString('en-IN')+'</td>'+
+          '<td style="padding:8px;">'+( p.paymentMode||'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;color:var(--text-muted);">'+(p.utrNumber||'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;">'+(p.periodFrom&&p.periodTo?p.periodFrom+' to '+p.periodTo:'—')+'</td>'+
+          '<td style="padding:8px;font-size:11px;color:var(--text-muted);">'+(p.recordedBy||'—')+'</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  } else {
+    histHtml = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Koi payment record nahi abhi tak</div>';
+  }
+
+  const detail = document.getElementById('pay-detail');
+  detail.innerHTML =
+    '<div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+      '<div>'+
+        '<div style="font-size:17px;font-weight:600;">'+client.busyName+'</div>'+
+        '<div style="font-size:12px;color:var(--text-muted);">'+client.clientCode+' · '+client.marketplace+(client.phone?' · 📞 '+client.phone:'')+'</div>'+
+      '</div>'+
+      (canRecord?'<button class="btn btn-primary btn-sm" id="rec-pay-btn" data-cc="'+client.clientCode+'" data-cn="'+client.busyName.replace(/['"]/g,'')+'" onclick="openRecordPayment(this)">+ Record Payment</button>':'')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:12px 0;border-bottom:0.5px solid var(--border);margin-bottom:12px;">'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Plan</div><div style="font-weight:500;font-size:14px;">'+(client.servicePlan||'—')+'</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Cycle</div><div style="font-weight:500;font-size:14px;">'+cycleLabel(cycle)+'</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Seller Aging</div><div style="font-weight:500;font-size:14px;">'+aging+' days</div></div>'+
+      '<div style="background:var(--bg-secondary,var(--bg));border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Total Payments</div><div style="font-weight:500;font-size:14px;">'+history.length+'</div></div>'+
+      '<div style="background:'+(isOverdue?'#FCEBEB':(daysLeft!==null&&daysLeft<=7?'#FAEEDA':'var(--bg-secondary,var(--bg))'))+';border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-muted);">Next Due</div><div style="font-weight:500;font-size:14px;color:'+(isOverdue?'var(--red)':(daysLeft!==null&&daysLeft<=7?'var(--amber)':'inherit'))+';">'+(rd?client.renewalDate+' ('+(isOverdue?'OVERDUE':daysLeft+'d')+')'  :'—')+'</div></div>'+
+    '</div>'+
+    '<div style="font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:8px;">PAYMENT HISTORY</div>'+
+    histHtml;
+}
+
+function openRecordPayment(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var client = (window._payClients||[]).find(function(c){return c.clientCode===cc;});
+  var cycle = client ? (client.paymentCycle||1) : 1;
+  var today = new Date().toISOString().split('T')[0];
+  var periodFrom = today;
+  var periodTo = new Date();
+  periodTo.setMonth(periodTo.getMonth() + cycle);
+  var periodToStr = periodTo.toISOString().split('T')[0];
+
+  openPanel('💰 Record Payment — '+cn,
+    '<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">'+
+      '<strong>'+cn+'</strong> · '+cycleLabel(cycle)+' cycle'+
+    '</div>'+
+    '<div class="form-group"><label>Payment Date *</label><input type="date" class="form-control" id="rp-date" value="'+today+'"></div>'+
+    '<div class="form-group"><label>Amount (₹) *</label><input type="number" class="form-control" id="rp-amount" placeholder="0"></div>'+
+    '<div class="form-group"><label>Payment Mode</label>'+
+      '<select class="form-control" id="rp-mode">'+
+        '<option>UPI</option><option>NEFT</option><option>RTGS</option><option>IMPS</option><option>Cheque</option><option>Cash</option>'+
+      '</select></div>'+
+    '<div class="form-group"><label>UTR / Transaction Number</label><input type="text" class="form-control" id="rp-utr" placeholder="UTR or TXN number"></div>'+
+    '<div class="form-row">'+
+      '<div class="form-group"><label>Period From</label><input type="date" class="form-control" id="rp-from" value="'+periodFrom+'"></div>'+
+      '<div class="form-group"><label>Period To (Next Renewal)</label><input type="date" class="form-control" id="rp-to" value="'+periodToStr+'"></div>'+
+    '</div>'+
+    '<div class="form-group"><label>Notes</label><textarea class="form-control" id="rp-notes" rows="2" placeholder="Koi aur detail..."></textarea></div>'+
+    '<button class="btn btn-success btn-full" data-cc="'+cc+'" data-cn="'+cn+'" onclick="submitPayment(this)">💾 Save Payment</button>'
+  );
+}
+
+async function submitPayment(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var amount = document.getElementById('rp-amount').value;
+  var date = document.getElementById('rp-date').value;
+  if(!amount || !date) { showToast('Amount aur date required!','error'); return; }
+  var r = await api('POST','/payments',{
+    clientCode:cc, clientName:cn,
+    amount:amount, paymentDate:date,
+    paymentMode:document.getElementById('rp-mode').value,
+    utrNumber:document.getElementById('rp-utr').value||null,
+    periodFrom:document.getElementById('rp-from').value||null,
+    periodTo:document.getElementById('rp-to').value||null,
+    notes:document.getElementById('rp-notes').value||null,
+  });
+  if(r?.success){
+    showToast('✅ Payment recorded!','success');
+    closePanel();
+    selectPaySeller(cc);
+  } else {
+    showToast(r?.error||'Failed','error');
+  }
+}
+
+
+function navigateTo(page){ navigate(page); }
+
+async function renderClients() {
+  const clients=await getClients();if(!clients) return;
+  APP.clients=clients; renderClientsUI(clients);
+}
+
+function renderClientsUI(clients) {
+  const u=APP.user,qa=QUICK_ACTIONS[u.role]||[],canAdd=['Admin','Ops Lead'].includes(u.role);
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👥 Clients (${clients.length})</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)"><option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option></select>
+          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)"><option value="">All Markets</option><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select>
+          ${canAdd?'<button class="btn btn-primary btn-sm" onclick="openAddClient()">➕ Add Client</button><button class="btn btn-secondary btn-sm" onclick="openBulkUpload()">📥 Bulk Upload</button>':''}
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap" id="clients-table">${clientTableRows(clients,qa)}</div>
+        <div class="mobile-cards" id="clients-cards" style="padding:12px;">${clientCards(clients)}</div>
+      </div>
+    </div>`;
+}
+
+function clientTableRows(clients,qa) {
+  if(!clients.length) return '<div class="empty-state"><div class="emoji">👥</div><h3>No clients</h3></div>';
+  return `<table><thead><tr><th>#</th><th>Code</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Status</th><th>Health</th><th>Renewal</th><th>Quick Actions</th><th>More</th></tr></thead>
+  <tbody>${clients.map((c,i)=>`<tr>
+    <td>${i+1}</td><td><strong>${c.clientCode}</strong></td><td><strong>${c.busyName}</strong></td>
+    <td><span class="badge badge-blue">${c.marketplace}</span></td>
+    <td>${c.amName||'—'}</td><td>${statusBadge(c.status)}</td><td>${healthBadge(c.healthStatus)}</td>
+    <td>${renewalBadge(c.renewalDate)}</td>
+    <td><div class="quick-actions">${qa.map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div></td>
+    <td><div style="display:flex;gap:4px;">
+      <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️</button>
+      <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
+      <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
+      ${['Admin','Ops Lead'].includes(APP.user.role)?'<button class="btn btn-sm btn-secondary" onclick="openEditClient(\''+c.clientCode+'\')">✏️</button>':''}
+      ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️</button>`:''}
+    </div></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+function clientCards(clients) {
+  return clients.map(c=>`
+    <div class="client-card ${c.healthStatus==='Warning'?'warning':c.healthStatus==='At Risk'?'at-risk':''}">
+      <div class="client-card-header"><div><div class="client-name">${c.busyName}</div><div style="font-size:12px;color:var(--text-muted);">${c.clientCode}</div></div>${healthBadge(c.healthStatus)}</div>
+      <div class="client-meta"><span class="badge badge-blue">${c.marketplace}</span>${statusBadge(c.status)}</div>
+      <div class="quick-actions">${(QUICK_ACTIONS[APP.user.role]||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${c.clientCode}','${c.busyName}','${q.action}')">${q.label}</button>`).join('')}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️ Detail</button>
+        <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋 History</button>
+        <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫 Ticket</button>
+        ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️ Delete</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+let _cf={health:'',market:''};
+function filterClientsByHealth(v){_cf.health=v;applyClientFilters();}
+function filterClientsByMarket(v){_cf.market=v;applyClientFilters();}
+function applyClientFilters(){
+  let f=APP.clients;
+  if(_cf.health) f=f.filter(c=>c.healthStatus===_cf.health);
+  if(_cf.market) f=f.filter(c=>c.marketplace===_cf.market);
+  const qa=QUICK_ACTIONS[APP.user.role]||[];
+  document.getElementById('clients-table').innerHTML=clientTableRows(f,qa);
+  document.getElementById('clients-cards').innerHTML=clientCards(f);
+}
+function globalSearch(q){
+  if(!q.trim()||APP.page!=='clients') return;
+  const f=APP.clients.filter(c=>c.busyName.toLowerCase().includes(q.toLowerCase())||c.clientCode.toLowerCase().includes(q.toLowerCase()));
+  const qa=QUICK_ACTIONS[APP.user.role]||[];
+  document.getElementById('clients-table')?.innerHTML&&(document.getElementById('clients-table').innerHTML=clientTableRows(f,qa));
+}
+async function quickAction(cc,cn,action){
+  const r=await api('POST',`/clients/${cc}/quick-action`,{action,clientName:cn});
+  if(r?.success||r){showToast('✅ '+action+' — '+cn,'success');}
+  else showToast('Error — try again','error');
+}
+async function viewTimeline(cc,cn){
+  openPanel('📋 '+cn+' — History','<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const [logs, timeline] = await Promise.all([
+    api('GET',`/clients/${cc}/activity`),
+    api('GET',`/clients/${cc}/timeline`)
+  ]);
+  const actLogs=logs||[], crmCalls=timeline?.crmCalls||[], tickets=timeline?.tickets||[], tasks=timeline?.tasks||[];
+  document.getElementById('panel-body').innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📋 Activity (${actLogs.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('crm')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!actLogs.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>':
+        actLogs.map(l=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--secondary);">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-crm" style="display:none;">
+      ${!crmCalls.length?'<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>':
+        crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:6px;">${c.seller_comment||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length?'<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>':
+        tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;">${t.subject||t.category||'—'}</span>
+            <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${(t.description||'').slice(0,80)}</div>
+        </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length?'<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>':
+        tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+            <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showTimelineTab(tab){
+  ['act','crm','tkt','tsk'].forEach(t=>{
+    const el=document.getElementById('tl-'+t);
+    if(el) el.style.display=t===tab?'':'none';
+  });
+}
+
+async function openAddClient(){
+  const users = await api('GET','/users');
+  const ams = (users||[]).filter(u=>u.role==='Account Manager'&&u.isActive).map(u=>u.name);
+  const ads = (users||[]).filter(u=>u.role==='Ads Executive'&&u.isActive).map(u=>u.name);
+  const crms = (users||[]).filter(u=>u.role==='CRM Executive'&&u.isActive).map(u=>u.name);
+  const allExecs = (users||[]).filter(u=>u.isActive).map(u=>u.name);
+  openPanel('➕ Add Client',`
+    <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
+    <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Account Manager</label>
+        <select class="form-control" id="nc-am"><option value="">-- Select AM --</option>${ams.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Ads Manager</label>
+        <select class="form-control" id="nc-ads"><option value="">-- Select Ads --</option>${ads.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CRM Executive</label>
+        <select class="form-control" id="nc-crm"><option value="">-- Select CRM --</option>${crms.map(n=>`<option>${n}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Plan</label><select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
+    </div>
+    <div class="form-group"><label>Ops Lead / CSI Executive (optional)</label>
+      <select class="form-control" id="nc-ops"><option value="">-- Select --</option>${allExecs.map(n=>`<option>${n}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Renewal Date</label><input type="date" class="form-control" id="nc-renewal"></div>
+    <div class="form-group"><label>📞 Phone Number</label><input type="tel" class="form-control" id="nc-phone" placeholder="e.g. 9876543210"></div>
+    <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
+}
+async function submitAddClient(){
+  const name=document.getElementById('nc-name').value.trim();if(!name){showToast('Name required','error');return;}
+  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:document.getElementById('nc-am').value,adsManager:document.getElementById('nc-ads').value,crmExecutive:document.getElementById('nc-crm').value,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null,phone:document.getElementById('nc-phone')?.value||null});
+  if(r?.success){showToast('✅ '+r.clientCode+' added!','success');closePanel();renderClients();}
+}
+
+// ── TICKETS ──────────────────────────────────────────────────
+async function renderTickets(){
+  const tickets=await api('GET','/tickets');if(!tickets) return;
+  APP.tickets=tickets;
+  const open=tickets.filter(t=>t.status!=='Done').length;
+  const pendingApproval=tickets.filter(t=>t.status==='Pending Approval').length;
+  const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">In Progress</div><div class="kpi-value">${tickets.filter(t=>t.status==='In Progress').length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">⏳ Pending Approval</div><div class="kpi-value">${pendingApproval}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${tickets.filter(t=>t.resolvedAt&&isToday(t.resolvedAt)).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">🎫 Tickets</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)"><option value="">All</option><option>Open</option><option>In Progress</option><option>Pending Approval</option><option>Done</option></select>
+          ${isLead?`<button class="btn btn-sm btn-outline" onclick="renderTicketTimeStats()" style="background:#8e44ad;color:#fff;">⏱ Time Stats</button>`:''}
+          <button class="btn btn-danger btn-sm" onclick="openRaiseTicket()">🎫 Raise</button>
+        </div>
+      </div>
+      <div class="card-body" id="tickets-body">${ticketCards(tickets)}</div>
+    </div>
+    <div id="ticket-time-stats"></div>`;
+}
+
+function ticketCards(tickets){
+  if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  return [...tickets].sort((a,b)=>{
+    const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
+    return (order[a.status]||0)-(order[b.status]||0);
+  }).map(t=>{
+    const statusColor = t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber';
+    const pendingApproval = t.status==='Pending Approval';
+    return `
+    <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}" style="${pendingApproval?'border-left:4px solid #3498db;background:#eaf4fd;':''}">
+      <div class="ticket-header">
+        <div><div class="ticket-id">${t.ticketId}</div><div class="ticket-client">${t.clientName}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
+          <span class="badge ${statusColor}">${t.status}</span>
+        </div>
+      </div>
+      <div class="ticket-desc" style="cursor:pointer;" onclick="viewTicketDetail(this)" data-tid="${t.ticketId}">${t.category} — ${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);font-size:11px;"> ...read more</span>':''}</div>
+      ${pendingApproval?`<div style="font-size:12px;color:#2980b9;padding:4px 0;"><strong>⏳ Close request by:</strong> ${t.closeRequestedBy||'—'} · ${t.closeRequestedAt||'—'}</div>`:''}
+      <div class="ticket-footer">
+        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">${t.status==='Done'?'✅ Resolved '+(t.hoursToClose?'('+t.hoursToClose+'h)':''):t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}</span>
+        <span style="font-size:11px;color:var(--text-muted);">→ ${t.assignedTo}</span>
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          ${t.status==='Open'?`<button class="btn btn-sm btn-outline" data-tid="${t.ticketId}" onclick="updateTicket(this.getAttribute('data-tid'),'In Progress')">▶ Accept</button>`:''}
+          ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" data-tid="${t.ticketId}" data-cn="${t.clientName.replace(/['"]/g,'')}" onclick="promptCloseTicket(this.getAttribute('data-tid'),this.getAttribute('data-cn'))">✅ Request Close</button>`:''}
+          ${pendingApproval && isLead?`
+            <button class="btn btn-sm btn-success" data-tid="${t.ticketId}" onclick="approveTicketClose(this.getAttribute('data-tid'))">✅ Approve</button>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;" data-tid="${t.ticketId}" onclick="rejectTicketClose(this.getAttribute('data-tid'))">❌ Reject</button>
+          `:''}
+          ${pendingApproval && !isLead?`<span style="font-size:11px;color:#2980b9;">⏳ Approval ka wait kar rahe hain...</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function viewTicketDetail(el){
+  const tid = el.getAttribute('data-tid');
+  const t = (APP.tickets||[]).find(x=>x.ticketId===tid);
+  if(!t) return;
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  const pendingApproval = t.status==='Pending Approval';
+
+  openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
+    '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+        '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span>'+
+        '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
+        '<span class="badge badge-blue">'+t.category+'</span>'+
+      '</div>'+
+      '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">Client: '+t.clientName+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+t.assignedTo+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Raised By: '+t.raisedBy+' · '+t.createdAt+'</div>'+
+      (t.hoursToClose?'<div style="font-size:12px;color:var(--green);font-weight:700;">⏱ Close time: '+t.hoursToClose+' hours</div>':'')+
+    '</div>'+
+    '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
+    '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>'+
+    (t.resolutionNote?
+      '<div style="font-weight:600;margin-bottom:6px;">✅ Resolution Note:</div>'+
+      '<div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;margin-bottom:8px;">'+t.resolutionNote+'</div>'+
+      (t.closeRequestedBy?'<div style="font-size:12px;color:#2980b9;margin-bottom:4px;">⏳ Close requested by: <strong>'+t.closeRequestedBy+'</strong> · '+t.closeRequestedAt+'</div>':'')
+    :'')+
+    (t.approvedBy?'<div style="font-size:12px;color:var(--green);margin-bottom:8px;">✅ Approved by: <strong>'+t.approvedBy+'</strong> · '+t.approvedAt+'</div>':'')+
+    (t.status!=='Done'?
+      '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'+
+        (t.status==='Open'?'<button class="btn btn-outline" data-tid="'+t.ticketId+'" onclick="var b=this;updateTicket(b.getAttribute(\'data-tid\'),\'In Progress\');closePanel()">▶ Accept</button>':'')+
+        (t.status==='In Progress'?'<button class="btn btn-success" data-tid="'+t.ticketId+'" data-cn="'+t.clientName.replace(/[\'\"]/g,'')+'" onclick="var b=this;promptCloseTicket(b.getAttribute(\'data-tid\'),b.getAttribute(\'data-cn\'));closePanel()">✅ Request Close</button>':'')+
+        (pendingApproval && isLead?
+          '<button class="btn btn-success" data-tid="'+t.ticketId+'" onclick="approveTicketClose(this.getAttribute(\'data-tid\'));closePanel()">✅ Approve & Close</button>'+
+          '<button class="btn btn-sm" style="background:var(--red);color:#fff;" data-tid="'+t.ticketId+'" onclick="rejectTicketClose(this.getAttribute(\'data-tid\'));closePanel()">❌ Reject</button>'
+        :'')+
+        (pendingApproval && !isLead?'<span style="color:#2980b9;font-size:13px;">⏳ CSI Lead approval ka intezaar hai...</span>':'')+
+      '</div>':
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">✅ Closed by: '+(t.resolvedBy||'—')+' · '+t.resolvedAt+'</div>'
+    )
+  );
+}
+
+function viewTaskDetail(tid){
+  const t = (_allTasksCache||[]).find(x=>x.taskId===tid) || (APP.tasks||[]).find(x=>x.taskId===tid);
+  if(!t) return;
+  openPanel('📋 Task — '+(t.clientName||'General'),
+    '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+        '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green')+'">'+t.priority+'</span>'+
+        '<span class="badge '+(t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber')+'">'+t.status+'</span>'+
+        (t.category?'<span class="badge badge-blue">'+t.category+'</span>':'')+
+      '</div>'+
+      '<div style="font-size:14px;font-weight:700;margin-bottom:6px;">'+t.title+'</div>'+
+      (t.clientName?'<div style="font-size:12px;color:var(--text-muted);">Client: '+t.clientName+'</div>':'')+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+(t.assignedTo||'—')+'</div>'+
+      '<div style="font-size:12px;color:var(--text-muted);">Assigned By: '+(t.assignedBy||'—')+' · '+t.createdAt+'</div>'+
+      (t.deadline?'<div style="font-size:12px;color:'+(t.isOverdue?'var(--red)':'var(--text-muted)')+';">Deadline: '+t.deadline+(t.isOverdue?' 🔴 OVERDUE':'')+'</div>':'')+
+    '</div>'+
+    (t.description?
+      '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
+      '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>':'')
+  );
+}
+
+function filterTickets(s){const f=s?APP.tickets.filter(t=>t.status===s):APP.tickets;document.getElementById('tickets-body').innerHTML=ticketCards(f);}
+async function updateTicket(id,status,note){const r=await api('PATCH',`/tickets/${id}`,{status,resolutionNote:note||''});if(r?.success){showToast('Ticket: '+status,'success');renderTickets();}}
+function promptCloseTicket(id,cn){
+  openPanel('✅ Close Ticket — '+cn,
+    '<div style="background:#eafaf1;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">'+
+      '<strong>Ticket ID:</strong> '+id+'<br><strong>Client:</strong> '+cn+
+    '</div>'+
+    '<div class="form-group"><label>✅ Resolution / Action Taken *</label>'+
+      '<textarea class="form-control" id="close-note" rows="4" placeholder="Kya kiya? Problem kaise solve ki? Detail mein likho..."></textarea></div>'+
+    '<div class="form-group"><label>Closed By</label>'+
+      '<input type="text" class="form-control" value="'+(APP.user?APP.user.name:'—')+'" disabled></div>'+
+    '<div class="form-group"><label>Closed At</label>'+
+      '<input type="text" class="form-control" value="'+new Date().toLocaleString('en-IN')+'" disabled></div>'+
+    '<button class="btn btn-success btn-full" id="close-ticket-btn" data-tid="'+id+'" data-cn="'+cn.replace(/['"]/g,'')+'" onclick="submitCloseTicket(this)">📨 Request Close (CSI Lead ko bhejega)</button>'
+  );
+}
+
+async function submitCloseTicket(btn){
+  var id = btn.getAttribute('data-tid');
+  var note = document.getElementById('close-note').value.trim();
+  if(!note){ showToast('Resolution note zaroor likho!', 'error'); return; }
+  var r = await api('PATCH', '/tickets/'+id, {
+    action: 'request_close',
+    resolutionNote: note,
+  });
+  if(r?.success){
+    showToast('✅ Close request bhej di! CSI Lead approve karega.', 'success');
+    closePanel();
+    renderTickets();
+  }
+}
+
+async function approveTicketClose(id) {
+  if(!confirm('Is ticket ko approved karke close karna hai?')) return;
+  const r = await api('PATCH', '/tickets/'+id, { action: 'approve_close' });
+  if(r?.success){
+    showToast('✅ Ticket approved aur closed!', 'success');
+    renderTickets();
+  }
+}
+
+async function rejectTicketClose(id) {
+  if(!confirm('Close request reject karna hai? Executive ko wapas In Progress mein jaayega.')) return;
+  const r = await api('PATCH', '/tickets/'+id, { action: 'reject_close' });
+  if(r?.success){
+    showToast('❌ Close request reject ki — ticket wapas In Progress.', 'success');
+    renderTickets();
+  }
+}
+
+async function renderTicketTimeStats() {
+  const el = document.getElementById('ticket-time-stats');
+  if(!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Loading stats...</div>';
+  const stats = await api('GET', '/tickets/stats/time?_='+Date.now()) || [];
+  if(!stats.length){ el.innerHTML='<div class="card"><div class="card-body">Abhi tak koi closed ticket nahi.</div></div>'; return; }
+
+  el.innerHTML = '<div class="card" style="margin-top:16px;">'+
+    '<div class="card-header"><span class="card-title">⏱ Ticket Close Time Stats — Per Executive</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>#</th><th>Executive</th><th>Total Closed</th><th>Avg Hours</th><th>Fastest</th><th>Slowest</th><th>Proactiveness</th></tr></thead>'+
+    '<tbody>'+
+    stats.map((s,i)=>{
+      const avgColor = s.avgHoursToClose<=4?'var(--green)':s.avgHoursToClose<=12?'var(--amber)':'var(--red)';
+      const label = s.avgHoursToClose<=4?'🟢 Proactive':s.avgHoursToClose<=12?'🟡 Average':'🔴 Slow';
+      return '<tr>'+
+        '<td>'+(i+1)+'</td>'+
+        '<td><strong>'+s.name+'</strong></td>'+
+        '<td style="text-align:center;">'+s.totalTickets+'</td>'+
+        '<td style="text-align:center;font-weight:700;color:'+avgColor+';">'+s.avgHoursToClose+'h</td>'+
+        '<td style="text-align:center;color:var(--green);">'+s.minHours+'h</td>'+
+        '<td style="text-align:center;color:var(--red);">'+s.maxHours+'h</td>'+
+        '<td>'+label+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div></div></div>';
+}
+
+function openRaiseTicket(){
+  if(!APP.clients.length){getClients().then(c=>{if(c){APP.clients=c;openRaiseTicket();}});return;}
+  openPanel('🎫 Raise Ticket',`
+    <div class="form-group"><label>Client *</label>
+      <select class="form-control" id="tk-client"><option value="">Select client...</option>${APP.clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}</select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="tk-cat"><option>Account Health</option><option>Listing Issue</option><option>Order Issue</option><option>Fulfillment Issue</option><option>Ads / Campaign</option><option>Seller Complaint</option><option>Escalation</option><option>Renewal Follow-up</option><option>CSI Review Due</option><option>General</option></select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="tk-pri"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Description *</label><textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea></div>
+    <button class="btn btn-danger btn-full" onclick="submitTicket()">🎫 Raise Ticket</button>`);
+}
+function openRaiseTicketFor(cc,cn){openRaiseTicket();setTimeout(()=>{const s=document.getElementById('tk-client');if(s)s.value=cc;},150);}
+async function submitTicket(){
+  const sel=document.getElementById('tk-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.dataset?.name||'';
+  const desc=document.getElementById('tk-desc').value.trim();
+  if(!cc){showToast('Select client','error');return;}if(!desc){showToast('Add description','error');return;}
+  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,description:desc});
+  if(r?.success){showToast(`✅ ${r.ticketId} → ${r.assignedTo}`,'success');closePanel();if(APP.page==='tickets')renderTickets();}
+}
+
+// ── CRM ──────────────────────────────────────────────────────
+async function renderCRM(){
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
+  const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
+  if(clients&&clients.length) APP.clients=clients;
+
+  // Role-based filtering — CRM Executive sees only assigned sellers
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  let myClients = APP.clients || [];
+  if (!isLead) {
+    const uname = u.name.trim().toLowerCase();
+    myClients = myClients.filter(c => {
+      const am  = (c.amName||'').trim().toLowerCase();
+      const ads = (c.adsManager||'').trim().toLowerCase();
+      const crm = (c.crmExecutive||'').trim().toLowerCase();
+      return (am && (am.includes(uname) || uname.includes(am))) ||
+             (ads && (ads.includes(uname) || uname.includes(ads))) ||
+             (crm && (crm.includes(uname) || uname.includes(crm)));
+    });
+  }
+
+  renderCRMPage(myClients, todayCalls||[]);
+  setTimeout(() => {
+    buildSearchableSelect('crm-client-wrap', myClients, '', '🔍 Search client...');
+    // Watch for selection change
+    const wrap = document.getElementById('crm-client-wrap');
+    if (wrap) {
+      const origSelect = selectSearchableItem;
+      window._crmSelectItem = function(id, code, name) {
+        selectSearchableItem(id, code, name);
+        if (id === 'crm-client-wrap') loadCRMHistory(code);
+      };
+      wrap.querySelectorAll('.dropdown-item').forEach(item => {
+        item.onmousedown = function() {
+          const code = item.getAttribute('onmousedown')?.match(/'([^']+)'/)?.[1] || '';
+        };
+      });
+    }
+  }, 100);
+}
+
+function renderCRMPage(clients,todayCalls){
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">My Clients</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Calls Today</div><div class="kpi-value">${todayCalls.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('Connected')).length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('No Response')).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📞 Log a Call</span></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group"><label>Client *</label>
+            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value)">
+              <option value="">Select...</option>
+              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.clientCode})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Call Outcome</label>
+            <select class="form-control" id="crm-outcome"><option>Called — Connected</option><option>Called — No Response</option><option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Seller Feedback</label><textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea></div>
+          <div class="form-group"><label>Severity</label><select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
+        </div>
+        <div class="form-group"><label>Next Follow-up</label><input type="date" class="form-control" id="crm-followup"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="saveCRMCall()">📞 Save Call</button>
+          <button class="btn btn-danger" onclick="saveCRMCall(true)">📞 + 🎫 Save & Raise Ticket</button>
+          <button class="btn btn-secondary" onclick="openCSIForClient()">📝 Fill CSI</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;" onclick="openCloseRequestForm()">🔴 Close Request</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${todayCalls.map(c=>`<tr><td><strong>${c.clientName}</strong></td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+    <div class="card" id="crm-history-card" style="display:none;">
+      <div class="card-header"><span class="card-title" id="crm-hist-title">📋 Call History</span></div>
+      <div class="card-body" id="crm-history"></div>
+    </div>`;
+}
+
+async function saveCRMCall(andTicket){
+  const cc = getSearchableVal('crm-client-wrap') || document.getElementById('crm-client')?.value || '';
+  const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
+  if(!cc){showToast('Select a client','error');return;}
+  const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
+  if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
+}
+
+async function loadCRMHistory(cc){
+  if(!cc) return;
+  const client=APP.clients.find(c=>c.clientCode===cc);
+  document.getElementById('crm-history-card').style.display='';
+  if(client) document.getElementById('crm-hist-title').textContent=`📋 Call History — ${client.busyName}`;
+  document.getElementById('crm-history').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  const calls=await api('GET',`/crm/client/${cc}`);
+  document.getElementById('crm-history').innerHTML=!calls?.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Outcome</th><th>Feedback</th><th>Severity</th><th>Follow-up</th><th>By</th></tr></thead>
+  <tbody>${calls.map(c=>`<tr><td style="font-size:12px;">${c.callDate}</td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:200px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':'badge-gray'}">${c.severity}</span></td><td style="font-size:12px;">${c.nextFollowUp||'—'}</td><td style="font-size:12px;color:var(--text-muted);">${c.crmExecutive}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function openCSIForClient(){
+  const cc=getSearchableVal('crm-client-wrap')||document.getElementById('crm-client')?.value||'';
+  const cn=document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0]||'';
+  openCSIForm(cc,cn);
+}
+
+// ── CSI ───────────────────────────────────────────────────────
+async function renderCSI(){
+  window._csiFilter = window._csiFilter || 'all';
+  window._csiDateFrom = window._csiDateFrom || '';
+  window._csiDateTo = window._csiDateTo || '';
+
+  const [clients, csiData] = await Promise.all([getClients(), api('GET','/csi')]);
+  if(clients) APP.clients = clients;
+
+  window._csiAllData = csiData || [];
+  window._csiClients = clients || [];
+
+  var csiMap = {};
+  (csiData||[]).forEach(function(r){
+    if(!csiMap[r.clientCode] || r.reviewDate > csiMap[r.clientCode].reviewDate)
+      csiMap[r.clientCode] = r;
+  });
+  window._csiMap = csiMap;
+
+  var canFill = ['CRM Executive','Admin','CSI Lead','CSI Executive'].includes(APP.user.role);
+  window._csiCanFill = canFill;
+
+  var reviewed = Object.keys(csiMap).length;
+  var lowScore = Object.values(csiMap).filter(function(r){return r.csiPercent < 50;}).length;
+  var notDone = (clients||[]).filter(function(c){return !csiMap[c.clientCode];}).length;
+  var today = new Date().toISOString().split('T')[0];
+  var monthAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+
+  var pc = document.getElementById('page-content');
+  pc.innerHTML = '';
+
+  // KPI Grid
+  var kpiDiv = document.createElement('div');
+  kpiDiv.className = 'kpi-grid';
+  var kpis = [
+    {cls:'blue', label:'Total', val:(clients||[]).length, f:'all'},
+    {cls:'green', label:'✅ Done', val:reviewed, f:'done'},
+    {cls:'red', label:'⏳ Pending', val:notDone, f:'pending'},
+    {cls:'amber', label:'⚠️ Low Score', val:lowScore, f:'low'},
+  ];
+  kpis.forEach(function(k){
+    var d = document.createElement('div');
+    d.className = 'kpi-card ' + k.cls;
+    d.style.cursor = 'pointer';
+    d.innerHTML = '<div class="kpi-label">'+k.label+'</div><div class="kpi-value">'+k.val+'</div>';
+    d.onclick = (function(f){ return function(){ csiSetFilter(f); }; })(k.f);
+    kpiDiv.appendChild(d);
+  });
+  pc.appendChild(kpiDiv);
+
+  // Card
+  var card = document.createElement('div');
+  card.className = 'card';
+
+  // Card Header
+  var header = document.createElement('div');
+  header.className = 'card-header';
+
+  var title = document.createElement('span');
+  title.className = 'card-title';
+  title.textContent = '📊 CSI Health';
+  header.appendChild(title);
+
+  var controls = document.createElement('div');
+  controls.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+
+  // Filter buttons
+  var filters = [{f:'all',label:'All'},{f:'pending',label:'⏳ Pending',color:'var(--red)'},{f:'done',label:'✅ Done',color:'var(--green)'},{f:'low',label:'⚠️ Low Score',color:'var(--amber)'}];
+  filters.forEach(function(fb){
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-sm btn-outline';
+    btn.id = 'csi-btn-' + fb.f;
+    btn.textContent = fb.label;
+    if(fb.color) btn.style.cssText = 'color:'+fb.color+';border-color:'+fb.color+';';
+    btn.onclick = (function(f){ return function(){ csiSetFilter(f); }; })(fb.f);
+    controls.appendChild(btn);
+  });
+
+  // Date from
+  var fromInput = document.createElement('input');
+  fromInput.type = 'date'; fromInput.id = 'csi-from';
+  fromInput.className = 'form-control';
+  fromInput.style.cssText = 'width:130px;padding:4px 8px;font-size:12px;';
+  fromInput.value = monthAgo;
+  fromInput.onchange = function(){ window._csiDateFrom = this.value; buildCSITable(); };
+  controls.appendChild(fromInput);
+
+  var toSpan = document.createElement('span');
+  toSpan.style.fontSize = '12px'; toSpan.textContent = 'to';
+  controls.appendChild(toSpan);
+
+  var toInput = document.createElement('input');
+  toInput.type = 'date'; toInput.id = 'csi-to';
+  toInput.className = 'form-control';
+  toInput.style.cssText = 'width:130px;padding:4px 8px;font-size:12px;';
+  toInput.value = today;
+  toInput.onchange = function(){ window._csiDateTo = this.value; buildCSITable(); };
+  controls.appendChild(toInput);
+
+  var clearBtn = document.createElement('button');
+  clearBtn.className = 'btn btn-sm btn-outline';
+  clearBtn.textContent = 'Clear';
+  clearBtn.onclick = csiClearDates;
+  controls.appendChild(clearBtn);
+
+  if(canFill){
+    var fillBtn = document.createElement('button');
+    fillBtn.className = 'btn btn-primary btn-sm';
+    fillBtn.textContent = '📝 Fill CSI';
+    fillBtn.onclick = function(){ openCSIForm(); };
+    controls.appendChild(fillBtn);
+  }
+
+  header.appendChild(controls);
+  card.appendChild(header);
+
+  var body = document.createElement('div');
+  body.className = 'card-body';
+  body.style.padding = '0';
+  var wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
+  wrap.id = 'csi-table-wrap';
+  body.appendChild(wrap);
+  card.appendChild(body);
+  pc.appendChild(card);
+
+  buildCSITable();
+}
+
+
+function csiSetFilter(f){
+  window._csiFilter = f;
+  buildCSITable();
+}
+
+function csiClearDates(){
+  window._csiDateFrom='';
+  window._csiDateTo='';
+  var f=document.getElementById('csi-from');
+  var t=document.getElementById('csi-to');
+  if(f) f.value='';
+  if(t) t.value='';
+  buildCSITable();
+}
+
+function buildCSITable(){
+  var clients = window._csiClients || [];
+  var csiMap = window._csiMap || {};
+  var allData = window._csiAllData || [];
+  var canFill = window._csiCanFill || false;
+  var filter = window._csiFilter || 'all';
+  var dateFrom = window._csiDateFrom || '';
+  var dateTo = window._csiDateTo || '';
+
+  // Update button styles
+  ['all','pending','done','low'].forEach(function(f){
+    var btn = document.getElementById('csi-btn-'+f);
+    if(btn){
+      if(f===filter) btn.className='btn btn-sm btn-primary';
+      else {
+        btn.className='btn btn-sm btn-outline';
+        if(f==='pending') btn.style.cssText='color:var(--red);border-color:var(--red);';
+        else if(f==='done') btn.style.cssText='color:var(--green);border-color:var(--green);';
+        else if(f==='low') btn.style.cssText='color:var(--amber);border-color:var(--amber);';
+        else btn.style.cssText='';
+      }
+    }
+  });
+
+  // Filter by date if set
+  var filteredCsiMap = csiMap;
+  if(dateFrom || dateTo) {
+    filteredCsiMap = {};
+    allData.forEach(function(r){
+      if(dateFrom && r.reviewDate < dateFrom) return;
+      if(dateTo && r.reviewDate > dateTo) return;
+      if(!filteredCsiMap[r.clientCode] || r.reviewDate > filteredCsiMap[r.clientCode].reviewDate)
+        filteredCsiMap[r.clientCode] = r;
+    });
+  }
+
+  var filtered = clients.filter(function(c){
+    var csi = filteredCsiMap[c.clientCode];
+    if(filter==='pending') return !csi;
+    if(filter==='done') return !!csi;
+    if(filter==='low') return csi && csi.csiPercent < 50;
+    return true;
+  });
+
+  var wrap = document.getElementById('csi-table-wrap');
+  if(!wrap) return;
+
+  if(!filtered.length){
+    wrap.innerHTML='<div class="empty-state"><div class="emoji">✅</div><h3>Koi seller nahi is filter mein</h3></div>';
+    return;
+  }
+
+  var rows='';
+  filtered.forEach(function(c, idx){
+    var csi = filteredCsiMap[c.clientCode];
+    var allHistory = allData.filter(function(r){return r.clientCode===c.clientCode;});
+    var score = csi ? csi.csiPercent : null;
+    var health = score===null?'Not Reviewed':score>=80?'Healthy':score>=50?'Warning':'At Risk';
+    var isPending = !csi;
+    var phone = c.phone||'';
+    var phoneHtml = phone?'<a href="tel:'+phone+'">📞 '+phone+'</a>':'—';
+    var scoreHtml = score!==null?'<strong style="color:'+(score>=80?'var(--green)':score>=50?'var(--amber)':'var(--red)')+';">'+score+'%</strong>':'<span style="color:var(--red);">Not Done</span>';
+
+    // History indicator
+    var historyBtn = allHistory.length>0?
+      '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="showCSIHistory(this)">📈 '+allHistory.length+' record'+(allHistory.length>1?'s':'')+'</button>':
+      '<span style="font-size:11px;color:var(--text-muted);">—</span>';
+
+    var actionHtml = canFill?'<td><button class="btn btn-sm '+(isPending?'btn-primary':'btn-secondary')+'" data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" onclick="csiClick(this)">'+(isPending?'📝':'✏️')+'</button></td>':'';
+
+    rows+='<tr data-cc="'+c.clientCode+'" data-cn="'+c.busyName.replace(/['"]/g,'')+'" style="'+(isPending?'background:#fdf2f2;':(score!==null&&score<50?'background:#fff9f0;':''))+'">'+
+      '<td style="font-size:12px;">'+(idx+1)+'</td>'+
+      '<td><strong>'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
+      '<td>'+phoneHtml+'</td>'+
+      '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+      '<td>'+scoreHtml+'</td>'+
+      '<td>'+healthBadge(health)+'</td>'+
+      '<td style="font-size:11px;">'+historyBtn+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(csi?csi.reviewDate:'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(csi&&csi.reviewedBy?csi.reviewedBy:'—')+'</td>'+
+      actionHtml+
+    '</tr>';
+  });
+
+  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>History</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
+  wrap.innerHTML='<table>'+thead+'<tbody>'+rows+'</tbody></table>';
+}
+
+function showCSIHistory(btn){
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var allData = window._csiAllData || [];
+  var history = allData.filter(function(r){return r.clientCode===cc;})
+    .sort(function(a,b){return b.reviewDate.localeCompare(a.reviewDate);});
+
+  var rows='';
+  history.forEach(function(r,i){
+    var prev = history[i+1];
+    var trend = '';
+    if(prev){
+      if(r.csiPercent > prev.csiPercent) trend='<span style="color:var(--green);">▲ +'+( r.csiPercent-prev.csiPercent)+'%</span>';
+      else if(r.csiPercent < prev.csiPercent) trend='<span style="color:var(--red);">▼ '+(r.csiPercent-prev.csiPercent)+'%</span>';
+      else trend='<span style="color:var(--text-muted);">→ Same</span>';
+    }
+    var col = r.csiPercent>=80?'var(--green)':r.csiPercent>=50?'var(--amber)':'var(--red)';
+    rows+='<tr>'+
+      '<td style="font-size:12px;">'+r.reviewDate+'</td>'+
+      '<td><strong style="color:'+col+';">'+r.csiPercent+'%</strong></td>'+
+      '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
+      '<td style="font-size:12px;">'+trend+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
+      '<td style="font-size:12px;max-width:200px;">'+( r.remarks?'<div style="line-height:1.5;">'+r.remarks+'</div>':'—')+'</td>'+
+      '<td style="font-size:12px;max-width:200px;">'+(r.actionTaken?'<div style="color:var(--secondary);line-height:1.5;">'+r.actionTaken+'</div>':'—')+'</td>'+
+      '<td>'+(r.actionStatus?'<span class="badge badge-blue" style="font-size:11px;">'+r.actionStatus+'</span>':'—')+'</td>'+
+    '</tr>';
+  });
+
+  // Add note button
+  var addNoteHtml = canFill ? '<button class="btn btn-sm btn-primary" onclick="openCSINote(\''+cc+'\',\''+cn.replace(/'/g,'')+'\')">➕ Add Action Note</button>' : '';
+  openPanel('📈 CSI History — '+cn,
+    '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'+
+      '<span><strong>'+cn+'</strong> · Total '+history.length+' reviews</span>'+
+      addNoteHtml+
+    '</div>'+
+    '<div class="table-wrap">'+
+      '<table><thead><tr><th>Date</th><th>Score</th><th>Health</th><th>Trend</th><th>By</th><th>Remarks</th><th>Action Taken</th><th>Status</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table>'+
+    '</div>'
+  );
+}
+
+
+function openCSINote(cc, cn) {
+  closePanel();
+  setTimeout(function(){
+    openPanel('📝 Add Action Note — ' + cn,
+      '<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+
+        '<strong>'+cn+'</strong> — seller pe action note add karo (bina CSI score bhare)'+
+      '</div>'+
+      '<div class="form-group"><label>✅ Action Taken</label>'+
+        '<textarea class="form-control" id="note-action" rows="3" placeholder="Kya step liya? Seller ko kya bataya?"></textarea></div>'+
+      '<div class="form-group"><label>📊 Current Status</label>'+
+        '<select class="form-control" id="note-status">'+
+          '<option value="">-- Select --</option>'+
+          '<option>Issue Identified — Working on it</option>'+
+          '<option>Explained to Seller</option>'+
+          '<option>Escalated to AM</option>'+
+          '<option>Escalated to Ops Lead</option>'+
+          '<option>Resolved</option>'+
+          '<option>Follow-up Scheduled</option>'+
+          '<option>No Action Needed</option>'+
+        '</select></div>'+
+      '<div class="form-group"><label>💬 Additional Remarks</label>'+
+        '<textarea class="form-control" id="note-remarks" rows="2" placeholder="Koi aur update..."></textarea></div>'+
+      '<button class="btn btn-primary btn-full" id="save-note-btn" '+
+        'data-cc="'+cc+'" data-cn="'+cn+'" '+
+        'onclick="submitCSINote(this)">💾 Save Note</button>'
+    );
+  }, 200);
+}
+
+async function submitCSINote(btn) {
+  var cc = btn.getAttribute('data-cc');
+  var cn = btn.getAttribute('data-cn');
+  var action = document.getElementById('note-action').value.trim();
+  var status = document.getElementById('note-status').value;
+  var remarks = document.getElementById('note-remarks').value.trim();
+  if(!action && !status) { showToast('Action ya status zaroor bharo', 'error'); return; }
+  // Save as a note-only CSI entry (no scores)
+  var r = await api('POST', '/csi', {
+    clientCode: cc, clientName: cn,
+    q1:0,q2:0,q3:0,q4:0,q5:0,
+    csiScore:0, csiPercent:0,
+    healthStatus:'Note Only',
+    remarks: remarks,
+    actionTaken: action,
+    actionStatus: status,
+    nextReviewDate: null,
+    isNote: true,
+  });
+  if(r?.success) {
+    showToast('✅ Action note saved!', 'success');
+    closePanel();
+    renderCSI();
+  } else {
+    showToast('Save failed', 'error');
+  }
+}
+
+function csiClick(btn){
+  var row=btn.closest('tr');
+  if(row) openCSIForm(row.getAttribute('data-cc'), row.getAttribute('data-cn'));
+}
+
+
+function starRating(val){const n=parseInt(val)||0;return `<span title="${n}/5" style="font-size:12px;">${'⭐'.repeat(n)}${'☆'.repeat(5-n)}</span>`;}
+
+function openCSIForm(cc,cn){
+  var client=cc?(APP.clients||[]).find(function(c){return c.clientCode===cc;}):null;
+  var phone=client?(client.phone||''):'';
+  
+  // Get existing CSI data for pre-fill
+  var existingCSI = cc && window._csiMap ? window._csiMap[cc] : null;
+  
+  var opts='';
+  (APP.clients||[]).forEach(function(c){
+    opts+='<option value="'+c.clientCode+'"'+(cc===c.clientCode?' selected':'')+'>'+c.busyName+' ('+c.clientCode+')</option>';
+  });
+  
+  var qHtml='';
+  CSI_QUESTIONS.forEach(function(q){
+    var existingVal = existingCSI ? (existingCSI[q.id]||0) : 0;
+    var stars='';
+    for(var n=1;n<=5;n++){
+      var isSelected = n <= existingVal;
+      stars+='<div style="flex:1;text-align:center;cursor:pointer;" onclick="selectStar(\''+q.id+'\','+n+')">'+
+        '<div id="star-'+q.id+'-'+n+'" class="star-box" style="'+(isSelected?'background:var(--amber);border-color:var(--amber);color:#fff;':'')+'">'+
+        (isSelected?'⭐':'☆')+'<br><span style="font-size:11px;font-weight:600;">'+n+'</span></div></div>';
+    }
+    qHtml+='<div class="form-group"><label>'+q.label+'</label>'+
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">'+q.desc+'</div>'+
+      '<div style="display:flex;gap:8px;">'+stars+'</div>'+
+      '<input type="hidden" id="val-'+q.id+'" value="'+existingVal+'"></div>';
+  });
+  
+  var infoHtml=client?('<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'')):' ';
+  var isEdit = !!existingCSI;
+  
+  openPanel((isEdit?'✏️ Edit':'📝 Fill')+' CSI Review'+(cn?' — '+cn:''),
+    '<div style="background:'+(isEdit?'#fef9e7':'var(--bg)')+';border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;color:var(--text-muted);">'+
+      (isEdit?'⚠️ Editing existing CSI — purana data pre-filled hai':'Rate 1 (Poor) to 5 (Excellent)')+
+    '</div>'+
+    '<div class="form-group"><label>Client *</label>'+
+    '<select class="form-control" id="csi-client" onchange="updateCSIClientInfo(this)">'+
+    '<option value="">Select...</option>'+opts+
+    '</select></div>'+
+    (infoHtml?'<div style="background:#eafaf1;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">'+infoHtml+'</div>':'')+
+    qHtml+
+    '<div class="form-group"><label>💬 Seller Remarks / Feedback</label>'+
+      '<textarea class="form-control" id="csi-remarks" rows="2" placeholder="Seller ne kya kaha...">'+(existingCSI&&existingCSI.remarks?existingCSI.remarks:'')+'</textarea></div>'+
+    '<hr style="margin:16px 0;border-color:var(--border);">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--secondary);margin-bottom:8px;">📋 ACTION TRACKING (Optional — baad mein bhi add kar sakte ho)</div>'+
+    '<div class="form-group"><label>✅ Action Taken</label>'+
+      '<textarea class="form-control" id="csi-action" rows="2" placeholder="Kya step liya? Seller ko kya bataya?"></textarea></div>'+
+    '<div class="form-group"><label>📊 Current Status</label>'+
+      '<select class="form-control" id="csi-status-action">'+
+        '<option value="">-- Select Status (Optional) --</option>'+
+        '<option>Issue Identified — Working on it</option>'+
+        '<option>Explained to Seller</option>'+
+        '<option>Escalated to AM</option>'+
+        '<option>Escalated to Ops Lead</option>'+
+        '<option>Resolved</option>'+
+        '<option>Follow-up Scheduled</option>'+
+        '<option>No Action Needed</option>'+
+      '</select></div>'+
+    '<div class="form-group"><label>Next Review Date</label>'+
+      '<input type="date" class="form-control" id="csi-next" value="'+(existingCSI&&existingCSI.nextReviewDate?existingCSI.nextReviewDate:dateAfterDays(15))+'"></div>'+
+    '<button class="btn btn-primary btn-full" onclick="submitCSI()">📊 Save CSI Review</button>'
+  );
+}
+
+
+function selectStar(qId,val){
+  for(let i=1;i<=5;i++){const el=document.getElementById(`star-${qId}-${i}`);if(el){el.style.background=i<=val?'var(--amber)':'white';el.style.borderColor=i<=val?'var(--amber)':'var(--border)';el.style.color=i<=val?'white':'var(--text)';el.innerHTML=(i<=val?'⭐':'☆')+`<br><span style="font-size:11px;font-weight:600;">${i}</span>`;}}
+  document.getElementById('val-'+qId).value=val;
+}
+
+function updateCSIClientInfo(sel) {
+  const cc = sel.value;
+  const client = cc ? (APP.clients||[]).find(c=>c.clientCode===cc) : null;
+  const infoDiv = document.getElementById('csi-client-info');
+  if (infoDiv) {
+    if (client) {
+      const phone = client.phone || client.contactNumber || client.mobile || '';
+      infoDiv.innerHTML = '<strong>'+client.busyName+'</strong> · '+client.marketplace+(phone?' · 📞 '+phone:'');
+      infoDiv.style.display = '';
+    } else {
+      infoDiv.style.display = 'none';
+    }
+  }
+}
+
+async function submitCSI(){
+  const sel=document.getElementById('csi-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.text?.split(' (')[0]||'';
+  if(!cc){showToast('Select a client','error');return;}
+  const scores={};let allFilled=true;
+  CSI_QUESTIONS.forEach(q=>{const v=parseInt(document.getElementById('val-'+q.id).value);if(!v||v<1)allFilled=false;else scores[q.id]=v;});
+  if(!allFilled){showToast('Please rate all 5 questions','error');return;}
+  const total=Object.values(scores).reduce((a,b)=>a+b,0),percent=Math.round((total/25)*100);
+  const actionTaken = document.getElementById('csi-action')?.value||'';
+  const actionStatus = document.getElementById('csi-status-action')?.value||'';
+  const r=await api('POST','/csi',{clientCode:cc,clientName:cn,...scores,csiScore:total,csiPercent:percent,remarks:document.getElementById('csi-remarks').value,actionTaken,actionStatus,nextReviewDate:document.getElementById('csi-next').value,healthStatus:percent>=80?'Healthy':percent>=50?'Warning':'At Risk'});
+  if(r?.success){showToast(`✅ CSI Saved! ${percent}% — ${percent>=80?'Healthy':percent>=50?'Warning':'At Risk'}`,'success');closePanel();renderCSI();}
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// 📝 NEW TASK MANAGER — Teamwork Style
+// Replace everything between "// ── TASKS" and "// ── WORK LOG"
+// in index.html with this code
+// ═══════════════════════════════════════════════════════════════════
+
+// ── TASK MANAGER ─────────────────────────────────────────────────
+
+let _taskTab = 'mytasks'; // mytasks | clienttasks | teamoverview
+let _allTasksCache = [];
+let _taskSubtasksOpen = {}; // track which task's subtasks are open
+
+async function renderTasks() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading tasks...</div>';
+  const tasks = await api('GET', '/tasks');
+  if (!tasks) return;
+  APP.tasks = tasks;
+  _allTasksCache = tasks;
+
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const pending = tasks.filter(t => t.status === 'Pending');
+  const inprog  = tasks.filter(t => t.status === 'In Progress');
+  const done    = tasks.filter(t => t.status === 'Completed' && isToday(t.completedAt));
+  const overdue = tasks.filter(t => t.isOverdue && t.status !== 'Completed');
+
+  // Update badge
+  const b = document.getElementById('badge-tasks');
+  if (b) { const c = pending.length + inprog.length; b.textContent = c; b.style.display = c ? '' : 'none'; }
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- KPI Row -->
+    <div class="kpi-grid">
+      <div class="kpi-card red" style="cursor:pointer;" onclick="switchTaskTab('mytasks');filterTasksBySection('overdue')">
+        <div class="kpi-label">🔴 Overdue</div>
+        <div class="kpi-value">${overdue.length}</div>
+      </div>
+      <div class="kpi-card amber" style="cursor:pointer;" onclick="switchTaskTab('mytasks');filterTasksBySection('pending')">
+        <div class="kpi-label">⏳ Pending</div>
+        <div class="kpi-value">${pending.length}</div>
+      </div>
+      <div class="kpi-card blue" style="cursor:pointer;" onclick="switchTaskTab('mytasks');filterTasksBySection('inprogress')">
+        <div class="kpi-label">▶ In Progress</div>
+        <div class="kpi-value">${inprog.length}</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">✅ Done Today</div>
+        <div class="kpi-value">${done.length}</div>
+      </div>
+    </div>
+
+    <!-- Tab Nav -->
+    <div style="display:flex;gap:0;margin-bottom:16px;background:#fff;border-radius:12px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+      <button id="tab-btn-mytasks" onclick="switchTaskTab('mytasks')"
+        style="flex:1;padding:10px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;transition:all 0.2s;">
+        📋 My Tasks
+      </button>
+      <button id="tab-btn-clienttasks" onclick="switchTaskTab('clienttasks')"
+        style="flex:1;padding:10px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted);transition:all 0.2s;">
+        👥 Client Tasks
+      </button>
+      ${isLead ? `<button id="tab-btn-teamoverview" onclick="switchTaskTab('teamoverview')"
+        style="flex:1;padding:10px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text-muted);transition:all 0.2s;">
+        🏢 Team Overview
+      </button>` : ''}
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="tab-mytasks">${buildMyTasksTab(tasks)}</div>
+    <div id="tab-clienttasks" style="display:none;">${buildClientTasksTab()}</div>
+    ${isLead ? `<div id="tab-teamoverview" style="display:none;"><div class="loading"><div class="spinner"></div></div></div>` : ''}
+  `;
+}
+
+function switchTaskTab(tab) {
+  _taskTab = tab;
+  // Hide all
+  ['mytasks','clienttasks','teamoverview'].forEach(t => {
+    const el = document.getElementById('tab-'+t);
+    if (el) el.style.display = 'none';
+    const btn = document.getElementById('tab-btn-'+t);
+    if (btn) { btn.style.background = 'transparent'; btn.style.color = 'var(--text-muted)'; }
+  });
+  // Show active
+  const active = document.getElementById('tab-'+tab);
+  if (active) active.style.display = '';
+  const activeBtn = document.getElementById('tab-btn-'+tab);
+  if (activeBtn) { activeBtn.style.background = 'var(--primary)'; activeBtn.style.color = '#fff'; }
+
+  // Lazy load team overview
+  if (tab === 'teamoverview') loadTeamOverviewTab();
+}
+
+// ─── MY TASKS TAB ────────────────────────────────────────────────
+
+function buildMyTasksTab(tasks) {
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const myTasks = tasks.filter(t => t.assignedTo === u.name || t.assignedBy === u.name);
+
+  const overdue   = myTasks.filter(t => t.isOverdue && t.status !== 'Completed');
+  const today     = myTasks.filter(t => !t.isOverdue && t.deadline && isToday(t.deadline) && t.status !== 'Completed');
+  const upcoming  = myTasks.filter(t => !t.isOverdue && t.status !== 'Completed' && !today.find(x=>x.taskId===t.taskId));
+  const completed = myTasks.filter(t => t.status === 'Completed').slice(0,10);
+  // Parent tasks only (no subtasks shown in main view - they're inline)
+  const parentTasks = (arr) => arr.filter(t => !t.parentTaskId);
+
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="tsec-all"    class="btn btn-sm btn-primary"    onclick="filterTasksBySection('all')">All (${myTasks.length})</button>
+        <button id="tsec-overdue" class="btn btn-sm btn-outline"   onclick="filterTasksBySection('overdue')" style="color:var(--red);border-color:var(--red);">🔴 Overdue (${overdue.length})</button>
+        <button id="tsec-pending" class="btn btn-sm btn-outline"   onclick="filterTasksBySection('pending')">⏳ Pending</button>
+        <button id="tsec-inprogress" class="btn btn-sm btn-outline" onclick="filterTasksBySection('inprogress')">▶ In Progress</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="openCreateTask()">➕ Create Task</button>
+        ${isLead ? '<button class="btn btn-secondary btn-sm" onclick="openAssignTask()">📤 Assign Task</button>' : ''}
+      </div>
+    </div>
+
+    <div id="my-tasks-sections">
+      ${overdue.length ? `
+        <div style="background:#fadbd8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:700;color:#922b21;display:flex;justify-content:space-between;">
+          🔴 Overdue (${overdue.length})
+          <span style="font-weight:400;font-size:12px;">Turant karo!</span>
+        </div>
+        ${parentTasks(overdue).map(t => twTaskCard(t, tasks)).join('')}
+      ` : ''}
+
+      ${today.length ? `
+        <div style="background:#fef9e7;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:700;color:#b7950b;display:flex;justify-content:space-between;">
+          📅 Due Today (${today.length})
+        </div>
+        ${parentTasks(today).map(t => twTaskCard(t, tasks)).join('')}
+      ` : ''}
+
+      ${upcoming.length ? `
+        <div style="background:#d6eaf8;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:700;color:#1a5276;display:flex;justify-content:space-between;">
+          📆 Upcoming (${upcoming.length})
+        </div>
+        ${parentTasks(upcoming).map(t => twTaskCard(t, tasks)).join('')}
+      ` : ''}
+
+      ${completed.length ? `
+        <div style="background:#d5f5e3;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:700;color:#1e8449;cursor:pointer;" onclick="toggleCompletedSection()">
+          ✅ Recently Completed (${completed.length}) — click to toggle
+        </div>
+        <div id="completed-section" style="display:none;">
+          ${completed.map(t => twTaskCard(t, tasks)).join('')}
+        </div>
+      ` : ''}
+
+      ${!myTasks.length ? `<div class="empty-state"><div class="emoji">🎉</div><h3>Koi task nahi!</h3><p style="color:var(--text-muted);">Sab clear hai ya naya create karo.</p></div>` : ''}
+    </div>
+  `;
+}
+
+function toggleCompletedSection() {
+  const el = document.getElementById('completed-section');
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function filterTasksBySection(section) {
+  const tasks = _allTasksCache;
+  const u = APP.user;
+  let filtered;
+  if (section === 'overdue')    filtered = tasks.filter(t => t.isOverdue && t.status !== 'Completed');
+  else if (section === 'pending')    filtered = tasks.filter(t => t.status === 'Pending');
+  else if (section === 'inprogress') filtered = tasks.filter(t => t.status === 'In Progress');
+  else filtered = tasks; // all
+
+  const container = document.getElementById('my-tasks-sections');
+  if (!container) return;
+  const parentOnly = filtered.filter(t => !t.parentTaskId);
+  container.innerHTML = parentOnly.length
+    ? parentOnly.map(t => twTaskCard(t, tasks)).join('')
+    : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi is section mein</h3></div>';
+}
+
+// ─── TEAMWORK-STYLE TASK CARD ─────────────────────────────────────
+
+function twTaskCard(task, allTasks) {
+  const t = task;
+  const safeTitle = (t.title||'').replace(/'/g, '');
+  const safeClientName = (t.clientName||'').replace(/'/g, '');
+  const subTasks = allTasks.filter(x => x.parentTaskId === t.taskId);
+  const subDone  = subTasks.filter(x => x.status === 'Completed').length;
+  const isOpen   = _taskSubtasksOpen[t.taskId];
+
+  const priorityColor = t.priority === 'Critical' ? 'var(--red)' : t.priority === 'High' ? 'var(--orange)' : t.priority === 'Medium' ? 'var(--amber)' : 'var(--green)';
+  const statusBadgeClass = t.status === 'Completed' ? 'badge-green' : t.status === 'In Progress' ? 'badge-blue' : 'badge-gray';
+  const cardBg = t.status === 'Completed' ? '#f9fffe' : t.isOverdue ? '#fff8f8' : '#fff';
+
+  return `
+  <div style="background:${cardBg};border-radius:12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid ${priorityColor};overflow:hidden;">
+    <!-- Main Task Row -->
+    <div style="padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <!-- Title row -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="font-size:14px;font-weight:700;color:var(--primary);${t.status==='Completed'?'text-decoration:line-through;opacity:0.6;':''}">${t.title || '—'}</span>
+            ${t.isOverdue && t.status !== 'Completed' ? '<span style="background:#fadbd8;color:#922b21;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">🔴 OVERDUE</span>' : ''}
+          </div>
+          <!-- Meta row -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);align-items:center;">
+            ${t.clientName ? `<span>👥 <strong style="color:var(--primary);">${t.clientName}</strong></span>` : ''}
+            <span>👤 <strong>${t.assignedTo || '—'}</strong></span>
+            ${t.assignedBy && t.assignedBy !== t.assignedTo ? `<span style="color:#999;">📤 from ${t.assignedBy}</span>` : ''}
+            ${t.deadline ? `<span style="color:${t.isOverdue ? 'var(--red)' : 'var(--text-muted)'};">📅 ${t.deadline}</span>` : ''}
+            ${t.category ? `<span class="badge badge-gray" style="font-size:10px;">${t.category}</span>` : ''}
+          </div>
+          ${t.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.4;cursor:pointer;" onclick="viewTaskDetail('${t.taskId}')">${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);"> ...read more</span>':''}</div>` : ''}
+        </div>
+        <!-- Right: status + priority -->
+        <!-- Right: status + priority -->
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <span class="badge ${statusBadgeClass}">${t.status}</span>
+          <span class="badge" style="background:${priorityColor}20;color:${priorityColor};font-size:10px;">${t.priority}</span>
+        </div>
+      </div>
+
+      <!-- Sub-tasks progress bar (if any) -->
+      ${subTasks.length ? `
+        <div style="margin-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text-muted);">Sub-tasks: ${subDone}/${subTasks.length}</span>
+            <button onclick="toggleSubTasks('${t.taskId}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--secondary);font-weight:700;">
+              ${isOpen ? '▲ Hide' : '▼ Show Sub-tasks'}
+            </button>
+          </div>
+          <div style="background:#ecf0f1;border-radius:4px;height:4px;overflow:hidden;">
+            <div style="height:100%;background:${subDone===subTasks.length?'var(--green)':'var(--secondary)'};border-radius:4px;width:${Math.round(subDone/subTasks.length*100)}%;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Action Buttons -->
+      ${t.status !== 'Completed' ? `
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+          ${t.status === 'Pending' ? `<button class="btn btn-sm btn-secondary" onclick="updateTask('${t.taskId}','In Progress')" style="font-size:12px;">▶ Start</button>` : ''}
+          ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
+          <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
+          ${['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
+        </div>
+      ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
+    </div>
+
+    <!-- Sub-tasks Inline -->
+    <div id="subtasks-${t.taskId}" style="display:${isOpen?'':'none'};">
+      ${renderSubTasksBlock(subTasks, t.taskId, safeTitle)}
+    </div>
+  </div>`;
+}
+
+function renderSubTaskRow(st) {
+  const borderColor = st.status === 'Completed' ? 'var(--green)' : st.isOverdue ? 'var(--red)' : 'var(--border)';
+  const titleStyle = st.status === 'Completed' ? 'text-decoration:line-through;opacity:0.5;' : '';
+  const badgeClass = st.status === 'Completed' ? 'badge-green' : st.status === 'In Progress' ? 'badge-blue' : 'badge-gray';
+  const deadlinePart = st.deadline ? ' | 📅 ' + st.deadline : '';
+  const overduePart = (st.isOverdue && st.status !== 'Completed') ? ' 🔴' : '';
+  const startBtn = st.status !== 'Completed'
+    ? '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="updateTask(\'' + st.taskId + '\',\'In Progress\')">▶</button>'
+    : '';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid ' + borderColor + ';">'
+    + '<input type="checkbox" ' + (st.status === 'Completed' ? 'checked' : '') + ' onchange="updateTask(\'' + st.taskId + '\',this.checked?\'Completed\':\'Pending\')" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green);">'
+    + '<div style="flex:1;">'
+    + '<div style="font-size:13px;font-weight:600;' + titleStyle + '">' + (st.title || '—') + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">👤 ' + (st.assignedTo || '—') + deadlinePart + overduePart + '</div>'
+    + '</div>'
+    + '<span class="badge ' + badgeClass + '" style="font-size:10px;">' + st.status + '</span>'
+    + startBtn
+    + '</div>';
+}
+
+function renderSubTasksBlock(subTasks, parentId, parentTitle) {
+  if (!subTasks.length) {
+    return '<div style="background:#f8fafc;border-top:1px solid var(--border);padding:10px 16px;">'
+      + '<button onclick="openCreateTask(\'' + parentId + '\',\'' + parentTitle + '\',\'inline\')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 14px;width:100%;cursor:pointer;font-size:12px;color:var(--text-muted);">'
+      + '➕ Sub-task add karo</button></div>';
+  }
+  return '<div style="background:#f8fafc;border-top:1px solid var(--border);padding:10px 16px;">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Sub-Tasks</div>'
+    + subTasks.map(renderSubTaskRow).join('')
+    + '<button onclick="openCreateTask(\'' + parentId + '\',\'' + parentTitle + '\',\'inline\')" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:6px 14px;width:100%;cursor:pointer;font-size:12px;color:var(--text-muted);margin-top:4px;">'
+    + '➕ Add sub-task</button></div>';
+}
+
+function toggleSubTasks(taskId) {
+  _taskSubtasksOpen[taskId] = !_taskSubtasksOpen[taskId];
+  const el = document.getElementById('subtasks-'+taskId);
+  if (el) el.style.display = _taskSubtasksOpen[taskId] ? '' : 'none';
+  // Update button text
+  const btn = el?.previousElementSibling?.querySelector('button[onclick*="toggleSubTasks"]');
+  if (btn) btn.textContent = _taskSubtasksOpen[taskId] ? '▲ Hide' : '▼ Show Sub-tasks';
+}
+
+// ─── CLIENT TASKS TAB ─────────────────────────────────────────────
+
+function buildClientTasksTab() {
+  const clients = APP.clients || [];
+  return `
+    <div class="card">
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Client Select Karo</label>
+            <select class="form-control" id="ct-client-sel" onchange="loadClientTasks(this.value,this.options[this.selectedIndex].text)">
+              <option value="">-- Client choose karo --</option>
+              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.marketplace})</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="openCreateTask()" style="flex-shrink:0;">➕ New Task</button>
+        </div>
+      </div>
+    </div>
+    <div id="client-tasks-body">
+      <div class="empty-state"><div class="emoji">👆</div><h3>Client select karo tasks dekhne ke liye</h3></div>
+    </div>`;
+}
+
+async function loadClientTasks(clientCode, clientName) {
+  if (!clientCode) return;
+  const container = document.getElementById('client-tasks-body');
+  if (!container) return;
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  const tasks = await api('GET', '/tasks');
+  _allTasksCache = tasks || [];
+  const clientTasks = (tasks||[]).filter(t => t.clientCode === clientCode);
+  const parentTasks = clientTasks.filter(t => !t.parentTaskId);
+
+  const open   = clientTasks.filter(t => t.status !== 'Completed').length;
+  const done   = clientTasks.filter(t => t.status === 'Completed').length;
+  const over   = clientTasks.filter(t => t.isOverdue && t.status !== 'Completed').length;
+  const safeClientName = (clientName||'').replace(/'/g, '');
+
+  container.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="background:#fadbd8;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--red);">${over}</div>
+        <div style="font-size:11px;color:#922b21;">Overdue</div>
+      </div>
+      <div style="background:#fef9e7;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--amber);">${open}</div>
+        <div style="font-size:11px;color:#b7950b;">Open</div>
+      </div>
+      <div style="background:#d5f5e3;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;">
+        <div style="font-size:18px;font-weight:800;color:var(--green);">${done}</div>
+        <div style="font-size:11px;color:#1e8449;">Done</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="openCreateTask('','${safeClientName}')">➕ Add Task for this Client</button>
+      </div>
+    </div>
+    ${!parentTasks.length
+      ? '<div class="empty-state"><div class="emoji">📝</div><h3>Is client ke koi tasks nahi hain</h3><p style="color:var(--text-muted);">Upar se naya task create karo</p></div>'
+      : parentTasks.map(t => twTaskCard(t, tasks||[])).join('')
+    }`;
+}
+
+// ─── TEAM OVERVIEW TAB ────────────────────────────────────────────
+
+async function loadTeamOverviewTab() {
+  const container = document.getElementById('tab-teamoverview');
+  if (!container) return;
+
+  const [tasks, users] = await Promise.all([api('GET','/tasks'), api('GET','/users')]);
+  if (!tasks) return;
+
+  const activeUsers = (users||[]).filter(u => u.isActive);
+  // Group tasks by assignee
+  const byPerson = {};
+  activeUsers.forEach(u => { byPerson[u.name] = { user: u, tasks: [] }; });
+  tasks.forEach(t => {
+    if (byPerson[t.assignedTo]) byPerson[t.assignedTo].tasks.push(t);
+    else byPerson[t.assignedTo] = { user: { name: t.assignedTo, role: '' }, tasks: [t] };
+  });
+
+  const rows = Object.values(byPerson).filter(p => p.tasks.length > 0).sort((a,b) => {
+    const aOver = a.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+    const bOver = b.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+    return bOver - aOver; // sort by overdue count desc
+  });
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">🏢 Team Task Overview</span></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Team Member</th><th>Role</th><th>Overdue</th><th>Pending</th><th>In Progress</th><th>Done</th><th>Total</th><th>Action</th></tr></thead>
+          <tbody>
+            ${rows.map(p => {
+              const over = p.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+              const pend = p.tasks.filter(t=>t.status==='Pending').length;
+              const inp  = p.tasks.filter(t=>t.status==='In Progress').length;
+              const done = p.tasks.filter(t=>t.status==='Completed').length;
+              return `<tr style="${over > 0 ? 'background:#fff8f8;' : ''}">
+                <td><strong>${p.user.name || '—'}</strong></td>
+                <td><span class="badge badge-blue" style="font-size:10px;">${p.user.role||'—'}</span></td>
+                <td><span style="color:var(--red);font-weight:700;">${over||'—'}</span></td>
+                <td>${pend||'—'}</td>
+                <td>${inp||'—'}</td>
+                <td><span style="color:var(--green);font-weight:700;">${done||'—'}</span></td>
+                <td><strong>${p.tasks.length}</strong></td>
+                <td>
+                  <button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="viewPersonTasksFromOverview('${p.user.name}')">👁️ View</button>
+                  <button class="btn btn-sm btn-primary" style="font-size:11px;" onclick="openAssignTaskTo('${p.user.name}','${p.user.role||''}')">📤 Assign</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    </div>`;
+}
+
+async function viewPersonTasksFromOverview(name) {
+  openPanel('📝 Tasks: ' + name, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const tasks = _allTasksCache.length ? _allTasksCache : await api('GET','/tasks');
+  const myTasks = (tasks||[]).filter(t => t.assignedTo === name);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role);
+
+  document.getElementById('panel-body').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      ${[['Overdue','#fadbd8','var(--red)','#922b21'], ['Pending','#fef9e7','var(--amber)','#b7950b'], ['In Progress','#d6eaf8','var(--primary)','#1a5276'], ['Completed','#d5f5e3','var(--green)','#1e8449']].map(([label,bg,clr,txtclr]) => {
+        const cnt = label==='Overdue' ? myTasks.filter(t=>t.isOverdue&&t.status!=='Completed').length : myTasks.filter(t=>t.status===label).length;
+        return `<div style="background:${bg};border-radius:8px;padding:8px 12px;text-align:center;flex:1;">
+          <div style="font-size:18px;font-weight:800;color:${clr};">${cnt}</div>
+          <div style="font-size:11px;color:${txtclr};">${label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${isLead ? `<button class="btn btn-primary btn-sm" onclick="openAssignTaskTo('${name}','')" style="margin-bottom:12px;width:100%;">📤 Assign Task to ${name}</button>` : ''}
+    ${myTasks.length
+      ? myTasks.filter(t=>!t.parentTaskId).map(t => twTaskCard(t, tasks||[])).join('')
+      : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>'}`;
+}
+
+// ─── CREATE TASK WITH @MENTION ─────────────────────────────────────
+
+async function openCreateTask(parentTaskId = '', parentTitle = '', mode = '') {
+  const [clients, users] = await Promise.all([getClients(), api('GET', '/users')]);
+  if (clients) APP.clients = clients;
+  const allUsers = (users||[]).filter(u => u.isActive);
+  const isSubTask = !!parentTaskId;
+
+  openPanel(isSubTask ? '📝 Sub-Task: ' + parentTitle : '📝 Create Task', `
+    ${isSubTask ? `<div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a5276;">📎 Parent Task: <strong>${parentTitle}</strong></div>` : ''}
+
+    <div class="form-group">
+      <label>Task Title *</label>
+      <input type="text" class="form-control" id="tsk-title" placeholder="Task kya karna hai...">
+    </div>
+
+    <div class="form-group">
+      <label>Assign To — @mention ya dropdown se</label>
+      <div style="position:relative;">
+        <input type="text" class="form-control" id="tsk-assignee-search"
+          placeholder="@name type karo ya search karo..."
+          value="${APP.user.name}"
+          oninput="filterAssigneeList(this.value)"
+          onfocus="showAssigneeList()"
+          onblur="setTimeout(()=>hideAssigneeList(),200)"
+          autocomplete="off">
+        <input type="hidden" id="tsk-assignee-val" value="${APP.user.name}">
+        <div id="tsk-assignee-list" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--secondary);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:500;">
+          ${allUsers.map(u => `<div class="dropdown-item" style="padding:8px 12px;cursor:pointer;font-size:13px;" data-name="${u.name}" data-role="${u.role}"
+            onmousedown="selectAssignee('${u.name}','${u.role}')">
+            <strong>${u.name}</strong> <span style="font-size:11px;color:var(--text-muted);">— ${u.role}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Related Client (optional)</label>
+      <div id="tsk-client-wrap"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Description / Notes</label>
+      <textarea class="form-control" id="tsk-desc" placeholder="Details..." rows="3"></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Category</label>
+        <select class="form-control" id="tsk-cat">
+          <option>Account Management</option><option>Listing Work</option><option>Ads Campaign</option>
+          <option>CRM / Calling</option><option>CSI Review</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select class="form-control" id="tsk-pri">
+          <option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Deadline</label>
+      <input type="date" class="form-control" id="tsk-deadline">
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitCreateTask('${parentTaskId}')">
+      📝 ${isSubTask ? 'Create Sub-Task' : 'Create Task'}
+    </button>
+  `);
+
+  setTimeout(() => buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+  window._assigneeList = allUsers;
+}
+
+function showAssigneeList() {
+  document.getElementById('tsk-assignee-list').style.display = '';
+}
+function hideAssigneeList() {
+  document.getElementById('tsk-assignee-list').style.display = 'none';
+}
+function filterAssigneeList(q) {
+  const list = document.getElementById('tsk-assignee-list');
+  if (!list) return;
+  const lq = q.toLowerCase().replace('@','');
+  list.style.display = '';
+  list.querySelectorAll('.dropdown-item').forEach(item => {
+    item.style.display = item.dataset.name.toLowerCase().includes(lq) ? '' : 'none';
+  });
+}
+function selectAssignee(name, role) {
+  document.getElementById('tsk-assignee-search').value = name;
+  document.getElementById('tsk-assignee-val').value = name;
+  hideAssigneeList();
+}
+
+// openAssignTask — for Leads assigning to others
+async function openAssignTask() {
+  const [users, clients] = await Promise.all([api('GET','/users'), getClients()]);
+  if (clients) APP.clients = clients;
+  const allUsers = (users||[]).filter(u => u.isActive);
+  openPanel('📤 Assign Task to Someone', `
+    <div class="form-group"><label>Assign To *</label>
+      <select class="form-control" id="at-exec">
+        <option value="">Select person...</option>
+        ${allUsers.map(u=>`<option value="${u.name}" data-role="${u.role}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <div class="form-group"><label>Client (optional)</label><div id="at-client-wrap"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Category</label>
+        <select class="form-control" id="at-cat">
+          <option>Account Management</option><option>CRM / Calling</option><option>CSI Review</option>
+          <option>Ads Campaign</option><option>Listing Work</option><option>Renewal Follow-up</option><option>General</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
+    <button class="btn btn-danger btn-full" onclick="submitAssignTask()">📤 Assign Task</button>`);
+  setTimeout(() => buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+}
+
+// Quick assign to specific person (from team overview)
+async function openAssignTaskTo(name, role) {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+  openPanel(`📤 Assign Task to ${name}`, `
+    <div style="background:#d6eaf8;border-radius:8px;padding:10px;margin-bottom:14px;">
+      👤 Assigning to: <strong>${name}</strong> <span style="font-size:12px;color:#666;">(${role})</span>
+    </div>
+    <div class="form-group"><label>Task Title *</label><input type="text" class="form-control" id="at-title" placeholder="Task description..."></div>
+    <div class="form-group"><label>Client (optional)</label><div id="at-client-wrap"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-pri"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+      <div class="form-group"><label>Deadline *</label><input type="date" class="form-control" id="at-deadline"></div>
+    </div>
+    <div class="form-group"><label>Instructions</label><textarea class="form-control" id="at-desc" rows="3"></textarea></div>
+    <button class="btn btn-primary btn-full" onclick="submitDirectAssign('${name}','${role}')">📤 Assign</button>`);
+  setTimeout(() => buildSearchableSelect('at-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+}
+
+async function submitDirectAssign(name, role) {
+  const title = document.getElementById('at-title').value.trim();
+  const deadline = document.getElementById('at-deadline').value;
+  if (!title) { showToast('Title required', 'error'); return; }
+  if (!deadline) { showToast('Deadline required', 'error'); return; }
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r = await api('POST', '/tasks', {
+    title,
+    description: document.getElementById('at-desc').value,
+    clientCode, clientName,
+    assignedTo: name, assignedToRole: role,
+    priority: document.getElementById('at-pri').value,
+    category: 'General',
+    deadline,
+  });
+  if (r?.success) { showToast('✅ Task assigned to ' + name, 'success'); closePanel(); renderTasks(); }
+}
+
+// Edit task (admin/lead only)
+async function openEditTask(taskId) {
+  const task = _allTasksCache.find(t => t.taskId === taskId);
+  if (!task) return;
+  const [users] = await Promise.all([api('GET','/users')]);
+  const allUsers = (users||[]).filter(u=>u.isActive);
+  openPanel('✏️ Edit Task', `
+    <div class="form-group"><label>Title</label><input type="text" class="form-control" id="et-title" value="${task.title||''}"></div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="et-assignee">
+        ${allUsers.map(u=>`<option value="${u.name}" ${task.assignedTo===u.name?'selected':''}>${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="et-pri">
+          ${['Low','Medium','High','Critical'].map(p=>`<option ${task.priority===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Deadline</label><input type="date" class="form-control" id="et-deadline" value="${task.deadline||''}"></div>
+    </div>
+    <div class="form-group"><label>Status</label>
+      <select class="form-control" id="et-status">
+        ${['Pending','In Progress','Completed'].map(s=>`<option ${task.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitEditTask('${taskId}')">💾 Save</button>
+  `);
+}
+
+async function submitEditTask(taskId) {
+  const r = await api('PATCH', '/tasks/'+taskId, {
+    title: document.getElementById('et-title').value.trim(),
+    assignedTo: document.getElementById('et-assignee').value,
+    priority: document.getElementById('et-pri').value,
+    deadline: document.getElementById('et-deadline').value,
+    status: document.getElementById('et-status').value,
+  });
+  if (r?.success) { showToast('✅ Task updated!', 'success'); closePanel(); renderTasks(); }
+  else showToast('Error updating task', 'error');
+}
+
+// ─── SUBMIT FUNCTIONS ─────────────────────────────────────────────
+
+async function submitCreateTask(parentTaskId = '') {
+  const title = document.getElementById('tsk-title').value.trim();
+  if (!title) { showToast('Title required', 'error'); return; }
+  const assignedTo = document.getElementById('tsk-assignee-val')?.value || document.getElementById('tsk-assignee-search')?.value || APP.user.name;
+  const clientCode = getSearchableVal('tsk-client-wrap') || '';
+  const clientName = document.getElementById('tsk-client-wrap_search')?.value?.split(' (')[0] || '';
+  const u = APP.user;
+  const r = await api('POST', '/tasks', {
+    title,
+    description: document.getElementById('tsk-desc').value,
+    clientCode, clientName,
+    assignedTo,
+    assignedBy: u.name,
+    priority: document.getElementById('tsk-pri').value,
+    category: document.getElementById('tsk-cat').value,
+    deadline: document.getElementById('tsk-deadline').value || null,
+    parentTaskId: parentTaskId || null,
+  });
+  if (r?.success) {
+    showToast('✅ Task created: ' + r.taskId, 'success');
+    closePanel();
+    renderTasks();
+  }
+}
+
+async function submitAssignTask() {
+  const esel = document.getElementById('at-exec');
+  const to = esel.value, toRole = esel.options[esel.selectedIndex]?.dataset?.role || '';
+  const title = document.getElementById('at-title').value.trim();
+  const deadline = document.getElementById('at-deadline').value;
+  if (!to) { showToast('Select executive', 'error'); return; }
+  if (!title) { showToast('Title required', 'error'); return; }
+  if (!deadline) { showToast('Deadline required', 'error'); return; }
+  const clientCode = getSearchableVal('at-client-wrap') || '';
+  const clientName = document.getElementById('at-client-wrap_search')?.value?.split(' (')[0] || '';
+  const r = await api('POST', '/tasks', {
+    title, description: document.getElementById('at-desc').value,
+    clientCode, clientName,
+    assignedTo: to, assignedToRole: toRole,
+    priority: document.getElementById('at-pri').value,
+    category: document.getElementById('at-cat').value,
+    deadline,
+  });
+  if (r?.success) { showToast('✅ Task assigned to ' + to, 'success'); closePanel(); renderTasks(); }
+}
+
+async function updateTask(id, status, workLog) {
+  const r = await api('PATCH', `/tasks/${id}`, { status, workLog: workLog || '' });
+  if (r?.success) { showToast('Task: ' + status, 'success'); renderTasks(); }
+}
+
+function promptCompleteTask(id, title) {
+  const n = prompt(`Complete: "${title}"\nWork log (optional):`);
+  if (n !== null) updateTask(id, 'Completed', n || 'Done');
+}
+
+function filterTasks(val) {
+  let f = _allTasksCache;
+  if (val === 'overdue') f = f.filter(t => t.isOverdue && t.status !== 'Completed');
+  else if (val) f = f.filter(t => t.status === val);
+  // Re-render in my tasks tab
+  const container = document.getElementById('my-tasks-sections');
+  if (container) {
+    const parentOnly = f.filter(t => !t.parentTaskId);
+    container.innerHTML = parentOnly.length
+      ? parentOnly.map(t => twTaskCard(t, _allTasksCache)).join('')
+      : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi task nahi</h3></div>';
+  }
+}
+
+// ─── WORK LOG (kept same, just referenced here) ───────────────────
+function openWorkLogEntry(taskId, cc, cn) {
+  openPanel('📓 Log Work', `
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="wl-desc" placeholder="Detailed work..." rows="4"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="wl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Time (minutes)</label><input type="number" class="form-control" id="wl-time" placeholder="30"></div>
+    </div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="wl-outcome" placeholder="Result..."></div>
+    ${cc ? `<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px;">📎 Client: <strong>${cn || cc}</strong></div>` : ''}
+    <button class="btn btn-primary btn-full" onclick="submitWorkLog('${taskId}','${cc}','${cn}')">📓 Save Work Log</button>`);
+}
+
+async function submitWorkLog(taskId, cc, cn) {
+  const desc = document.getElementById('wl-desc').value.trim();
+  if (!desc) { showToast('Description required', 'error'); return; }
+  const r = await api('POST', '/tasks/worklog', {
+    clientCode: cc, clientName: cn,
+    workType: document.getElementById('wl-type').value,
+    description: desc,
+    outcome: document.getElementById('wl-outcome').value,
+    timeSpent: document.getElementById('wl-time').value,
+  });
+  if (r?.success) { showToast('✅ Work logged!', 'success'); closePanel(); renderTasks(); }
+}
+
+// ─── PERFORMANCE: CLIENT CACHE ALREADY AT 60s ─────────────────────
+// Additional perf fix: debounce global search
+let _searchDebounce;
+function globalSearch(q) {
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(() => {
+    if (!q.trim() || APP.page !== 'clients') return;
+    const f = APP.clients.filter(c =>
+      c.busyName.toLowerCase().includes(q.toLowerCase()) ||
+      c.clientCode.toLowerCase().includes(q.toLowerCase())
+    );
+    const qa = QUICK_ACTIONS[APP.user.role] || [];
+    const tbl = document.getElementById('clients-table');
+    if (tbl) tbl.innerHTML = clientTableRows(f, qa);
+    const cards = document.getElementById('clients-cards');
+    if (cards) cards.innerHTML = clientCards(f);
+  }, 300); // 300ms debounce
+}
+// ── WORK LOG ─────────────────────────────────────────────────
+async function renderWorkLog(){
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
+  const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),getClients()]);
+  if(clients) APP.clients=clients;
+  const myLogs = logs||[];
+  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(new Date().toLocaleDateString('en-IN').split('/').reverse().join('-').slice(0,10)));
+  const totalMins = myLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${myLogs.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Today</div><div class="kpi-value">${todayLogs.length}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📓 Work Log</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
+            <option value="">All Types</option>
+            <option>Call</option><option>Meeting</option><option>Listing Update</option>
+            <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+            <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;" id="worklog-table">
+        ${renderWorkLogTable(myLogs)}
+      </div>
+    </div>`;
+  window._allWorkLogs = myLogs;
+}
+
+function renderWorkLogTable(logs) {
+  if (!logs?.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3><p style="color:var(--text-muted);">Log Work button se kaam record karo!</p></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+    <tbody>${logs.map(l=>`<tr>
+      <td style="font-size:11px;white-space:nowrap;">${l.loggedAt||'—'}</td>
+      <td><strong>${l.executiveName||'—'}</strong></td>
+      <td style="font-size:12px;">${l.clientName||'—'}</td>
+      <td><span class="badge badge-blue">${l.workType||'—'}</span></td>
+      <td style="font-size:12px;max-width:200px;">${l.description||'—'}</td>
+      <td style="font-size:12px;">${l.outcome||'—'}</td>
+      <td>${l.timeSpent||'—'}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function filterWorkLog(type) {
+  const logs = type ? (window._allWorkLogs||[]).filter(l=>l.workType===type) : (window._allWorkLogs||[]);
+  document.getElementById('worklog-table').innerHTML = renderWorkLogTable(logs);
+}
+
+function openQuickWorkLog(){
+  openPanel('📓 Quick Work Log',`
+    <div class="form-group"><label>Client (optional)</label>
+      <div id="qwl-client-wrap"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Work Type</label>
+        <select class="form-control" id="qwl-type">
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Time (mins)</label><input type="number" class="form-control" id="qwl-time" placeholder="30"></div>
+    </div>
+    <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
+    <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
+    <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save Work Log</button>`);
+  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+}
+
+async function submitQuickWorkLog(){
+  const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const clientCode=getSearchableVal('qwl-client-wrap')||'';
+  const clientName=document.getElementById('qwl-client-wrap_search')?.value?.split(' (')[0]||'';
+  const r=await api('POST','/tasks/worklog',{clientCode,clientName,workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
+  if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
+}
+
+// ── RENEWALS ─────────────────────────────────────────────────
+async function renderRenewals(){
+  const [renewals, stats, clients] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats'), getClients()]);
+  if(clients) APP.clients = clients;
+
+  // Merge clients renewal dates if renewals table is sparse
+  let allRenewals = renewals || [];
+  if (allRenewals.length < (APP.clients||[]).filter(c=>c.renewalDate).length) {
+    const existingCodes = new Set(allRenewals.map(r=>r.clientCode||r.client_code));
+    const fromClients = (APP.clients||[]).filter(c=>c.renewalDate && !existingCodes.has(c.clientCode)).map(c=>{
+      const d = new Date(c.renewalDate); d.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const daysLeft = Math.ceil((d-today)/86400000);
+      return {
+        renewalId: 'CLT_'+c.clientCode, clientCode: c.clientCode,
+        clientName: c.busyName, servicePlan: c.servicePlan||'—',
+        renewalDate: c.renewalDate, daysLeft, isOverdue: daysLeft<0,
+        isDueSoon: daysLeft>=0&&daysLeft<=15, status: 'Pending',
+        owner: c.amName||'—', amount: null, crmComment: null,
+      };
+    });
+    allRenewals = [...allRenewals, ...fromClients];
+  }
+  window._allRenewals = allRenewals;
+
+  const u = APP.user;
+  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  const isAdmin = ['Admin','Ops Lead','Sub Admin','CSI Lead','CSI Executive'].includes(u.role);
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next30 = new Date(today); next30.setDate(today.getDate()+30);
+
+  const overdue    = allRenewals.filter(r=>r.isOverdue&&r.status!=='Confirmed'&&r.status!=='Lost');
+  const next30List = allRenewals.filter(r=>{
+    if(r.status==='Confirmed'||r.status==='Lost') return false;
+    if(!r.renewalDate) return false;
+    const d=new Date(r.renewalDate); d.setHours(0,0,0,0);
+    return d>=today&&d<=next30;
+  });
+  const urgent = allRenewals.filter(r=>r.daysLeft!=null&&r.daysLeft<=7&&r.daysLeft>=0&&r.status!=='Confirmed'&&r.status!=='Lost');
+
+  function amtCell(r){ return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—'; }
+  function actionBtns(r){
+    var rid = r.renewalId;
+    var rname = (r.clientName||"").replace(/['"]/g,"");
+    var html = '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    if(r.status!=="Confirmed") html += '<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
+    if(r.status!=="Lost"&&r.status!=="Confirmed") html += '<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
+    if(r.status!=="Hold"&&r.status!=="Confirmed") html += '<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
+    html += '<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
+    if(isCRM) html += '<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
+    html += '</div>';
+    return html;
+  }
+  function statusBadge(s){
+    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};
+    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(s||'Pending')+'</span>';
+  }
+
+  var html = '<div class="kpi-grid">'+
+    '<div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">'+overdue.length+'</div></div>'+
+    '<div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">'+urgent.length+'</div></div>'+
+    '<div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">'+next30List.length+'</div></div>'+
+    '<div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Confirmed').length+'</div></div>'+
+    '<div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Hold').length+'</div></div>'+
+    (canSeeAmount&&stats?.totalValue?'<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹'+Number(stats.totalValue).toLocaleString('en-IN')+'</div></div>':'')+
+  '</div>';
+
+  // Next 30 Days section
+  html += '<div class="card" style="border-left:4px solid var(--amber);margin-bottom:12px;">'+
+    '<div class="card-header" style="background:#fef9e7;"><span class="card-title">📅 Next 30 Days ('+next30List.length+')</span></div>';
+  if(!next30List.length){
+    html += '<div class="card-body"><div class="empty-state"><div class="emoji">📅</div><h3>Next 30 days mein koi renewal nahi</h3></div></div>';
+  } else {
+    var rows30='';
+    next30List.sort(function(a,b){return a.daysLeft-b.daysLeft;}).forEach(function(r){
+      rows30+='<tr>'+
+        '<td><strong>'+r.clientName+'</strong>'+(r.crmComment?'<div style="font-size:11px;color:var(--secondary);margin-top:2px;">💬 '+r.crmComment+'</div>':'')+'</td>'+
+        '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+        (canSeeAmount?'<td><strong>'+amtCell(r)+'</strong></td>':'')+
+        '<td>'+r.renewalDate+'</td>'+
+        '<td><strong style="color:'+(r.daysLeft<=7?'var(--red)':'var(--amber)')+';">'+r.daysLeft+'d left</strong></td>'+
+        '<td style="font-size:12px;">'+r.owner+'</td>'+
+        '<td>'+statusBadge(r.status)+'</td>'+
+        '<td>'+actionBtns(r)+'</td>'+
+      '</tr>';
+    });
+    html+='<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+
+      '<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Action</th></tr></thead>'+
+      '<tbody>'+rows30+'</tbody></table></div></div>';
+  }
+  html += '</div>';
+
+  // All Renewals section
+  var allRows='';
+  allRenewals.forEach(function(r){
+    allRows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td>'+statusBadge(r.status)+'</td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+
+  html += '<div class="card">'+
+    '<div class="card-header"><span class="card-title">🔄 All Renewals ('+allRenewals.length+')</span>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+      '<select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">'+
+        '<option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option><option>Hold</option>'+
+      '</select>'+
+      (isAdmin?'<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>':'')+
+    '</div></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+
+      '<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead>'+
+      '<tbody id="renewals-tbody">'+allRows+'</tbody>'+
+    '</table></div></div></div>';
+
+  document.getElementById('page-content').innerHTML = html;
+}
+
+function filterRenewals(status){
+  var u=APP.user;
+  var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+  var data=status?(window._allRenewals||[]).filter(function(r){return r.status===status;}):(window._allRenewals||[]);
+  function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
+  function actionBtns(r){
+    var rid=r.renewalId; var rname=(r.clientName||"").replace(/['"]/g,"");
+    var h='<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    if(r.status!=="Confirmed") h+='<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
+    if(r.status!=="Lost"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
+    if(r.status!=="Hold"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
+    h+='<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
+    if(isCRM) h+='<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
+    return h+'</div>';
+  }
+  var rows='';
+  data.forEach(function(r){
+    rows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td><span class="badge '+(r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber')+'">'+(r.status||'Pending')+'</span></td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+  var el=document.getElementById('renewals-tbody');
+  if(el) el.innerHTML=rows;
+}
+
+function openEditRenewal(id, name) {
+  var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
+  var isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(APP.user.role);
+  var canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+  openPanel('✏️ Renewal — '+name,
+    '<div class="form-group"><label>Renewal Date (Seller ne bataya)</label>'+
+    '<input type="date" class="form-control" id="er-date" value="'+(renewal.renewalDate||'')+'"></div>'+
+    (canSeeAmount?'<div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>':'<input type="hidden" id="er-amount" value="">')+
+    '<div class="form-group"><label>Status</label>'+
+    '<select class="form-control" id="er-status">'+
+      '<option '+(renewal.status==='Pending'?'selected':'')+'>Pending</option>'+
+      '<option '+(renewal.status==='Confirmed'?'selected':'')+'>Confirmed</option>'+
+      '<option '+(renewal.status==='Hold'?'selected':'')+'>Hold</option>'+
+      '<option '+(renewal.status==='Lost'?'selected':'')+'>Lost</option>'+
+    '</select></div>'+
+    (isCRM?'<div class="form-group"><label>CRM Comment</label>'+
+    '<textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha?">'+(renewal.crmComment||'')+'</textarea></div>':'<input type="hidden" id="er-comment" value="">')+
+    '<div class="form-group"><label>Notes</label>'+
+    '<textarea class="form-control" id="er-notes" rows="2" placeholder="Koi aur update...">'+(renewal.notes||'')+'</textarea></div>'+
+    '<button class="btn btn-primary btn-full" data-id="'+id+'" onclick="var b=this;submitEditRenewal(b.getAttribute(\'data-id\'))">💾 Save</button>'+
+    '<button class="btn btn-secondary btn-full" style="margin-top:8px;" data-id="'+id+'" data-cn="'+name+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰 Payment Record</button>'
+  );
+}
+
+async function submitEditRenewal(id) {
+  var r = await api('PATCH', '/renewals/'+id, {
+    status: document.getElementById('er-status').value,
+    amount: document.getElementById('er-amount').value||undefined,
+    renewalDate: document.getElementById('er-date').value||undefined,
+    notes: document.getElementById('er-notes').value,
+    crmComment: document.getElementById('er-comment').value||undefined,
+  });
+  if(r?.success){showToast('✅ Renewal updated!','success');closePanel();renderRenewals();}
+  else showToast('Update failed','error');
+}
+
+async function updateRenewal(id,status){
+  var r=await api('PATCH','/renewals/'+id,{status});
+  if(r?.success){showToast('Renewal: '+status,'success');renderRenewals();}
+}
+
+function openRenewalPayment(id, name) {
+  var renewal=(window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
+  openPanel('💰 Payment — '+name,
+    '<div style="background:#d5f5e3;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">'+
+      '<strong>'+name+'</strong> · '+(renewal.servicePlan||'—')+(renewal.amount?' · ₹'+Number(renewal.amount).toLocaleString('en-IN'):'')+
+    '</div>'+
+    '<div class="form-group"><label>Payment Date *</label>'+
+    '<input type="date" class="form-control" id="pay-date" value="'+new Date().toISOString().split('T')[0]+'"></div>'+
+    '<div class="form-group"><label>Amount Received (₹) *</label>'+
+    '<input type="number" class="form-control" id="pay-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>'+
+    '<div class="form-group"><label>Payment Mode</label>'+
+    '<select class="form-control" id="pay-mode"><option>NEFT</option><option>RTGS</option><option>IMPS</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></div>'+
+    '<div class="form-group"><label>UTR / Transaction Number *</label>'+
+    '<input type="text" class="form-control" id="pay-utr" placeholder="UTR number daalo"></div>'+
+    '<div class="form-group"><label>Remarks</label>'+
+    '<textarea class="form-control" id="pay-remarks" rows="2"></textarea></div>'+
+    '<button class="btn btn-success btn-full" data-id="'+id+'" data-cn="'+name+'" onclick="var b=this;submitRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰 Save Payment</button>'
+  );
+}
+
+async function submitRenewalPayment(id, name) {
+  var utr=document.getElementById('pay-utr').value.trim();
+  var amount=document.getElementById('pay-amount').value;
+  var date=document.getElementById('pay-date').value;
+  if(!utr){showToast('UTR required!','error');return;}
+  if(!amount){showToast('Amount required!','error');return;}
+  var r=await api('PATCH','/renewals/'+id,{
+    status:'Confirmed', amount, renewalDate:date, paymentDate:date,
+    paymentMode:document.getElementById('pay-mode').value,
+    utrNumber:utr, paymentRemarks:document.getElementById('pay-remarks').value,
+    crmComment:'Payment received — UTR: '+utr+' via '+document.getElementById('pay-mode').value,
+  });
+  if(r?.success){showToast('✅ Payment saved! UTR: '+utr,'success');closePanel();renderRenewals();}
+  else showToast('Payment save failed','error');
+}
+
+
+// ── ADS ───────────────────────────────────────────────────────
+async function renderAds(){
+  const ads=await api('GET','/ads');if(!ads) return;
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">📢 Ads Manager</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>Market</th><th>Budget</th><th>Spent</th><th>Used%</th><th>ACOS</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${ads.map(a=>`<tr><td><strong>${a.clientName}</strong></td><td><span class="badge badge-blue">${a.marketplace||'—'}</span></td><td>₹${Number(a.budgetAllocated||0).toLocaleString()}</td><td>₹${Number(a.budgetSpent||0).toLocaleString()}</td>
+        <td><div style="min-width:70px;"><div style="font-size:12px;font-weight:700;color:${(a.budgetPercent||0)>=95?'var(--red)':(a.budgetPercent||0)>=80?'var(--amber)':'var(--green)'};">${a.budgetPercent||0}%</div><div class="progress"><div class="progress-fill ${(a.budgetPercent||0)>=95?'red':(a.budgetPercent||0)>=80?'amber':'green'}" style="width:${Math.min(a.budgetPercent||0,100)}%;"></div></div></div></td>
+        <td>${a.acos?a.acos+'%':'—'}</td><td><span class="badge ${a.campaignStatus==='Active'?'badge-green':'badge-amber'}">${a.campaignStatus||'—'}</span></td>
+        <td><div class="quick-actions">${(QUICK_ACTIONS['Ads Executive']||[]).map(q=>`<button class="qa-btn ${q.type}" onclick="quickAction('${a.clientCode}','${a.clientName}','${q.action}')">${q.label}</button>`).join('')}</div></td></tr>`).join('')}</tbody>
+      </table></div></div>
+    </div>`;
+}
+
+// ── REPORTS ──────────────────────────────────────────────────
+
+function renderRenewalAnalysis(data, el) {
+  // Group by month of service_start_date
+  const months = {};
+  data.forEach(function(r) {
+    if(!r.service_start_date) return;
+    const m = r.service_start_date.slice(0,7); // YYYY-MM
+    if(!months[m]) months[m] = {expected:0, active:0, inactive:0, paused:0, revenue:0, buckets:{}};
+    months[m].expected++;
+    const mis = (r.mis_status||'').toLowerCase();
+    if(mis==='active') months[m].active++;
+    else if(mis==='inactive') months[m].inactive++;
+    else months[m].paused++;
+    months[m].revenue += parseFloat(r.amount_with_gst||0);
+    // Closing reason bucket
+    if(r.closing_reason && r.closing_reason.length > 3) {
+      const bucket = r.closing_reason.slice(0,40);
+      months[m].buckets[bucket] = (months[m].buckets[bucket]||0)+1;
+    }
+  });
+
+  const sorted = Object.keys(months).sort().reverse().slice(0,12);
+  const rows = sorted.map(function(m) {
+    const d = months[m];
+    const renewalPct = d.expected ? Math.round(d.active/d.expected*100) : 0;
+    const topBucket = Object.entries(d.buckets).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+m+'</strong></td>'+
+      '<td>'+d.expected+'</td>'+
+      '<td style="color:var(--green);font-weight:600;">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(renewalPct>=70?'badge-green':renewalPct>=50?'badge-amber':'badge-red')+'">'+renewalPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(topBucket?topBucket[0]+'('+topBucket[1]+')':'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">📈 Renewal Analysis — Month Wise ('+data.length+' records)</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Month</th><th>Expected</th><th>Active</th><th>Inactive</th><th>Renewal %</th><th>Revenue (w/GST)</th><th>Top Closing Reason</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
+function renderExecutiveRetention(data, el) {
+  // Group by AM name
+  const execs = {};
+  data.forEach(function(r) {
+    const am = r.am_name || 'Unknown';
+    if(!execs[am]) execs[am] = {total:0, active:0, inactive:0, revenue:0, marketplaces:{}};
+    execs[am].total++;
+    if((r.mis_status||'').toLowerCase()==='active') execs[am].active++;
+    else execs[am].inactive++;
+    execs[am].revenue += parseFloat(r.amount_with_gst||0);
+    const mp = r.marketplace||'Other';
+    execs[am].marketplaces[mp] = (execs[am].marketplaces[mp]||0)+1;
+  });
+
+  const sorted = Object.entries(execs).sort((a,b)=>b[1].total-a[1].total);
+  const rows = sorted.map(function(entry) {
+    const am = entry[0], d = entry[1];
+    const retPct = d.total ? Math.round(d.active/d.total*100) : 0;
+    const topMp = Object.entries(d.marketplaces).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+am+'</strong></td>'+
+      '<td>'+d.total+'</td>'+
+      '<td style="color:var(--green);">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(retPct>=70?'badge-green':retPct>=50?'badge-amber':'badge-red')+'">'+retPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;">'+(topMp?topMp[0]:'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">👤 Executive Retention Report ('+Object.keys(execs).length+' executives)</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Account Manager</th><th>Total Sellers</th><th>Active</th><th>Inactive</th><th>Retention %</th><th>Revenue (w/GST)</th><th>Top Market</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
+function renderMarketplaceRetention(data, el) {
+  const mps = {};
+  data.forEach(function(r) {
+    const mp = (r.marketplace||'Other').trim();
+    if(!mps[mp]) mps[mp] = {total:0, active:0, inactive:0, revenue:0, plans:{}};
+    mps[mp].total++;
+    if((r.mis_status||'').toLowerCase()==='active') mps[mp].active++;
+    else mps[mp].inactive++;
+    mps[mp].revenue += parseFloat(r.amount_with_gst||0);
+    const plan = r.service_plan||'Unknown';
+    mps[mp].plans[plan] = (mps[mp].plans[plan]||0)+1;
+  });
+
+  const sorted = Object.entries(mps).sort((a,b)=>b[1].total-a[1].total);
+  const rows = sorted.map(function(entry) {
+    const mp = entry[0], d = entry[1];
+    const retPct = d.total ? Math.round(d.active/d.total*100) : 0;
+    const topPlan = Object.entries(d.plans).sort((a,b)=>b[1]-a[1])[0];
+    return '<tr>'+
+      '<td><strong>'+mp+'</strong></td>'+
+      '<td>'+d.total+'</td>'+
+      '<td style="color:var(--green);">'+d.active+'</td>'+
+      '<td style="color:var(--red);">'+d.inactive+'</td>'+
+      '<td><span class="badge '+(retPct>=70?'badge-green':retPct>=50?'badge-amber':'badge-red')+'">'+retPct+'%</span></td>'+
+      '<td>₹'+Math.round(d.revenue).toLocaleString('en-IN')+'</td>'+
+      '<td style="font-size:11px;">'+(topPlan?topPlan[0].replace('Enewcleus ',''):'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  el.innerHTML = '<div class="card"><div class="card-header"><span class="card-title">🛒 Marketplace Retention Report</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>Marketplace</th><th>Total Sellers</th><th>Active</th><th>Inactive</th><th>Retention %</th><th>Revenue (w/GST)</th><th>Top Plan</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div></div>';
+  window._reportData = data;
+}
+
+function calcAMTenure(joiningDate){
+  if(!joiningDate) return '—';
+  try{
+    const jd=new Date(joiningDate),now=new Date();
+    const months=(now.getFullYear()-jd.getFullYear())*12+(now.getMonth()-jd.getMonth());
+    if(months<1) return '<1m';
+    if(months<12) return months+'m';
+    return Math.floor(months/12)+'y '+(months%12)+'m';
+  }catch(e){return '—';}
+}
+
+function buildAMPerformanceData(hist,users,clients){
+  // Build per-store data
+  const stores={};
+  hist.forEach(function(r){
+    const key=r.client_code||(r.busy_name||'').toLowerCase().trim();
+    if(!stores[key]){
+      stores[key]={
+        busy_name:r.busy_name||'—',client_code:r.client_code,
+        marketplace:r.marketplace||'—',am_name:r.am_name||'Unknown',
+        total:0,active:0,total_rev:0,active_rev:0
+      };
+    }
+    stores[key].total++;
+    stores[key].total_rev+=parseFloat(r.amount||0);
+    if((r.mis_status||'').toLowerCase()==='active'){
+      stores[key].active++;
+      stores[key].active_rev+=parseFloat(r.amount_with_gst||0);
+    }
+  });
+  // Count stores per AM
+  const amCount={};
+  Object.values(stores).forEach(function(s){
+    const am=s.am_name||'Unknown';
+    amCount[am]=(amCount[am]||0)+1;
+  });
+  // Build final rows
+  return Object.values(stores).map(function(s){
+    const cl=clients.find(function(c){return c.clientCode===s.client_code||c.busyName===s.busy_name;});
+    const usr=users.find(function(u){return u.name&&u.name.toLowerCase()===(s.am_name||'').toLowerCase();});
+    const renewal_pct=s.total?Math.round(s.active/s.total*100):0;
+    return {
+      busy_name:s.busy_name,
+      store_aging:cl?(cl.sellerAging||cl.seller_aging||'—'):'—',
+      am_name:s.am_name,
+      am_aging:usr?calcAMTenure(usr.joiningDate):'—',
+      no_of_stores:amCount[s.am_name||'Unknown']||1,
+      eligible:s.active,
+      marketplace:s.marketplace,
+      total_rev:Math.round(s.total_rev),
+      renewal_count:s.total,
+      renewal_pct:renewal_pct,
+      active_rev:Math.round(s.active_rev)
+    };
+  }).sort(function(a,b){return a.am_name.localeCompare(b.am_name);});
+}
+
+function renderAMPerformanceReport(data,el){
+  if(!data||!data.length){el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><div class="emoji">📋</div><h3>No data found</h3></div></div></div>';return;}
+  // Get unique AMs for filter
+  const ams=[...new Set(data.map(function(r){return r.am_name;}))].sort();
+  const mps=[...new Set(data.map(function(r){return r.marketplace;}))].sort();
+  window._amPerfData=data;
+
+  function buildTable(rows){
+    if(!rows.length) return '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No matching records</td></tr>';
+    return rows.map(function(r){
+      const pctColor=r.renewal_pct>=70?'badge-green':r.renewal_pct>=50?'badge-amber':'badge-red';
+      return '<tr>'+
+        '<td><strong style="font-size:12px;">'+r.busy_name+'</strong></td>'+
+        '<td style="text-align:center;">'+r.store_aging+'</td>'+
+        '<td>'+r.am_name+'</td>'+
+        '<td style="text-align:center;color:var(--primary);font-weight:600;">'+r.am_aging+'</td>'+
+        '<td style="text-align:center;">'+r.no_of_stores+'</td>'+
+        '<td style="text-align:center;color:var(--green);font-weight:600;">'+r.eligible+'</td>'+
+        '<td style="text-align:center;"><span class="badge badge-blue" style="font-size:10px;">'+r.marketplace+'</span></td>'+
+        '<td style="text-align:right;">₹'+r.total_rev.toLocaleString('en-IN')+'</td>'+
+        '<td style="text-align:center;">'+r.renewal_count+'</td>'+
+        '<td style="text-align:center;"><span class="badge '+pctColor+'">'+r.renewal_pct+'%</span></td>'+
+        '<td style="text-align:right;color:var(--green);font-weight:600;">₹'+r.active_rev.toLocaleString('en-IN')+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  // Summary KPIs
+  const totalStores=data.length;
+  const totalEligible=data.reduce(function(s,r){return s+r.eligible;},0);
+  const totalRev=data.reduce(function(s,r){return s+r.total_rev;},0);
+  const totalActiveRev=data.reduce(function(s,r){return s+r.active_rev;},0);
+  const avgRenPct=totalStores?Math.round(data.reduce(function(s,r){return s+r.renewal_pct;},0)/totalStores):0;
+
+  el.innerHTML=
+    '<div class="kpi-grid" style="margin-bottom:16px;">'+
+      '<div class="kpi-card blue"><div class="kpi-label">Total Stores</div><div class="kpi-value">'+totalStores+'</div></div>'+
+      '<div class="kpi-card green"><div class="kpi-label">Eligible for Renewal</div><div class="kpi-value">'+totalEligible+'</div></div>'+
+      '<div class="kpi-card amber"><div class="kpi-label">Avg Renewal %</div><div class="kpi-value">'+avgRenPct+'%</div></div>'+
+      '<div class="kpi-card red"><div class="kpi-label">Total Revenue</div><div class="kpi-value" style="font-size:18px;">₹'+Math.round(totalRev/100000)+'L</div></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-header">'+
+        '<span class="card-title">📋 AM Performance Report ('+data.length+' stores)</span>'+
+        '<button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Download Excel</button>'+
+      '</div>'+
+      '<div class="card-body" style="padding:12px 16px;">'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+
+          '<select class="form-control" style="width:200px;" id="amp-am-filter" onchange="filterAMPerfReport()">'+
+            '<option value="">— All Account Managers —</option>'+
+            ams.map(function(a){return '<option value="'+a+'">'+a+'</option>';}).join('')+
+          '</select>'+
+          '<select class="form-control" style="width:160px;" id="amp-mp-filter" onchange="filterAMPerfReport()">'+
+            '<option value="">— All Marketplaces —</option>'+
+            mps.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('')+
+          '</select>'+
+          '<input type="text" class="form-control" style="width:200px;" id="amp-search" placeholder="🔍 Search store..." oninput="filterAMPerfReport()">'+
+          '<button class="btn btn-outline btn-sm" onclick="document.getElementById(\'amp-am-filter\').value=\'\';document.getElementById(\'amp-mp-filter\').value=\'\';document.getElementById(\'amp-search\').value=\'\';filterAMPerfReport();">✕ Clear</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="table-wrap"><table id="amp-table">'+
+        '<thead><tr>'+
+          '<th>Store Name</th><th style="text-align:center;">Store Ageing</th>'+
+          '<th>Account Manager</th><th style="text-align:center;">AM Ageing</th>'+
+          '<th style="text-align:center;">No. of Stores</th><th style="text-align:center;">Eligible</th>'+
+          '<th style="text-align:center;">Marketplace</th><th style="text-align:right;">Total Revenue</th>'+
+          '<th style="text-align:center;">Renewal Count</th><th style="text-align:center;">Renewal %</th>'+
+          '<th style="text-align:right;">Revenue After Renewal</th>'+
+        '</tr></thead>'+
+        '<tbody id="amp-tbody">'+buildTable(data)+'</tbody>'+
+      '</table></div>'+
+    '</div>';
+  window._reportData=data;
+}
+
+function filterAMPerfReport(){
+  const data=window._amPerfData||[];
+  const amF=(document.getElementById('amp-am-filter')||{}).value||'';
+  const mpF=(document.getElementById('amp-mp-filter')||{}).value||'';
+  const srch=((document.getElementById('amp-search')||{}).value||'').toLowerCase();
+  const filtered=data.filter(function(r){
+    if(amF && r.am_name!==amF) return false;
+    if(mpF && r.marketplace!==mpF) return false;
+    if(srch && !r.busy_name.toLowerCase().includes(srch)) return false;
+    return true;
+  });
+  window._reportData=filtered;
+  const tbody=document.getElementById('amp-tbody');
+  if(tbody){
+    const pctColor=function(p){return p>=70?'badge-green':p>=50?'badge-amber':'badge-red';};
+    tbody.innerHTML=filtered.length?filtered.map(function(r){
+      return '<tr>'+
+        '<td><strong style="font-size:12px;">'+r.busy_name+'</strong></td>'+
+        '<td style="text-align:center;">'+r.store_aging+'</td>'+
+        '<td>'+r.am_name+'</td>'+
+        '<td style="text-align:center;color:var(--primary);font-weight:600;">'+r.am_aging+'</td>'+
+        '<td style="text-align:center;">'+r.no_of_stores+'</td>'+
+        '<td style="text-align:center;color:var(--green);font-weight:600;">'+r.eligible+'</td>'+
+        '<td style="text-align:center;"><span class="badge badge-blue" style="font-size:10px;">'+r.marketplace+'</span></td>'+
+        '<td style="text-align:right;">₹'+r.total_rev.toLocaleString('en-IN')+'</td>'+
+        '<td style="text-align:center;">'+r.renewal_count+'</td>'+
+        '<td style="text-align:center;"><span class="badge '+pctColor(r.renewal_pct)+'">'+r.renewal_pct+'%</span></td>'+
+        '<td style="text-align:right;color:var(--green);font-weight:600;">₹'+r.active_rev.toLocaleString('en-IN')+'</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:24px;">No matching records</td></tr>';
+  }
+}
+
+async function renderReports(){
+  const clients=await getClients();if(clients) APP.clients=clients;
+  const today=new Date().toISOString().split('T')[0],monthStart=today.slice(0,7)+'-01';
+  window._currentReport='dsr';
+  document.getElementById('page-content').innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">📋 Reports & Export</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn btn-primary" onclick="window._currentReport='dsr';generateReport()">📊 DSR Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='crm';generateReport()">📞 CRM Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='renewal';generateReport()">🔄 Renewal Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='ticket';generateReport()">🎫 Ticket Report</button>
+          <button class="btn btn-secondary" onclick="window._currentReport='team';generateReport()">👥 Team Report</button>
+          <button class="btn btn-secondary" style="background:var(--primary);color:#fff;" onclick="window._currentReport='executive';generateReport()">🧑‍💼 Executive Summary</button>
+          <button class="btn btn-secondary" style="background:#8e44ad;color:#fff;" onclick="window._currentReport='renewal_analysis';generateReport()">📈 Renewal Analysis</button>
+          <button class="btn btn-secondary" style="background:#16a085;color:#fff;" onclick="window._currentReport='executive_retention';generateReport()">👤 Executive Retention</button>
+          <button class="btn btn-secondary" style="background:#2980b9;color:#fff;" onclick="window._currentReport='marketplace_retention';generateReport()">🛒 Marketplace Retention</button>
+          <button class="btn btn-secondary" style="background:#c0392b;color:#fff;" onclick="window._currentReport='am_performance';generateReport()">📋 AM Performance</button>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
+          <div class="form-group"><label>To Date</label><input type="date" class="form-control" id="rpt-to" value="${today}"></div>
+          <div class="form-group"><label>Seller</label><select class="form-control" id="rpt-client"><option value="">-- All Sellers --</option>${(APP.clients||[]).map(c=>`<option value="${c.clientCode}">${c.busyName}</option>`).join('')}</select></div>
+          <div class="form-group" id="rpt-exec-wrap" style="display:none;"><label>Executive</label><select class="form-control" id="rpt-exec"><option value="">-- All Executives --</option></select></div>
+          <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+            <button class="btn btn-primary" onclick="generateReport()">🔍 Generate</button>
+            <button class="btn btn-success" onclick="exportExcel()">📥 Excel</button>
+            <button class="btn btn-outline" onclick="window.print()">📄 PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="report-output"><div class="loading"><div class="spinner"></div></div></div>`;
+  generateReport();
+}
+
+async function generateReport(){
+  const type=window._currentReport||'dsr',from=document.getElementById('rpt-from')?.value,to=document.getElementById('rpt-to')?.value,cc=document.getElementById('rpt-client')?.value,el=document.getElementById('report-output');
+  if(!el) return;
+
+  // Show/hide executive filter based on report type
+  const execWrap=document.getElementById('rpt-exec-wrap');
+  if(execWrap) execWrap.style.display = type==='executive' ? '' : 'none';
+
+  el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
+
+  if(type==='executive'){
+    // Fetch tasks + worklogs + users
+    const [tasks, worklogs, users] = await Promise.all([
+      api('GET','/tasks'),
+      api('GET','/tasks/worklog'),
+      api('GET','/users')
+    ]);
+
+    const allTasks = tasks||[];
+    const allLogs = worklogs||[];
+    const allUsers = (users||[]).filter(u=>u.isActive);
+
+    // Populate executive dropdown
+    const execSel = document.getElementById('rpt-exec');
+    if(execSel && execSel.options.length <= 1){
+      allUsers.forEach(u=>{
+        const opt=document.createElement('option');
+        opt.value=u.name; opt.textContent=u.name+' — '+u.role;
+        execSel.appendChild(opt);
+      });
+    }
+
+    const filterExec = execSel?.value||'';
+
+    // Date filter helper
+    function inRange(dateStr){
+      if(!dateStr) return false;
+      const d = dateStr.split('T')[0];
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    }
+
+    // Filter tasks — use deadline OR completedAt OR createdAt, fallback: include all active tasks
+    const filteredTasks = allTasks.filter(t=>{
+      const dates = [t.deadline, t.completedAt, t.createdAt, t.created_at].filter(Boolean);
+      const taskDate = dates.length ? dates[0].split('T')[0] : null;
+      // If no date found, include active tasks always
+      if(!taskDate) return t.status !== 'Completed';
+      if(from && taskDate < from) return false;
+      if(to && taskDate > to) return false;
+      if(cc && t.clientCode !== cc) return false;
+      return true;
     });
 
-    const result = Object.values(execMap).map(e => ({
-      name: e.name,
-      totalTickets: e.count,
-      avgHoursToClose: e.count ? Math.round(e.totalHours / e.count) : 0,
-      minHours: Math.min(...e.tickets.map(t => t.hours_to_close || 0)),
-      maxHours: Math.max(...e.tickets.map(t => t.hours_to_close || 0)),
-      recentTickets: e.tickets.slice(0, 5).map(t => ({
-        ticketId: t.ticket_id,
-        clientName: t.client_name,
-        hoursToClose: t.hours_to_close,
-        priority: t.priority,
-        approvedAt: t.approved_at ? new Date(t.approved_at).toLocaleDateString('en-IN') : '—',
-      })),
-    })).sort((a, b) => a.avgHoursToClose - b.avgHoursToClose);
+    // Filter worklogs by date and client
+    const filteredLogs = allLogs.filter(l=>{
+      const logDate = (l.loggedAt||l.createdAt||l.logged_at||l.created_at||'').split('T')[0];
+      if(from && logDate && logDate < from) return false;
+      if(to && logDate && logDate > to) return false;
+      if(cc && l.clientCode !== cc) return false;
+      return true;
+    });
 
-    res.json(result);
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
+    // Build per-executive summary
+    // Use tasks assignedTo as primary source, supplement with worklogs
+    const execMap = {};
 
-module.exports = router;
+    filteredTasks.forEach(t=>{
+      const exec = t.assignedTo||'Unknown';
+      if(!execMap[exec]) execMap[exec]={ name:exec, role:'', tasksDone:0, inProgress:0, overdue:0, clientsMap:{} };
+      if(t.status==='Completed') execMap[exec].tasksDone++;
+      else if(t.status==='In Progress') execMap[exec].inProgress++;
+      if(t.isOverdue && t.status!=='Completed') execMap[exec].overdue++;
+      if(t.clientCode){
+        if(!execMap[exec].clientsMap[t.clientCode]){
+          execMap[exec].clientsMap[t.clientCode]={ clientCode:t.clientCode, clientName:t.clientName||t.clientCode, tasks:[] };
+        }
+        execMap[exec].clientsMap[t.clientCode].tasks.push(t);
+      }
+    });
+
+    // Add work logs to client map too
+    filteredLogs.forEach(l=>{
+      const exec = l.enteredBy||l.executive||'Unknown';
+      if(!execMap[exec]) execMap[exec]={ name:exec, role:'', tasksDone:0, inProgress:0, overdue:0, clientsMap:{} };
+      if(l.clientCode && !execMap[exec].clientsMap[l.clientCode]){
+        execMap[exec].clientsMap[l.clientCode]={ clientCode:l.clientCode, clientName:l.clientName||l.clientCode, tasks:[] };
+      }
+    });
+
+    // Attach roles from users
+    allUsers.forEach(u=>{ if(execMap[u.name]) execMap[u.name].role=u.role; });
+
+    let rows = Object.values(execMap);
+    if(filterExec) rows = rows.filter(r=>r.name===filterExec);
+    rows.sort((a,b)=> Object.keys(b.clientsMap).length - Object.keys(a.clientsMap).length);
+
+    window._reportData = rows;
+    window._reportType = 'executive';
+
+    if(!rows.length){
+      el.innerHTML='<div class="empty-state"><div class="emoji">📭</div><h3>Is range mein koi data nahi</h3></div>';
+      return;
+    }
+
+    el.innerHTML=`
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🧑‍💼 Executive Summary (${from} to ${to})</span>
+          <span class="badge badge-blue">${rows.length} Executives</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Executive</th>
+                  <th>Role</th>
+                  <th style="text-align:center;">Clients Worked</th>
+                  <th style="text-align:center;">✅ Done</th>
+                  <th style="text-align:center;">▶ In Progress</th>
+                  <th style="text-align:center;">🔴 Overdue</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(r=>{
+                  const clientCount = Object.keys(r.clientsMap).length;
+                  const rowBg = r.overdue > 0 ? 'background:#fff8f8;' : '';
+                  return '<tr style="'+rowBg+'">'
+                    +'<td><strong>'+r.name+'</strong></td>'
+                    +'<td><span class="badge badge-blue" style="font-size:11px;">'+( r.role||'—')+'</span></td>'
+                    +'<td style="text-align:center;">'
+                      +(clientCount > 0
+                        ? '<button onclick="toggleExecClients(\'exec-'+r.name.replace(/\s/g,'_')+'\')" style="background:var(--secondary);color:#fff;border:none;border-radius:20px;padding:3px 14px;cursor:pointer;font-weight:700;font-size:13px;">'+clientCount+' clients 👆</button>'
+                        : '<span style="color:var(--text-muted);">0</span>')
+                    +'</td>'
+                    +'<td style="text-align:center;"><span class="badge badge-green">'+r.tasksDone+'</span></td>'
+                    +'<td style="text-align:center;"><span class="badge badge-blue">'+r.inProgress+'</span></td>'
+                    +'<td style="text-align:center;">'+(r.overdue>0?'<span class="badge badge-red">'+r.overdue+'</span>':'<span class="badge badge-green">0</span>')+'</td>'
+                    +'</tr>'
+                    // Expandable client rows
+                    +'<tr id="exec-'+r.name.replace(/\s/g,'_')+'" style="display:none;">'
+                    +'<td colspan="6" style="padding:0 0 0 32px;background:#f8fafc;">'
+                    +'<div style="padding:12px;">'
+                    +'<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">'+r.name+' — Clients:</div>'
+                    + Object.values(r.clientsMap).map(cl=>{
+                        const done = cl.tasks.filter(t=>t.status==='Completed').length;
+                        const prog = cl.tasks.filter(t=>t.status==='In Progress').length;
+                        const over = cl.tasks.filter(t=>t.isOverdue&&t.status!=='Completed').length;
+                        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--secondary);">'
+                          +'<div style="flex:1;font-size:13px;font-weight:600;">👥 '+cl.clientName+'</div>'
+                          +(done?'<span class="badge badge-green" style="font-size:11px;">✅ '+done+' done</span>':'')
+                          +(prog?'<span class="badge badge-blue" style="font-size:11px;">▶ '+prog+' progress</span>':'')
+                          +(over?'<span class="badge badge-red" style="font-size:11px;">🔴 '+over+' overdue</span>':'')
+                          +'<span style="font-size:11px;color:var(--text-muted);">'+cl.tasks.length+' tasks total</span>'
+                          +'</div>';
+                      }).join('')
+                    +'</div></td></tr>';
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if(type==='dsr'){
+    let url='/dsr?x=1';if(from)url+=`&from=${from}`;if(to)url+=`&to=${to}`;if(cc)url+=`&client=${cc}`;
+    const data=await api('GET',url)||[];window._reportData=data;window._reportType='dsr';
+    const zeros=data.filter(d=>!d.sales_amount||!d.orders_count);
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📊 DSR Report (${data.length} records)</span>${zeros.length?`<span class="badge badge-red">⚠️ ${zeros.length} Zero Sale Days</span>`:''}</div>
+    <div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>Koi data nahi</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Orders</th><th>Sales(Rs)</th><th>Returns</th><th>Return%</th><th>Ad Spend</th><th>Budget</th><th>Used%</th><th>Alert</th><th>By</th></tr></thead>
+    <tbody>${data.map(d=>{const z=!d.sales_amount||!d.orders_count;const al=[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':'',d.alert_budget_80?'80%Budget':''].filter(Boolean).join(' ')||'OK';return `<tr style="${z?'background:#fdf2f2;':''}"><td>${d.report_date}</td><td><strong>${d.client_name||d.client_code}</strong></td><td>${z&&!d.orders_count?'<b style="color:red">0</b>':d.orders_count||0}</td><td>${z&&!d.sales_amount?'<b style="color:red">Rs 0</b>':`Rs ${(d.sales_amount||0).toLocaleString('en-IN')}`}</td><td>${d.returns_count||0}</td><td><span class="badge ${(d.return_rate||0)>10?'badge-red':'badge-green'}">${d.return_rate||0}%</span></td><td>Rs ${(d.ad_spend||0).toLocaleString('en-IN')}</td><td>Rs ${(d.seller_budget||0).toLocaleString('en-IN')}</td><td><span class="badge ${(d.budget_used_pct||0)>100?'badge-red':(d.budget_used_pct||0)>80?'badge-amber':'badge-green'}">${d.budget_used_pct||0}%</span></td><td style="font-size:11px;">${al}</td><td style="font-size:11px;">${d.entered_by||'—'}</td></tr>`;}).join('')}</tbody></table></div>`}</div></div>`;
+  } else if(type==='crm'){
+    let url='/crm?x=1';if(cc)url+=`&client=${cc}`;const data=await api('GET',url)||[];window._reportData=data;window._reportType='crm';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">📞 CRM Report (${data.length} calls)</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Seller</th><th>Executive</th><th>Outcome</th><th>Severity</th><th>Follow Up</th><th>Feedback</th></tr></thead><tbody>${data.map(d=>`<tr><td>${d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.client_name||d.client_code||'—'}</strong></td><td>${d.crm_executive||d.entered_by||'—'}</td><td><span class="badge ${d.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${d.call_outcome||'—'}</span></td><td><span class="badge ${d.severity==='Critical'?'badge-red':d.severity==='High'?'badge-amber':'badge-blue'}">${d.severity||'Low'}</span></td><td>${d.next_follow_up||'—'}</td><td style="font-size:12px;max-width:160px;">${d.seller_comment||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
+  } else if(type==='renewal'){
+    const data=await api('GET','/renewals')||[];window._reportData=data;window._reportType='renewal';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🔄 Renewal Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No renewals</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Plan</th><th>Amount(Rs)</th><th>Renewal Date</th><th>Days Left</th><th>Status</th><th>Owner</th></tr></thead><tbody>${data.map(d=>`<tr><td><strong>${d.clientName||d.clientCode}</strong></td><td>${d.servicePlan||'—'}</td><td>Rs ${(d.amount||0).toLocaleString('en-IN')}</td><td>${d.renewalDate||'—'}</td><td><span class="badge ${(d.daysLeft||99)<=7?'badge-red':(d.daysLeft||99)<=15?'badge-amber':'badge-green'}">${d.daysLeft!=null?d.daysLeft+' days':'—'}</span></td><td>${d.status||'—'}</td><td>${d.owner||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
+  } else if(type==='ticket'){
+    const data=await api('GET','/tickets')||[];window._reportData=data;window._reportType='ticket';
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">🎫 Ticket Report (${data.length})</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>':`<div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Seller</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>${data.map(d=>`<tr><td style="font-size:11px;">${d.ticketId||'—'}</td><td>${d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'—'}</td><td><strong>${d.clientName||'—'}</strong></td><td>${d.subject||'—'}</td><td><span class="badge ${d.priority==='Critical'?'badge-red':d.priority==='High'?'badge-amber':'badge-blue'}">${d.priority||'—'}</span></td><td><span class="badge ${d.status==='Open'?'badge-red':d.status==='Resolved'?'badge-green':'badge-amber'}">${d.status||'—'}</span></td><td>${d.assignedTo||'—'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
+  } else if(type==='team'){
+    const data=await api('GET','/dashboard/team')||[];window._reportData=data;window._reportType='team';
+  } else if(type==='renewal_analysis'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='renewal_analysis';
+    renderRenewalAnalysis(data,el);return;
+  } else if(type==='executive_retention'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='executive_retention';
+    renderExecutiveRetention(data,el);return;
+  } else if(type==='marketplace_retention'){
+    const data=await api('GET','/renewal-history')||[];window._reportData=data;window._reportType='marketplace_retention';
+    renderMarketplaceRetention(data,el);return;
+  } else if(type==='am_performance'){
+    const ts=Date.now();
+    const [hist,usersData,clientsData]=await Promise.all([api('GET','/renewal-history?_='+ts),api('GET','/users?_='+ts),api('GET','/clients?_='+ts)]);
+    const processed=buildAMPerformanceData(hist||[],usersData||[],clientsData||[]);
+    window._reportData=processed;window._reportType='am_performance';
+    renderAMPerformanceReport(processed,el);return;
+    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
+  }
+}
+
+function toggleExecClients(rowId){
+  const el = document.getElementById(rowId);
+  if(el) el.style.display = el.style.display==='none' ? '' : 'none';
+}
+
+function exportExcel(){
+  const data=window._reportData||[],type=window._reportType||'report';
+  if(!data.length){showToast('Pehle report generate karo','error');return;}
+  let csv='';
+  if(type==='executive'){
+    csv='Executive,Role,Clients Worked,Tasks Done,In Progress,Overdue\n';
+    csv+=data.map(r=>[
+      r.name,
+      r.role||'',
+      Object.keys(r.clientsMap).length,
+      r.tasksDone,
+      r.inProgress,
+      r.overdue
+    ].join(',')).join('\n');
+  }
+  else if(type==='renewal_analysis'||type==='executive_retention'||type==='marketplace_retention'){
+    // Extract table data from rendered HTML
+    const tbl = document.querySelector('#report-output table');
+    if(!tbl) { showToast('Pehle report generate karo','error'); return; }
+    const headers = Array.from(tbl.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+    const rowData = Array.from(tbl.querySelectorAll('tbody tr')).map(tr=>
+      Array.from(tr.querySelectorAll('td')).map(td=>'"'+td.textContent.trim().replace(/"/g,'')+'"')
+    );
+    csv = headers.join(',') + '\n' + rowData.map(r=>r.join(',')).join('\n');
+  }
+  else if(type==='dsr'){csv='Date,Seller,Orders,Sales,Returns,ReturnPct,AdSpend,Budget,UsedPct,Alerts,By\n';csv+=data.map(d=>[d.report_date,d.client_name||'',d.orders_count||0,d.sales_amount||0,d.returns_count||0,d.return_rate||0,d.ad_spend||0,d.seller_budget||0,d.budget_used_pct||0,[d.alert_overspend?'OverBudget':'',d.alert_high_returns?'HighReturns':'',d.alert_sales_drop?'SalesDrop':''].filter(Boolean).join('|')||'OK',d.entered_by||''].join(',')).join('\n');}
+  else if(type==='crm'){csv='Date,Seller,Executive,Outcome,Severity,FollowUp,Feedback\n';csv+=data.map(d=>[d.created_at?new Date(d.created_at).toLocaleDateString('en-IN'):'',d.client_name||'',d.crm_executive||'',d.call_outcome||'',d.severity||'',d.next_follow_up||'','"'+(d.seller_comment||'').replace(/"/g,"'")+'"'].join(',')).join('\n');}
+  else if(type==='renewal'){csv='Client,Plan,Amount,RenewalDate,DaysLeft,Status,Owner\n';csv+=data.map(d=>[d.clientName||'',d.servicePlan||'',d.amount||0,d.renewalDate||'',d.daysLeft||'',d.status||'',d.owner||''].join(',')).join('\n');}
+  else if(type==='ticket'){csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');}
+  else if(type==='team'){csv='Name,Role,ActionsToday,TicketsClosed,Status\n';csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');}
+  else if(type==='am_performance'){csv='Store Name,Store Ageing,Account Manager,AM Ageing,No. of Stores,Eligible for Renewal,Marketplace,Total Revenue (Sales),Renewal Count,Renewal %,Revenue After Renewal\n';csv+=data.map(function(r){return['"'+(r.busy_name||'').replace(/"/g,'')+ '"',r.store_aging||'—','"'+(r.am_name||'').replace(/"/g,'')+'"',r.am_aging||'—',r.no_of_stores||0,r.eligible||0,r.marketplace||'—',r.total_rev||0,r.renewal_count||0,(r.renewal_pct||0)+'%',r.active_rev||0].join(',');}).join('\n');}
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
+  showToast('Excel download ho raha hai!','success');
+}
+
+
+// ── ADMIN ────────────────────────────────────────────────────
+async function renderAdmin(){
+  const [users,hierarchy]=await Promise.all([api('GET','/users'),api('GET','/users/hierarchy')]);
+  if(!users) return;
+  const depts=[...new Set(users.map(u=>u.department).filter(Boolean))];
+  document.getElementById('page-content').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Users</div><div class="kpi-value">${users.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Active</div><div class="kpi-value">${users.filter(u=>u.isActive).length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Departments</div><div class="kpi-value">${depts.length||'—'}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Inactive</div><div class="kpi-value">${users.filter(u=>!u.isActive).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">👥 Team Management</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="openAddUser()">➕ Add User</button>
+          <button class="btn btn-outline btn-sm" onclick="openResetPassword()">🔑 Reset Password</button>
+          <button class="btn btn-secondary btn-sm" onclick="showHierarchy()">🏢 Hierarchy View</button>
+          <button class="btn btn-warning btn-sm" onclick="navigate('stafftransfer')">🔁 Staff Transfer</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${users.map((u,i)=>{const manager=users.find(m=>m.id===u.reportingTo);return `<tr><td>${i+1}</td><td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td><td>${u.designation||'<span style="color:#ccc;">—</span>'}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td><td style="font-size:12px;">${u.email}</td><td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td><td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td></tr>`;}).join('')}</tbody>
+      </table></div></div>
+    </div>
+    <div class="card" id="hierarchy-card" style="display:none;">
+      <div class="card-header"><span class="card-title">🏢 Reporting Hierarchy</span></div>
+      <div class="card-body" id="hierarchy-body"></div>
+    </div>
+
+    <!-- ✅ ROLE ACCESS MATRIX -->
+    <div class="card" style="border-left:4px solid #7f77dd;">
+      <div class="card-header" style="background:#eeedfe;">
+        <span class="card-title">🔐 Role & Access Manager</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-success" onclick="saveAccessMatrix()">💾 Save Changes</button>
+          <button class="btn btn-sm btn-outline" onclick="resetAccessMatrix()">Reset Default</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Har module ka access har role ke liye set karo. Changes save karne ke baad turant apply honge.</p>
+        <div style="overflow-x:auto;">
+          <table id="access-matrix-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:800px;">
+            <thead>
+              <tr style="background:#1C2B2D;">
+                <th style="padding:10px 14px;text-align:left;color:#fff;font-weight:500;width:180px;">Module</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Admin</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Ops Lead</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Sub Admin</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Sr. Exec</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Team Lead</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">CRM Exec</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Ads Exec</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Acct Mgr</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">SME</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">CSI Exec</th>
+                <th style="padding:10px 8px;text-align:center;color:#fff;font-weight:500;">Executive</th>
+              </tr>
+            </thead>
+            <tbody id="access-matrix-body"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:18px;height:18px;background:#d5f5e3;border:1px solid #27ae60;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#1e8449;">✓</span> Full Access</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:18px;height:18px;background:#d6eaf8;border:1px solid #3498db;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#1a5276;">👁</span> View Only</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:18px;height:18px;background:#f2f3f4;border:1px solid #ccc;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#999;">—</span> No Access</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ SELLER CLOSE REQUESTS SECTION -->
+    <div class="card" style="border-left:4px solid #dc2626;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">🔴 Seller Close Requests</span>
+        <button class="btn btn-sm btn-outline" onclick="loadCloseRequests()">🔄 Refresh</button>
+      </div>
+      <div class="card-body" id="close-requests-list">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>`;
+
+  window._adminUsers=users;
+  loadCloseRequests();
+  renderAccessMatrix().catch(()=>{});
+}
+
+function showHierarchy(){
+  const card=document.getElementById('hierarchy-card');
+  card.style.display=card.style.display==='none'?'':'none';
+  if(card.style.display==='') buildHierarchyView();
+}
+
+function buildHierarchyView(){
+  const users=window._adminUsers||[],topLevel=users.filter(u=>!u.reportingTo&&u.isActive);
+  function renderUser(u,depth=0){
+    const reports=users.filter(r=>r.reportingTo===u.id);
+    return `<div style="margin-left:${depth*24}px;margin-bottom:8px;"><div style="display:inline-flex;align-items:center;gap:8px;background:${depth===0?'#1F3864':depth===1?'#2E75B6':'#e8f4fd'};color:${depth<2?'#fff':'#333'};padding:6px 14px;border-radius:20px;font-size:13px;">${depth===0?'👑':depth===1?'⭐':'👤'} <strong>${u.name}</strong> ${u.designation?`<span style="opacity:0.8;font-size:11px;">(${u.designation})</span>`:''} ${u.department?`<span style="opacity:0.7;font-size:11px;">[${u.department}]</span>`:''}</div>${reports.map(r=>renderUser(r,depth+1)).join('')}</div>`;
+  }
+  document.getElementById('hierarchy-body').innerHTML=topLevel.length?topLevel.map(u=>renderUser(u)).join(''):'<p style="color:#999;">No hierarchy set yet!</p>';
+}
+
+function openAddUser(){
+  const users=window._adminUsers||[];
+  openPanel('➕ Add New User',`
+    <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" class="form-control" id="nu-name" placeholder="Full Name"></div><div class="form-group"><label>Email *</label><input type="email" class="form-control" id="nu-email" placeholder="user@enewcleus.in"></div></div>
+    <div class="form-row"><div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Department</label><select class="form-control" id="nu-dept"><option value="">-- Select --</option><option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option></select></div>
+      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="Sub Admin">Sub Admin</option><option value="CSI Lead">CSI Lead</option><option value="CSI Executive">CSI Executive</option><option value="Admin">Admin</option></select></div>
+    </div>
+    <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
+    <div class="form-group"><label>📅 Joining Date</label><input type="date" class="form-control" id="nu-joining"></div>
+    <div class="form-group"><label>🛒 Marketplace Access <small style="color:var(--text-muted);">(Sub Admin ke liye select karo — khali = sab)</small></label><select class="form-control" id="nu-marketplace" multiple style="height:110px;"><option value="Amazon.in">Amazon.in</option><option value="Amazon.com">Amazon.com</option><option value="Amazon.uk">Amazon.uk</option><option value="Amazon.ae">Amazon.ae</option><option value="Amazon.ca">Amazon.ca</option><option value="Flipkart">Flipkart</option><option value="Meesho">Meesho</option><option value="Myntra">Myntra</option><option value="Snapdeal">Snapdeal</option><option value="Other">Other</option></select><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Ctrl/Cmd + click se multiple select karo</div></div>
+    <button class="btn btn-primary btn-full" onclick="submitAddUser()">➕ Add User</button>`);
+}
+
+async function submitAddUser(){
+  const name=document.getElementById('nu-name').value.trim(),email=document.getElementById('nu-email').value.trim(),pass=document.getElementById('nu-pass').value,role=document.getElementById('nu-role').value,designation=document.getElementById('nu-designation').value.trim(),department=document.getElementById('nu-dept').value,reportingTo=document.getElementById('nu-manager').value;
+  if(!name||!email||!pass){showToast('Name, email, password required','error');return;}
+  const mktSel = document.getElementById('nu-marketplace');
+  const marketplaceAccess = mktSel ? Array.from(mktSel.selectedOptions).map(function(o){return o.value;}) : [];
+  const r=await api('POST','/users',{name,email,password:pass,role,designation,department,reportingTo,marketplaceAccess:marketplaceAccess.length?marketplaceAccess:null});
+  if(r?.success){showToast('✅ User added!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
+}
+
+function openEditUser(userId){
+  const users=window._adminUsers||[],u=users.find(x=>x.userId===userId);if(!u) return;
+  openPanel(`✏️ Edit — ${u.name}`,`
+    <div class="form-row"><div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>Department</label><select class="form-control" id="eu-dept"><option value="">-- Select --</option>${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','Ops Lead','Sub Admin','CSI Lead','CSI Executive','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-group"><label>Reports To</label><select class="form-control" id="eu-manager"><option value="">-- Top Level --</option>${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Status</label><select class="form-control" id="eu-active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
+    <button class="btn btn-primary btn-full" onclick="submitEditUser('${userId}')">💾 Save Changes</button>`);
+}
+
+async function submitEditUser(userId){
+  const name=document.getElementById('eu-name').value.trim(),designation=document.getElementById('eu-designation').value.trim(),department=document.getElementById('eu-dept').value,role=document.getElementById('eu-role').value,reportingTo=document.getElementById('eu-manager').value,isActive=document.getElementById('eu-active').value==='true';
+  const r=await api('PATCH',`/users/${userId}`,{name,designation,department,role,reportingTo,isActive});
+  if(r?.success){showToast('✅ User updated!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
+}
+
+function openResetPassword(){
+  const users=window._adminUsers||[];
+  openPanel('🔑 Reset Password',`
+    <div class="form-group"><label>User Select Karo</label><select class="form-control" id="rp-code"><option value="">-- Select User --</option>${users.map(u=>`<option value="${u.userId}">${u.name} (${u.userId})</option>`).join('')}</select></div>
+    <div class="form-group"><label>New Password *</label><input type="password" class="form-control" id="rp-pass"></div>
+    <button class="btn btn-warning btn-full" onclick="submitResetPassword()">🔑 Reset Password</button>`);
+}
+async function submitResetPassword(){
+  const code=document.getElementById('rp-code').value.trim(),pass=document.getElementById('rp-pass').value;
+  if(!code||!pass){showToast('User aur password required','error');return;}
+  const r=await api('PATCH',`/users/${code}/password`,{password:pass});
+  if(r?.success){showToast('✅ Password reset!','success');closePanel();}else showToast('Failed','error');
+}
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────
+async function loadNotifications(){
+  const notifs=await api('GET','/notifications');if(!notifs) return;
+  const badge=document.getElementById('notif-count');
+  if(notifs.length){badge.textContent=notifs.length;badge.style.display='flex';}else{badge.style.display='none';}
+  const el=document.getElementById('notif-list');if(!el) return;
+  el.innerHTML=!notifs.length?'<div class="empty-state" style="padding:24px;"><div class="emoji">🔕</div><h3>All clear!</h3></div>':notifs.map(n=>`<div class="notif-item" onclick="handleNotif('${n.notifId}','${n.type}')"><div class="notif-type">${n.type.replace(/_/g,' ')}</div><div class="notif-msg">${n.message}</div><div class="notif-time">${n.createdAt}</div></div>`).join('');
+}
+function toggleNotifications(){document.getElementById('notif-dropdown').classList.toggle('show');}
+async function markAllRead(){
+  await api('GET','/notifications').then(ns=>(ns||[]).forEach(n=>api('PATCH',`/notifications/${n.notifId}/read`,{})));
+  document.getElementById('notif-count').style.display='none';
+  document.getElementById('notif-list').innerHTML='<div class="empty-state" style="padding:24px;"><div class="emoji">✅</div><h3>All read!</h3></div>';
+  document.getElementById('notif-dropdown').classList.remove('show');
+}
+async function handleNotif(id,type){
+  await api('PATCH',`/notifications/${id}/read`,{});
+  document.getElementById('notif-dropdown').classList.remove('show');
+  if(type==='NEW_TICKET'||type==='SLA_BREACH') navigate('tickets');
+  else if(type==='RENEWAL_ALERT') navigate('renewals');
+  else if(type==='CSI_DUE') navigate('csi');
+  else if(type==='NEW_TASK') navigate('tasks');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ✅ SELLER CLOSE REQUEST WORKFLOW
+// ═══════════════════════════════════════════════════════════
+
+function openCloseRequestForm() {
+  const sel = document.getElementById('crm-client');
+  const cc = sel?.value;
+  const cn = sel?.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+  if (!cc) { showToast('Pehle client select karo', 'error'); return; }
+
+  openPanel('🔴 Seller Close Request — ' + cn, `
+    <div style="background:#fdf2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;margin-bottom:16px;">
+      <strong style="color:#dc2626;">⚠️ Dhyan Se!</strong>
+      <p style="font-size:13px;color:#7f1d1d;margin-top:6px;">Yeh request Admin ko bhejegi. Approve hone par seller <strong>Inactive</strong> ho jayega.</p>
+    </div>
+    <div class="form-group">
+      <label>Seller</label>
+      <input type="text" class="form-control" value="${cn}" disabled style="background:#f9f9f9;">
+    </div>
+    <div class="form-group">
+      <label>Close Karne Ki Wajah *</label>
+      <select class="form-control" id="cr-reason-type" onchange="toggleCustomReason()">
+        <option value="">-- Select Reason --</option>
+        <option>Seller ne services band ki</option>
+        <option>Payment nahi aaya</option>
+        <option>Seller ne contract khatam kiya</option>
+        <option>Duplicate account</option>
+        <option>Business band ho gaya</option>
+        <option value="other">Other (specify)</option>
+      </select>
+    </div>
+    <div class="form-group" id="cr-custom-reason" style="display:none;">
+      <label>Custom Reason</label>
+      <textarea class="form-control" id="cr-reason-text" placeholder="Detail mein likho..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Additional Notes</label>
+      <textarea class="form-control" id="cr-notes" placeholder="Koi aur detail..."></textarea>
+    </div>
+    <button class="btn btn-full" style="background:#dc2626;color:#fff;margin-top:8px;" onclick="submitCloseRequest('${cc}','${cn}')">
+      🔴 Close Request Bhejo Admin Ko
+    </button>`);
+}
+
+function toggleCustomReason() {
+  const val = document.getElementById('cr-reason-type')?.value;
+  const div = document.getElementById('cr-custom-reason');
+  if (div) div.style.display = val === 'other' ? '' : 'none';
+}
+
+async function submitCloseRequest(clientId, clientName) {
+  const reasonType = document.getElementById('cr-reason-type')?.value;
+  if (!reasonType) { showToast('Reason select karo', 'error'); return; }
+  const customReason = document.getElementById('cr-reason-text')?.value || '';
+  const notes = document.getElementById('cr-notes')?.value || '';
+  const reason = reasonType === 'other' ? (customReason || 'Other') : reasonType + (notes ? ' — ' + notes : '');
+  const r = await api('POST', '/close-requests', {
+    client_id: clientId,
+    client_name: clientName,
+    requested_by: APP.user.name,
+    reason: reason
+  });
+  if (r?.error) { showToast('❌ ' + r.error, 'error'); }
+  else if (r?.success) {
+    showToast('✅ Close request Admin ko bhej diya gaya!', 'success');
+    document.getElementById('overlay').classList.remove('show');
+  }
+}
+
+async function loadCloseRequests() {
+  const container = document.getElementById('close-requests-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const requests = await api('GET', '/close-requests/pending');
+  if (!requests || requests.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">✅</div><h3>Koi pending request nahi!</h3></div>';
+    return;
+  }
+  container.innerHTML = requests.map(r => `
+    <div style="background:#fff;border:1px solid #fca5a5;border-radius:10px;padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h4 style="margin:0 0 4px;color:#111827;font-size:15px;">🏢 ${r.client_name}</h4>
+          <p style="margin:0;font-size:13px;color:#6b7280;">Requested by: <strong>${r.requested_by}</strong></p>
+          <p style="margin:6px 0 0;font-size:13px;color:#374151;">📋 Reason: ${r.reason}</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">🕐 ${new Date(r.requested_at).toLocaleString('en-IN')}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="resolveCloseRequest('${r.id}','approved','${r.client_id}')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve</button>
+          <button onclick="resolveCloseRequest('${r.id}','rejected','${r.client_id}')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function resolveCloseRequest(requestId, status, clientId) {
+  let remark = '';
+  if (status === 'approved') {
+    remark = prompt('Approval remark (optional):') || 'Approved';
+  } else {
+    remark = prompt('Rejection reason batao:');
+    if (remark === null) return;
+    if (!remark) { showToast('Rejection reason required', 'error'); return; }
+  }
+  const r = await api('PATCH', '/close-requests/' + requestId, { status, admin_remark: remark, client_id: clientId });
+  if (r?.error) { showToast('❌ ' + r.error, 'error'); }
+  else if (r?.success) {
+    showToast(status === 'approved' ? '✅ Seller inactive kar diya gaya!' : '✅ Request reject kar diya gaya!', 'success');
+    loadCloseRequests();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 🔁 STAFF TRANSFER WORKFLOW
+// ═══════════════════════════════════════════════════════════
+
+async function renderStaffTransfer() {
+  const [users, pending] = await Promise.all([api('GET','/users'), api('GET','/staff-transfer/pending')]);
+  const activeUsers = (users||[]).filter(u=>u.isActive);
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card amber"><div class="kpi-label">Pending Transfers</div><div class="kpi-value">${(pending||[]).length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">Active Staff</div><div class="kpi-value">${activeUsers.length}</div></div>
+    </div>
+
+    <!-- New Transfer Form -->
+    <div class="card" style="border-left:4px solid var(--amber);">
+      <div class="card-header" style="background:#fef9e7;"><span class="card-title">🔁 New Staff Transfer / Exit</span></div>
+      <div class="card-body">
+        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#92400e;">
+          ⚠️ Jab koi employee exit kare ya transfer ho — uske sellers naye person ko assign ho jayenge.
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Exiting / Transferring Staff *</label>
+            <select class="form-control" id="st-from" onchange="loadTransferPreview(this.value)">
+              <option value="">-- Select Staff --</option>
+              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Transfer Sellers To *</label>
+            <select class="form-control" id="st-to">
+              <option value="">-- Select New Person --</option>
+              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div id="st-preview" style="display:none;background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--primary);">📋 Transfer Preview</div>
+          <div id="st-preview-body"></div>
+        </div>
+        <div class="form-group"><label>Transfer Type</label>
+          <select class="form-control" id="st-type">
+            <option value="Full Transfer">Full Transfer (sab kuch)</option>
+            <option value="AM Only">Account Manager only</option>
+            <option value="Ads Only">Ads Manager only</option>
+            <option value="CRM Only">CRM Executive only</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fields to Transfer</label>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-am" checked> Account Manager</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-ads" checked> Ads Manager</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-crm" checked> CRM Executive</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Reason</label><textarea class="form-control" id="st-reason" placeholder="Exit reason ya transfer reason..." rows="2"></textarea></div>
+          <div class="form-group"><label>Effective Date</label><input type="date" class="form-control" id="st-date" value="${new Date().toISOString().split('T')[0]}"></div>
+        </div>
+        <button class="btn btn-warning btn-full" onclick="submitStaffTransfer()">🔁 Transfer Request Submit Karo</button>
+      </div>
+    </div>
+
+    <!-- Pending Transfers -->
+    <div class="card" style="border-left:4px solid var(--orange);">
+      <div class="card-header" style="background:#fef3e7;">
+        <span class="card-title">⏳ Pending Approvals (${(pending||[]).length})</span>
+        <button class="btn btn-sm btn-outline" onclick="renderStaffTransfer()">🔄 Refresh</button>
+      </div>
+      <div class="card-body">
+        ${!(pending||[]).length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi pending transfer nahi</h3></div>' :
+        (pending||[]).map(r => `
+          <div style="background:#fff;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+              <div>
+                <h4 style="margin:0 0 4px;font-size:15px;">🔁 ${r.exiting_user} → ${r.transfer_to}</h4>
+                <p style="margin:0;font-size:13px;color:#666;">Type: <strong>${r.transfer_type}</strong> | Requested by: ${r.requested_by}</p>
+                <p style="margin:4px 0 0;font-size:13px;">📋 Reason: ${r.reason||'—'}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#999;">📅 ${r.effective_date} | ${new Date(r.created_at).toLocaleDateString('en-IN')}</p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button onclick="resolveTransfer('${r.id}','approved')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve & Execute</button>
+                <button onclick="resolveTransfer('${r.id}','rejected')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+  window._staffUsers = activeUsers;
+}
+
+async function loadTransferPreview(name) {
+  if (!name) return;
+  document.getElementById('st-preview').style.display = '';
+  document.getElementById('st-preview-body').innerHTML = '<div class="loading" style="padding:10px;"><div class="spinner"></div></div>';
+  const data = await api('GET', '/staff-transfer/preview/' + encodeURIComponent(name));
+  if (!data) return;
+  document.getElementById('st-preview-body').innerHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
+      <div><strong style="color:var(--green);">👤 AM Sellers:</strong> ${data.am_clients.length} ${data.am_clients.map(c=>`<span class="badge badge-blue" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+      <div><strong style="color:var(--orange);">📢 Ads Sellers:</strong> ${data.ads_clients.length} ${data.ads_clients.map(c=>`<span class="badge badge-orange" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+      <div><strong style="color:var(--teal);">📞 CRM Sellers:</strong> ${data.crm_clients.length} ${data.crm_clients.map(c=>`<span class="badge badge-gray" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
+    </div>
+    <div style="margin-top:8px;font-weight:700;color:var(--primary);">Total: ${data.total} sellers will be transferred</div>`;
+}
+
+async function submitStaffTransfer() {
+  const from = document.getElementById('st-from').value;
+  const to = document.getElementById('st-to').value;
+  if (!from || !to) { showToast('From aur To dono select karo', 'error'); return; }
+  if (from === to) { showToast('Same person select nahi kar sakte', 'error'); return; }
+  const fields = [];
+  if (document.getElementById('st-f-am').checked) fields.push('am_name');
+  if (document.getElementById('st-f-ads').checked) fields.push('ads_manager');
+  if (document.getElementById('st-f-crm').checked) fields.push('crm_executive');
+  if (!fields.length) { showToast('Kam se kam ek field select karo', 'error'); return; }
+  const r = await api('POST', '/staff-transfer', {
+    exiting_user: from, transfer_to: to,
+    transfer_type: document.getElementById('st-type').value,
+    fields_to_transfer: fields,
+    reason: document.getElementById('st-reason').value,
+    effective_date: document.getElementById('st-date').value,
+  });
+  if (r?.success) { showToast('✅ Transfer request submit ho gayi!', 'success'); renderStaffTransfer(); }
+  else showToast(r?.error || 'Error', 'error');
+}
+
+async function resolveTransfer(id, status) {
+  let remark = '';
+  if (status === 'approved') {
+    remark = prompt('Approval note (optional):') || 'Approved';
+  } else {
+    remark = prompt('Rejection reason:');
+    if (remark === null) return;
+  }
+  const r = await api('PATCH', '/staff-transfer/' + id, { status, admin_remark: remark });
+  if (r?.success) {
+    showToast(status === 'approved' ? '✅ Transfer execute ho gaya! Sellers reassigned!' : '❌ Transfer rejected', status === 'approved' ? 'success' : 'info');
+    renderStaffTransfer();
+  } else showToast(r?.error || 'Error', 'error');
+}
+
+
+
+// ═══════════════════════════════════════════════════════════
+// 📥 BULK CLIENT UPLOAD
+// ═══════════════════════════════════════════════════════════
+
+function downloadClientTemplate() {
+  // Create CSV template with headers + 2 sample rows
+  const headers = ['busy_name','marketplace','am_name','ads_manager','crm_executive','service_plan','renewal_date'];
+  const sample1 = ['ABC Traders','Amazon.in','Rohit Chouhan','Aarin','Ayushi','Basic','2026-06-01'];
+  const sample2 = ['XYZ Enterprises','Flipkart','Suhani','Muskan','Ankit','Premium','2026-09-15'];
+  const notes   = ['# NOTES: marketplace = Amazon/Flipkart/Meesho/Myntra | renewal_date = YYYY-MM-DD format | am_name/ads_manager/crm_executive = exact name as in system','','','','','',''];
+
+  const csvRows = [
+    headers.join(','),
+    notes.join(','),
+    sample1.join(','),
+    sample2.join(','),
+  ];
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'eNewcleus_Client_Bulk_Template.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('📥 Template downloaded!', 'success');
+}
+
+function openBulkUpload() {
+  openPanel('📥 Bulk Client Upload', `
+    <div style="background:#FFF8E7;border:2px solid #D4A03D;border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;color:#1C2B2D;margin-bottom:8px;">📋 Step 1 — Template Download Karo</div>
+      <p style="font-size:13px;color:#555;margin:0 0 12px 0;">Pehle yeh template download karo. Isme sab required columns hain — data bhar ke wapas upload karo.</p>
+      <button class="btn btn-primary" onclick="downloadClientTemplate()">📥 Download Template (CSV)</button>
+    </div>
+
+    <div style="background:#E8F4FD;border:2px solid #3498db;border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;color:#1C2B2D;margin-bottom:8px;">📤 Step 2 — Filled File Upload Karo</div>
+      <p style="font-size:13px;color:#555;margin:0 0 12px 0;">Template fill kar ke yahan upload karo. Preview dikhega — confirm karo phir save hoga.</p>
+      <input type="file" id="bulk-file-input" accept=".csv" class="form-control" style="margin-bottom:10px;" onchange="parseBulkCSV(this)">
+    </div>
+
+    <div id="bulk-preview" style="display:none;margin-top:16px;">
+      <div style="font-weight:700;color:#1C2B2D;margin-bottom:8px;">👁️ Step 3 — Preview & Confirm</div>
+      <div id="bulk-preview-table"></div>
+      <div id="bulk-error-box" style="display:none;background:#FDECEA;border:1px solid #e74c3c;border-radius:8px;padding:12px;margin-top:12px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-success" id="bulk-submit-btn" onclick="submitBulkClients()" style="display:none;">✅ Confirm & Save All</button>
+        <button class="btn btn-outline" onclick="document.getElementById('bulk-file-input').value='';document.getElementById('bulk-preview').style.display='none';">🔄 Reset</button>
+      </div>
+    </div>
+  `);
+}
+
+let _bulkData = [];
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) {
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function parseBulkCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const cleanText = text.replace(/^\uFEFF/, '');
+    const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    if (lines.length < 2) { showToast('File mein data nahi hai', 'error'); return; }
+
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+    const requiredCols = ['busy_name','marketplace'];
+    const missingCols = requiredCols.filter(c => !headers.includes(c));
+    if (missingCols.length) {
+      showToast('Required columns missing: ' + missingCols.join(', '), 'error');
+      return;
+    }
+
+    const rows = [];
+    const errors = [];
+    const validMarkets = ['Amazon.in','Amazon.com','Amazon.uk','Amazon.ae','Amazon.ca','Flipkart','Meesho','Myntra','Snapdeal','Other'];
+
+    for (let i = 1; i < lines.length; i++) {
+      const vals = parseCSVLine(lines[i]);
+      if (vals.every(v => !v)) continue; // skip empty rows
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+
+      const rowErrors = [];
+      if (!row.busy_name) rowErrors.push('busy_name missing');
+      if (!row.marketplace) rowErrors.push('marketplace missing');
+      else if (!validMarkets.includes(row.marketplace)) rowErrors.push('marketplace invalid (use: Amazon.in/Amazon.com/Flipkart/Meesho/Myntra etc.)');
+      if (row.renewal_date && !/^\d{4}-\d{2}-\d{2}$/.test(row.renewal_date)) rowErrors.push('renewal_date format galat (use YYYY-MM-DD)');
+
+      if (rowErrors.length) errors.push('Row ' + (i+1) + ': ' + rowErrors.join(', '));
+      rows.push({ ...row, _errors: rowErrors, _rowNum: i+1 });
+    }
+
+    _bulkData = rows.filter(r => r._errors.length === 0);
+    const errRows = rows.filter(r => r._errors.length > 0);
+
+    // Build preview table
+    const previewEl = document.getElementById('bulk-preview');
+    const tableEl = document.getElementById('bulk-preview-table');
+    const errorEl = document.getElementById('bulk-error-box');
+    const submitBtn = document.getElementById('bulk-submit-btn');
+    previewEl.style.display = 'block';
+
+    // Preview table
+    tableEl.innerHTML = [
+      '<div style="margin-bottom:8px;font-size:13px;color:#27ae60;font-weight:600;">Valid rows: ' + _bulkData.length + ' | Error rows: ' + errRows.length + '</div>',
+      '<div class="table-wrap" style="max-height:280px;overflow-y:auto;">',
+      '<table><thead><tr><th>#</th><th>Busy Name</th><th>Market</th><th>AM</th><th>Ads Mgr</th><th>CRM</th><th>Plan</th><th>Renewal</th><th>Status</th></tr></thead><tbody>',
+      rows.map(function(r) {
+        return '<tr style="' + (r._errors.length ? 'background:#fdf2f2;' : '') + '">' +
+          '<td>' + r._rowNum + '</td>' +
+          '<td><strong>' + (r.busy_name||'-') + '</strong></td>' +
+          '<td>' + (r.marketplace||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.am_name||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.ads_manager||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.crm_executive||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.service_plan||'-') + '</td>' +
+          '<td style="font-size:12px;">' + (r.renewal_date||'-') + '</td>' +
+          '<td>' + (r._errors.length ? '<span class="badge badge-red">Error</span>' : '<span class="badge badge-green">OK</span>') + '</td>' +
+          '</tr>';
+      }).join(''),
+      '</tbody></table></div>'
+    ].join('');
+
+    // Error box
+    if (errRows.length) {
+      errorEl.style.display = 'block';
+      errorEl.innerHTML = '<strong style="color:#e74c3c;">⚠️ In rows mein errors hain — fix karke dobara upload karo:</strong><br>' +
+        errors.map(e => '<div style="font-size:12px;margin-top:4px;">• ' + e + '</div>').join('');
+    } else {
+      errorEl.style.display = 'none';
+    }
+
+    submitBtn.style.display = _bulkData.length > 0 ? 'block' : 'none';
+    submitBtn.textContent = '✅ Confirm & Save ' + _bulkData.length + ' Clients';
+  };
+  reader.readAsText(file);
+}
+
+// Open full client detail panel (Admin/Lead/CRM direct access)
+// Full page client view for Admin/Lead/CRM
+async function navigateClientPage(cc) {
+  APP.page = 'clientdetail';
+  document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading client data...</div>';
+
+  const [timeline, dsrData, actLogs, expectations] = await Promise.all([
+    api('GET', '/clients/'+cc+'/timeline'),
+    api('GET', '/dsr/trend/'+cc),
+    api('GET', '/clients/'+cc+'/activity'),
+    api('GET', '/expectations/'+cc+'?_='+Date.now()),
+  ]);
+
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+  const hColor = client?.healthStatus==='Healthy'?'#27ae60':client?.healthStatus==='Warning'?'#f39c12':'#e74c3c';
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- Header -->
+    <div class="card" style="border-left:4px solid ${hColor};margin-bottom:12px;">
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:var(--primary);">${client?.busyName||cc}</div>
+            <div style="font-size:13px;color:var(--text-muted);">${client?.clientCode} • ${client?.marketplace||'—'} • ${client?.servicePlan||'—'}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            ${healthBadge(client?.healthStatus)}
+            ${statusBadge(client?.status)}
+            <button class="btn btn-sm btn-outline" onclick="navigateBack()">← Back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:12px;">
+      <div class="kpi-card green" style="cursor:pointer;" onclick="document.getElementById('cd-crm').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📞 CRM Calls</div>
+        <div class="kpi-value">${crmCalls.length}</div>
+      </div>
+      <div class="kpi-card red" style="cursor:pointer;" onclick="document.getElementById('cd-tickets').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">🎫 Tickets</div>
+        <div class="kpi-value">${tickets.length}</div>
+        <div class="kpi-sub">${tickets.filter(t=>t.status==='Open').length} open</div>
+      </div>
+      <div class="kpi-card purple" style="cursor:pointer;" onclick="document.getElementById('cd-tasks').scrollIntoView({behavior:'smooth'})">
+        <div class="kpi-label">📝 Tasks</div>
+        <div class="kpi-value">${tasks.length}</div>
+        <div class="kpi-sub">${tasks.filter(t=>t.status!=='Completed').length} pending</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">🔄 Renewal</div>
+        <div class="kpi-value" style="font-size:14px;">${client?.renewalDate||'—'}</div>
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f8fafc;">
+        <span class="card-title">👥 Team</span>
+        <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit</button>
+      </div>
+      <div class="card-body" style="padding:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+          <div style="background:#d6eaf8;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.amName||''}','Account Manager')">
+            <div style="font-size:11px;color:#1a5276;font-weight:700;">ACCOUNT MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.amName||'—'}</div>
+            <div style="font-size:11px;color:#2E75B6;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#fdebd0;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.adsManager||''}','Ads Executive')">
+            <div style="font-size:11px;color:#a04000;font-weight:700;">ADS MANAGER</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.adsManager||'—'}</div>
+            <div style="font-size:11px;color:#d35400;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+          <div style="background:#d5f5e3;border-radius:8px;padding:10px;cursor:pointer;" onclick="viewPersonTasks('${client?.crmExecutive||''}','CRM Executive')">
+            <div style="font-size:11px;color:#1e8449;font-weight:700;">CRM EXECUTIVE</div>
+            <div style="font-size:14px;font-weight:700;margin-top:3px;">${client?.crmExecutive||'—'}</div>
+            <div style="font-size:11px;color:#27ae60;margin-top:2px;">👆 Tasks dekhne click karo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="btn btn-primary" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">🎫 Raise Ticket</button>
+      <button class="btn btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📝 Create Task</button>
+      <button class="btn btn-secondary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📞 Log Call</button>
+    </div>
+
+    <!-- CRM Calls -->
+    <div class="card" id="cd-crm" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#e8f4fd;">
+        <span class="card-title">📞 CRM Calls (${crmCalls.length})</span>
+        <button class="btn btn-sm btn-primary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No calls yet</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Executive</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+          <tbody>${crmCalls.map(c=>`<tr>
+            <td style="font-size:12px;">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td>${c.crm_executive||'—'}</td>
+            <td><span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span></td>
+            <td style="font-size:12px;max-width:180px;">${c.seller_comment||'—'}</td>
+            <td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-amber':'badge-blue'}">${c.severity||'Low'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="card" id="cd-tickets" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#fef9e7;">
+        <span class="card-title">🎫 Tickets (${tickets.length})</span>
+        <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">+ Raise</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tickets.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tickets</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Subject</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+          <tbody>${tickets.map(t=>`<tr>
+            <td style="font-size:12px;">${t.created_at?new Date(t.created_at).toLocaleDateString('en-IN'):'—'}</td>
+            <td style="max-width:180px;">${t.subject||t.category||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status||'—'}</span></td>
+            <td style="font-size:12px;">${t.assigned_to||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card" id="cd-tasks" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f4f0fb;">
+        <span class="card-title">📝 Tasks (${tasks.length})</span>
+        <button class="btn btn-sm btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">+ Add Task</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!tasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>No tasks</h3></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Task</th><th>Assigned To</th><th>Due</th><th>Priority</th><th>Status</th></tr></thead>
+          <tbody>${tasks.map(t=>`<tr>
+            <td style="max-width:180px;font-weight:600;">${t.title||'—'}</td>
+            <td>${t.assigned_to||'—'}</td>
+            <td style="font-size:12px;">${t.due_date||'—'}</td>
+            <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+            <td><span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status||'—'}</span></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>
+
+    <!-- Seller Expectations -->
+    <div class="card" id="cd-expectations" style="margin-bottom:12px;border-left:4px solid #8e44ad;">
+      <div class="card-header" style="background:#f5eef8;">
+        <span class="card-title">🎯 Seller Expectations</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-outline" onclick="openExpectationHistory('${cc}')">📋 History</button>
+          <button class="btn btn-sm" style="background:#8e44ad;color:#fff;" onclick="openExpectationForm('${cc}','${(client?.busyName||'').replace(/'/g,"\\'")}','${expectations?'update':'new'}')">
+            ${expectations ? '✏️ Update' : '➕ Add Expectations'}
+          </button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:14px;">
+        ${expectations ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+            ${expectations.revenue_target ? `<div style="background:#fef9e7;border-radius:8px;padding:10px;border-left:3px solid #f39c12;"><div style="font-size:10px;font-weight:700;color:#7d6608;text-transform:uppercase;">💰 Revenue Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.revenue_target}</div></div>` : ''}
+            ${expectations.sales_growth_target ? `<div style="background:#eafaf1;border-radius:8px;padding:10px;border-left:3px solid #27ae60;"><div style="font-size:10px;font-weight:700;color:#1e8449;text-transform:uppercase;">📈 Sales Growth</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.sales_growth_target}</div></div>` : ''}
+            ${expectations.ads_acos_target ? `<div style="background:#eaf4fd;border-radius:8px;padding:10px;border-left:3px solid #2980b9;"><div style="font-size:10px;font-weight:700;color:#1a5276;text-transform:uppercase;">📢 Ads ACOS Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.ads_acos_target}</div></div>` : ''}
+            ${expectations.listing_improvement ? `<div style="background:#fdf2f8;border-radius:8px;padding:10px;border-left:3px solid #8e44ad;"><div style="font-size:10px;font-weight:700;color:#6c3483;text-transform:uppercase;">📝 Listing</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.listing_improvement}</div></div>` : ''}
+            ${expectations.inventory_management ? `<div style="background:#fef5e7;border-radius:8px;padding:10px;border-left:3px solid #e67e22;"><div style="font-size:10px;font-weight:700;color:#a04000;text-transform:uppercase;">📦 Inventory</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.inventory_management}</div></div>` : ''}
+            ${expectations.customer_rating_target ? `<div style="background:#fdfefe;border-radius:8px;padding:10px;border-left:3px solid #17a589;"><div style="font-size:10px;font-weight:700;color:#148f77;text-transform:uppercase;">⭐ Rating Target</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.customer_rating_target}</div></div>` : ''}
+            ${expectations.brand_building ? `<div style="background:#f9ebea;border-radius:8px;padding:10px;border-left:3px solid #e74c3c;"><div style="font-size:10px;font-weight:700;color:#922b21;text-transform:uppercase;">🏷️ Brand Building</div><div style="font-size:14px;font-weight:700;margin-top:4px;">${expectations.brand_building}</div></div>` : ''}
+          </div>
+          ${expectations.additional_notes ? `<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px;"><strong>📌 Additional Notes:</strong><br><span style="color:var(--text-muted);">${expectations.additional_notes}</span></div>` : ''}
+          ${expectations.special_requests ? `<div style="background:#fff3cd;border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px;border-left:3px solid #ffc107;"><strong>⚠️ Special Requests:</strong><br>${expectations.special_requests}</div>` : ''}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+            ✍️ Added by: <strong>${expectations.filled_by||'—'}</strong> (${expectations.filled_by_role||'—'}) · 
+            Type: <span class="badge ${expectations.fill_type==='renewal'?'badge-blue':'badge-green'}" style="font-size:10px;">${expectations.fill_type||'onboarding'}</span>
+            ${expectations.updated_by ? ` · Last updated by: <strong>${expectations.updated_by}</strong>` : ''}
+          </div>
+        ` : `
+          <div style="text-align:center;padding:20px;color:var(--text-muted);">
+            <div style="font-size:32px;margin-bottom:8px;">🎯</div>
+            <div style="font-weight:600;margin-bottom:4px;">Abhi tak koi expectation note nahi ki</div>
+            <div style="font-size:13px;">Seller ki expectations record karein taaki team aligned rahe</div>
+          </div>
+        `}
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">📋 Activity Log (${actLogs?.length||0})</span></div>
+      <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
+        ${!actLogs?.length ? '<div class="empty-state"><div class="emoji">📭</div><h3>No activity yet</h3></div>' :
+        actLogs.map(l=>`<div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:700;color:var(--primary);">${l.actionType||'—'}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${l.timestamp||'—'}</span>
+          </div>
+          <div style="font-size:13px;margin-top:2px;">${l.actionDetail||''}</div>
+          <div style="font-size:11px;color:var(--text-muted);">by ${l.userName||'—'}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function navigateBack() {
+  navigate('clients');
+}
+
+function openExpectationForm(cc, cn, mode) {
+  openPanel((mode==='new'?'➕ Add':'✏️ Update')+' Expectations — '+cn, `
+    <div style="background:#f5eef8;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">
+      🎯 Seller: <strong>${cn}</strong>
+    </div>
+    <div class="form-group">
+      <label>Fill Type</label>
+      <select class="form-control" id="exp-filltype">
+        <option value="onboarding">🆕 Onboarding</option>
+        <option value="renewal">🔄 Renewal Update</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label>💰 Revenue Target</label>
+        <input type="text" class="form-control" id="exp-revenue" placeholder="e.g. ₹10L/month">
+      </div>
+      <div class="form-group">
+        <label>📈 Sales Growth Target</label>
+        <input type="text" class="form-control" id="exp-sales" placeholder="e.g. 2x in 6 months">
+      </div>
+      <div class="form-group">
+        <label>📢 Ads ACOS Target</label>
+        <input type="text" class="form-control" id="exp-acos" placeholder="e.g. Below 15%">
+      </div>
+      <div class="form-group">
+        <label>⭐ Customer Rating Target</label>
+        <input type="text" class="form-control" id="exp-rating" placeholder="e.g. Maintain 4.5+">
+      </div>
+      <div class="form-group">
+        <label>📝 Listing Improvement</label>
+        <input type="text" class="form-control" id="exp-listing" placeholder="e.g. All ASINs A+ content">
+      </div>
+      <div class="form-group">
+        <label>📦 Inventory Management</label>
+        <input type="text" class="form-control" id="exp-inventory" placeholder="e.g. Never go OOS">
+      </div>
+      <div class="form-group">
+        <label>🏷️ Brand Building</label>
+        <input type="text" class="form-control" id="exp-brand" placeholder="e.g. Launch 5 new products">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>📌 Additional Notes</label>
+      <textarea class="form-control" id="exp-notes" rows="3" placeholder="Seller ne kya kaha? Koi specific request?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>⚠️ Special Requests</label>
+      <textarea class="form-control" id="exp-special" rows="2" placeholder="Koi special demand ya concern?"></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" data-cc="${cc}" data-cn="${cn.replace(/"/g,'&quot;')}" onclick="submitExpectation(this)">
+      ✅ Save Expectations
+    </button>
+  `);
+}
+
+async function submitExpectation(btn) {
+  const cc = btn.getAttribute('data-cc');
+  const cn = btn.getAttribute('data-cn');
+  const r = await api('POST', '/expectations', {
+    clientCode: cc,
+    clientName: cn,
+    fillType: document.getElementById('exp-filltype').value,
+    revenueTarget: document.getElementById('exp-revenue').value.trim(),
+    salesGrowthTarget: document.getElementById('exp-sales').value.trim(),
+    adsAcosTarget: document.getElementById('exp-acos').value.trim(),
+    customerRatingTarget: document.getElementById('exp-rating').value.trim(),
+    listingImprovement: document.getElementById('exp-listing').value.trim(),
+    inventoryManagement: document.getElementById('exp-inventory').value.trim(),
+    brandBuilding: document.getElementById('exp-brand').value.trim(),
+    additionalNotes: document.getElementById('exp-notes').value.trim(),
+    specialRequests: document.getElementById('exp-special').value.trim(),
+  });
+  if (r?.success) {
+    showToast('✅ Expectations save ho gayi!', 'success');
+    closePanel();
+    navigateClientPage(cc);
+  } else {
+    showToast('Error: '+(r?.error||'Failed'), 'error');
+  }
+}
+
+async function openExpectationHistory(cc) {
+  const hist = await api('GET', '/expectations/'+cc+'/history?_='+Date.now()) || [];
+  openPanel('📋 Expectation History', hist.length
+    ? hist.map(h => `
+        <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span class="badge ${h.change_type==='created'?'badge-green':'badge-blue'}" style="font-size:11px;">
+              ${h.change_type==='created'?'➕ Created':'✏️ Updated'}
+            </span>
+            <span style="font-size:11px;color:var(--text-muted);">${new Date(h.changed_at).toLocaleString('en-IN')}</span>
+          </div>
+          <div style="font-size:13px;">${h.changes_summary||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">by <strong>${h.changed_by}</strong> (${h.changed_by_role||'—'})</div>
+        </div>`).join('')
+    : '<div class="empty-state"><div class="emoji">📋</div><h3>Koi history nahi</h3></div>'
+  );
+}
+
+// Log CRM call directly from client detail page
+function logCRMCallFor(cc, cn) {
+  openPanel('📞 Log Call — '+cn, `
+    <div style="background:#d5f5e3;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;">
+      📎 Client: <strong>${cn}</strong>
+    </div>
+    <div class="form-group"><label>Call Outcome</label>
+      <select class="form-control" id="lcd-outcome">
+        <option>Called — Connected</option><option>Called — No Response</option>
+        <option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Seller Feedback</label>
+      <textarea class="form-control" id="lcd-comment" placeholder="Seller ne kya kaha?" rows="3"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Severity</label>
+        <select class="form-control" id="lcd-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+      </div>
+      <div class="form-group"><label>Next Follow-up</label>
+        <input type="date" class="form-control" id="lcd-followup">
+      </div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="submitCRMCallFor('${cc}','${cn.replace(/'/g,"\'")}')">📞 Save Call</button>`);
+}
+
+async function submitCRMCallFor(cc, cn) {
+  const r = await api('POST', '/crm', {
+    clientCode: cc, clientName: cn,
+    callOutcome: document.getElementById('lcd-outcome').value,
+    sellerComment: document.getElementById('lcd-comment').value,
+    severity: document.getElementById('lcd-sev').value,
+    nextFollowUp: document.getElementById('lcd-followup').value||null,
+  });
+  if (r?.success) {
+    showToast('✅ Call logged!', 'success');
+    closePanel();
+    navigateClientPage(cc); // Refresh
+  }
+}
+
+async function openClientDetail(cc) {
+  const client = APP.clients.find(c=>c.clientCode===cc);
+  if (!client) return;
+  // Admin/Lead/CRM — full page view
+  if (['Admin','Ops Lead','CSI Lead','CRM Executive','SME','Team Lead'].includes(APP.user.role)) {
+    navigateClientPage(cc);
+    return;
+  }
+  openPanel('👁️ '+client.busyName, '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const timeline = await api('GET', '/clients/'+cc+'/timeline');
+  const crmCalls = timeline?.crmCalls||[];
+  const tickets = timeline?.tickets||[];
+  const tasks = timeline?.tasks||[];
+
+  document.getElementById('panel-body').innerHTML = `
+    <!-- Client Info -->
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+        <div><span style="color:var(--text-muted);">Code:</span> <strong>${client.clientCode}</strong></div>
+        <div><span style="color:var(--text-muted);">Market:</span> <strong>${client.marketplace||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">AM:</span> <strong>${client.amName||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Ads:</span> <strong>${client.adsManager||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">CRM:</span> <strong>${client.crmExecutive||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Plan:</span> <strong>${client.servicePlan||'—'}</strong></div>
+        <div><span style="color:var(--text-muted);">Status:</span> ${statusBadge(client.status)}</div>
+        <div><span style="color:var(--text-muted);">Health:</span> ${healthBadge(client.healthStatus)}</div>
+        <div><span style="color:var(--text-muted);">Renewal:</span> <strong>${client.renewalDate||'—'}</strong></div>
+      </div>
+    </div>
+    <!-- Quick Actions -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-sm btn-primary" onclick="openRaiseTicketFor('${cc}','${client.busyName}')">🎫 Raise Ticket</button>
+      <button class="btn btn-sm btn-success" onclick="openCreateTask('','${client.busyName}');document.getElementById('tsk-client-wrap_val')&&(document.getElementById('tsk-client-wrap_val').value='${cc}')">📝 Add Task</button>
+      <button class="btn btn-sm btn-outline" onclick="openEditClient360('${cc}')">✏️ Edit Team</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" onclick="showTimelineTab('act')">📞 CRM (${crmCalls.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tkt')">🎫 Tickets (${tickets.length})</button>
+      <button class="btn btn-sm btn-outline" onclick="showTimelineTab('tsk')">📝 Tasks (${tasks.length})</button>
+    </div>
+    <div id="tl-act">
+      ${!crmCalls.length ? '<div class="empty-state"><div class="emoji">📞</div><h3>No calls yet</h3></div>' :
+      crmCalls.map(c=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="badge ${c.call_outcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.call_outcome||'—'}</span>
+          <span style="font-size:11px;color:var(--text-muted);">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):'—'}</span>
+        </div>
+        <div style="font-size:13px;margin-top:4px;">${c.seller_comment||'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">by ${c.crm_executive||'—'} | ${c.severity||'Low'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tkt" style="display:none;">
+      ${!tickets.length ? '<div class="empty-state"><div class="emoji">🎫</div><h3>No tickets</h3></div>' :
+      tickets.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--red);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.subject||t.category||'—'}</span>
+          <span class="badge ${t.status==='Open'?'badge-red':t.status==='Done'?'badge-green':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Priority: ${t.priority||'—'} | ${t.assigned_to||'—'}</div>
+      </div>`).join('')}
+    </div>
+    <div id="tl-tsk" style="display:none;">
+      ${!tasks.length ? '<div class="empty-state"><div class="emoji">📝</div><h3>No tasks</h3></div>' :
+      tasks.map(t=>`<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--purple);">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;">${t.title||'—'}</span>
+          <span class="badge ${t.status==='Completed'?'badge-green':t.status==='In Progress'?'badge-blue':'badge-amber'}">${t.status}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">👤 ${t.assigned_to||'—'} | 📅 ${t.due_date||'—'}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+async function deleteClient(code, name) {
+  if (!confirm('⚠️ "' + name + '" ko permanently delete karna chahte ho?\nYeh action undo nahi ho sakta!')) return;
+  const r = await api('DELETE', '/clients/' + code);
+  if (r?.success) {
+    showToast('🗑️ ' + name + ' deleted!', 'success');
+    renderClients();
+  } else {
+    showToast('Delete failed: ' + (r?.error || 'Unknown error'), 'error');
+  }
+}
+
+async function submitBulkClients() {
+  if (!_bulkData.length) { showToast('Koi valid data nahi', 'error'); return; }
+  const btn = document.getElementById('bulk-submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving...';
+
+  let success = 0, failed = 0;
+  for (const row of _bulkData) {
+    const r = await api('POST', '/clients', {
+      busyName: row.busy_name,
+      marketplace: row.marketplace,
+      amName: row.am_name || '',
+      adsManager: row.ads_manager || '',
+      crmExecutive: row.crm_executive || '',
+      servicePlan: row.service_plan || '',
+      renewalDate: row.renewal_date || null,
+    });
+    if (r?.success) success++;
+    else failed++;
+  }
+
+  btn.disabled = false;
+  if (failed === 0) {
+    showToast('✅ ' + success + ' clients successfully added!', 'success');
+    closePanel();
+    renderClients();
+  } else {
+    showToast('✅ ' + success + ' added, ❌ ' + failed + ' failed', 'error');
+    btn.textContent = '✅ Retry Failed';
+  }
+  _bulkData = [];
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📋 ADS TASKS — Advertising Department Task Tracker
+// ═══════════════════════════════════════════════════════════
+
+const ADS_TASK_CATEGORIES = [
+  'Campaign Optimization',
+  'New Campaign Live',
+  'Campaign Paused',
+  'Keyword Research',
+  'A/B Testing',
+  'Report Review',
+  'Client Approval Pending',
+];
+
+const ADS_TASK_STATUS_COLORS = {
+  'Pending': 'badge-amber',
+  'In Progress': 'badge-blue',
+  'Done': 'badge-green',
+  'Blocked': 'badge-red',
+};
+
+async function renderAdsTasks() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Ads Tasks...</div>';
+  const [tasks, clients] = await Promise.all([
+    api('GET', '/tasks/ads'),
+    getClients(true)
+  ]);
+  if (clients) APP.clients = clients;
+  const allTasks = tasks || [];
+
+  // KPI counts
+  const pending   = allTasks.filter(t => t.status === 'Pending').length;
+  const inprog    = allTasks.filter(t => t.status === 'In Progress').length;
+  const done      = allTasks.filter(t => t.status === 'Done').length;
+  const overdue   = allTasks.filter(t => t.isOverdue).length;
+
+  // Category breakdown
+  const catCounts = {};
+  ADS_TASK_CATEGORIES.forEach(c => { catCounts[c] = allTasks.filter(t => t.category === c).length; });
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card amber"><div class="kpi-label">Pending</div><div class="kpi-value">${pending}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">In Progress</div><div class="kpi-value">${inprog}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Done</div><div class="kpi-value">${done}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Overdue</div><div class="kpi-value">${overdue}</div></div>
+    </div>
+
+    <!-- Category pills -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="btn btn-primary btn-sm" onclick="filterAdsTasks('all')" id="atf-all">All (${allTasks.length})</button>
+      ${ADS_TASK_CATEGORIES.map(c => `<button class="btn btn-outline btn-sm" onclick="filterAdsTasks('${c}')" id="atf-${c.replace(/\s/g,'_')}">${c} (${catCounts[c]||0})</button>`).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Ads Tasks</span>
+        <button class="btn btn-primary btn-sm" onclick="openNewAdsTask()">➕ New Ads Task</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="ads-task-list">
+        ${renderAdsTaskTable(allTasks)}
+      </div>
+    </div>`;
+
+  window._allAdsTasks = allTasks;
+}
+
+function renderAdsTaskTable(tasks) {
+  if (!tasks.length) return '<div class="empty-state"><div class="emoji">📋</div><h3>Koi ads task nahi</h3><p>New task banao!</p></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Seller</th><th>Category</th><th>Task</th><th>Priority</th><th>Due Date</th><th>Assigned To</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>${tasks.map(t => `<tr style="${t.isOverdue ? 'background:#fdf2f2;' : ''}">
+      <td><strong>${t.clientName || '—'}</strong></td>
+      <td><span class="badge badge-blue" style="font-size:11px;">${t.category || '—'}</span></td>
+      <td style="max-width:180px;font-size:13px;">${t.title || '—'}</td>
+      <td><span class="badge ${t.priority === 'High' ? 'badge-red' : t.priority === 'Medium' ? 'badge-amber' : 'badge-gray'}">${t.priority || '—'}</span></td>
+      <td style="font-size:12px;${t.isOverdue ? 'color:red;font-weight:700;' : ''}">${t.deadline ? new Date(t.deadline).toLocaleDateString('en-IN') : '—'}${t.isOverdue ? ' ⚠️' : ''}</td>
+      <td style="font-size:12px;">${t.assignedTo || '—'}</td>
+      <td><span class="badge ${ADS_TASK_STATUS_COLORS[t.status] || 'badge-gray'}">${t.status || '—'}</span></td>
+      <td>
+        <select class="form-control" style="width:120px;font-size:12px;padding:4px;" onchange="updateAdsTaskStatus('${t.taskId}', this.value, this)">
+          <option value="">Update...</option>
+          <option value="Pending" ${t.status==='Pending'?'selected':''}>Pending</option>
+          <option value="In Progress" ${t.status==='In Progress'?'selected':''}>In Progress</option>
+          <option value="Done" ${t.status==='Done'?'selected':''}>✅ Done</option>
+          <option value="Blocked" ${t.status==='Blocked'?'selected':''}>🚫 Blocked</option>
+        </select>
+      </td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function filterAdsTasks(cat) {
+  const all = window._allAdsTasks || [];
+  const filtered = cat === 'all' ? all : all.filter(t => t.category === cat);
+  document.getElementById('ads-task-list').innerHTML = renderAdsTaskTable(filtered);
+  // highlight active filter
+  document.querySelectorAll('[id^="atf-"]').forEach(b => b.classList.remove('btn-primary'));
+  const activeId = cat === 'all' ? 'atf-all' : 'atf-' + cat.replace(/\s/g, '_');
+  const el = document.getElementById(activeId);
+  if (el) { el.classList.remove('btn-outline'); el.classList.add('btn-primary'); }
+}
+
+function openNewAdsTask() {
+  const clients = APP.clients || [];
+  const users = APP.users || [];
+  const adsTeam = users.filter(u => ['Ads Executive', 'SME', 'Admin', 'Ops Lead'].includes(u.role) && u.isActive);
+  openPanel('📋 New Ads Task', `
+    <div class="form-group"><label>Seller / Client *</label>
+      <select class="form-control" id="at-client">
+        <option value="">-- Select Seller --</option>
+        ${clients.map(c => `<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Category *</label>
+      <select class="form-control" id="at-cat">
+        ${ADS_TASK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Task Title *</label>
+      <input type="text" class="form-control" id="at-title" placeholder="e.g. Optimize Broad Match Keywords for Summer Campaign">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Priority</label>
+        <select class="form-control" id="at-priority">
+          <option>High</option><option selected>Medium</option><option>Low</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Due Date</label>
+        <input type="date" class="form-control" id="at-due" value="${new Date(Date.now()+86400000).toISOString().split('T')[0]}">
+      </div>
+    </div>
+    <div class="form-group"><label>Assign To</label>
+      <select class="form-control" id="at-assign">
+        <option value="${APP.user?.name}">${APP.user?.name} (Me)</option>
+        ${adsTeam.filter(u => u.name !== APP.user?.name).map(u => `<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Notes / Details</label>
+      <textarea class="form-control" id="at-notes" rows="2" placeholder="Task ke baare mein details..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitAdsTask()">📋 Task Create Karo</button>
+  `);
+}
+
+async function submitAdsTask() {
+  const sel = document.getElementById('at-client');
+  const clientCode = sel.value;
+  const clientName = sel.options[sel.selectedIndex]?.dataset?.name || '';
+  const title = document.getElementById('at-title').value.trim();
+  const category = document.getElementById('at-cat').value;
+  if (!clientCode || !title) { showToast('Seller aur title required hai', 'error'); return; }
+  const r = await api('POST', '/tasks', {
+    clientCode, clientName, title,
+    category,
+    description: document.getElementById('at-notes').value,
+    priority: document.getElementById('at-priority').value,
+    deadline: document.getElementById('at-due').value,
+    assignedTo: document.getElementById('at-assign').value,
+    assignedToRole: 'Ads Executive',
+    taskType: 'ads',
+  });
+  if (r?.success) { showToast('✅ Ads Task created!', 'success'); closePanel(); renderAdsTasks(); }
+  else showToast(r?.error || 'Error aya', 'error');
+}
+
+async function updateAdsTaskStatus(taskId, status, selectEl) {
+  if (!status) return;
+  const r = await api('PATCH', '/ads/' + taskId, { status });
+  if (r?.success) {
+    showToast('✅ Status updated — ' + status, 'success');
+    renderAdsTasks();
+  } else {
+    showToast('Error updating status', 'error');
+    selectEl.value = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📞 MY CALL LOG — Executive ka personal call log
+// ═══════════════════════════════════════════════════════════
+async function renderMyCalls() {
+  const [calls, clients] = await Promise.all([
+    api('GET', '/crm/my-calls'),
+    getClients()
+  ]);
+  if (clients) APP.clients = clients;
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">Total Calls</div><div class="kpi-value">${(calls||[]).length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${(calls||[]).filter(c=>c.outcome==='Connected'||c.call_outcome==='Connected').length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${(calls||[]).filter(c=>(c.outcome||c.call_outcome||'').includes('No Response')).length}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📞 My Call Log</span>
+        <button class="btn btn-primary btn-sm" onclick="openLogMyCall()">➕ Log Call</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!(calls||[]).length ? '<div class="empty-state"><div class="emoji">📞</div><h3>Koi call log nahi abhi tak</h3><p>Pehli call log karo!</p></div>' :
+        `<div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Seller / Client</th><th>Subject</th><th>Outcome</th><th>Notes</th><th>Action</th></tr></thead>
+          <tbody>${(calls||[]).map(c=>`<tr>
+            <td style="white-space:nowrap;">${c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):c.call_date||'—'}</td>
+            <td><strong>${c.client_name||c.clientName||'—'}</strong></td>
+            <td>${c.subject||c.notes||'—'}</td>
+            <td><span class="badge ${(c.outcome||c.call_outcome||'').includes('Connected')?'badge-green':(c.outcome||c.call_outcome||'').includes('No Response')?'badge-amber':'badge-gray'}">${c.outcome||c.call_outcome||'—'}</span></td>
+            <td style="max-width:200px;font-size:12px;">${c.description||c.remarks||'—'}</td>
+            <td><button class="btn btn-sm btn-primary" onclick="createTaskFromCall('${c.client_code||c.clientCode||''}','${(c.client_name||c.clientName||'').replace(/'/g,"\\'")}','${(c.subject||c.notes||'').replace(/'/g,"\\'")}')">📝 Task</button></td>
+          </tr>`).join('')}</tbody>
+        </table></div>`}
+      </div>
+    </div>`;
+}
+
+function openLogMyCall() {
+  const clients = APP.clients || [];
+  openPanel('📞 Call Log Karo', `
+    <div class="form-group"><label>Seller / Client *</label>
+      <select class="form-control" id="mc-client">
+        <option value="">-- Select Client --</option>
+        ${clients.map(c=>`<option value="${c.clientCode}" data-name="${c.busyName}">${c.busyName} (${c.clientCode})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Subject / Kya baat hui *</label>
+      <input type="text" class="form-control" id="mc-subject" placeholder="e.g. Account health issue, Budget update...">
+    </div>
+    <div class="form-group"><label>Outcome</label>
+      <select class="form-control" id="mc-outcome">
+        <option>Connected</option>
+        <option>No Response</option>
+        <option>Callback Requested</option>
+        <option>Voicemail Left</option>
+        <option>Wrong Number</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Notes / Details</label>
+      <textarea class="form-control" id="mc-notes" rows="3" placeholder="Call mein kya hua, kya promise kiya, next step kya hai..."></textarea>
+    </div>
+    <div class="form-group"><label>Follow-up Date (optional)</label>
+      <input type="date" class="form-control" id="mc-followup">
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitMyCall()">📞 Call Log Karo</button>
+  `);
+}
+
+async function submitMyCall() {
+  const sel = document.getElementById('mc-client');
+  const clientCode = sel.value;
+  const clientName = sel.options[sel.selectedIndex]?.dataset?.name || '';
+  const subject = document.getElementById('mc-subject').value.trim();
+  if (!clientCode || !subject) { showToast('Client aur subject required hai', 'error'); return; }
+  const r = await api('POST', '/crm/log', {
+    clientCode, clientName,
+    subject, notes: subject,
+    outcome: document.getElementById('mc-outcome').value,
+    description: document.getElementById('mc-notes').value,
+    followupDate: document.getElementById('mc-followup').value || null,
+    callDate: new Date().toISOString().split('T')[0],
+  });
+  if (r?.success) { showToast('✅ Call logged!', 'success'); closePanel(); renderMyCalls(); }
+  else showToast(r?.error || 'Error', 'error');
+}
+
+function createTaskFromCall(clientCode, clientName, subject) {
+  if (!clientCode) { showToast('Client select karo pehle', 'error'); return; }
+  openPanel(`📝 Task — ${clientName}`, `
+    <div style="background:#e8f4fd;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;">
+      📞 Call se create: <strong>${subject || 'Follow-up'}</strong>
+    </div>
+    <div class="form-group"><label>Task Title *</label>
+      <input type="text" class="form-control" id="cft-title" value="Follow up: ${subject}" placeholder="Task description...">
+    </div>
+    <div class="form-group"><label>Priority</label>
+      <select class="form-control" id="cft-priority">
+        <option>Medium</option><option>High</option><option>Low</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Due Date</label>
+      <input type="date" class="form-control" id="cft-due" value="${new Date(Date.now()+86400000).toISOString().split('T')[0]}">
+    </div>
+    <div class="form-group"><label>Notes</label>
+      <textarea class="form-control" id="cft-notes" rows="2" placeholder="Task details..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitTaskFromCall('${clientCode}','${clientName.replace(/'/g,"\\'")}')">✅ Task Create Karo</button>
+  `);
+}
+
+async function submitTaskFromCall(clientCode, clientName) {
+  const title = document.getElementById('cft-title').value.trim();
+  if (!title) { showToast('Task title required', 'error'); return; }
+  const r = await api('POST', '/tasks', {
+    clientCode, clientName,
+    title, description: document.getElementById('cft-notes').value,
+    priority: document.getElementById('cft-priority').value,
+    dueDate: document.getElementById('cft-due').value,
+    assignedTo: APP.user.name,
+  });
+  if (r?.success) { showToast('✅ Task created!', 'success'); closePanel(); }
+  else showToast(r?.error || 'Error', 'error');
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function healthBadge(s){const m={'Healthy':'badge-green','Warning':'badge-amber','At Risk':'badge-red'};const d={'Healthy':'🟢','Warning':'🟡','At Risk':'🔴'};return `<span class="badge ${m[s]||'badge-gray'}">${d[s]||''} ${s||'Unknown'}</span>`;}
+function statusBadge(s){return `<span class="badge ${s==='Active'?'badge-green':s==='Inactive'?'badge-red':'badge-gray'}">${s||'—'}</span>`;}
+function renewalBadge(d){if(!d)return '—';try{const days=Math.ceil((new Date(d)-new Date())/86400000);return `<span class="badge ${days<=7?'badge-red':days<=15?'badge-amber':'badge-green'}">${new Date(d).toLocaleDateString('en-IN')} (${days}d)</span>`;}catch(e){return d;}}
+function isToday(ds){if(!ds)return false;try{const d=new Date(ds),t=new Date();return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear();}catch(e){return false;}}
+function dateAfterDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+function openPanel(title,html){document.getElementById('panel-title').textContent=title;document.getElementById('panel-body').innerHTML=html;document.getElementById('overlay').classList.add('show');}
+function closePanel(e){if(e&&e.target!==document.getElementById('overlay'))return;document.getElementById('overlay').classList.remove('show');}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('show');}
+function showToast(msg,type='info'){const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;document.getElementById('toast-container').appendChild(t);setTimeout(()=>t.remove(),3500);}
+function showError(el,msg){el.textContent=msg;el.style.display='block';}
+document.addEventListener('click',e=>{const dd=document.getElementById('notif-dropdown'),btn=document.getElementById('notif-btn');if(dd&&!dd.contains(e.target)&&btn&&!btn.contains(e.target))dd.classList.remove('show');});
+window.addEventListener('resize',()=>{const h=document.querySelector('.hamburger');if(h)h.style.display=window.innerWidth<768?'flex':'none';});
+
+// ── THEME SYSTEM ─────────────────────────────────────────────
+const THEMES=[
+  {name:'eNewcleus Gold',primary:'#1C2B2D',secondary:'#D4A03D'},
+  {name:'Navy Blue',primary:'#1F3864',secondary:'#2E75B6'},
+  {name:'Dark Green',primary:'#1a5c38',secondary:'#27ae60'},
+  {name:'Purple',primary:'#4a235a',secondary:'#8e44ad'},
+  {name:'Dark Red',primary:'#6E2C2C',secondary:'#e74c3c'},
+  {name:'Teal',primary:'#0d4f4f',secondary:'#16a085'},
+  {name:'Charcoal',primary:'#2c3e50',secondary:'#34495e'},
+  {name:'Orange',primary:'#6E3A1A',secondary:'#d35400'},
+];
+
+function initTheme(){
+  const saved=localStorage.getItem('en_theme');
+  if(saved){const t=JSON.parse(saved);applyTheme(t.primary,t.secondary);}
+  else{applyTheme('#1C2B2D','#D4A03D');}
+  const tc=document.getElementById('theme-colors');
+  if(tc){tc.innerHTML=THEMES.map(t=>`<div class="theme-btn" style="background:${t.primary};" title="${t.name}" onclick="applyTheme('${t.primary}','${t.secondary}')"></div>`).join('');}
+}
+function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
+function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
+document.addEventListener('click',(e)=>{const panel=document.getElementById('theme-panel');if(panel&&!panel.contains(e.target)&&!e.target.closest('[onclick="toggleThemePanel()"]')){panel.classList.remove('show');}});
+  // ═══════════════════════════════════════════════════════════════════
+// FEATURE 1: DSR EXECUTIVE FILTER
+// Add filterDSRByExec function + inject exec dropdown in renderDSR
+// ═══════════════════════════════════════════════════════════════════
+
+let _dsrAllData = [];
+
+function injectDSRExecFilter(data) {
+  _dsrAllData = data || [];
+  const isLead = ['Admin','Ops Lead','CSI Lead','Team Lead','SME'].includes(APP.user.role);
+  if (!isLead) return;
+  if (document.getElementById('dsr-exec-filter')) return;
+  const execs = [...new Set((_dsrAllData).map(d => d.entered_by).filter(Boolean))].sort();
+  const wrap = document.querySelector('#dsr-exec-filter-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<label style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:4px;">Executive</label>'
+    + '<select class="form-control" id="dsr-exec-filter" onchange="filterDSRByExec()">'
+    + '<option value="">-- All Executives --</option>'
+    + execs.map(function(e){ return '<option value="' + e + '">' + e + '</option>'; }).join('')
+    + '</select>';
+}
+
+function filterDSRByExec() {
+  const execVal = (document.getElementById('dsr-exec-filter') || {}).value || '';
+  const rows = document.querySelectorAll('#dsr-data-table tr[data-exec]');
+  rows.forEach(function(row) {
+    if (!execVal) { row.style.display = ''; return; }
+    row.style.display = (row.dataset.exec || '').toLowerCase().includes(execVal.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 2: HURDLE TRACKER
+// ═══════════════════════════════════════════════════════════════════
+
+async function renderHurdleTracker() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading hurdles...</div>';
+  const [hurdles, clients] = await Promise.all([api('GET','/hurdles'), getClients()]);
+  if (clients) APP.clients = clients;
+  const all = hurdles || [];
+  const statusFilter = window._hurdleStatus || 'Open';
+  const filtered = statusFilter === 'All' ? all : all.filter(function(h){ return h.status === statusFilter; });
+  const open = all.filter(function(h){ return h.status === 'Open'; }).length;
+  const inprog = all.filter(function(h){ return h.status === 'In Progress'; }).length;
+  const resolved = all.filter(function(h){ return h.status === 'Resolved'; }).length;
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="kpi-grid" style="margin-bottom:16px;">'
+    + '<div class="kpi-card red"><div class="kpi-label">🔴 Open</div><div class="kpi-value">' + open + '</div></div>'
+    + '<div class="kpi-card amber"><div class="kpi-label">⏳ In Progress</div><div class="kpi-value">' + inprog + '</div></div>'
+    + '<div class="kpi-card green"><div class="kpi-label">✅ Resolved</div><div class="kpi-value">' + resolved + '</div></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+    + '<div style="display:flex;gap:8px;">'
+    + '<button class="btn btn-sm ' + (statusFilter==='All'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'All\')">All (' + all.length + ')</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='Open'?'btn-primary':'btn-outline') + '" style="color:var(--red);border-color:var(--red);" onclick="setHurdleFilter(\'Open\')">🔴 Open</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='In Progress'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'In Progress\')">⏳ In Progress</button>'
+    + '<button class="btn btn-sm ' + (statusFilter==='Resolved'?'btn-primary':'btn-outline') + '" onclick="setHurdleFilter(\'Resolved\')">✅ Resolved</button>'
+    + '</div>'
+    + '<button class="btn btn-primary" onclick="openAddHurdle()">➕ Add Hurdle</button>'
+    + '</div>'
+    + buildHurdleTable(filtered);
+}
+
+function setHurdleFilter(status) {
+  window._hurdleStatus = status;
+  renderHurdleTracker();
+}
+
+function buildHurdleTable(hurdles) {
+  if (!hurdles.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>Koi hurdle nahi!</h3><p style="color:var(--text-muted);">Sab clients smooth chal rahe hain.</p></div>';
+  var rows = hurdles.map(function(h) {
+    var attempts = h.attempts || [];
+    var lastAttempt = attempts.length ? attempts[attempts.length-1] : null;
+    var statusClass = h.status==='Resolved' ? 'badge-green' : h.status==='In Progress' ? 'badge-blue' : 'badge-red';
+    var daysSince = h.created_at ? Math.floor((Date.now() - new Date(h.created_at)) / 86400000) : 0;
+    return '<tr>'
+      + '<td><strong>' + (h.client_name || h.client_code) + '</strong><br><small style="color:var(--text-muted);">' + h.client_code + '</small></td>'
+      + '<td style="max-width:200px;font-size:13px;">' + (h.description || '').slice(0, 80) + (h.description && h.description.length > 80 ? '...' : '') + '</td>'
+      + '<td><span class="badge ' + statusClass + '">' + h.status + '</span></td>'
+      + '<td style="text-align:center;"><strong>' + attempts.length + '</strong> attempts</td>'
+      + '<td style="font-size:12px;">' + (lastAttempt ? (lastAttempt.channel || '') + '<br>' + new Date(lastAttempt.date).toLocaleDateString('en-IN') : '—') + '</td>'
+      + '<td style="font-size:12px;color:var(--text-muted);">' + h.added_by + '<br>' + daysSince + 'd ago</td>'
+      + '<td>'
+      + '<button class="btn btn-sm btn-primary" onclick="openHurdleDetail(\'' + h.id + '\')">📋 Detail</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+
+  return '<div class="card"><div class="card-body" style="padding:0;"><div class="table-wrap">'
+    + '<table><thead><tr>'
+    + '<th>Client</th><th>Hurdle</th><th>Status</th><th>Attempts</th><th>Last Contact</th><th>Added By</th><th>Action</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+}
+
+async function openAddHurdle() {
+  const clients = APP.clients || [];
+  openPanel('🚧 Add Client Hurdle', `
+    <div style="background:#fef9e7;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;border-left:4px solid var(--amber);">
+      ⚠️ <strong>Important:</strong> Hurdle add karne se pehle client ko email karna MANDATORY hai.
+    </div>
+
+    <div class="form-group">
+      <label>Client *</label>
+      <select class="form-control" id="h-client">
+        <option value="">-- Select Client --</option>
+        ${clients.map(function(c){ return '<option value="' + c.clientCode + '">' + c.busyName + ' (' + c.clientCode + ')</option>'; }).join('')}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Hurdle Description * <span style="color:var(--text-muted);font-size:11px;">(Kya kaam nahi kar raha hai?)</span></label>
+      <textarea class="form-control" id="h-desc" rows="4" placeholder="Seller ne kya nahi kiya / kya problem hai..."></textarea>
+    </div>
+
+    <div style="background:#d5f5e3;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">📧 Email Confirmation (Required)</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
+        <input type="checkbox" id="h-email-sent" onchange="toggleHurdleEmail()" style="width:18px;height:18px;accent-color:var(--green);">
+        <span style="font-size:13px;font-weight:600;">Maine client ko email kar diya hai</span>
+      </label>
+      <div id="h-email-fields" style="display:none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email Date</label>
+            <input type="date" class="form-control" id="h-email-date">
+          </div>
+          <div class="form-group">
+            <label>Email Subject</label>
+            <input type="text" class="form-control" id="h-email-subject" placeholder="Subject line...">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Pehli Communication</label>
+      <div class="form-row">
+        <div class="form-group">
+          <select class="form-control" id="h-channel">
+            <option value="">Channel</option>
+            <option>Phone</option><option>WhatsApp</option><option>Email</option><option>Meeting</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select class="form-control" id="h-response">
+            <option value="">Response</option>
+            <option>No Response</option><option>Promised</option><option>Partial</option><option>Refused</option>
+          </select>
+        </div>
+      </div>
+      <input type="text" class="form-control" id="h-notes" placeholder="Notes (kya bola client ne)...">
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitHurdle()">🚧 Add Hurdle</button>
+  `);
+}
+
+function toggleHurdleEmail() {
+  var checked = document.getElementById('h-email-sent').checked;
+  document.getElementById('h-email-fields').style.display = checked ? '' : 'none';
+}
+
+async function submitHurdle() {
+  const clientSel = document.getElementById('h-client');
+  const clientCode = clientSel.value;
+  const clientName = clientSel.options[clientSel.selectedIndex]?.text?.split(' (')[0] || '';
+  const desc = document.getElementById('h-desc').value.trim();
+  const emailSent = document.getElementById('h-email-sent').checked;
+
+  if (!clientCode) { showToast('Client select karo', 'error'); return; }
+  if (!desc) { showToast('Hurdle description daalo', 'error'); return; }
+  if (!emailSent) { showToast('Email confirmation required hai!', 'error'); return; }
+
+  const attempt = {
+    channel: document.getElementById('h-channel').value,
+    response: document.getElementById('h-response').value,
+    notes: document.getElementById('h-notes').value,
+  };
+
+  const r = await api('POST', '/hurdles', {
+    clientCode, clientName, description: desc,
+    emailSent: true,
+    emailDate: document.getElementById('h-email-date').value,
+    emailSubject: document.getElementById('h-email-subject').value,
+    attempt: attempt.channel ? attempt : null,
+  });
+
+  if (r?.success) {
+    showToast('✅ Hurdle added!', 'success');
+    closePanel();
+    renderHurdleTracker();
+  } else {
+    showToast(r?.error || 'Error adding hurdle', 'error');
+  }
+}
+
+async function openHurdleDetail(hurdleId) {
+  const hurdles = await api('GET', '/hurdles');
+  const h = (hurdles || []).find(function(x){ return x.id === hurdleId; });
+  if (!h) { showToast('Hurdle not found', 'error'); return; }
+
+  const attempts = h.attempts || [];
+  const attemptsHtml = attempts.length
+    ? attempts.map(function(a, i) {
+        var channelIcon = a.channel === 'Phone' ? '📞' : a.channel === 'WhatsApp' ? '💬' : a.channel === 'Email' ? '📧' : '🤝';
+        var responseClass = a.response === 'No Response' ? 'badge-red' : a.response === 'Promised' ? 'badge-green' : 'badge-amber';
+        return '<div style="display:flex;gap:10px;padding:10px;background:#fff;border-radius:8px;margin-bottom:6px;border-left:3px solid var(--secondary);">'
+          + '<div style="font-size:20px;">' + channelIcon + '</div>'
+          + '<div style="flex:1;">'
+          + '<div style="font-size:13px;font-weight:600;">' + (a.channel || '—') + ' — ' + (a.addedBy || '') + '</div>'
+          + '<div style="font-size:12px;color:var(--text-muted);">' + new Date(a.date).toLocaleString('en-IN') + '</div>'
+          + (a.notes ? '<div style="font-size:12px;margin-top:4px;">' + a.notes + '</div>' : '')
+          + '</div>'
+          + '<span class="badge ' + responseClass + '" style="font-size:10px;align-self:flex-start;">' + (a.response || '—') + '</span>'
+          + '</div>';
+      }).join('')
+    : '<div style="color:var(--text-muted);font-size:13px;padding:8px;">Koi attempt log nahi hua abhi</div>';
+
+  const statusOptions = ['Open','In Progress','Resolved'].map(function(s){
+    return '<option value="' + s + '"' + (h.status === s ? ' selected' : '') + '>' + s + '</option>';
+  }).join('');
+
+  openPanel('📋 Hurdle: ' + (h.client_name || h.client_code),
+    '<div style="background:#d6eaf8;border-radius:8px;padding:12px;margin-bottom:14px;">'
+    + '<strong>' + (h.client_name || h.client_code) + '</strong> | ' + h.client_code + '<br>'
+    + '<span style="font-size:12px;color:#1a5276;">' + h.description + '</span>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">'
+    + '<label style="font-size:13px;font-weight:600;">Status:</label>'
+    + '<select class="form-control" id="h-status-sel" style="width:auto;" onchange="updateHurdleStatus(\'' + hurdleId + '\')">'
+    + statusOptions
+    + '</select>'
+    + '</div>'
+
+    + (h.email_sent ? '<div style="background:#d5f5e3;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;">✅ Email sent: <strong>' + (h.email_date || '') + '</strong> — ' + (h.email_subject || '') + '</div>' : '')
+
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">📞 Communication History (' + attempts.length + ' attempts)</div>'
+    + attemptsHtml
+
+    + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">'
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">➕ New Attempt Log</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><select class="form-control" id="na-channel"><option value="">Channel</option><option>Phone</option><option>WhatsApp</option><option>Email</option><option>Meeting</option></select></div>'
+    + '<div class="form-group"><select class="form-control" id="na-response"><option value="">Response</option><option>No Response</option><option>Promised</option><option>Partial</option><option>Refused</option><option>Resolved</option></select></div>'
+    + '</div>'
+    + '<input type="text" class="form-control" id="na-notes" placeholder="Notes (kya bola client ne)..." style="margin-bottom:10px;">'
+    + '<button class="btn btn-secondary btn-full" onclick="addHurdleAttempt(\'' + hurdleId + '\')">📝 Log Attempt</button>'
+    + '</div>'
+  );
+}
+
+async function updateHurdleStatus(hurdleId) {
+  const status = document.getElementById('h-status-sel').value;
+  const r = await api('PATCH', '/hurdles/' + hurdleId, { status });
+  if (r?.success) { showToast('✅ Status updated!', 'success'); renderHurdleTracker(); }
+}
+
+async function addHurdleAttempt(hurdleId) {
+  const channel = document.getElementById('na-channel').value;
+  const response = document.getElementById('na-response').value;
+  const notes = document.getElementById('na-notes').value;
+  if (!channel) { showToast('Channel select karo', 'error'); return; }
+  const r = await api('PATCH', '/hurdles/' + hurdleId, {
+    attempt: { channel, response, notes }
+  });
+  if (r?.success) {
+    showToast('✅ Attempt logged!', 'success');
+    closePanel();
+    renderHurdleTracker();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 3: AMAZON REPORT ANALYZER
+// ═══════════════════════════════════════════════════════════════════
+
+let _reportData = {
+  business: null,
+  targeting: null,
+  advertised: null,
+  searchterm: null,
+  inventory: null,
+  returns: null,
+};
+let _reportInsights = [];
+let _reportClientCode = '';
+let _reportClientName = '';
+
+async function renderReportAnalyzer() {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Upload karo → AI Analysis → Task Create karo</span></div>'
+    + '<div class="card-body">'
+
+    + '<div class="form-group" style="margin-bottom:20px;">'
+    + '<label style="font-weight:700;">Seller Select Karo *</label>'
+    + '<select class="form-control" id="ra-client" onchange="setRAClient()">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + (clients || []).map(function(c){ return '<option value="' + c.clientCode + '">' + c.busyName + ' (' + c.marketplace + ')</option>'; }).join('')
+    + '</select>'
+    + '</div>'
+
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">'
+    + buildUploadCard('business', '📊', 'Business Report', 'Sessions, Page Views, Conversion, Sales', '.csv')
+    + buildUploadCard('targeting', '🎯', 'Sponsored Products Targeting', 'Keywords, ACOS, Spend, CTR', '.xlsx,.csv')
+    + buildUploadCard('advertised', '📢', 'Advertised Product Report', 'ASIN-level ads performance', '.xlsx,.csv')
+    + buildUploadCard('searchterm', '🔍', 'Search Term Report', 'Customer search terms', '.xlsx,.csv')
+    + buildUploadCard('inventory', '📦', 'Inventory Report', 'FBA Stock, Replenishment needed', '.xlsx,.csv,.txt')
+    + buildUploadCard('returns', '🔄', 'Returns Report', 'Return reasons and count', '.tsv,.csv')
+    + '</div>'
+
+    + '<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">'
+    + '<button class="btn btn-primary" onclick="runReportAnalysis()" style="font-size:15px;padding:12px 24px;">🔍 Analyze All Reports</button>'
+    + '<button class="btn btn-outline" onclick="clearAllReports()">🗑️ Clear All</button>'
+    + '</div>'
+    + '</div></div>'
+
+    + '<div id="ra-results"></div>';
+}
+
+function buildUploadCard(type, icon, title, subtitle, accept) {
+  return '<div id="card-' + type + '" style="border:2px dashed var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s;background:#fff;" '
+    + 'onclick="document.getElementById(\'file-' + type + '\').click()" '
+    + 'onmouseover="this.style.borderColor=\'var(--secondary)\'" '
+    + 'onmouseout="this.style.borderColor=\'var(--border)\'">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
+    + '<span style="font-size:24px;">' + icon + '</span>'
+    + '<div>'
+    + '<div style="font-weight:700;font-size:14px;">' + title + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">' + subtitle + '</div>'
+    + '</div>'
+    + '</div>'
+    + '<div id="status-' + type + '" style="font-size:12px;color:var(--text-muted);">Click to upload</div>'
+    + '<input type="file" id="file-' + type + '" accept="' + accept + '" style="display:none;" onchange="handleReportUpload(\'' + type + '\', this)">'
+    + '</div>';
+}
+
+function setRAClient() {
+  var sel = document.getElementById('ra-client');
+  _reportClientCode = sel.value;
+  _reportClientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+}
+
+async function handleReportUpload(type, input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var statusEl = document.getElementById('status-' + type);
+  var cardEl = document.getElementById('card-' + type);
+  statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
+
+  try {
+    var content = await readFileContent(file, type);
+    _reportData[type] = { raw: content, filename: file.name };
+    statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
+    cardEl.style.borderColor = 'var(--green)';
+    cardEl.style.background = '#f0fff4';
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:var(--red);">❌ Error: ' + e.message + '</span>';
+  }
+}
+
+function readFileContent(file, type) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.onerror = function() { reject(new Error('File read error')); };
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
+
+function clearAllReports() {
+  _reportData = { business: null, targeting: null, advertised: null, searchterm: null, inventory: null, returns: null };
+  renderReportAnalyzer();
+}
+
+async function runReportAnalysis() {
+  if (!_reportClientCode) { showToast('Pehle seller select karo!', 'error'); return; }
+  var hasData = Object.values(_reportData).some(function(v){ return v !== null; });
+  if (!hasData) { showToast('Pehle koi report upload karo!', 'error'); return; }
+
+  var results = document.getElementById('ra-results');
+  results.innerHTML = '<div class="loading"><div class="spinner"></div> Reports analyze ho rahi hain...</div>';
+
+  try {
+    var insights = [];
+
+    // Parse Business Report
+    if (_reportData.business) {
+      var bizInsights = parseBusinessReport(_reportData.business.raw);
+      insights = insights.concat(bizInsights);
+    }
+
+    // Parse Inventory
+    if (_reportData.inventory) {
+      var invInsights = parseInventoryReport(_reportData.inventory.raw);
+      insights = insights.concat(invInsights);
+    }
+
+    // Parse Ads (Targeting)
+    if (_reportData.targeting) {
+      var adsInsights = parseAdsReport(_reportData.targeting.raw);
+      insights = insights.concat(adsInsights);
+    }
+
+    // Parse Advertised Product
+    if (_reportData.advertised) {
+      var advInsights = parseAdvertisedReport(_reportData.advertised.raw);
+      insights = insights.concat(advInsights);
+    }
+
+    // Parse Search Terms
+    if (_reportData.searchterm) {
+      var stInsights = parseSearchTermReport(_reportData.searchterm.raw);
+      insights = insights.concat(stInsights);
+    }
+
+    // Parse Returns
+    if (_reportData.returns) {
+      var retInsights = parseReturnsReport(_reportData.returns.raw);
+      insights = insights.concat(retInsights);
+    }
+
+    _reportInsights = insights;
+    renderInsights(insights);
+
+  } catch(e) {
+    results.innerHTML = '<div class="card"><div class="card-body"><p style="color:var(--red);">Error: ' + e.message + '</p></div></div>';
+  }
+}
+
+function parseCSV(text) {
+  var lines = text.trim().split('\n');
+  if (!lines.length) return [];
+  // Handle BOM
+  lines[0] = lines[0].replace(/^\uFEFF/, '');
+  var headers = parseCSVLine(lines[0]);
+  var rows = [];
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var vals = parseCSVLine(lines[i]);
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+    else { current += ch; }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseTSV(text) {
+  var lines = text.trim().split('\n');
+  if (!lines.length) return [];
+  var headers = lines[0].split('\t');
+  var rows = [];
+  for (var i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    var vals = lines[i].split('\t');
+    var obj = {};
+    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function cleanNum(val) {
+  if (!val) return 0;
+  return parseFloat(String(val).replace(/[₹,%\s]/g,'').replace(/,/g,'')) || 0;
+}
+
+function parseBusinessReport(raw) {
+  var rows = parseCSV(raw);
+  var insights = [];
+  var lowConvItems = [];
+  var highSessionLowConv = [];
+  var lowBuyBox = [];
+
+  rows.forEach(function(row) {
+    var sessions = cleanNum(row['Sessions - Total'] || row['Sessions']);
+    var units = cleanNum(row['Units Ordered']);
+    var sales = cleanNum(row['Ordered Product Sales'] || row['Sales(INR)']);
+    var convRaw = row['Unit Session Percentage'] || row['Conversion rate'] || '0';
+    var conv = cleanNum(convRaw);
+    var fop = cleanNum(row['Featured Offer Percentage'] || '100');
+    var title = (row['Title'] || '').slice(0, 60);
+    var sku = row['SKU'] || row['(Child) ASIN'] || '';
+
+    if (sessions > 100 && conv < 5) {
+      lowConvItems.push({ title: title, sessions: sessions, conv: conv, sales: sales, sku: sku });
+    }
+    if (sessions > 300 && conv < 10) {
+      highSessionLowConv.push({ title: title, sessions: sessions, conv: conv });
+    }
+    if (fop < 80 && sessions > 50) {
+      lowBuyBox.push({ title: title, fop: fop });
+    }
+  });
+
+  if (lowConvItems.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '📉',
+      title: 'Low Conversion Products (' + lowConvItems.length + ')',
+      detail: lowConvItems.slice(0,3).map(function(x){ return x.title + ' — ' + x.sessions + ' sessions, ' + x.conv + '% conv'; }).join(' | '),
+      suggestions: [
+        { text: 'Main images improve karo — white background, zoomable', dept: 'Ops', time: 2 },
+        { text: 'Price competitive karo — competitor price check karo', dept: 'Ops', time: 1 },
+        { text: 'A+ content add karo listing mein', dept: 'Ops', time: 3 },
+        { text: 'Review count badhao — request review button use karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  if (highSessionLowConv.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '👁️',
+      title: 'High Traffic But Low Sales (' + highSessionLowConv.length + ' products)',
+      detail: highSessionLowConv.slice(0,2).map(function(x){ return x.title + ' (' + x.sessions + ' sessions)'; }).join(' | '),
+      suggestions: [
+        { text: 'Listing bullet points rewrite karo — benefits highlight karo', dept: 'Ops', time: 2 },
+        { text: 'Discount coupon add karo listing pe', dept: 'Ops', time: 1 },
+        { text: 'Video content add karo listing mein', dept: 'Ops', time: 5 },
+      ]
+    });
+  }
+
+  if (lowBuyBox.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '🏆',
+      title: 'Buy Box Loss (' + lowBuyBox.length + ' products)',
+      detail: lowBuyBox.slice(0,2).map(function(x){ return x.title + ' (' + x.fop + '% FOP)'; }).join(' | '),
+      suggestions: [
+        { text: 'Buy Box recover karo — price match competitor', dept: 'Ops', time: 1 },
+        { text: 'FBA se fulfill karo agar MFN hai', dept: 'Ops', time: 3 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseInventoryReport(raw) {
+  var insights = [];
+  var rows;
+  if (raw.includes('\t')) {
+    rows = parseTSV(raw);
+  } else {
+    rows = parseCSV(raw);
+  }
+
+  var outOfStock = [];
+  var lowStock = [];
+  var needReplenish = [];
+
+  rows.forEach(function(row) {
+    var qty = cleanNum(row['Quantity Available'] || row['Current FBA Stock'] || '0');
+    var replenish = cleanNum(row['Replenish Inventory'] || '0');
+    var sku = row['seller-sku'] || row['SKU'] || '';
+    var title = (row['Title'] || sku || '').slice(0, 60);
+
+    if (qty === 0) outOfStock.push({ sku: sku, title: title, replenish: replenish });
+    else if (qty < 10 && qty > 0) lowStock.push({ sku: sku, title: title, qty: qty });
+    if (replenish > 0) needReplenish.push({ sku: sku, title: title, replenish: replenish });
+  });
+
+  if (outOfStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'urgent',
+      icon: '🚨',
+      title: 'OUT OF STOCK — ' + outOfStock.length + ' Products!',
+      detail: outOfStock.slice(0,3).map(function(x){ return (x.title || x.sku); }).join(' | '),
+      suggestions: [
+        { text: 'FBA mein stock bhejo ASAP — ' + outOfStock.length + ' products out of stock hain. Sales loss ho raha hai!', dept: 'Ops', time: 1 },
+        { text: 'Out of stock SKUs pe ads pause karo — wasted spend rokne ke liye', dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (lowStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'high',
+      icon: '⚠️',
+      title: 'Low Stock Warning (' + lowStock.length + ' products < 10 units)',
+      detail: lowStock.slice(0,3).map(function(x){ return x.title + ' (' + x.qty + ' left)'; }).join(' | '),
+      suggestions: [
+        { text: 'Replenishment plan banao — low stock products ke liye shipment schedule karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  if (needReplenish.length > outOfStock.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '📦',
+      title: 'Replenishment Needed (' + needReplenish.length + ' products)',
+      detail: needReplenish.slice(0,3).map(function(x){ return x.title + ' (' + x.replenish + ' units)'; }).join(' | '),
+      suggestions: [
+        { text: 'Inventory plan review karo aur FBA shipment create karo', dept: 'Ops', time: 3 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseAdsReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var highSpendNoSales = [];
+  var highACOS = [];
+  var goodCTRLowConv = [];
+  var totalSpend = 0;
+  var totalSales = 0;
+
+  rows.forEach(function(row) {
+    var spend = cleanNum(row['Spend'] || '0');
+    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
+    var acos = cleanNum(row['Total Advertising Cost of Sales (ACOS) '] || '0');
+    var clicks = cleanNum(row['Clicks'] || '0');
+    var ctr = cleanNum(row['Click-Through Rate (CTR)'] || '0');
+    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
+    var keyword = row['Targeting'] || row['Customer Search Term'] || '';
+    totalSpend += spend;
+    totalSales += sales;
+
+    if (spend > 100 && sales === 0) highSpendNoSales.push({ keyword: keyword, spend: spend, clicks: clicks });
+    if (acos > 50 && spend > 50) highACOS.push({ keyword: keyword, acos: acos, spend: spend });
+    if (ctr > 0.5 && conv < 5 && spend > 50) goodCTRLowConv.push({ keyword: keyword, ctr: ctr, conv: conv });
+  });
+
+  var overallACOS = totalSales > 0 ? Math.round((totalSpend / totalSales) * 100) : 0;
+
+  if (highSpendNoSales.length) {
+    var totalWasted = highSpendNoSales.reduce(function(s,x){ return s + x.spend; }, 0);
+    insights.push({
+      type: 'ads',
+      priority: 'urgent',
+      icon: '💸',
+      title: 'Wasted Spend — ₹' + Math.round(totalWasted).toLocaleString('en-IN') + ' on ' + highSpendNoSales.length + ' keywords (0 sales)',
+      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.keyword + '" ₹' + Math.round(x.spend); }).join(' | '),
+      suggestions: [
+        { text: 'Ye keywords pause karo ya bid ₹5 tak kam karo: ' + highSpendNoSales.slice(0,5).map(function(x){ return x.keyword; }).join(', '), dept: 'Ads', time: 1 },
+        { text: 'Negative keywords add karo irrelevant traffic rokne ke liye', dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (highACOS.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'high',
+      icon: '📊',
+      title: 'High ACOS Keywords (' + highACOS.length + ' keywords > 50% ACOS)',
+      detail: highACOS.slice(0,3).map(function(x){ return '"' + x.keyword + '" ACOS:' + x.acos + '%'; }).join(' | '),
+      suggestions: [
+        { text: 'High ACOS keywords ke bids 20-30% kam karo', dept: 'Ads', time: 1 },
+        { text: 'Campaign structure review karo — exact match mein move karo', dept: 'Ads', time: 2 },
+      ]
+    });
+  }
+
+  if (overallACOS > 30) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '📈',
+      title: 'Overall ACOS ' + overallACOS + '% — Target 20-25% hona chahiye',
+      detail: 'Total Spend: ₹' + Math.round(totalSpend).toLocaleString('en-IN') + ' | Total Sales: ₹' + Math.round(totalSales).toLocaleString('en-IN'),
+      suggestions: [
+        { text: 'Budget allocation review karo — top performing campaigns mein shift karo', dept: 'Ads', time: 2 },
+        { text: 'Dayparting set karo — peak hours mein hi ads chalao', dept: 'Ads', time: 2 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseAdvertisedReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var lowImpression = [];
+  rows.forEach(function(row) {
+    var imp = cleanNum(row['Impressions'] || '0');
+    var spend = cleanNum(row['Spend'] || '0');
+    var asin = row['Advertised ASIN'] || row['(Child) ASIN'] || '';
+    var sku = row['Advertised SKU'] || '';
+    if (imp < 100 && spend > 0) lowImpression.push({ asin: asin, sku: sku, imp: imp, spend: spend });
+  });
+
+  if (lowImpression.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '👁️',
+      title: 'Low Impression ASINs (' + lowImpression.length + ' products < 100 impressions)',
+      detail: 'Yeh products ads mein proper show nahi ho rahe',
+      suggestions: [
+        { text: 'Low impression ASINs ke bids increase karo 30-50%', dept: 'Ads', time: 1 },
+        { text: 'Campaign mein broader match types add karo', dept: 'Ads', time: 2 },
+        { text: 'Product listing quality check karo — listing suppressed to nahi?', dept: 'Ops', time: 1 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseSearchTermReport(raw) {
+  var insights = [];
+  var rows = parseCSV(raw);
+  if (!rows.length) return insights;
+
+  var highConvTerms = [];
+  var highSpendNoSales = [];
+
+  rows.forEach(function(row) {
+    var term = row['Customer Search Term'] || '';
+    var orders = cleanNum(row['7 Day Total Orders (#)'] || '0');
+    var spend = cleanNum(row['Spend'] || '0');
+    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
+    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
+    var clicks = cleanNum(row['Clicks'] || '0');
+
+    if (orders >= 2 && conv > 10 && term) highConvTerms.push({ term: term, orders: orders, conv: conv });
+    if (spend > 200 && sales === 0 && term) highSpendNoSales.push({ term: term, spend: spend });
+  });
+
+  if (highConvTerms.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'medium',
+      icon: '🌟',
+      title: 'High Converting Search Terms (' + highConvTerms.length + ' terms)',
+      detail: highConvTerms.slice(0,3).map(function(x){ return '"' + x.term + '" ' + x.conv + '% conv'; }).join(' | '),
+      suggestions: [
+        { text: 'Yeh terms exact match mein add karo aur budget badhao: ' + highConvTerms.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  if (highSpendNoSales.length) {
+    insights.push({
+      type: 'ads',
+      priority: 'high',
+      icon: '🚫',
+      title: 'Irrelevant Search Terms (' + highSpendNoSales.length + ' terms — spend without sales)',
+      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.term + '" ₹' + Math.round(x.spend); }).join(' | '),
+      suggestions: [
+        { text: 'Yeh search terms negative mein add karo: ' + highSpendNoSales.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function parseReturnsReport(raw) {
+  var insights = [];
+  var rows = parseTSV(raw);
+  if (rows.length < 2) return insights;
+
+  var reasons = {};
+  rows.forEach(function(row) {
+    var reason = row['Return reason'] || '';
+    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+  });
+
+  var topReasons = Object.entries(reasons).sort(function(a,b){ return b[1]-a[1]; }).slice(0,3);
+  if (topReasons.length) {
+    insights.push({
+      type: 'ops',
+      priority: 'medium',
+      icon: '🔄',
+      title: 'Returns Analysis (' + rows.length + ' returns)',
+      detail: topReasons.map(function(r){ return r[0] + ': ' + r[1]; }).join(' | '),
+      suggestions: [
+        { text: 'Return reasons analyze karo aur product quality/packaging improve karo', dept: 'Ops', time: 3 },
+        { text: 'High return rate ASINs ki listings mein accurate size/spec add karo', dept: 'Ops', time: 2 },
+      ]
+    });
+  }
+
+  return insights;
+}
+
+function renderInsights(insights) {
+  var results = document.getElementById('ra-results');
+  if (!insights.length) {
+    results.innerHTML = '<div class="empty-state"><div class="emoji">✅</div><h3>Koi major issue nahi mila!</h3><p>Reports analyze ho gayi — sab theek dikh raha hai.</p></div>';
+    return;
+  }
+
+  var urgent = insights.filter(function(x){ return x.priority === 'urgent'; });
+  var high = insights.filter(function(x){ return x.priority === 'high'; });
+  var medium = insights.filter(function(x){ return x.priority === 'medium'; });
+
+  var html = '<div style="margin-bottom:16px;">'
+    + '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">📊 Analysis Complete — ' + _reportClientName + '</div>'
+    + '<div style="font-size:13px;color:var(--text-muted);">' + insights.length + ' insights mili | '
+    + (urgent.length ? '<span style="color:var(--red);">🚨 ' + urgent.length + ' Urgent</span> | ' : '')
+    + '<span style="color:var(--orange);">⚠️ ' + high.length + ' High</span> | '
+    + '<span style="color:var(--amber);">📌 ' + medium.length + ' Medium</span>'
+    + '</div></div>';
+
+  // All suggestions list for task creation
+  var allSuggestions = [];
+  insights.forEach(function(ins){ allSuggestions = allSuggestions.concat(ins.suggestions || []); });
+
+  insights.forEach(function(ins, idx) {
+    var priorityColor = ins.priority === 'urgent' ? 'var(--red)' : ins.priority === 'high' ? 'var(--orange)' : 'var(--amber)';
+    var priorityBg = ins.priority === 'urgent' ? '#fadbd8' : ins.priority === 'high' ? '#fdebd0' : '#fef9e7';
+    var deptColor = ins.type === 'ads' ? 'badge-blue' : 'badge-green';
+
+    var suggestionsHtml = (ins.suggestions || []).map(function(s, sidx) {
+      var globalIdx = allSuggestions.indexOf(s);
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#fff;border-radius:8px;margin-bottom:6px;border:1px solid var(--border);">'
+        + '<div style="flex:1;">'
+        + '<span class="badge ' + deptColor + '" style="font-size:10px;margin-bottom:4px;">' + s.dept + '</span>'
+        + '<div style="font-size:13px;">' + s.text + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">⏱ ' + s.time + ' din mein karo</div>'
+        + '</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="createTaskFromInsight(' + JSON.stringify(s.text).replace(/'/g,"\\'") + ',' + JSON.stringify(s.dept) + ',' + s.time + ')" style="white-space:nowrap;font-size:11px;">➕ Task</button>'
+        + '</div>';
+    }).join('');
+
+    html += '<div class="card" style="margin-bottom:12px;border-left:4px solid ' + priorityColor + ';">'
+      + '<div class="card-header" style="background:' + priorityBg + ';">'
+      + '<span style="font-size:16px;">' + ins.icon + '</span>'
+      + '<span class="card-title" style="font-size:14px;">' + ins.title + '</span>'
+      + '<span class="badge" style="background:' + priorityColor + '20;color:' + priorityColor + ';font-size:10px;">' + ins.priority.toUpperCase() + '</span>'
+      + '</div>'
+      + '<div class="card-body">'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">' + ins.detail + '</div>'
+      + '<div style="font-weight:700;font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">💡 Suggested Tasks:</div>'
+      + suggestionsHtml
+      + '</div></div>';
+  });
+
+  results.innerHTML = html;
+}
+
+async function createTaskFromInsight(text, dept, days) {
+  if (!_reportClientCode) { showToast('Seller select nahi hai!', 'error'); return; }
+  var deadline = new Date();
+  deadline.setDate(deadline.getDate() + days);
+  var deadlineStr = deadline.toISOString().split('T')[0];
+
+  var category = dept === 'Ads' ? 'Ads Campaign' : 'Account Management';
+  var priority = days <= 1 ? 'Critical' : days <= 2 ? 'High' : 'Medium';
+
+  var r = await api('POST', '/tasks', {
+    title: text.slice(0, 120),
+    description: 'Amazon Report Analysis se auto-generated task. Client: ' + _reportClientName,
+    clientCode: _reportClientCode,
+    clientName: _reportClientName,
+    assignedTo: APP.user.name,
+    assignedBy: APP.user.name,
+    priority: priority,
+    category: category,
+    deadline: deadlineStr,
+  });
+
+  if (r?.success) {
+    showToast('✅ Task created: ' + r.taskId, 'success');
+  } else {
+    showToast('Error creating task', 'error');
+  }
+}
+// ═══════════════════════════════════════════════════════════════════
+// AMAZON REPORT ANALYZER v2 — ASIN LEVEL + SALES PROJECTION
+// Replace previous renderReportAnalyzer section in FRONTEND_ALL.js
+// ═══════════════════════════════════════════════════════════════════
+
+// Global data store
+var _ra = {
+  client: '', clientName: '',
+  business: null, targeting: null, advertised: null,
+  searchterm: null, inventory: null, returns: null,
+  dsrHistory: null,
+  asinMap: {},        // ASIN -> merged data
+  keywordMap: {},     // ASIN -> best keywords
+  tasks: [],          // Generated tasks
+};
+
+// ─── MAIN RENDER ─────────────────────────────────────────────────
+async function renderReportAnalyzer() {
+  const [clients, recentLogs] = await Promise.all([
+    getClients(),
+    api('GET', '/report-analyzer/logs?_='+Date.now()),
+  ]);
+  if (clients) APP.clients = clients;
+  const logs = recentLogs || [];
+  const isLead = ['Admin','Ops Lead','Sub Admin','SME','Team Lead','Senior Executive'].includes(APP.user.role);
+
+  // Last 5 logs panel
+  let logsHtml = '';
+  if (logs.length) {
+    logsHtml = '<div class="card" style="margin-bottom:16px;">'
+      + '<div class="card-header"><span class="card-title">🕐 Recent Analyses</span>'
+      + '<span style="font-size:12px;color:var(--text-muted);">Last '+logs.length+' analyses</span></div>'
+      + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+      + '<thead><tr><th>#</th><th>Seller</th><th>Analyzed By</th><th>Reports</th><th>Date</th><th>Tasks</th><th></th></tr></thead><tbody>'
+      + logs.map((l,i) => {
+          const reports = (l.reports_uploaded||[]).join(', ') || '—';
+          const taskCount = (l.tasks_generated||[]).length;
+          const doneCount = (l.tasks_generated||[]).filter(t=>t.status==='done').length;
+          const date = new Date(l.analyzed_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+          const time = new Date(l.analyzed_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+          return '<tr>'
+            + '<td>'+(i+1)+'</td>'
+            + '<td><strong>'+l.client_name+'</strong></td>'
+            + '<td><span style="font-size:12px;">'+l.analyzed_by+'</span><br><span style="font-size:10px;color:var(--text-muted);">'+l.analyzed_by_role+'</span></td>'
+            + '<td style="font-size:11px;color:var(--text-muted);">'+reports+'</td>'
+            + '<td style="font-size:12px;">'+date+'<br><span style="color:var(--text-muted);">'+time+'</span></td>'
+            + '<td>'
+              + (taskCount ? '<span class="badge badge-blue">'+taskCount+' tasks</span> '
+                + '<span class="badge badge-green">'+doneCount+' done</span> '
+                + (taskCount-doneCount > 0 ? '<span class="badge badge-red">'+(taskCount-doneCount)+' pending</span>' : '')
+                : '<span style="color:var(--text-muted);font-size:12px;">—</span>')
+            + '</td>'
+            + '<td><button class="btn btn-sm btn-outline" data-lid="'+l.log_id+'" onclick="viewRALog(this.getAttribute(\'data-lid\'))">👁 View</button></td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div></div></div>';
+  }
+
+  document.getElementById('page-content').innerHTML =
+    logsHtml
+    + '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">ASIN-level insights + AI tasks + Sales Projection</span></div>'
+    + '<div class="card-body">'
+    + '<div class="form-group" style="margin-bottom:16px;">'
+    + '<label style="font-weight:700;">Seller Select Karo *</label>'
+    + '<select class="form-control" id="ra-client" onchange="raSetClient()">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + (clients||[]).map(c => '<option value="'+c.clientCode+'">'+c.busyName+' ('+c.marketplace+')</option>').join('')
+    + '</select></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">'
+    + raUploadCard('business',  '📊', 'Business Report',         'Sessions/Conv/Sales per ASIN',        '.csv')
+    + raUploadCard('targeting', '🎯', 'SP Targeting Report',     'Keywords, ACOS, Spend',               '.xlsx,.csv')
+    + raUploadCard('advertised','📢', 'Advertised Product',      'ASIN-level ads perf',                 '.xlsx,.csv')
+    + raUploadCard('searchterm','🔍', 'Search Term Report',      'Customer keywords',                   '.xlsx,.csv')
+    + raUploadCard('inventory', '📦', 'Inventory Report',        'FBA stock levels',                    '.xlsx,.csv,.txt')
+    + raUploadCard('returns',   '🔄', 'Returns Report',          'Return reasons',                      '.tsv,.csv')
+    + '</div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    + '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;" onclick="raRunAnalysis()">🔍 Analyze & Generate Tasks</button>'
+    + '<button class="btn btn-outline" onclick="renderReportAnalyzer()">🗑 Clear All</button>'
+    + '</div></div></div>'
+    + '<div id="ra-results"></div>';
+}
+
+function raUploadCard(type, icon, title, sub, accept) {
+  return '<div id="racard-'+type+'" style="border:2px dashed var(--border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;transition:all 0.2s;" onclick="document.getElementById(\'rafile-'+type+'\').click()" onmouseover="this.style.borderColor=\'var(--secondary)\'" onmouseout="this.style.borderColor=(_ra.'+type+'?\'var(--green)\':\'var(--border)\')">'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+    + '<span style="font-size:22px;">'+icon+'</span>'
+    + '<div><div style="font-weight:700;font-size:13px;">'+title+'</div><div style="font-size:11px;color:var(--text-muted);">'+sub+'</div></div></div>'
+    + '<div id="rastatus-'+type+'" style="font-size:12px;color:var(--text-muted);">Click to upload</div>'
+    + '<input type="file" id="rafile-'+type+'" accept="'+accept+'" style="display:none;" onchange="raHandleUpload(\''+type+'\',this)">'
+    + '</div>';
+}
+
+function raSetClient() {
+  const sel = document.getElementById('ra-client');
+  _ra.client = sel.value;
+  _ra.clientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+}
+
+async function raHandleUpload(type, input) {
+  if (!input.files?.[0]) return;
+  const file = input.files[0];
+  const statusEl = document.getElementById('rastatus-'+type);
+  const cardEl = document.getElementById('racard-'+type);
+  statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
+  try {
+    const text = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = () => rej(new Error('Read error'));
+      r.readAsText(file);
+    });
+    _ra[type] = { text, filename: file.name };
+    statusEl.innerHTML = '<span style="color:var(--green);">✅ '+file.name+'</span>';
+    cardEl.style.borderColor = 'var(--green)';
+    cardEl.style.background = '#f0fff4';
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:var(--red);">❌ '+e.message+'</span>';
+  }
+}
+
+// ─── MAIN ANALYSIS ───────────────────────────────────────────────
+async function raRunAnalysis() {
+  if (!_ra.client) { showToast('Pehle seller select karo!','error'); return; }
+  const hasData = ['business','targeting','advertised','searchterm','inventory','returns'].some(k => _ra[k]);
+  if (!hasData) { showToast('Pehle koi report upload karo!','error'); return; }
+
+  document.getElementById('ra-results').innerHTML = '<div class="loading"><div class="spinner"></div> ASIN-level analysis chal rahi hai...</div>';
+
+  // Load DSR history for sales projection
+  const dsrData = await api('GET', '/dsr?client='+_ra.client+'&limit=90') || [];
+  _ra.dsrHistory = dsrData;
+
+  // Build ASIN map
+  _ra.asinMap = {};
+  _ra.keywordMap = {};
+
+  if (_ra.business)   raParseBusiness();
+  if (_ra.inventory)  raParseInventory();
+  if (_ra.advertised) raParseAdvertised();
+  if (_ra.targeting)  raParseTargeting();
+  if (_ra.searchterm) raParseSearchTerms();
+  if (_ra.returns)    raParseReturns();
+
+  // Generate tasks per ASIN
+  _ra.tasks = [];
+  raGenerateTasks();
+
+  // Save log to DB (fire & forget)
+  const reportsUploaded = ['business','targeting','advertised','searchterm','inventory','returns'].filter(k => _ra[k]);
+  const tasksForLog = _ra.tasks.map((t,i) => ({
+    index: i,
+    asin: t.asin || '',
+    issue: t.issue || '',
+    task: t.task || '',
+    priority: t.priority || 'medium',
+    dept: t.dept || '',
+    status: 'pending',
+  }));
+  api('POST', '/report-analyzer/log', {
+    clientCode: _ra.client,
+    clientName: _ra.clientName,
+    reportsUploaded,
+    tasksGenerated: tasksForLog,
+  }).catch(() => {});
+
+  // Render results
+  raRenderResults();
+}
+
+// ─── PARSERS ─────────────────────────────────────────────────────
+function raCSV(text) {
+  const lines = text.replace(/^\uFEFF/,'').trim().split('\n');
+  if (!lines.length) return [];
+  const headers = raCSVLine(lines[0]);
+  return lines.slice(1).filter(l=>l.trim()).map(l => {
+    const vals = raCSVLine(l);
+    const obj = {};
+    headers.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
+    return obj;
+  });
+}
+
+function raCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let ch of line) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+function raTSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split('\t');
+  return lines.slice(1).filter(l=>l.trim()).map(l => {
+    const vals = l.split('\t');
+    const obj = {};
+    headers.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
+    return obj;
+  });
+}
+
+function raNum(v) { return parseFloat(String(v||0).replace(/[₹,%\s,]/g,'')) || 0; }
+
+function raGetAsin(asin) {
+  if (!asin) return null;
+  if (!_ra.asinMap[asin]) _ra.asinMap[asin] = { asin, title:'', sessions:0, pageViews:0, units:0, sales:0, conv:0, fop:100, stock:0, needReplenish:0, adSpend:0, adSales:0, acos:0, roas:0, impressions:0, clicks:0, ctr:0, returns:0, keywords:[] };
+  return _ra.asinMap[asin];
+}
+
+function raParseBusiness() {
+  const rows = raCSV(_ra.business.text);
+  rows.forEach(r => {
+    const asin = r['(Child) ASIN'] || r['(Parent) ASIN'] || r['ASIN'] || '';
+    if (!asin) return;
+    const a = raGetAsin(asin);
+    a.title = a.title || (r['Title']||'').slice(0,80);
+    a.sku = a.sku || r['SKU'] || '';
+    a.sessions += raNum(r['Sessions - Total']||r['Sessions']);
+    a.pageViews += raNum(r['Page Views - Total']||r['Page Views']);
+    a.units += raNum(r['Units Ordered']);
+    a.sales += raNum(r['Ordered Product Sales']||r['Sales(INR)']);
+    const convRaw = r['Unit Session Percentage']||r['Conversion rate']||'0';
+    a.conv = raNum(convRaw); // last value wins (per ASIN)
+    a.fop = raNum(r['Featured Offer Percentage']||'100');
+  });
+}
+
+function raParseInventory() {
+  const text = _ra.inventory.text;
+  const rows = text.includes('\t') ? raTSV(text) : raCSV(text);
+  rows.forEach(r => {
+    const asin = r['asin'] || r['ASIN'] || r['(Child) ASIN'] || '';
+    const sku = r['seller-sku'] || r['SKU'] || '';
+    // Try to match by ASIN or SKU
+    const key = asin || sku;
+    if (!key) return;
+    let a = _ra.asinMap[asin] || Object.values(_ra.asinMap).find(x => x.sku === sku);
+    if (!a) a = raGetAsin(asin || sku);
+    a.title = a.title || (r['Title']||sku).slice(0,80);
+    a.stock = raNum(r['Quantity Available']||r['Current FBA Stock']||'0');
+    a.needReplenish = raNum(r['Replenish Inventory']||'0');
+  });
+}
+
+function raParseAdvertised() {
+  const rows = raCSV(_ra.advertised.text);
+  rows.forEach(r => {
+    const asin = r['Advertised ASIN'] || r['(Child) ASIN'] || '';
+    if (!asin) return;
+    const a = raGetAsin(asin);
+    a.adSpend += raNum(r['Spend']);
+    a.adSales += raNum(r['7 Day Total Sales (₹)']);
+    a.impressions += raNum(r['Impressions']);
+    a.clicks += raNum(r['Clicks']);
+    const s = raNum(r['Spend']); const sl = raNum(r['7 Day Total Sales (₹)']);
+    if (sl > 0) a.acos = Math.round((s/sl)*100);
+    a.roas = raNum(r['Total Return on Advertising Spend (ROAS)']);
+  });
+}
+
+function raParseTargeting() {
+  const rows = raCSV(_ra.targeting.text);
+  rows.forEach(r => {
+    const kw = r['Targeting']||r['Customer Search Term']||'';
+    const spend = raNum(r['Spend']);
+    const sales = raNum(r['7 Day Total Sales (₹)']);
+    const acos = raNum(r['Total Advertising Cost of Sales (ACOS) ']);
+    const matchType = r['Match Type']||'';
+    const campaignName = r['Campaign Name']||'';
+    // Store globally for recommendations
+    if (!_ra.keywordMap['_all']) _ra.keywordMap['_all'] = [];
+    _ra.keywordMap['_all'].push({ kw, spend, sales, acos, matchType, campaignName });
+  });
+}
+
+function raParseSearchTerms() {
+  const rows = raCSV(_ra.searchterm.text);
+  rows.forEach(r => {
+    const term = r['Customer Search Term']||'';
+    const orders = raNum(r['7 Day Total Orders (#)']);
+    const conv = raNum(r['7 Day Conversion Rate']);
+    const spend = raNum(r['Spend']);
+    const sales = raNum(r['7 Day Total Sales (₹)']);
+    const asin = r['Advertised ASIN']||'';
+    if (!term) return;
+    // Store best converting terms
+    if (orders >= 1 || conv > 5) {
+      if (asin) {
+        if (!_ra.keywordMap[asin]) _ra.keywordMap[asin] = [];
+        _ra.keywordMap[asin].push({ term, orders, conv, spend, sales });
+      }
+      if (!_ra.keywordMap['_converting']) _ra.keywordMap['_converting'] = [];
+      _ra.keywordMap['_converting'].push({ term, orders, conv });
+    }
+    if (spend > 200 && sales === 0) {
+      if (!_ra.keywordMap['_wasted']) _ra.keywordMap['_wasted'] = [];
+      _ra.keywordMap['_wasted'].push({ term, spend });
+    }
+  });
+}
+
+function raParseReturns() {
+  const text = _ra.returns.text;
+  const rows = text.includes('\t') ? raTSV(text) : raCSV(text);
+  const reasonMap = {};
+  rows.forEach(r => {
+    const reason = r['Return reason']||'';
+    const asin = r['ASIN']||'';
+    if (!_ra.asinMap['_returns']) _ra.asinMap['_returns'] = {};
+    if (asin) {
+      const a = _ra.asinMap[asin];
+      if (a) a.returns = (a.returns||0) + 1;
+    }
+    if (reason) reasonMap[reason] = (reasonMap[reason]||0) + 1;
+  });
+  _ra.returnReasons = reasonMap;
+}
+
+// ─── TASK GENERATION ─────────────────────────────────────────────
+function raGenerateTasks() {
+  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
+  const allKeywords = _ra.keywordMap['_all'] || [];
+  const convertingTerms = _ra.keywordMap['_converting'] || [];
+  const wastedTerms = _ra.keywordMap['_wasted'] || [];
+
+  asins.forEach(a => {
+    const asinLabel = '[' + (a.asin||a.sku||'?') + '] ' + (a.title||'').slice(0,50);
+    const asinKeywords = _ra.keywordMap[a.asin] || [];
+
+    // === OPS TASKS ===
+    // 1. Out of Stock
+    if (a.stock === 0 && (a.sessions > 0 || a.units > 0)) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'urgent', dept: 'Ops',
+        issue: '🚨 OUT OF STOCK',
+        task: 'FBA mein stock bhejo — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
+        reason: 'Stock = 0, sessions aa rahe hain. Sales loss ho raha hai!',
+        deadline: 1,
+        metric: 'Stock: 0 units',
+      });
+    }
+
+    // 2. Low conversion + High sessions
+    if (a.sessions > 150 && a.conv < 8 && a.conv > 0) {
+      const kwSuggest = asinKeywords.filter(k=>k.conv>10).slice(0,3).map(k=>k.term).join(', ');
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: a.conv < 4 ? 'urgent' : 'high', dept: 'Ops',
+        issue: '📉 Low Conversion (' + a.conv + '%)',
+        task: 'Listing optimize karo — Images, Price, Bullets: ' + asinLabel,
+        reason: a.sessions + ' sessions aa rahe hain par sirf ' + a.conv + '% convert ho rahe hain. Industry avg 12-15% hota hai.',
+        deadline: 2,
+        metric: 'Sessions: '+a.sessions+' | Conv: '+a.conv+'%',
+        subTasks: [
+          { task: 'Main image check karo — white bg, high res, zoom enable', dept: 'Ops', deadline: 1 },
+          { task: 'Price compare karo competitors se — ₹ 5-10 adjust karo', dept: 'Ops', deadline: 1 },
+          { task: 'Bullet points rewrite karo — top 3 benefits bold karo', dept: 'Ops', deadline: 2 },
+          a.units > 10 ? { task: 'Discount coupon 5-10% add karo listing pe', dept: 'Ops', deadline: 1 } : null,
+        ].filter(Boolean),
+      });
+    }
+
+    // 3. Low sessions — new listing / keyword issue
+    if (a.sessions < 50 && a.units > 0) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '👁️ Low Visibility ('+a.sessions+' sessions)',
+        task: 'Listing keywords update karo: ' + asinLabel,
+        reason: 'Bahut kam sessions aa rahe hain. Organic ranking improve karni hogi.',
+        deadline: 3,
+        metric: 'Sessions: '+a.sessions,
+        subTasks: [
+          { task: 'Title mein top keywords add karo (brand + category + benefit)', dept: 'Ops', deadline: 2 },
+          { task: 'Backend search terms fill karo — 250 bytes use karo', dept: 'Ops', deadline: 2 },
+          { task: 'A+ Content add karo — comparison table aur lifestyle images', dept: 'Ops', deadline: 5 },
+        ],
+      });
+    }
+
+    // 4. Buy Box loss
+    if (a.fop < 80 && a.sessions > 50) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '🏆 Buy Box Loss (' + a.fop + '% FOP)',
+        task: 'Buy Box recover karo: ' + asinLabel,
+        reason: 'Sirf ' + a.fop + '% time Buy Box mil raha hai. Sales directly impact ho rahi hai.',
+        deadline: 1,
+        metric: 'Featured Offer: '+a.fop+'%',
+        subTasks: [
+          { task: 'Price competitor se ₹ 5-10 kam karo', dept: 'Ops', deadline: 1 },
+          { task: 'FBA fulfillment ensure karo', dept: 'Ops', deadline: 2 },
+        ],
+      });
+    }
+
+    // 5. High returns
+    if ((a.returns||0) > 3) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ops',
+        issue: '🔄 High Returns (' + a.returns + ' returns)',
+        task: 'Return reasons investigate karo: ' + asinLabel,
+        reason: a.returns + ' returns aaye hain. Product description ya quality issue ho sakta hai.',
+        deadline: 3,
+        metric: 'Returns: '+a.returns,
+        subTasks: [
+          { task: 'Customer reviews check karo — kya complain kar rahe hain', dept: 'Ops', deadline: 1 },
+          { task: 'Product description accurate hai? Size/specs correct hain?', dept: 'Ops', deadline: 2 },
+          { task: 'Packaging quality check karo — damaged goods ka risk', dept: 'Ops', deadline: 3 },
+        ],
+      });
+    }
+
+    // === ADS TASKS ===
+    // 6. High ACOS
+    if (a.acos > 35 && a.adSpend > 200) {
+      const highWaste = allKeywords.filter(k => raNum(k.spend) > 100 && raNum(k.sales) === 0).slice(0,5);
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ads',
+        issue: '💸 High ACOS (' + a.acos + '%)',
+        task: 'Ad campaign optimize karo — ACOS 20-25% target: ' + asinLabel,
+        reason: 'ACOS ' + a.acos + '% hai — target 20-25% hona chahiye. ₹' + Math.round(a.adSpend).toLocaleString('en-IN') + ' spend ho raha hai.',
+        deadline: 1,
+        metric: 'ACOS: '+a.acos+'% | Spend: ₹'+Math.round(a.adSpend),
+        subTasks: [
+          highWaste.length ? { task: 'Pause karo — 0 sales ke keywords: ' + highWaste.map(k=>k.kw).join(', '), dept: 'Ads', deadline: 1 } : null,
+          { task: 'Top 5 converting keywords ke bids 10-15% badhao', dept: 'Ads', deadline: 1 },
+          { task: 'Broad match ko phrase/exact mein convert karo', dept: 'Ads', deadline: 2 },
+          wastedTerms.length ? { task: 'Negative keywords add karo: ' + wastedTerms.slice(0,5).map(k=>k.term).join(', '), dept: 'Ads', deadline: 1 } : null,
+        ].filter(Boolean),
+      });
+    }
+
+    // 7. Low impressions (visibility issue in ads)
+    if (a.impressions < 500 && a.adSpend > 0) {
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ads',
+        issue: '📡 Low Ad Impressions (' + a.impressions + ')',
+        task: 'Ad visibility badhao — bids increase karo: ' + asinLabel,
+        reason: 'Sirf ' + a.impressions + ' impressions aa rahe hain. Product ads mein proper show nahi ho raha.',
+        deadline: 1,
+        metric: 'Impressions: '+a.impressions,
+        subTasks: [
+          { task: 'CPC bid 30-50% increase karo top keywords pe', dept: 'Ads', deadline: 1 },
+          { task: 'Broad match campaign launch karo — new keywords discover karo', dept: 'Ads', deadline: 2 },
+          { task: 'Sponsored Display ads add karo competitor pages pe', dept: 'Ads', deadline: 3 },
+        ],
+      });
+    }
+
+    // 8. Good sales — new campaign opportunity
+    if (a.sales > 30000 && a.adSpend < 5000 && a.sessions > 200) {
+      const topConverting = asinKeywords.sort((a,b)=>b.conv-a.conv).slice(0,5);
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'medium', dept: 'Ads',
+        issue: '🌟 Scale Opportunity',
+        task: 'New ad campaign launch karo — strong performer: ' + asinLabel,
+        reason: 'Yeh ASIN ₹'+Math.round(a.sales/1000)+'K sales kar raha hai kam ads ke saath. Scale karne ka time!',
+        deadline: 2,
+        metric: 'Sales: ₹'+Math.round(a.sales/1000)+'K | Ad Spend: ₹'+Math.round(a.adSpend),
+        subTasks: [
+          { task: 'Exact match campaign launch karo — budget ₹500/day: ' + asinLabel, dept: 'Ads', deadline: 1 },
+          topConverting.length ? { task: 'Top converting keywords ke liye dedicated campaign: ' + topConverting.map(k=>k.term).join(', '), dept: 'Ads', deadline: 2 } : null,
+          { task: 'Sponsored Brand campaign launch karo — brand awareness ke liye', dept: 'Ads', deadline: 3 },
+          { task: 'Competitor targeting campaign add karo', dept: 'Ads', deadline: 3 },
+        ].filter(Boolean),
+      });
+    }
+
+    // 9. Keyword placement suggestions
+    if (asinKeywords.length > 0) {
+      const highConvKW = asinKeywords.filter(k=>k.conv>15).slice(0,5);
+      const medConvKW = asinKeywords.filter(k=>k.conv>5&&k.conv<=15).slice(0,5);
+      if (highConvKW.length) {
+        _ra.tasks.push({
+          asin: a.asin, title: a.title, sku: a.sku,
+          priority: 'medium', dept: 'Ops',
+          issue: '🔑 Keyword Optimization',
+          task: 'High-converting keywords listing mein add karo: ' + asinLabel,
+          reason: 'Yeh keywords customers ko convert kar rahe hain — inhe listing mein include karo.',
+          deadline: 2,
+          metric: 'Identified: '+asinKeywords.length+' keywords',
+          keywordData: {
+            title: highConvKW.map(k=>k.term),
+            bullets: medConvKW.map(k=>k.term),
+            backend: asinKeywords.filter(k=>k.conv<=5).slice(0,10).map(k=>k.term),
+          },
+          subTasks: [
+            highConvKW.length ? { task: 'Title mein add karo (high conv): ' + highConvKW.map(k=>k.term).join(', '), dept: 'Ops', deadline: 1 } : null,
+            medConvKW.length ? { task: 'Bullet points mein add karo: ' + medConvKW.map(k=>k.term).join(', '), dept: 'Ops', deadline: 2 } : null,
+            { task: 'Backend search terms update karo — remaining keywords', dept: 'Ops', deadline: 2 },
+          ].filter(Boolean),
+        });
+      }
+    }
+  });
+
+  // === ACCOUNT MANAGER TASKS ===
+  // Overall account health
+  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+  const totalSpend = asins.reduce((s,a)=>s+a.adSpend,0);
+  const outOfStockCount = asins.filter(a=>a.stock===0&&a.sessions>0).length;
+  const avgConv = asins.length ? asins.reduce((s,a)=>s+a.conv,0)/asins.length : 0;
+
+  if (outOfStockCount > 0) {
+    _ra.tasks.push({
+      asin: 'ACCOUNT', title: 'Account Overview',
+      priority: 'urgent', dept: 'Account Manager',
+      issue: '🚨 Account Alert — ' + outOfStockCount + ' OOS Products',
+      task: 'Seller se immediately baat karo — ' + outOfStockCount + ' products OOS hain. Sales loss ho raha hai.',
+      reason: 'Out of stock products se account health aur ranking dono impact hoti hai.',
+      deadline: 1,
+      metric: 'OOS Products: '+outOfStockCount,
+    });
+  }
+
+  // Team Lead review task
+  _ra.tasks.push({
+    asin: 'REVIEW', title: 'Team Lead Review',
+    priority: 'medium', dept: 'Team Lead',
+    issue: '👀 Weekly Review',
+    task: 'Is week ki report review karo — ' + _ra.clientName + '. Total tasks: ' + (_ra.tasks.length) + '. Key issues check karo.',
+    reason: 'Regular review ensures sab tasks time pe complete ho.',
+    deadline: 2,
+    metric: 'Total Insights: '+(_ra.tasks.length+1),
+  });
+}
+
+// ─── SALES PROJECTION ────────────────────────────────────────────
+function raCalcProjection() {
+  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
+  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+
+  // Also use DSR data if available
+  let baseSales = totalSales;
+  if (_ra.dsrHistory && _ra.dsrHistory.length > 0) {
+    const recentMonth = _ra.dsrHistory.slice(0,30).reduce((s,d)=>s+(raNum(d.sales_amount)||0),0);
+    if (recentMonth > 0) baseSales = Math.max(baseSales, recentMonth);
+  }
+
+  if (baseSales === 0) return null;
+
+  const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const projections = [];
+  const minGrowth = 0.08; // 8%
+  const maxGrowth = 0.18; // 18%
+  const targetGrowth = 0.12; // 12% target
+
+  // Peak months: Oct-Dec (festive), Jan (New Year)
+  const peakMonths = [9,10,11,0];
+  const slowMonths = [2,3,4]; // Mar-May
+
+  for (let i = 0; i < 12; i++) {
+    const monthIdx = (currentMonth + i) % 12;
+    const monthName = months[monthIdx];
+    const isPeak = peakMonths.includes(monthIdx);
+    const isSlow = slowMonths.includes(monthIdx);
+    const growth = isPeak ? maxGrowth : isSlow ? minGrowth : targetGrowth;
+    const prev = i === 0 ? baseSales : projections[i-1].target;
+    const min = Math.round(prev * (1 + minGrowth));
+    const target = Math.round(prev * (1 + growth));
+    const max = Math.round(prev * (1 + maxGrowth));
+    projections.push({ month: monthName, min, target, max, growth: Math.round(growth*100), isPeak, isSlow });
+  }
+
+  return { baseSales, projections };
+}
+
+// ─── RENDER RESULTS ──────────────────────────────────────────────
+function raRenderResults() {
+  const tasks = _ra.tasks;
+  const urgent = tasks.filter(t=>t.priority==='urgent');
+  const high = tasks.filter(t=>t.priority==='high');
+  const medium = tasks.filter(t=>t.priority==='medium');
+
+  const proj = raCalcProjection();
+  const asins = Object.values(_ra.asinMap).filter(a=>a.asin!=='_returns'&&a.sessions>0);
+
+  let html = '';
+
+  // Summary bar
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
+    + raSummaryCard('🚨','Urgent',urgent.length,'red')
+    + raSummaryCard('⚠️','High Priority',high.length,'orange')
+    + raSummaryCard('📌','Medium',medium.length,'amber')
+    + raSummaryCard('📦','ASINs Analyzed',asins.length,'blue')
+    + raSummaryCard('📋','Total Tasks',tasks.length,'green')
+    + '</div>';
+
+  // Urgent section
+  if (urgent.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:10px;padding:8px 12px;background:#fadbd8;border-radius:8px;">🚨 Urgent — Abhi Karo</div>';
+    urgent.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // High priority
+  if (high.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--orange);margin:16px 0 10px;padding:8px 12px;background:#fdebd0;border-radius:8px;">⚠️ High Priority — Is Hafte</div>';
+    high.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // Medium
+  if (medium.length) {
+    html += '<div style="font-size:16px;font-weight:700;color:var(--amber);margin:16px 0 10px;padding:8px 12px;background:#fef9e7;border-radius:8px;">📌 Medium — Is Mahine</div>';
+    medium.forEach(t => { html += raTaskCard(t); });
+  }
+
+  // Sales Projection
+  if (proj) {
+    html += '<div style="margin-top:24px;">';
+    html += '<div style="font-size:16px;font-weight:700;margin-bottom:12px;padding:8px 12px;background:#d6eaf8;border-radius:8px;">📈 Sales Projection — Next 12 Months</div>';
+    html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Base: ₹'+Math.round(proj.baseSales).toLocaleString('en-IN')+' | Min Growth: 8%/month | Target: 12% | Peak: 18% (Festive)</div>';
+    html += '<div class="card"><div class="card-body" style="padding:0;"><div class="table-wrap"><table><thead><tr>'
+      + '<th>Month</th><th>Minimum (8%)</th><th style="background:#d5f5e3;">Target (12%)</th><th>Maximum (18%)</th><th>Growth%</th><th>Type</th></tr></thead><tbody>';
+    proj.projections.forEach(p => {
+      const rowBg = p.isPeak ? 'background:#d5f5e3;' : p.isSlow ? 'background:#fef9e7;' : '';
+      html += '<tr style="'+rowBg+'">'
+        + '<td><strong>'+p.month+'</strong></td>'
+        + '<td>₹'+p.min.toLocaleString('en-IN')+'</td>'
+        + '<td style="font-weight:700;color:var(--green);">₹'+p.target.toLocaleString('en-IN')+'</td>'
+        + '<td>₹'+p.max.toLocaleString('en-IN')+'</td>'
+        + '<td><span class="badge '+(p.isPeak?'badge-green':p.isSlow?'badge-amber':'badge-blue')+'">'+p.growth+'%</span></td>'
+        + '<td style="font-size:11px;">'+(p.isPeak?'🎯 Peak':p.isSlow?'🐢 Slow':'📊 Normal')+'</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div></div>';
+
+    // Projection tasks
+    html += '<div style="margin-top:12px;padding:14px;background:#fff;border-radius:10px;border:1.5px solid var(--border);">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">📋 Projection Achieve Karne Ke Liye Tasks:</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">'
+      + raProjTaskCard('Ops','Monthly listing refresh — new images, updated keywords',1,'Ops')
+      + raProjTaskCard('Ads','Budget planning — peak months mein +30% budget allocate karo',2,'Ads')
+      + raProjTaskCard('Ops','A+ content all top ASINs pe add karo',5,'Ops')
+      + raProjTaskCard('Ads','Festive campaign ready rakho — Oct se pehle setup',14,'Ads')
+      + raProjTaskCard('AM','Monthly performance review seller ke saath karo',7,'Account Manager')
+      + raProjTaskCard('Ads','New product launch campaign plan banao',10,'Ads')
+      + '</div></div>';
+    html += '</div>';
+  }
+
+  document.getElementById('ra-results').innerHTML = html;
+}
+
+async function viewRALog(logId) {
+  const log = await api('GET', '/report-analyzer/log/'+logId);
+  if (!log) { showToast('Log nahi mila!','error'); return; }
+
+  const tasks = log.tasks_generated || [];
+  const doneCount = tasks.filter(t=>t.status==='done').length;
+  const pendingCount = tasks.length - doneCount;
+  const date = new Date(log.analyzed_at).toLocaleString('en-IN');
+
+  let tasksHtml = '';
+  if (tasks.length) {
+    tasksHtml = '<div style="margin-top:12px;">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">📋 Tasks ('
+      + '<span style="color:var(--green);">'+doneCount+' done</span> / '
+      + '<span style="color:var(--red);">'+pendingCount+' pending</span>)</div>';
+    tasks.forEach((t,i) => {
+      const isDone = t.status === 'done';
+      const pColor = t.priority==='urgent'?'var(--red)':t.priority==='high'?'var(--orange)':'var(--amber)';
+      tasksHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:'+(isDone?'#f0fff4':'var(--bg)')+';opacity:'+(isDone?'0.7':'1')+'">'
+        + '<input type="checkbox" '+(isDone?'checked':'')+' style="margin-top:3px;width:16px;height:16px;cursor:pointer;" data-lid="'+logId+'" data-tidx="'+i+'" onchange="toggleRATask(this)">'
+        + '<div style="flex:1;">'
+        + '<div style="font-size:12px;font-weight:700;color:'+pColor+';margin-bottom:2px;">'+(t.issue||t.priority?.toUpperCase()||'Task')+'</div>'
+        + '<div style="font-size:13px;'+(isDone?'text-decoration:line-through;color:var(--text-muted);':'')+'">'+t.task+'</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'
+        + '<span class="badge '+(t.dept==='Ads'?'badge-blue':'badge-green')+'" style="font-size:10px;">'+t.dept+'</span>'
+        + (t.asin ? ' · ASIN: '+t.asin : '')
+        + (isDone && t.updatedBy ? ' · ✅ Done by: '+t.updatedBy : '')
+        + '</div>'
+        + '</div></div>';
+    });
+    tasksHtml += '</div>';
+  } else {
+    tasksHtml = '<div style="color:var(--text-muted);font-size:13px;margin-top:12px;">Koi tasks nahi mili thi</div>';
+  }
+
+  openPanel('📊 Analysis Log — '+log.client_name,
+    '<div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;">'
+    + '<strong>Seller:</strong> '+log.client_name+'<br>'
+    + '<strong>Analyzed By:</strong> '+log.analyzed_by+' ('+log.analyzed_by_role+')<br>'
+    + '<strong>Date:</strong> '+date+'<br>'
+    + '<strong>Reports:</strong> '+(log.reports_uploaded||[]).join(', ')||'—'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    + '<span class="badge badge-blue" style="font-size:12px;">'+tasks.length+' Total Tasks</span>'
+    + '<span class="badge badge-green" style="font-size:12px;">'+doneCount+' Done</span>'
+    + '<span class="badge badge-red" style="font-size:12px;">'+pendingCount+' Pending</span>'
+    + '</div>'
+    + tasksHtml
+  );
+}
+
+async function toggleRATask(checkbox) {
+  const logId = checkbox.getAttribute('data-lid');
+  const taskIndex = parseInt(checkbox.getAttribute('data-tidx'));
+  const status = checkbox.checked ? 'done' : 'pending';
+  const r = await api('PATCH', '/report-analyzer/log/'+logId+'/task', { taskIndex, status });
+  if (r?.success) {
+    showToast(status==='done'?'✅ Task done!':'Task pending mark kiya','success');
+    // Refresh panel
+    viewRALog(logId);
+  } else {
+    checkbox.checked = !checkbox.checked; // revert
+    showToast('Update failed!','error');
+  }
+}
+
+function raSummaryCard(icon, label, val, color) {
+  return '<div style="background:#fff;border-radius:10px;padding:14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'
+    + '<div style="font-size:22px;">'+icon+'</div>'
+    + '<div style="font-size:22px;font-weight:800;color:var(--'+color+');">'+val+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">'+label+'</div>'
+    + '</div>';
+}
+
+function raTaskCard(t) {
+  const deptColor = t.dept==='Ads'?'badge-blue':t.dept==='Team Lead'?'badge-gray':t.dept==='Account Manager'?'badge-amber':'badge-green';
+  const priorityColor = t.priority==='urgent'?'var(--red)':t.priority==='high'?'var(--orange)':'var(--amber)';
+  const isAccountLevel = t.asin==='ACCOUNT'||t.asin==='REVIEW';
+
+  let subTasksHtml = '';
+  if (t.subTasks && t.subTasks.length) {
+    subTasksHtml = '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Sub-tasks:</div>'
+      + t.subTasks.map((s,i) =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f8fafc;border-radius:6px;margin-bottom:4px;">'
+        + '<div style="flex:1;font-size:12px;">'+s.task+'</div>'
+        + '<span class="badge '+(s.dept==='Ads'?'badge-blue':'badge-green')+'" style="font-size:10px;white-space:nowrap;">'+s.dept+'</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">'+s.deadline+'d</span>'
+        + '<button class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:var(--secondary);color:#fff;white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(s.task)+'\',\''+s.dept+'\','+s.deadline+')">➕</button>'
+        + '</div>'
+      ).join('')
+      + '</div>';
+  }
+
+  let kwHtml = '';
+  if (t.keywordData) {
+    kwHtml = '<div style="margin-top:8px;background:#eaf4fb;border-radius:8px;padding:10px;font-size:12px;">'
+      + '<div style="font-weight:700;margin-bottom:6px;">🔑 Keyword Placement Map:</div>'
+      + (t.keywordData.title.length ? '<div><span style="background:#d5f5e3;padding:2px 6px;border-radius:4px;font-weight:600;">TITLE:</span> '+t.keywordData.title.join(', ')+'</div>' : '')
+      + (t.keywordData.bullets.length ? '<div style="margin-top:4px;"><span style="background:#d6eaf8;padding:2px 6px;border-radius:4px;font-weight:600;">BULLETS:</span> '+t.keywordData.bullets.join(', ')+'</div>' : '')
+      + (t.keywordData.backend.length ? '<div style="margin-top:4px;"><span style="background:#fdebd0;padding:2px 6px;border-radius:4px;font-weight:600;">BACKEND:</span> '+t.keywordData.backend.join(', ')+'</div>' : '')
+      + '</div>';
+  }
+
+  return '<div class="card" style="margin-bottom:10px;border-left:4px solid '+priorityColor+';">'
+    + '<div style="padding:14px 16px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+    + '<div style="flex:1;">'
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">'
+    + '<span class="badge '+deptColor+'">'+t.dept+'</span>'
+    + (!isAccountLevel ? '<span style="font-size:11px;background:#f0f0f0;padding:2px 8px;border-radius:12px;font-weight:600;">'+t.asin+'</span>' : '')
+    + '<span style="font-size:11px;color:var(--text-muted);">⏱ '+t.deadline+(t.deadline===1?' day':' days')+'</span>'
+    + '</div>'
+    + '<div style="font-weight:700;font-size:14px;color:'+priorityColor+';">'+t.issue+'</div>'
+    + '<div style="font-size:13px;margin-top:2px;">'+t.task+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+t.reason+'</div>'
+    + (t.metric ? '<div style="font-size:11px;background:#f8f8f8;padding:4px 8px;border-radius:6px;margin-top:6px;display:inline-block;">📊 '+t.metric+'</div>' : '')
+    + '</div>'
+    + '<button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(t.task)+'\',\''+t.dept+'\','+t.deadline+')">➕ Create Task</button>'
+    + '</div>'
+    + kwHtml
+    + subTasksHtml
+    + '</div></div>';
+}
+
+function raProjTaskCard(label, text, days, dept) {
+  const deptColor = dept==='Ads'?'badge-blue':dept==='Account Manager'?'badge-amber':'badge-green';
+  return '<div style="padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);display:flex;gap:8px;align-items:flex-start;">'
+    + '<div style="flex:1;">'
+    + '<span class="badge '+deptColor+'" style="font-size:10px;margin-bottom:4px;">'+dept+'</span>'
+    + '<div style="font-size:12px;">'+text+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">⏱ '+days+' days</div>'
+    + '</div>'
+    + '<button class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:var(--secondary);color:#fff;white-space:nowrap;" onclick="raCreateTask(\''+encodeURIComponent(text)+'\',\''+dept+'\','+days+')">➕</button>'
+    + '</div>';
+}
+
+async function raCreateTask(encodedTask, dept, days) {
+  if (!_ra.client) { showToast('Seller select nahi hai!','error'); return; }
+  const text = decodeURIComponent(encodedTask);
+  const deadline = new Date();
+  deadline.setDate(deadline.getDate() + days);
+  const deadlineStr = deadline.toISOString().split('T')[0];
+  const category = dept==='Ads' ? 'Ads Campaign' : dept==='Account Manager' ? 'Account Management' : 'Listing Work';
+  const priority = days<=1?'Critical':days<=2?'High':days<=5?'Medium':'Low';
+
+  const r = await api('POST','/tasks',{
+    title: text.slice(0,120),
+    description: 'Amazon Report Analysis se auto-generated. Client: '+_ra.clientName+' | Dept: '+dept,
+    clientCode: _ra.client, clientName: _ra.clientName,
+    assignedTo: APP.user.name, assignedBy: APP.user.name,
+    priority, category, deadline: deadlineStr,
+  });
+
+  if (r?.success) {
+    showToast('✅ Task created! — '+r.taskId,'success');
+  } else {
+    showToast('Error: '+(r?.error||'Task create nahi hua'),'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ROLE ACCESS MATRIX
+// ═══════════════════════════════════════════════════════════════
+
+const ACCESS_MODULES = [
+  { key:'dashboard',   label:'Dashboard',           icon:'🏠' },
+  { key:'clients',     label:'Client Manager',       icon:'👥' },
+  { key:'tasks',       label:'Task Manager',         icon:'📝' },
+  { key:'tickets',     label:'Tickets',              icon:'🎫' },
+  { key:'crm',         label:'CRM Log',              icon:'📞' },
+  { key:'renewals',    label:'Renewals',             icon:'🔄' },
+  { key:'renewal_amt', label:'Renewal Amount',       icon:'💰' },
+  { key:'ads',         label:'Ads Manager',          icon:'📢' },
+  { key:'dsr',         label:'Daily Sales Report',   icon:'📊' },
+  { key:'reports',     label:'Reports',              icon:'📋' },
+  { key:'seller360',   label:'Seller 360 View',      icon:'🔍' },
+  { key:'csi',         label:'CSI Health',           icon:'💊' },
+  { key:'hurdles',     label:'Hurdle Tracker',       icon:'🚧' },
+  { key:'admin',       label:'Admin Panel',          icon:'⚙️' },
+];
+
+const ACCESS_ROLES = ['Admin','Ops Lead','Sub Admin','Senior Executive','Team Lead','CRM Executive','Ads Executive','Account Manager','SME','CSI Executive','Executive'];
+
+// Default: 2=full, 1=view, 0=none
+const ACCESS_DEFAULTS = {
+  //            Admin OpsLd SubAdm SrExc  TmLd  CRM   Ads   AM    SME  CSIEx  Exec
+  dashboard:   [2,    2,    2,     2,     2,    2,    2,    2,    2,   2,     2],
+  clients:     [2,    2,    2,     1,     2,    1,    1,    1,    1,   0,     1],
+  tasks:       [2,    2,    2,     2,     2,    2,    2,    2,    2,   0,     2],
+  tickets:     [2,    2,    2,     2,     2,    2,    1,    1,    1,   0,     1],
+  crm:         [2,    2,    2,     1,     2,    2,    0,    1,    1,   0,     1],
+  renewals:    [2,    2,    2,     1,     2,    2,    0,    1,    1,   0,     1],
+  renewal_amt: [2,    2,    2,     1,     1,    0,    0,    0,    0,   0,     0],
+  ads:         [2,    2,    1,     1,     1,    0,    2,    1,    1,   0,     1],
+  dsr:         [2,    2,    2,     2,     2,    2,    2,    2,    2,   0,     2],
+  reports:     [2,    2,    2,     2,     2,    1,    1,    1,    1,   0,     1],
+  seller360:   [2,    2,    2,     2,     2,    2,    2,    2,    2,   0,     2],
+  csi:         [2,    2,    2,     1,     2,    1,    0,    1,    2,   2,     1],
+  hurdles:     [2,    2,    2,     2,     2,    1,    1,    1,    1,   0,     1],
+  admin:       [2,    2,    0,     0,     0,    0,    0,    0,    0,   0,     0],
+};
+
+window._accessState = null;
+
+async function loadAccessFromDB() {
+  try {
+    const r = await api('GET', '/settings/access-matrix');
+    if (r && r.value) {
+      window._accessState = JSON.parse(r.value);
+    } else {
+      window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+    }
+  } catch(e) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+  }
+}
+
+function getAccessState() {
+  if (!window._accessState) {
+    window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+  }
+  return window._accessState;
+}
+
+async function renderAccessMatrix() {
+  const tbody = document.getElementById('access-matrix-body');
+  if (!tbody) return;
+  await loadAccessFromDB();
+  const state = getAccessState();
+
+  tbody.innerHTML = ACCESS_MODULES.map(mod => {
+    const vals = state[mod.key] || [2,0,0,0,0,0,0,0];
+    return '<tr style="border-bottom:0.5px solid var(--border);">' +
+      '<td style="padding:9px 14px;font-weight:600;">' + mod.icon + ' ' + mod.label + '</td>' +
+      vals.map((v, ri) => {
+        // Admin always full — locked
+        if (ri === 0) {
+          return '<td style="text-align:center;padding:6px 4px;"><span style="width:30px;height:30px;border-radius:6px;background:#d5f5e3;border:1px solid #27ae60;color:#1e8449;display:inline-flex;align-items:center;justify-content:center;font-size:13px;">✓</span></td>';
+        }
+        const styles = [
+          'background:#f2f3f4;border:1px solid #ccc;color:#999;',
+          'background:#d6eaf8;border:1px solid #3498db;color:#1a5276;',
+          'background:#d5f5e3;border:1px solid #27ae60;color:#1e8449;',
+        ];
+        const labels = ['—','👁','✓'];
+        return '<td style="text-align:center;padding:6px 4px;">' +
+          '<span style="width:30px;height:30px;border-radius:6px;' + styles[v] + 'display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;" ' +
+          'onclick="toggleAccess(\'' + mod.key + '\',' + ri + ')">' + labels[v] + '</span></td>';
+      }).join('') +
+    '</tr>';
+  }).join('');
+}
+
+function toggleAccess(moduleKey, roleIdx) {
+  const state = getAccessState();
+  if (!state[moduleKey]) state[moduleKey] = [2,0,0,0,0,0,0,0];
+  state[moduleKey][roleIdx] = (state[moduleKey][roleIdx] + 1) % 3;
+  renderAccessMatrix();
+}
+
+async function saveAccessMatrix() {
+  const state = getAccessState();
+  // Save to DB
+  const r = await api('POST', '/settings/access-matrix', { value: JSON.stringify(state) });
+  if (r?.success) {
+    showToast('✅ Access Matrix saved! All browsers pe apply ho gaya.', 'success');
+  } else {
+    // Fallback to localStorage
+    localStorage.setItem('en_access_matrix', JSON.stringify(state));
+    showToast('✅ Saved locally!', 'success');
+  }
+}
+
+async function resetAccessMatrix() {
+  window._accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+  localStorage.removeItem('en_access_matrix');
+  await api('POST', '/settings/access-matrix', { value: JSON.stringify(window._accessState) });
+  renderAccessMatrix();
+  showToast('Access Matrix reset to defaults', 'success');
+}
+
+function checkModuleAccess(moduleKey) {
+  const u = APP.user;
+  if (!u) return false;
+  const roleIdx = ACCESS_ROLES.indexOf(u.role);
+  if (roleIdx === 0) return true; // Admin always full
+  if (roleIdx < 0) return true;  // Unknown role - allow
+  const state = getAccessState();
+  const vals = state[moduleKey] || ACCESS_DEFAULTS[moduleKey] || [2,2,2,2,2,2,2,2];
+  return (vals[roleIdx] || 0) > 0;
+}
+
+// ── CHAT ─────────────────────────────────────────────────────
+let _chatPollTimer = null;
+let _chatLastTs = null;
+let _chatCurrentRoom = null;
+
+async function renderChat() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading Chat...</div>';
+  if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
+
+  const [rooms, users] = await Promise.all([
+    api('GET', '/chat/rooms?_='+Date.now()),
+    api('GET', '/users?_='+Date.now()),
+  ]);
+  window._chatAllRooms = rooms || [];
+  window._chatAllUsers = (users || []).filter(u => u.isActive);
+  const totalUnread = (rooms||[]).reduce((s,r) => s+(r.unread||0), 0);
+  const canCreateGroup = ['Admin','Ops Lead','Sub Admin','SME','Team Lead','Senior Executive'].includes(APP.user.role);
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;height:calc(100vh - 120px);gap:0;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);">
+      <!-- LEFT: Room List -->
+      <div id="chat-rooms" style="width:290px;min-width:220px;border-right:1px solid var(--border);display:flex;flex-direction:column;">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;">
+          💬 Chat
+          ${totalUnread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;">${totalUnread}</span>` : ''}
+          ${canCreateGroup ? `<button onclick="openCreateGroup()" style="margin-left:auto;padding:4px 10px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">➕ Group</button>` : ''}
+        </div>
+        <div style="padding:8px 10px;border-bottom:1px solid var(--border);">
+          <input type="text" id="chat-room-search" placeholder="🔍 Search..."
+            style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text);outline:none;box-sizing:border-box;"
+            oninput="filterChatRooms(this.value)">
+        </div>
+        <div id="chat-room-list" style="overflow-y:auto;flex:1;">
+          ${buildChatRoomList(rooms||[])}
+        </div>
+      </div>
+      <!-- RIGHT: Chat Window -->
+      <div id="chat-window" style="flex:1;display:flex;flex-direction:column;background:var(--bg);">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:12px;">
+          <div style="font-size:48px;">💬</div>
+          <div style="font-size:16px;font-weight:600;">Koi room select karo</div>
+          <div style="font-size:13px;">Left mein client, group ya Team chat choose karo</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildChatRoomList(rooms) {
+  if (!rooms.length) return '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;">Koi room nahi</div>';
+
+  // Separate by type
+  const team = rooms.filter(r => r.roomType === 'team');
+  const groups = rooms.filter(r => r.roomType === 'group');
+  const clients = rooms.filter(r => r.roomType === 'client');
+
+  let html = '';
+
+  if (team.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">Team</div>`;
+    html += team.map(r => roomItem(r)).join('');
+  }
+  if (groups.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">My Groups</div>`;
+    html += groups.map(r => roomItem(r)).join('');
+  }
+  if (clients.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;background:var(--bg);">Clients (${clients.length})</div>`;
+    html += clients.map(r => roomItem(r)).join('');
+  }
+  return html;
+}
+
+function roomItem(r) {
+  const icon = r.roomType==='team' ? '👥' : r.roomType==='group' ? '👥' : r.roomName.charAt(0).toUpperCase();
+  const bg = r.roomType==='team' ? '#3498db' : r.roomType==='group' ? '#8e44ad' : '#27ae60';
+  const lastMsg = r.lastMessage ? ((r.lastSender ? r.lastSender.split(' ')[0]+': ' : '') + r.lastMessage) : '<em style="opacity:0.6;">No messages</em>';
+  return `<div class="chat-room-item" data-rid="${r.roomId}" data-rname="${(r.roomName||'').replace(/"/g,'&quot;')}" data-rtype="${r.roomType}"
+    onclick="openChatRoom(this)"
+    style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.1s;">
+    <div style="width:36px;height:36px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+    <div style="flex:1;overflow:hidden;">
+      <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.roomName}</div>
+      <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lastMsg}</div>
+    </div>
+    ${r.unread ? `<span style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700;flex-shrink:0;">${r.unread}</span>` : ''}
+  </div>`;
+}
+
+function filterChatRooms(q) {
+  const filtered = q.trim()
+    ? (window._chatAllRooms||[]).filter(r => r.roomName.toLowerCase().includes(q.toLowerCase()))
+    : (window._chatAllRooms||[]);
+  const list = document.getElementById('chat-room-list');
+  if (list) list.innerHTML = buildChatRoomList(filtered);
+}
+
+async function openChatRoom(el) {
+  const roomId = el.getAttribute('data-rid');
+  const roomName = el.getAttribute('data-rname');
+  const roomType = el.getAttribute('data-rtype');
+
+  document.querySelectorAll('.chat-room-item').forEach(e => e.style.background = '');
+  el.style.background = 'var(--primary-light,#eef2ff)';
+  // Remove unread badge
+  const badge = el.querySelector('span[style*="background:var(--red)"]');
+  if (badge) badge.remove();
+
+  _chatCurrentRoom = { roomId, roomName, roomType };
+  if (_chatPollTimer) clearInterval(_chatPollTimer);
+
+  const isGroup = roomType === 'group';
+  const canManage = isGroup && ['Admin','Ops Lead'].includes(APP.user.role) ||
+                    (isGroup && (window._chatAllRooms||[]).find(r=>r.roomId===roomId)?.createdBy === APP.user.name);
+
+  const win = document.getElementById('chat-window');
+  const iconBg = roomType==='team'?'#3498db':roomType==='group'?'#8e44ad':'#27ae60';
+  const icon = roomType==='team'?'👥':roomType==='group'?'👥':roomName.charAt(0).toUpperCase();
+
+  win.innerHTML = `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;background:var(--bg-card);">
+      <span style="width:32px;height:32px;border-radius:50%;background:${iconBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</span>
+      <div>
+        <div>${roomName}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:400;">${roomType==='team'?'Team General':roomType==='group'?'Group Chat':'Client Chat'}</div>
+      </div>
+      ${canManage ? `<button onclick="openGroupSettings('${roomId}')" style="margin-left:auto;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;">⚙️ Manage</button>` : ''}
+    </div>
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px;"></div>
+    <div id="chat-input-area" style="padding:10px 12px;border-top:1px solid var(--border);background:var(--bg-card);">
+      <div id="chat-file-preview" style="display:none;margin-bottom:8px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px;align-items:center;gap:8px;"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <label style="cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);display:flex;align-items:center;flex-shrink:0;" title="Attach file">
+          📎<input type="file" id="chat-file-input" style="display:none;" accept="image/*,.pdf,.xlsx,.xls,.csv" onchange="previewChatFile(this)">
+        </label>
+        <textarea id="chat-msg-input" rows="1" placeholder="Message likho... (Enter = send)"
+          style="flex:1;resize:none;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:var(--bg);color:var(--text);font-family:inherit;outline:none;min-height:40px;"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+        <button onclick="sendChatMessage()" style="padding:10px 16px;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;flex-shrink:0;">➤</button>
+      </div>
+    </div>
+  `;
+  win.style.display = 'flex';
+  win.style.flexDirection = 'column';
+
+  const msgs = await api('GET', '/chat/messages/'+roomId+'?_='+Date.now()) || [];
+  _chatLastTs = msgs.length ? msgs[msgs.length-1].created_at : new Date().toISOString();
+  renderChatMessages(msgs);
+
+  _chatPollTimer = setInterval(pollChatMessages, 4000);
+}
+
+function renderChatMessages(msgs, append=false) {
+  const container = document.getElementById('chat-msgs');
+  if (!container) return;
+  const me = APP.user.name;
+  if (!append) container.innerHTML = '';
+
+  if (!msgs.length && !append) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:40px;">Abhi koi message nahi 👋</div>';
+    return;
+  }
+
+  msgs.forEach(m => {
+    const isMe = m.sender_name === me;
+    const time = new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    const date = new Date(m.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+
+    let fileHtml = '';
+    if (m.file_url) {
+      if (m.file_type === 'image') {
+        fileHtml = `<img src="${m.file_url}" style="max-width:220px;max-height:180px;border-radius:8px;display:block;margin-top:6px;cursor:pointer;" onclick="window.open('${m.file_url}','_blank')">`;
+      } else {
+        const icon = m.file_type==='pdf'?'📄':m.file_type==='excel'?'📊':'📎';
+        fileHtml = `<a href="${m.file_url}" target="_blank" style="display:flex;align-items:center;gap:6px;padding:8px;background:rgba(0,0,0,0.08);border-radius:6px;margin-top:6px;text-decoration:none;color:inherit;font-size:12px;">${icon} ${m.file_name||'File'}</a>`;
+      }
+    }
+
+    const div = document.createElement('div');
+    div.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};`;
+    div.innerHTML = `
+      ${!isMe ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;margin-left:4px;">${m.sender_name}<span style="opacity:0.6;"> · ${m.sender_role||''}</span></div>` : ''}
+      <div style="max-width:68%;padding:10px 14px;border-radius:${isMe?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${isMe?'var(--primary)':'var(--bg-card)'};color:${isMe?'#fff':'var(--text)'};border:${isMe?'none':'1px solid var(--border)'};font-size:14px;line-height:1.5;word-break:break-word;">
+        ${m.message ? `<div>${m.message.replace(/\n/g,'<br>')}</div>` : ''}
+        ${fileHtml}
+        <div style="font-size:10px;opacity:0.6;margin-top:4px;text-align:right;">${time} · ${date}</div>
+      </div>`;
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+async function pollChatMessages() {
+  if (!_chatCurrentRoom || !_chatLastTs) return;
+  const msgs = await api('GET', `/chat/poll/${_chatCurrentRoom.roomId}?after=${encodeURIComponent(_chatLastTs)}&_=${Date.now()}`);
+  if (msgs && msgs.length) {
+    _chatLastTs = msgs[msgs.length-1].created_at;
+    renderChatMessages(msgs, true);
+  }
+}
+
+function previewChatFile(input) {
+  const preview = document.getElementById('chat-file-preview');
+  if (!preview || !input.files.length) return;
+  const file = input.files[0];
+  const icon = file.type.startsWith('image/')? '🖼️' : file.name.endsWith('.pdf')? '📄' : '📊';
+  preview.style.display = 'flex';
+  preview.innerHTML = `${icon} <strong>${file.name}</strong> <span style="color:var(--text-muted);">(${(file.size/1024).toFixed(0)} KB)</span><button onclick="clearChatFile()" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>`;
+}
+
+function clearChatFile() {
+  const i = document.getElementById('chat-file-input');
+  const p = document.getElementById('chat-file-preview');
+  if (i) i.value = '';
+  if (p) { p.style.display='none'; p.innerHTML=''; }
+}
+
+async function sendChatMessage() {
+  if (!_chatCurrentRoom) return;
+  const msgInput = document.getElementById('chat-msg-input');
+  const fileInput = document.getElementById('chat-file-input');
+  const msg = (msgInput?.value||'').trim();
+  const file = fileInput?.files?.[0];
+  if (!msg && !file) { showToast('Message ya file zaroor chahiye!','error'); return; }
+
+  const btn = document.querySelector('#chat-input-area button[onclick="sendChatMessage()"]');
+  if (btn) { btn.disabled=true; btn.textContent='...'; }
+
+  try {
+    if (file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('roomId', _chatCurrentRoom.roomId);
+      fd.append('roomName', _chatCurrentRoom.roomName);
+      fd.append('roomType', _chatCurrentRoom.roomType);
+      if (msg) fd.append('message', msg);
+      const res = await fetch(API+'/chat/upload', { method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error||'Upload failed');
+      clearChatFile();
+    } else {
+      const r = await api('POST', '/chat/messages', { roomId:_chatCurrentRoom.roomId, roomName:_chatCurrentRoom.roomName, roomType:_chatCurrentRoom.roomType, message:msg });
+      if (!r?.success) throw new Error('Send failed');
+    }
+    if (msgInput) { msgInput.value=''; msgInput.style.height='auto'; }
+    await pollChatMessages();
+  } catch(e) {
+    showToast('Error: '+e.message,'error');
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='➤'; }
+  }
+}
+
+// ── GROUP CREATE ──────────────────────────────────────────────
+function openCreateGroup() {
+  const users = window._chatAllUsers || [];
+  const me = APP.user.name;
+  openPanel('➕ New Group', `
+    <div class="form-group"><label>Group Name *</label>
+      <input type="text" class="form-control" id="grp-name" placeholder="e.g. Amazon Team, Flipkart Discussion..."></div>
+    <div class="form-group"><label>Members add karo *</label>
+      <input type="text" id="grp-member-search" class="form-control" placeholder="🔍 Name search karo..." oninput="filterGroupMembers(this.value)" style="margin-bottom:8px;">
+      <div id="grp-member-list" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+        ${users.filter(u=>u.name!==me).map(u=>`
+          <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+            <input type="checkbox" class="grp-member-cb" value="${u.name}" style="width:16px;height:16px;">
+            <div>
+              <div style="font-weight:600;font-size:13px;">${u.name}</div>
+              <div style="font-size:11px;color:var(--text-muted);">${u.role||''}</div>
+            </div>
+          </label>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitCreateGroup()">✅ Create Group</button>
+  `);
+}
+
+function filterGroupMembers(q) {
+  const users = window._chatAllUsers || [];
+  const me = APP.user.name;
+  const filtered = q.trim() ? users.filter(u => u.name !== me && u.name.toLowerCase().includes(q.toLowerCase())) : users.filter(u => u.name !== me);
+  const list = document.getElementById('grp-member-list');
+  if (!list) return;
+  list.innerHTML = filtered.map(u => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+      <input type="checkbox" class="grp-member-cb" value="${u.name}" style="width:16px;height:16px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${u.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${u.role||''}</div>
+      </div>
+    </label>`).join('');
+}
+
+async function submitCreateGroup() {
+  const name = (document.getElementById('grp-name')?.value||'').trim();
+  if (!name) { showToast('Group name dalo!','error'); return; }
+  const members = [...document.querySelectorAll('.grp-member-cb:checked')].map(cb => cb.value);
+  if (!members.length) { showToast('Kam se kam 1 member add karo!','error'); return; }
+
+  const r = await api('POST', '/chat/groups', { groupName: name, members });
+  if (r?.success) {
+    showToast('Group "'+name+'" ban gaya!','success');
+    closePanel();
+    renderChat();
+  } else {
+    showToast('Error: '+(r?.error||'Failed'),'error');
+  }
+}
+
+// ── GROUP SETTINGS ────────────────────────────────────────────
+async function openGroupSettings(groupId) {
+  const [members, users] = await Promise.all([
+    api('GET', '/chat/groups/'+groupId+'/members'),
+    api('GET', '/users'),
+  ]);
+  const memberNames = new Set((members||[]).map(m => m.user_name));
+  const nonMembers = (users||[]).filter(u => u.isActive && !memberNames.has(u.name));
+
+  openPanel('⚙️ Group Settings', `
+    <div class="form-group">
+      <label>Current Members (${(members||[]).length})</label>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;">
+        ${(members||[]).map(m=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);">
+            <div style="flex:1;font-size:13px;font-weight:600;">${m.user_name}</div>
+            ${m.user_name !== APP.user.name ? `<button onclick="removeGroupMember('${groupId}','${m.user_name}')" style="padding:3px 8px;background:var(--red);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">Remove</button>` : '<span style="font-size:11px;color:var(--text-muted);">You</span>'}
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Member Add Karo</label>
+      <select class="form-control" id="grp-add-member">
+        <option value="">-- Select user --</option>
+        ${nonMembers.map(u=>`<option value="${u.name}">${u.name} (${u.role})</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="addGroupMember('${groupId}')">➕ Add Member</button>
+    </div>
+    <hr>
+    <button class="btn btn-sm" style="background:var(--red);color:#fff;width:100%;" onclick="deleteGroup('${groupId}')">🗑️ Delete Group</button>
+  `);
+}
+
+async function addGroupMember(groupId) {
+  const userName = document.getElementById('grp-add-member')?.value;
+  if (!userName) { showToast('User select karo!','error'); return; }
+  const r = await api('POST', '/chat/groups/'+groupId+'/members', { userName });
+  if (r?.success) { showToast(userName+' add ho gaya!','success'); closePanel(); openGroupSettings(groupId); }
+  else showToast('Error: '+(r?.error||'Failed'),'error');
+}
+
+async function removeGroupMember(groupId, userName) {
+  if (!confirm(userName+' ko remove karein?')) return;
+  const r = await api('DELETE', '/chat/groups/'+groupId+'/members/'+userName);
+  if (r?.success) { showToast(userName+' removed!','success'); closePanel(); openGroupSettings(groupId); }
+}
+
+async function deleteGroup(groupId) {
+  if (!confirm('Group aur saare messages delete ho jayenge. Sure?')) return;
+  const r = await api('DELETE', '/chat/groups/'+groupId);
+  if (r?.success) { showToast('Group delete ho gaya!','success'); closePanel(); renderChat(); }
+}
+
+</script>
+</body>
+</html>

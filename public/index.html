@@ -1985,70 +1985,105 @@ async function renderTickets(){
   const tickets=await api('GET','/tickets');if(!tickets) return;
   APP.tickets=tickets;
   const open=tickets.filter(t=>t.status!=='Done').length;
+  const pendingApproval=tickets.filter(t=>t.status==='Pending Approval').length;
   const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">In Progress</div><div class="kpi-value">${tickets.filter(t=>t.status==='In Progress').length}</div></div>
-      <div class="kpi-card red"><div class="kpi-label">SLA Breached</div><div class="kpi-value">${tickets.filter(t=>t.slaBreached).length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">⏳ Pending Approval</div><div class="kpi-value">${pendingApproval}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${tickets.filter(t=>t.resolvedAt&&isToday(t.resolvedAt)).length}</div></div>
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">🎫 Tickets</span>
-        <div style="display:flex;gap:8px;">
-          <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)"><option value="">All</option><option>Open</option><option>In Progress</option><option>Done</option></select>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterTickets(this.value)"><option value="">All</option><option>Open</option><option>In Progress</option><option>Pending Approval</option><option>Done</option></select>
+          ${isLead?`<button class="btn btn-sm btn-outline" onclick="renderTicketTimeStats()" style="background:#8e44ad;color:#fff;">⏱ Time Stats</button>`:''}
           <button class="btn btn-danger btn-sm" onclick="openRaiseTicket()">🎫 Raise</button>
         </div>
       </div>
       <div class="card-body" id="tickets-body">${ticketCards(tickets)}</div>
-    </div>`;
+    </div>
+    <div id="ticket-time-stats"></div>`;
 }
 
 function ticketCards(tickets){
   if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
-  return [...tickets].sort((a,b)=>(a.status==='Done'?1:0)-(b.status==='Done'?1:0)).map(t=>`
-    <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}">
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  return [...tickets].sort((a,b)=>{
+    const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
+    return (order[a.status]||0)-(order[b.status]||0);
+  }).map(t=>{
+    const statusColor = t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber';
+    const pendingApproval = t.status==='Pending Approval';
+    return `
+    <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}" style="${pendingApproval?'border-left:4px solid #3498db;background:#eaf4fd;':''}">
       <div class="ticket-header">
         <div><div class="ticket-id">${t.ticketId}</div><div class="ticket-client">${t.clientName}</div></div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
-          <span class="badge badge-gray">${t.status}</span>
+          <span class="badge ${statusColor}">${t.status}</span>
         </div>
       </div>
       <div class="ticket-desc" style="cursor:pointer;" onclick="viewTicketDetail(this)" data-tid="${t.ticketId}">${t.category} — ${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);font-size:11px;"> ...read more</span>':''}</div>
+      ${pendingApproval?`<div style="font-size:12px;color:#2980b9;padding:4px 0;"><strong>⏳ Close request by:</strong> ${t.closeRequestedBy||'—'} · ${t.closeRequestedAt||'—'}</div>`:''}
       <div class="ticket-footer">
-        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">${t.status==='Done'?'✅ Resolved':t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}</span>
+        <span class="sla-timer ${t.status==='Done'?'sla-ok':t.slaBreached?'sla-breach':t.hoursRemaining<6?'sla-warn':'sla-ok'}">${t.status==='Done'?'✅ Resolved '+(t.hoursToClose?'('+t.hoursToClose+'h)':''):t.slaBreached?`🔴 Breached (${t.hoursOpen}h)`:`⏱ ${t.hoursRemaining}h left`}</span>
         <span style="font-size:11px;color:var(--text-muted);">→ ${t.assignedTo}</span>
-        ${t.status!=='Done'?`<div style="margin-left:auto;display:flex;gap:4px;">${t.status==='Open'?`<button class="btn btn-sm btn-outline" onclick="updateTicket('${t.ticketId}','In Progress')">▶ Accept</button>`:''}${t.status==='In Progress'?`<button class="btn btn-sm btn-success" onclick="promptCloseTicket('${t.ticketId}','${t.clientName}')">✅ Done</button>`:''}</div>`:''}
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          ${t.status==='Open'?`<button class="btn btn-sm btn-outline" data-tid="${t.ticketId}" onclick="updateTicket(this.getAttribute('data-tid'),'In Progress')">▶ Accept</button>`:''}
+          ${t.status==='In Progress'?`<button class="btn btn-sm btn-success" data-tid="${t.ticketId}" data-cn="${t.clientName.replace(/['"]/g,'')}" onclick="promptCloseTicket(this.getAttribute('data-tid'),this.getAttribute('data-cn'))">✅ Request Close</button>`:''}
+          ${pendingApproval && isLead?`
+            <button class="btn btn-sm btn-success" data-tid="${t.ticketId}" onclick="approveTicketClose(this.getAttribute('data-tid'))">✅ Approve</button>
+            <button class="btn btn-sm" style="background:var(--red);color:#fff;" data-tid="${t.ticketId}" onclick="rejectTicketClose(this.getAttribute('data-tid'))">❌ Reject</button>
+          `:''}
+          ${pendingApproval && !isLead?`<span style="font-size:11px;color:#2980b9;">⏳ Approval ka wait kar rahe hain...</span>`:''}
+        </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function viewTicketDetail(el){
   const tid = el.getAttribute('data-tid');
   const t = (APP.tickets||[]).find(x=>x.ticketId===tid);
   if(!t) return;
+  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  const pendingApproval = t.status==='Pending Approval';
+
   openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
     '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
       '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
         '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span>'+
-        '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
+        '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
         '<span class="badge badge-blue">'+t.category+'</span>'+
       '</div>'+
       '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">Client: '+t.clientName+'</div>'+
       '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+t.assignedTo+'</div>'+
       '<div style="font-size:12px;color:var(--text-muted);">Raised By: '+t.raisedBy+' · '+t.createdAt+'</div>'+
+      (t.hoursToClose?'<div style="font-size:12px;color:var(--green);font-weight:700;">⏱ Close time: '+t.hoursToClose+' hours</div>':'')+
     '</div>'+
     '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
     '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>'+
-    (t.resolutionNote?'<div style="font-weight:600;margin-bottom:6px;">✅ Resolution:</div>'+
-    '<div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;margin-bottom:8px;">'+t.resolutionNote+'</div>'+
-    (t.resolvedAt?'<div style="font-size:12px;color:var(--text-muted);">✅ Closed by: '+(t.resolvedBy||'—')+' · '+t.resolvedAt+'</div>':''):'')+
+    (t.resolutionNote?
+      '<div style="font-weight:600;margin-bottom:6px;">✅ Resolution Note:</div>'+
+      '<div style="background:#eafaf1;border-radius:8px;padding:12px;font-size:13px;margin-bottom:8px;">'+t.resolutionNote+'</div>'+
+      (t.closeRequestedBy?'<div style="font-size:12px;color:#2980b9;margin-bottom:4px;">⏳ Close requested by: <strong>'+t.closeRequestedBy+'</strong> · '+t.closeRequestedAt+'</div>':'')
+    :'')+
+    (t.approvedBy?'<div style="font-size:12px;color:var(--green);margin-bottom:8px;">✅ Approved by: <strong>'+t.approvedBy+'</strong> · '+t.approvedAt+'</div>':'')+
     (t.status!=='Done'?
-      '<div style="display:flex;gap:8px;margin-top:12px;">'+
+      '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'+
         (t.status==='Open'?'<button class="btn btn-outline" data-tid="'+t.ticketId+'" onclick="var b=this;updateTicket(b.getAttribute(\'data-tid\'),\'In Progress\');closePanel()">▶ Accept</button>':'')+
-        (t.status==='In Progress'?'<button class="btn btn-success" data-tid="'+t.ticketId+'" data-cn="'+t.clientName.replace(/['\'"]/g,'')+' " onclick="var b=this;promptCloseTicket(b.getAttribute(\'data-tid\'),b.getAttribute(\'data-cn\'));closePanel()">✅ Mark Done</button>':'')+
-      '</div>':'')
+        (t.status==='In Progress'?'<button class="btn btn-success" data-tid="'+t.ticketId+'" data-cn="'+t.clientName.replace(/[\'\"]/g,'')+'" onclick="var b=this;promptCloseTicket(b.getAttribute(\'data-tid\'),b.getAttribute(\'data-cn\'));closePanel()">✅ Request Close</button>':'')+
+        (pendingApproval && isLead?
+          '<button class="btn btn-success" data-tid="'+t.ticketId+'" onclick="approveTicketClose(this.getAttribute(\'data-tid\'));closePanel()">✅ Approve & Close</button>'+
+          '<button class="btn btn-sm" style="background:var(--red);color:#fff;" data-tid="'+t.ticketId+'" onclick="rejectTicketClose(this.getAttribute(\'data-tid\'));closePanel()">❌ Reject</button>'
+        :'')+
+        (pendingApproval && !isLead?'<span style="color:#2980b9;font-size:13px;">⏳ CSI Lead approval ka intezaar hai...</span>':'')+
+      '</div>':
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">✅ Closed by: '+(t.resolvedBy||'—')+' · '+t.resolvedAt+'</div>'
+    )
   );
 }
 
@@ -2087,7 +2122,7 @@ function promptCloseTicket(id,cn){
       '<input type="text" class="form-control" value="'+(APP.user?APP.user.name:'—')+'" disabled></div>'+
     '<div class="form-group"><label>Closed At</label>'+
       '<input type="text" class="form-control" value="'+new Date().toLocaleString('en-IN')+'" disabled></div>'+
-    '<button class="btn btn-success btn-full" id="close-ticket-btn" data-tid="'+id+'" data-cn="'+cn.replace(/['"]/g,'')+'" onclick="submitCloseTicket(this)">✅ Close Ticket</button>'
+    '<button class="btn btn-success btn-full" id="close-ticket-btn" data-tid="'+id+'" data-cn="'+cn.replace(/['"]/g,'')+'" onclick="submitCloseTicket(this)">📨 Request Close (CSI Lead ko bhejega)</button>'
   );
 }
 
@@ -2096,15 +2131,60 @@ async function submitCloseTicket(btn){
   var note = document.getElementById('close-note').value.trim();
   if(!note){ showToast('Resolution note zaroor likho!', 'error'); return; }
   var r = await api('PATCH', '/tickets/'+id, {
-    status: 'Done',
+    action: 'request_close',
     resolutionNote: note,
-    resolvedBy: APP.user ? APP.user.name : '',
   });
   if(r?.success){
-    showToast('✅ Ticket closed!', 'success');
+    showToast('✅ Close request bhej di! CSI Lead approve karega.', 'success');
     closePanel();
     renderTickets();
   }
+}
+
+async function approveTicketClose(id) {
+  if(!confirm('Is ticket ko approved karke close karna hai?')) return;
+  const r = await api('PATCH', '/tickets/'+id, { action: 'approve_close' });
+  if(r?.success){
+    showToast('✅ Ticket approved aur closed!', 'success');
+    renderTickets();
+  }
+}
+
+async function rejectTicketClose(id) {
+  if(!confirm('Close request reject karna hai? Executive ko wapas In Progress mein jaayega.')) return;
+  const r = await api('PATCH', '/tickets/'+id, { action: 'reject_close' });
+  if(r?.success){
+    showToast('❌ Close request reject ki — ticket wapas In Progress.', 'success');
+    renderTickets();
+  }
+}
+
+async function renderTicketTimeStats() {
+  const el = document.getElementById('ticket-time-stats');
+  if(!el) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Loading stats...</div>';
+  const stats = await api('GET', '/tickets/stats/time?_='+Date.now()) || [];
+  if(!stats.length){ el.innerHTML='<div class="card"><div class="card-body">Abhi tak koi closed ticket nahi.</div></div>'; return; }
+
+  el.innerHTML = '<div class="card" style="margin-top:16px;">'+
+    '<div class="card-header"><span class="card-title">⏱ Ticket Close Time Stats — Per Executive</span></div>'+
+    '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+    '<thead><tr><th>#</th><th>Executive</th><th>Total Closed</th><th>Avg Hours</th><th>Fastest</th><th>Slowest</th><th>Proactiveness</th></tr></thead>'+
+    '<tbody>'+
+    stats.map((s,i)=>{
+      const avgColor = s.avgHoursToClose<=4?'var(--green)':s.avgHoursToClose<=12?'var(--amber)':'var(--red)';
+      const label = s.avgHoursToClose<=4?'🟢 Proactive':s.avgHoursToClose<=12?'🟡 Average':'🔴 Slow';
+      return '<tr>'+
+        '<td>'+(i+1)+'</td>'+
+        '<td><strong>'+s.name+'</strong></td>'+
+        '<td style="text-align:center;">'+s.totalTickets+'</td>'+
+        '<td style="text-align:center;font-weight:700;color:'+avgColor+';">'+s.avgHoursToClose+'h</td>'+
+        '<td style="text-align:center;color:var(--green);">'+s.minHours+'h</td>'+
+        '<td style="text-align:center;color:var(--red);">'+s.maxHours+'h</td>'+
+        '<td>'+label+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div></div></div>';
 }
 
 function openRaiseTicket(){

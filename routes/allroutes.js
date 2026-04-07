@@ -9,7 +9,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
-    .order('created_at', { ascending: false }); 
+    .order('created_at', { ascending: false });
   if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
     query = query.eq('crm_executive', name);
   }
@@ -759,10 +759,195 @@ reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) 
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── MONTHLY REPORTS ──────────────────────────────────────────
+const monthlyReportsRouter = require('express').Router();
+
+// GET /api/monthly-reports/dsr — client-wise DSR totals
+monthlyReportsRouter.get('/dsr', authMiddleware, async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from and to dates required' });
+
+    const { data, error } = await supabase.from('dsr_data')
+      .select('client_code, client_name, sales_amount, orders_count, ad_spend, return_rate, report_date')
+      .gte('report_date', from)
+      .lte('report_date', to)
+      .order('report_date', { ascending: true });
+    if (error) throw error;
+
+    // Group by client
+    const clientMap = {};
+    (data || []).forEach(r => {
+      const key = r.client_code;
+      if (!clientMap[key]) {
+        clientMap[key] = {
+          clientCode: r.client_code,
+          clientName: r.client_name || r.client_code,
+          totalSales: 0, totalOrders: 0, totalAdSpend: 0,
+          avgReturnRate: 0, daysReported: 0, returnRates: [],
+        };
+      }
+      clientMap[key].totalSales += parseFloat(r.sales_amount || 0);
+      clientMap[key].totalOrders += parseInt(r.orders_count || 0);
+      clientMap[key].totalAdSpend += parseFloat(r.ad_spend || 0);
+      clientMap[key].returnRates.push(parseFloat(r.return_rate || 0));
+      clientMap[key].daysReported++;
+    });
+
+    const result = Object.values(clientMap).map(c => ({
+      ...c,
+      avgReturnRate: c.returnRates.length
+        ? Math.round(c.returnRates.reduce((s, r) => s + r, 0) / c.returnRates.length * 10) / 10
+        : 0,
+      acos: c.totalSales > 0 ? Math.round(c.totalAdSpend / c.totalSales * 100 * 10) / 10 : 0,
+      returnRates: undefined,
+    })).sort((a, b) => b.totalSales - a.totalSales);
+
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/monthly-reports/executive — executive performance
+monthlyReportsRouter.get('/executive', authMiddleware, async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from and to dates required' });
+
+    const [usersRes, tasksRes, ticketsRes, crmRes, dsrRes] = await Promise.all([
+      supabase.from('users').select('name, role, designation').eq('is_active', true)
+        .not('role', 'in', '("Admin","CSI Executive","Viewer")'),
+      supabase.from('tasks').select('assigned_to, status, completed_at, created_at')
+        .gte('created_at', from).lte('created_at', to+'T23:59:59'),
+      supabase.from('tickets').select('resolved_by, approved_at, status, close_requested_by')
+        .gte('approved_at', from).lte('approved_at', to+'T23:59:59').eq('status', 'Done'),
+      supabase.from('crm_calls').select('crm_executive, created_at, call_outcome')
+        .gte('created_at', from).lte('created_at', to+'T23:59:59'),
+      supabase.from('dsr_data').select('entered_by, report_date')
+        .gte('report_date', from).lte('report_date', to),
+    ]);
+
+    const users = usersRes.data || [];
+    const tasks = tasksRes.data || [];
+    const tickets = ticketsRes.data || [];
+    const crmCalls = crmRes.data || [];
+    const dsrEntries = dsrRes.data || [];
+
+    const result = users.map(u => {
+      const myTasks = tasks.filter(t => (t.assigned_to || '').toLowerCase().includes(u.name.toLowerCase()));
+      const myTickets = tickets.filter(t => (t.resolved_by || '').toLowerCase().includes(u.name.toLowerCase()));
+      const myCRM = crmCalls.filter(c => (c.crm_executive || '').toLowerCase().includes(u.name.toLowerCase()));
+      const myDSR = dsrEntries.filter(d => (d.entered_by || '').toLowerCase().includes(u.name.toLowerCase()));
+
+      const tasksDone = myTasks.filter(t => t.status === 'Completed' || t.status === 'Done').length;
+      const tasksPending = myTasks.filter(t => t.status !== 'Completed' && t.status !== 'Done').length;
+      const connectedCalls = myCRM.filter(c => (c.call_outcome || '').includes('Connected')).length;
+
+      // Score: tasks(40%) + tickets(20%) + crm(25%) + dsr(15%)
+      const maxScore = 100;
+      const taskScore = Math.min(tasksDone * 5, 40);
+      const ticketScore = Math.min(myTickets.length * 4, 20);
+      const crmScore = Math.min(connectedCalls * 2, 25);
+      const dsrScore = Math.min(myDSR.length * 1, 15);
+      const totalScore = taskScore + ticketScore + crmScore + dsrScore;
+
+      return {
+        name: u.name,
+        role: u.role,
+        designation: u.designation || u.role,
+        tasksDone, tasksPending,
+        totalTasks: myTasks.length,
+        ticketsClosed: myTickets.length,
+        crmCalls: myCRM.length,
+        connectedCalls,
+        dsrEntries: myDSR.length,
+        performanceScore: Math.min(totalScore, 100),
+        grade: totalScore >= 80 ? 'A' : totalScore >= 60 ? 'B' : totalScore >= 40 ? 'C' : 'D',
+      };
+    }).filter(u => u.totalTasks > 0 || u.ticketsClosed > 0 || u.crmCalls > 0 || u.dsrEntries > 0)
+      .sort((a, b) => b.performanceScore - a.performanceScore);
+
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/monthly-reports/ai-analysis — Claude AI summary
+monthlyReportsRouter.post('/ai-analysis', authMiddleware, async (req, res) => {
+  try {
+    const { reportType, data, period } = req.body;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+    let prompt = '';
+    if (reportType === 'dsr') {
+      const top5 = data.slice(0, 5).map(c => `${c.clientName}: ₹${Math.round(c.totalSales).toLocaleString('en-IN')} sales, ${c.totalOrders} orders, ${c.acos}% ACOS`).join('\n');
+      const bottom5 = data.slice(-5).map(c => `${c.clientName}: ₹${Math.round(c.totalSales).toLocaleString('en-IN')} sales, ${c.totalOrders} orders`).join('\n');
+      const totalSales = data.reduce((s, c) => s + c.totalSales, 0);
+      prompt = `You are an Amazon seller management expert. Analyze this DSR (Daily Sales Report) data for ${period} and provide insights in Hindi/English mix (Hinglish).
+
+Total clients: ${data.length}
+Total revenue: ₹${Math.round(totalSales).toLocaleString('en-IN')}
+
+Top 5 performers:
+${top5}
+
+Bottom 5 performers:
+${bottom5}
+
+Please provide:
+1. Overall performance summary (2-3 lines)
+2. Top performers ka highlight
+3. Underperforming clients ke liye concerns
+4. Next month ke liye 3 actionable recommendations
+
+Keep response concise, under 250 words. Use Hinglish naturally.`;
+    } else {
+      const gradeA = data.filter(e => e.grade === 'A').map(e => e.name).join(', ') || 'None';
+      const gradeD = data.filter(e => e.grade === 'D').map(e => e.name).join(', ') || 'None';
+      prompt = `You are an HR performance analyst. Analyze this team performance data for ${period} and provide insights in Hinglish.
+
+Total executives analyzed: ${data.length}
+Grade A (top performers): ${gradeA}
+Grade D (needs improvement): ${gradeD}
+
+Top 3 performers:
+${data.slice(0, 3).map(e => `${e.name} (${e.role}): Score ${e.performanceScore}/100, Tasks: ${e.tasksDone} done, Tickets: ${e.ticketsClosed} closed, CRM calls: ${e.connectedCalls} connected`).join('\n')}
+
+Bottom 3:
+${data.slice(-3).map(e => `${e.name} (${e.role}): Score ${e.performanceScore}/100, Tasks: ${e.tasksDone} done`).join('\n')}
+
+Please provide:
+1. Team ka overall performance summary
+2. Top performers ki tarif (name mention karo)
+3. Jo kaam nahi kar rahe unke baare mein concern
+4. HR ke liye 3 actionable steps
+
+Keep response under 250 words. Use Hinglish naturally.`;
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const aiData = await response.json();
+    const analysis = aiData.content?.[0]?.text || 'Analysis generate nahi ho paya.';
+    res.json({ success: true, analysis });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  expectationsRouter,
+  expectationsRouter, monthlyReportsRouter,
 };

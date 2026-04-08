@@ -5011,63 +5011,129 @@ async function resolveCloseRequest(requestId, status, clientId) {
 // ═══════════════════════════════════════════════════════════
 
 async function renderStaffTransfer() {
-  const [users, pending] = await Promise.all([api('GET','/users'), api('GET','/staff-transfer/pending')]);
-  const activeUsers = (users||[]).filter(u=>u.isActive);
+  const [users, pending, clients] = await Promise.all([
+    api('GET','/users'),
+    api('GET','/staff-transfer/pending'),
+    api('GET','/clients?_='+Date.now()),
+  ]);
+  const activeUsers = (users||[]).filter(u=>u.isActive && !['Admin','Viewer','CSI Executive'].includes(u.role));
+  if(clients) APP.clients = clients;
+  window._staffUsers = activeUsers;
+  window._staffClients = clients || [];
+
+  // Check temp transfers expiring today
+  const today = new Date().toISOString().split('T')[0];
+  const tempExpiring = (clients||[]).filter(c => c.tempEndDate && c.tempEndDate <= today && c.tempAmName);
+
   document.getElementById('page-content').innerHTML = `
     <div class="kpi-grid">
       <div class="kpi-card amber"><div class="kpi-label">Pending Transfers</div><div class="kpi-value">${(pending||[]).length}</div></div>
       <div class="kpi-card blue"><div class="kpi-label">Active Staff</div><div class="kpi-value">${activeUsers.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Temp Transfers Active</div><div class="kpi-value">${(clients||[]).filter(c=>c.tempAmName).length}</div></div>
+      ${tempExpiring.length?`<div class="kpi-card red"><div class="kpi-label">⚠️ Temp Expiring Today</div><div class="kpi-value">${tempExpiring.length}</div></div>`:''}
     </div>
 
-    <!-- New Transfer Form -->
-    <div class="card" style="border-left:4px solid var(--amber);">
-      <div class="card-header" style="background:#fef9e7;"><span class="card-title">🔁 New Staff Transfer / Exit</span></div>
-      <div class="card-body">
-        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#92400e;">
-          ⚠️ Jab koi employee exit kare ya transfer ho — uske sellers naye person ko assign ho jayenge.
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Exiting / Transferring Staff *</label>
-            <select class="form-control" id="st-from" onchange="loadTransferPreview(this.value)">
-              <option value="">-- Select Staff --</option>
-              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
-            </select>
+    <!-- Tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0;">
+      <button id="tab-perm" class="btn btn-primary btn-sm" style="border-radius:8px 8px 0 0;" onclick="showTransferTab('perm')">🔁 Permanent Transfer</button>
+      <button id="tab-temp" class="btn btn-outline btn-sm" style="border-radius:8px 8px 0 0;" onclick="showTransferTab('temp')">⏳ Temporary Transfer</button>
+      <button id="tab-restore" class="btn btn-outline btn-sm" style="border-radius:8px 8px 0 0;" onclick="showTransferTab('restore')">🔄 Restore / Active Temp</button>
+    </div>
+
+    <!-- PERMANENT TRANSFER TAB -->
+    <div id="tab-content-perm">
+      <div class="card" style="border-left:4px solid var(--amber);margin-bottom:16px;">
+        <div class="card-header" style="background:#fef9e7;"><span class="card-title">🔁 Permanent Transfer — Account Wise</span></div>
+        <div class="card-body">
+          <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#92400e;">
+            ⚠️ Permanent transfer — client permanently naye person ko assign ho jaayega.
           </div>
-          <div class="form-group"><label>Transfer Sellers To *</label>
-            <select class="form-control" id="st-to">
-              <option value="">-- Select New Person --</option>
-              ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
-            </select>
+          <div class="form-row">
+            <div class="form-group"><label>From (Exiting Staff) *</label>
+              <select class="form-control" id="st-from" onchange="loadAccountWisePreview(this.value)">
+                <option value="">-- Select Staff --</option>
+                ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Transfer Type</label>
+              <select class="form-control" id="st-field">
+                <option value="am_name">Account Manager</option>
+                <option value="ads_manager">Ads Manager</option>
+                <option value="crm_executive">CRM Executive</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Account wise assignment table -->
+          <div id="account-wise-table" style="display:none;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--primary);">📋 Account-wise Transfer karo:</div>
+            <div id="account-wise-body"></div>
+            <button class="btn btn-warning btn-full" onclick="submitAccountWiseTransfer()">🔁 Transfer Execute Karo</button>
+          </div>
+
+          <div class="form-row" style="margin-top:12px;">
+            <div class="form-group"><label>Reason</label><textarea class="form-control" id="st-reason" placeholder="Exit reason..." rows="2"></textarea></div>
+            <div class="form-group"><label>Effective Date</label><input type="date" class="form-control" id="st-date" value="${today}"></div>
           </div>
         </div>
-        <div id="st-preview" style="display:none;background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--primary);">📋 Transfer Preview</div>
-          <div id="st-preview-body"></div>
-        </div>
-        <div class="form-group"><label>Transfer Type</label>
-          <select class="form-control" id="st-type">
-            <option value="Full Transfer">Full Transfer (sab kuch)</option>
-            <option value="AM Only">Account Manager only</option>
-            <option value="Ads Only">Ads Manager only</option>
-            <option value="CRM Only">CRM Executive only</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Fields to Transfer</label>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-am" checked> Account Manager</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-ads" checked> Ads Manager</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="st-f-crm" checked> CRM Executive</label>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>Reason</label><textarea class="form-control" id="st-reason" placeholder="Exit reason ya transfer reason..." rows="2"></textarea></div>
-          <div class="form-group"><label>Effective Date</label><input type="date" class="form-control" id="st-date" value="${new Date().toISOString().split('T')[0]}"></div>
-        </div>
-        <button class="btn btn-warning btn-full" onclick="submitStaffTransfer()">🔁 Transfer Request Submit Karo</button>
       </div>
     </div>
 
-    <!-- Pending Transfers -->
+    <!-- TEMPORARY TRANSFER TAB -->
+    <div id="tab-content-temp" style="display:none;">
+      <div class="card" style="border-left:4px solid #3498db;margin-bottom:16px;">
+        <div class="card-header" style="background:#eaf4fd;"><span class="card-title">⏳ Temporary Transfer — Chutti / Leave</span></div>
+        <div class="card-body">
+          <div style="background:#d6eaf8;border:1px solid #85c1e9;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#1a5276;">
+            📅 Staff chutti pe hai — temporarily doosre ko assign karo. End date pe auto-restore option milega.
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Staff on Leave *</label>
+              <select class="form-control" id="temp-from" onchange="loadTempPreview(this.value)">
+                <option value="">-- Select Staff --</option>
+                ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Temporary Handler *</label>
+              <select class="form-control" id="temp-to">
+                <option value="">-- Select Handler --</option>
+                ${activeUsers.map(u=>`<option value="${u.name}">${u.name} — ${u.role}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Start Date *</label><input type="date" class="form-control" id="temp-start" value="${today}"></div>
+            <div class="form-group"><label>End Date (Wapas aane ki date) *</label><input type="date" class="form-control" id="temp-end"></div>
+          </div>
+          <div class="form-group"><label>Transfer Field</label>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 0;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="temp-f-am" checked> Account Manager</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="temp-f-ads"> Ads Manager</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="temp-f-crm"> CRM Executive</label>
+            </div>
+          </div>
+          <!-- Account selection -->
+          <div id="temp-accounts-section" style="display:none;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📋 Kaunse accounts transfer karne hain:</div>
+            <div style="margin-bottom:8px;"><label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="temp-select-all" onchange="toggleAllTempAccounts(this.checked)"> <strong>Sab select karo</strong></label></div>
+            <div id="temp-accounts-body" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="submitTempTransfer()">⏳ Temporary Transfer Karo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESTORE / ACTIVE TEMP TAB -->
+    <div id="tab-content-restore" style="display:none;">
+      <div class="card" style="border-left:4px solid #27ae60;margin-bottom:16px;">
+        <div class="card-header" style="background:#eafaf1;"><span class="card-title">🔄 Active Temporary Transfers</span></div>
+        <div class="card-body" style="padding:0;">
+          ${renderActiveTempTransfers(clients||[])}
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Approvals -->
     <div class="card" style="border-left:4px solid var(--orange);">
       <div class="card-header" style="background:#fef3e7;">
         <span class="card-title">⏳ Pending Approvals (${(pending||[]).length})</span>
@@ -5080,71 +5146,178 @@ async function renderStaffTransfer() {
             <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
               <div>
                 <h4 style="margin:0 0 4px;font-size:15px;">🔁 ${r.exiting_user} → ${r.transfer_to}</h4>
-                <p style="margin:0;font-size:13px;color:#666;">Type: <strong>${r.transfer_type}</strong> | Requested by: ${r.requested_by}</p>
-                <p style="margin:4px 0 0;font-size:13px;">📋 Reason: ${r.reason||'—'}</p>
-                <p style="margin:4px 0 0;font-size:11px;color:#999;">📅 ${r.effective_date} | ${new Date(r.created_at).toLocaleDateString('en-IN')}</p>
+                <p style="margin:0;font-size:13px;color:#666;">Type: <strong>${r.transfer_type}</strong> | By: ${r.requested_by}</p>
+                <p style="margin:4px 0 0;font-size:13px;">📋 ${r.reason||'—'}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#999;">📅 ${r.effective_date}</p>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button onclick="resolveTransfer('${r.id}','approved')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve & Execute</button>
-                <button onclick="resolveTransfer('${r.id}','rejected')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
+              <div style="display:flex;gap:8px;">
+                <button data-id="${r.id}" onclick="resolveTransfer(this.getAttribute('data-id'),'approved')" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✅ Approve</button>
+                <button data-id="${r.id}" onclick="resolveTransfer(this.getAttribute('data-id'),'rejected')" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">❌ Reject</button>
               </div>
             </div>
           </div>`).join('')}
       </div>
     </div>
   `;
-  window._staffUsers = activeUsers;
 }
 
-async function loadTransferPreview(name) {
-  if (!name) return;
-  document.getElementById('st-preview').style.display = '';
-  document.getElementById('st-preview-body').innerHTML = '<div class="loading" style="padding:10px;"><div class="spinner"></div></div>';
-  const data = await api('GET', '/staff-transfer/preview/' + encodeURIComponent(name));
-  if (!data) return;
-  document.getElementById('st-preview-body').innerHTML = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
-      <div><strong style="color:var(--green);">👤 AM Sellers:</strong> ${data.am_clients.length} ${data.am_clients.map(c=>`<span class="badge badge-blue" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
-      <div><strong style="color:var(--orange);">📢 Ads Sellers:</strong> ${data.ads_clients.length} ${data.ads_clients.map(c=>`<span class="badge badge-orange" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
-      <div><strong style="color:var(--teal);">📞 CRM Sellers:</strong> ${data.crm_clients.length} ${data.crm_clients.map(c=>`<span class="badge badge-gray" style="margin:2px;">${c.busy_name}</span>`).join('')}</div>
-    </div>
-    <div style="margin-top:8px;font-weight:700;color:var(--primary);">Total: ${data.total} sellers will be transferred</div>`;
-}
-
-async function submitStaffTransfer() {
-  const from = document.getElementById('st-from').value;
-  const to = document.getElementById('st-to').value;
-  if (!from || !to) { showToast('From aur To dono select karo', 'error'); return; }
-  if (from === to) { showToast('Same person select nahi kar sakte', 'error'); return; }
-  const fields = [];
-  if (document.getElementById('st-f-am').checked) fields.push('am_name');
-  if (document.getElementById('st-f-ads').checked) fields.push('ads_manager');
-  if (document.getElementById('st-f-crm').checked) fields.push('crm_executive');
-  if (!fields.length) { showToast('Kam se kam ek field select karo', 'error'); return; }
-  const r = await api('POST', '/staff-transfer', {
-    exiting_user: from, transfer_to: to,
-    transfer_type: document.getElementById('st-type').value,
-    fields_to_transfer: fields,
-    reason: document.getElementById('st-reason').value,
-    effective_date: document.getElementById('st-date').value,
+function showTransferTab(tab) {
+  ['perm','temp','restore'].forEach(function(t){
+    document.getElementById('tab-content-'+t).style.display = t===tab?'':'none';
+    const btn = document.getElementById('tab-'+t);
+    if(btn){ btn.className = t===tab?'btn btn-primary btn-sm':'btn btn-outline btn-sm'; btn.style.borderRadius='8px 8px 0 0'; }
   });
-  if (r?.success) { showToast('✅ Transfer request submit ho gayi!', 'success'); renderStaffTransfer(); }
-  else showToast(r?.error || 'Error', 'error');
 }
 
-async function resolveTransfer(id, status) {
-  let remark = '';
-  if (status === 'approved') {
-    remark = prompt('Approval note (optional):') || 'Approved';
-  } else {
-    remark = prompt('Rejection reason:');
-    if (remark === null) return;
-  }
-  const r = await api('PATCH', '/staff-transfer/' + id, { status, admin_remark: remark });
-  if (r?.success) {
-    showToast(status === 'approved' ? '✅ Transfer execute ho gaya! Sellers reassigned!' : '❌ Transfer rejected', status === 'approved' ? 'success' : 'info');
+function renderActiveTempTransfers(clients) {
+  const active = clients.filter(function(c){ return c.tempAmName || c.tempAdsManager || c.tempCrmExecutive; });
+  if(!active.length) return '<div class="empty-state"><div class="emoji">✅</div><h3>Koi active temporary transfer nahi</h3></div>';
+  return '<div class="table-wrap"><table><thead><tr><th>Client</th><th>Temp AM</th><th>Original AM</th><th>Start</th><th>End</th><th>Action</th></tr></thead><tbody>'+
+    active.map(function(c){
+      const expired = c.tempEndDate && c.tempEndDate < new Date().toISOString().split('T')[0];
+      return '<tr style="'+(expired?'background:#fdf2f2;':'')+'">'+
+        '<td><strong>'+c.busyName+'</strong></td>'+
+        '<td style="color:#2980b9;font-weight:600;">'+(c.tempAmName||'—')+'</td>'+
+        '<td style="color:var(--text-muted);">'+(c.tempOriginalAm||c.amName||'—')+'</td>'+
+        '<td style="font-size:12px;">'+(c.tempStartDate||'—')+'</td>'+
+        '<td style="font-size:12px;color:'+(expired?'var(--red)':'inherit')+';font-weight:'+(expired?'700':'400')+';">'+(c.tempEndDate||'—')+(expired?' ⚠️':'')+'</td>'+
+        '<td><button class="btn btn-sm btn-success" data-cc="'+c.clientCode+'" onclick="restoreSingleClient(this.getAttribute(\'data-cc\'))">🔄 Restore</button></td>'+
+      '</tr>';
+    }).join('')+
+  '</tbody></table></div>';
+}
+
+async function loadAccountWisePreview(name) {
+  if(!name) return;
+  const field = document.getElementById('st-field').value;
+  const allClients = window._staffClients || [];
+  const myClients = allClients.filter(function(c){
+    return (c.amName||'').toLowerCase().includes(name.toLowerCase()) ||
+           (c.adsManager||'').toLowerCase().includes(name.toLowerCase()) ||
+           (c.crmExecutive||'').toLowerCase().includes(name.toLowerCase());
+  });
+
+  const users = window._staffUsers || [];
+  const tableDiv = document.getElementById('account-wise-table');
+  const bodyDiv = document.getElementById('account-wise-body');
+  if(!myClients.length){ tableDiv.style.display='none'; showToast('Is staff ke koi clients nahi mile','error'); return; }
+
+  tableDiv.style.display='';
+  bodyDiv.innerHTML = '<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">'+
+    '<table><thead><tr><th>Client</th><th>Market</th><th>Current AM</th><th>Transfer To *</th></tr></thead><tbody>'+
+    myClients.map(function(c){
+      return '<tr>'+
+        '<td><label style="display:flex;align-items:center;gap:8px;cursor:pointer;">'+
+          '<input type="checkbox" class="acct-cb" data-cc="'+c.clientCode+'" checked style="width:14px;height:14px;">'+
+          '<strong>'+c.busyName+'</strong></label></td>'+
+        '<td style="font-size:12px;">'+c.marketplace+'</td>'+
+        '<td style="font-size:12px;color:var(--text-muted);">'+(c.amName||'—')+'</td>'+
+        '<td><select class="form-control acct-to-select" data-cc="'+c.clientCode+'" style="padding:4px;font-size:12px;min-width:140px;">'+
+          '<option value="">-- Select --</option>'+
+          users.filter(u=>u.name!==name).map(u=>'<option value="'+u.name+'">'+u.name+'</option>').join('')+
+        '</select></td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>'+
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">✅ = transfer hoga | Uncheck = skip karo | Dropdown se person choose karo</div>';
+}
+
+async function submitAccountWiseTransfer() {
+  const from = document.getElementById('st-from').value;
+  const reason = document.getElementById('st-reason').value;
+  const date = document.getElementById('st-date').value;
+  if(!from){ showToast('From select karo!','error'); return; }
+
+  const transfers = [];
+  document.querySelectorAll('.acct-cb:checked').forEach(function(cb){
+    const cc = cb.getAttribute('data-cc');
+    const toSel = document.querySelector('.acct-to-select[data-cc="'+cc+'"]');
+    const to = toSel ? toSel.value : '';
+    if(to) transfers.push({ clientCode: cc, transferTo: to });
+  });
+
+  if(!transfers.length){ showToast('Kam se kam ek account select karo aur person assign karo!','error'); return; }
+  if(!confirm(transfers.length+' accounts transfer karne hain. Confirm?')) return;
+
+  const r = await api('POST', '/staff-transfer/account-wise', {
+    from_user: from, transfers, reason, effective_date: date,
+  });
+  if(r?.success){
+    showToast('✅ '+transfers.length+' accounts transfer ho gaye!','success');
     renderStaffTransfer();
-  } else showToast(r?.error || 'Error', 'error');
+  } else {
+    showToast('Error: '+(r?.error||'Failed'),'error');
+  }
+}
+
+async function loadTempPreview(name) {
+  if(!name) return;
+  const allClients = window._staffClients || [];
+  const myClients = allClients.filter(function(c){
+    return (c.amName||'').toLowerCase().includes(name.toLowerCase()) ||
+           (c.adsManager||'').toLowerCase().includes(name.toLowerCase()) ||
+           (c.crmExecutive||'').toLowerCase().includes(name.toLowerCase());
+  });
+  const section = document.getElementById('temp-accounts-section');
+  const body = document.getElementById('temp-accounts-body');
+  if(!myClients.length){ section.style.display='none'; return; }
+  section.style.display='';
+  body.innerHTML = myClients.map(function(c){
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;border-bottom:1px solid var(--border);">'+
+      '<input type="checkbox" class="temp-acct-cb" data-cc="'+c.clientCode+'" data-am="'+(c.amName||'')+'" data-ads="'+(c.adsManager||'')+'" data-crm="'+(c.crmExecutive||'')+'" checked style="width:14px;height:14px;">'+
+      '<span style="font-size:13px;font-weight:600;">'+c.busyName+'</span>'+
+      '<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">'+c.marketplace+'</span>'+
+    '</label>';
+  }).join('');
+}
+
+function toggleAllTempAccounts(checked) {
+  document.querySelectorAll('.temp-acct-cb').forEach(function(cb){ cb.checked = checked; });
+}
+
+async function submitTempTransfer() {
+  const from = document.getElementById('temp-from').value;
+  const to = document.getElementById('temp-to').value;
+  const start = document.getElementById('temp-start').value;
+  const end = document.getElementById('temp-end').value;
+
+  if(!from||!to){ showToast('From aur To dono select karo!','error'); return; }
+  if(from===to){ showToast('Same person nahi ho sakta!','error'); return; }
+  if(!start||!end){ showToast('Start aur End date select karo!','error'); return; }
+  if(end<=start){ showToast('End date, start date ke baad honi chahiye!','error'); return; }
+
+  const fields = [];
+  if(document.getElementById('temp-f-am').checked) fields.push('am_name');
+  if(document.getElementById('temp-f-ads').checked) fields.push('ads_manager');
+  if(document.getElementById('temp-f-crm').checked) fields.push('crm_executive');
+  if(!fields.length){ showToast('Kam se kam ek field select karo!','error'); return; }
+
+  const selectedClients = [...document.querySelectorAll('.temp-acct-cb:checked')].map(function(cb){
+    return { clientCode: cb.getAttribute('data-cc') };
+  });
+  if(!selectedClients.length){ showToast('Kam se kam ek account select karo!','error'); return; }
+
+  if(!confirm(selectedClients.length+' accounts temporarily '+to+' ko '+start+' se '+end+' tak transfer karne hain. Confirm?')) return;
+
+  const r = await api('POST', '/staff-transfer/temporary', {
+    from_user: from, to_user: to,
+    start_date: start, end_date: end,
+    fields, clients: selectedClients,
+  });
+
+  if(r?.success){
+    showToast('✅ '+selectedClients.length+' accounts temporarily transfer ho gaye! Restore date: '+end,'success');
+    renderStaffTransfer();
+  } else {
+    showToast('Error: '+(r?.error||'Failed'),'error');
+  }
+}
+
+async function restoreSingleClient(clientCode) {
+  if(!confirm('Is client ko original person pe restore karna hai?')) return;
+  const r = await api('POST', '/staff-transfer/restore', { clients: [{ clientCode }] });
+  if(r?.success){ showToast('✅ Client restore ho gaya!','success'); renderStaffTransfer(); }
+  else showToast('Error: '+(r?.error||'Failed'),'error');
 }
 
 

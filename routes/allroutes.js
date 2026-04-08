@@ -119,15 +119,34 @@ const csiRouter = require('express').Router();
 csiRouter.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('csi_data').select('*').order('review_date', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
+
+  // For main list — latest NON-note record per client
   const map = {};
-  data.forEach(r => { if (!map[r.client_code]) map[r.client_code] = r; });
-  res.json(Object.values(map).map(r => ({
+  data.forEach(r => {
+    if (!r.is_note && !map[r.client_code]) map[r.client_code] = r;
+  });
+
+  // Also include latest note if no non-note exists
+  data.forEach(r => {
+    if (!map[r.client_code]) map[r.client_code] = r;
+  });
+
+  const format = r => ({
     csiId: r.csi_id, clientCode: r.client_code, clientName: r.client_name,
     reviewedBy: r.reviewed_by, q1: r.q1, q2: r.q2, q3: r.q3, q4: r.q4, q5: r.q5,
     csiScore: r.csi_score, csiPercent: r.csi_percent, healthStatus: r.health_status,
     remarks: r.remarks, nextReviewDate: r.next_review_date,
+    actionTaken: r.action_taken || null,
+    actionStatus: r.action_status || null,
+    isNote: r.is_note || false,
     reviewDate: r.review_date ? new Date(r.review_date).toLocaleDateString('en-IN') : '',
-  })));
+  });
+
+  // Return main list + full history for all records
+  res.json({
+    list: Object.values(map).map(format),
+    all: data.map(format),
+  });
 });
 
 csiRouter.post('/', authMiddleware, async (req, res) => {

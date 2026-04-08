@@ -1,202 +1,223 @@
-// routes/staff_transfer.js
-// Staff Exit & Seller Transfer Workflow
-// Add to server.js: app.use('/api/staff-transfer', require('./routes/staff_transfer'));
+const router = require('express').Router();
+const supabase = require('../db');
+const { authMiddleware } = require('../middleware/auth');
 
-const express = require('express');
-const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
-const jwt = require('jsonwebtoken');
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-
-function auth(req, res, next) {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'No token' });
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch { res.status(401).json({ error: 'Invalid token' }); }
-}
-
-function adminOnly(req, res, next) {
-  if (!['Admin', 'Ops Lead'].includes(req.user.role))
-    return res.status(403).json({ error: 'Admin only' });
-  next();
-}
-
-// ── SUPABASE TABLE REQUIRED ──────────────────────────────────
-// Run this SQL in Supabase:
-/*
-CREATE TABLE staff_transfer_requests (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  exiting_user TEXT NOT NULL,
-  transfer_to TEXT NOT NULL,
-  transfer_type TEXT NOT NULL,
-  fields_to_transfer JSONB DEFAULT '[]',
-  reason TEXT,
-  effective_date DATE,
-  requested_by TEXT,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  admin_remark TEXT,
-  resolved_by TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  resolved_at TIMESTAMP
-);
-*/
-
-// POST /api/staff-transfer — Submit transfer request
-router.post('/', auth, adminOnly, async (req, res) => {
-  try {
-    const { exiting_user, transfer_to, transfer_type, fields_to_transfer, reason, effective_date } = req.body;
-    if (!exiting_user || !transfer_to) return res.status(400).json({ error: 'exiting_user and transfer_to required' });
-
-    // Check for existing pending request
-    const { data: existing } = await supabase
-      .from('staff_transfer_requests')
-      .select('id')
-      .eq('exiting_user', exiting_user)
-      .eq('status', 'pending')
-      .limit(1);
-
-    if (existing?.length) return res.status(409).json({ error: 'Already one pending transfer for this user' });
-
-    const { data, error } = await supabase
-      .from('staff_transfer_requests')
-      .insert({
-        exiting_user,
-        transfer_to,
-        transfer_type: transfer_type || 'Full Transfer',
-        fields_to_transfer: fields_to_transfer || [],
-        reason: reason || '',
-        effective_date: effective_date || new Date().toISOString().split('T')[0],
-        requested_by: req.user.name,
-        status: 'pending',
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json({ success: true, id: data.id });
-  } catch (e) {
-    console.error('staff_transfer POST error:', e);
-    res.status(500).json({ error: e.message });
-  }
+// ── GET pending transfers ─────────────────────────────────────
+router.get('/pending', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase.from('staff_transfers')
+    .select('*').eq('status', 'pending').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
 });
 
-// GET /api/staff-transfer/pending
-router.get('/pending', auth, adminOnly, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('staff_transfer_requests')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json(data || []);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// ── GET preview for a user ───────────────────────────────────
+router.get('/preview/:name', authMiddleware, async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const [am, ads, crm] = await Promise.all([
+    supabase.from('clients').select('client_code, busy_name').ilike('am_name', `%${name}%`).eq('status','Active'),
+    supabase.from('clients').select('client_code, busy_name').ilike('ads_manager', `%${name}%`).eq('status','Active'),
+    supabase.from('clients').select('client_code, busy_name').ilike('crm_executive', `%${name}%`).eq('status','Active'),
+  ]);
+  res.json({
+    am_clients: am.data || [],
+    ads_clients: ads.data || [],
+    crm_clients: crm.data || [],
+    total: (am.data||[]).length + (ads.data||[]).length + (crm.data||[]).length,
+  });
 });
 
-// GET /api/staff-transfer/all
-router.get('/all', auth, adminOnly, async (req, res) => {
+// ── POST account-wise permanent transfer ─────────────────────
+router.post('/account-wise', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('staff_transfer_requests')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error) throw error;
-    res.json(data || []);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+    const { from_user, transfers, reason, effective_date } = req.body;
+    if (!from_user || !transfers?.length) return res.status(400).json({ error: 'from_user and transfers required' });
 
-// GET /api/staff-transfer/preview/:username — See what will be transferred
-router.get('/preview/:username', auth, adminOnly, async (req, res) => {
-  try {
-    const { username } = req.params;
-    const [am, ads, crm, adsData] = await Promise.all([
-      supabase.from('clients').select('client_code, busy_name').eq('am_name', username),
-      supabase.from('clients').select('client_code, busy_name').eq('ads_manager', username),
-      supabase.from('clients').select('client_code, busy_name').eq('crm_executive', username),
-      supabase.from('ads_data').select('id').eq('ads_manager', username),
-    ]);
-    res.json({
-      am_clients: am.data || [],
-      ads_clients: ads.data || [],
-      crm_clients: crm.data || [],
-      ads_data_count: adsData.data?.length || 0,
-      total: (am.data?.length || 0) + (ads.data?.length || 0) + (crm.data?.length || 0),
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+    let successCount = 0;
+    for (const t of transfers) {
+      if (!t.clientCode || !t.transferTo) continue;
 
-// PATCH /api/staff-transfer/:id — Approve and execute
-router.patch('/:id', auth, adminOnly, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, admin_remark } = req.body;
+      // Get current client data
+      const { data: client } = await supabase.from('clients')
+        .select('am_name, ads_manager, crm_executive')
+        .eq('client_code', t.clientCode).single();
 
-    const { data: request, error: fetchErr } = await supabase
-      .from('staff_transfer_requests')
-      .select('*')
-      .eq('id', id)
-      .single();
+      if (!client) continue;
 
-    if (fetchErr || !request) return res.status(404).json({ error: 'Request not found' });
-
-    if (status === 'approved') {
-      const { exiting_user, transfer_to, fields_to_transfer } = request;
-      const updates = [];
-
-      // Transfer clients fields
-      if (fields_to_transfer.includes('am_name')) {
-        updates.push(
-          supabase.from('clients').update({ am_name: transfer_to }).ilike('am_name', exiting_user)
-        );
+      const updates = {};
+      // Update whichever field matches from_user
+      if ((client.am_name||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.am_name = t.transferTo;
       }
-      if (fields_to_transfer.includes('ads_manager')) {
-        updates.push(
-          supabase.from('clients').update({ ads_manager: transfer_to }).ilike('ads_manager', exiting_user)
-        );
-        updates.push(
-          supabase.from('ads_data').update({ ads_manager: transfer_to }).ilike('ads_manager', exiting_user)
-        );
+      if ((client.ads_manager||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.ads_manager = t.transferTo;
       }
-      if (fields_to_transfer.includes('crm_executive')) {
-        updates.push(
-          supabase.from('clients').update({ crm_executive: transfer_to }).ilike('crm_executive', exiting_user)
-        );
+      if ((client.crm_executive||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.crm_executive = t.transferTo;
       }
 
-      await Promise.all(updates);
-
-      // Mark exiting user inactive
-      await supabase.from('users').update({ is_active: false }).ilike('name', exiting_user);
-
-      // Create notification
-      await supabase.from('notifications').insert({
-        type: 'STAFF_TRANSFER',
-        message: `✅ Staff transfer done: ${exiting_user} → ${transfer_to}`,
-        for_roles: JSON.stringify(['Admin', 'Ops Lead']),
-        is_read: false,
-      });
+      if (Object.keys(updates).length) {
+        await supabase.from('clients').update(updates).eq('client_code', t.clientCode);
+        successCount++;
+      }
     }
 
-    const { error: updateErr } = await supabase
-      .from('staff_transfer_requests')
-      .update({
-        status,
-        admin_remark: admin_remark || '',
-        resolved_at: new Date().toISOString(),
-        resolved_by: req.user.name,
-      })
-      .eq('id', id);
+    // Log the transfer
+    await supabase.from('staff_transfers').insert({
+      exiting_user: from_user,
+      transfer_to: 'Multiple (Account-wise)',
+      transfer_type: 'Account-wise Permanent',
+      fields_to_transfer: ['am_name'],
+      reason: reason || '',
+      effective_date: effective_date || new Date().toISOString().split('T')[0],
+      status: 'approved',
+      requested_by: req.user.name,
+      admin_remark: `${successCount} accounts transferred account-wise`,
+    });
 
-    if (updateErr) throw updateErr;
-    res.json({ success: true, status });
-  } catch (e) {
-    console.error('staff_transfer PATCH error:', e);
-    res.status(500).json({ error: e.message });
-  }
+    res.json({ success: true, transferred: successCount });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST temporary transfer ───────────────────────────────────
+router.post('/temporary', authMiddleware, async (req, res) => {
+  try {
+    const { from_user, to_user, start_date, end_date, fields, clients } = req.body;
+    if (!from_user || !to_user || !start_date || !end_date || !clients?.length) {
+      return res.status(400).json({ error: 'All fields required' });
+    }
+
+    let successCount = 0;
+    for (const c of clients) {
+      const { data: client } = await supabase.from('clients')
+        .select('am_name, ads_manager, crm_executive')
+        .eq('client_code', c.clientCode).single();
+
+      if (!client) continue;
+
+      const updates = {
+        temp_start_date: start_date,
+        temp_end_date: end_date,
+      };
+
+      // Save originals and set temp
+      if (fields.includes('am_name') && (client.am_name||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.temp_original_am = client.am_name;
+        updates.temp_am_name = to_user;
+        updates.am_name = to_user;
+      }
+      if (fields.includes('ads_manager') && (client.ads_manager||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.temp_original_ads = client.ads_manager;
+        updates.temp_ads_manager = to_user;
+        updates.ads_manager = to_user;
+      }
+      if (fields.includes('crm_executive') && (client.crm_executive||'').toLowerCase().includes(from_user.toLowerCase())) {
+        updates.temp_original_crm = client.crm_executive;
+        updates.temp_crm_executive = to_user;
+        updates.crm_executive = to_user;
+      }
+
+      await supabase.from('clients').update(updates).eq('client_code', c.clientCode);
+      successCount++;
+    }
+
+    // Log
+    await supabase.from('staff_transfers').insert({
+      exiting_user: from_user,
+      transfer_to: to_user,
+      transfer_type: 'Temporary',
+      fields_to_transfer: fields,
+      reason: `Temporary: ${start_date} to ${end_date}`,
+      effective_date: start_date,
+      status: 'approved',
+      requested_by: req.user.name,
+      admin_remark: `${successCount} accounts temp transferred till ${end_date}`,
+    });
+
+    res.json({ success: true, transferred: successCount });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST restore temp transfer ────────────────────────────────
+router.post('/restore', authMiddleware, async (req, res) => {
+  try {
+    const { clients } = req.body;
+    if (!clients?.length) return res.status(400).json({ error: 'clients required' });
+
+    let successCount = 0;
+    for (const c of clients) {
+      const { data: client } = await supabase.from('clients')
+        .select('temp_original_am, temp_original_ads, temp_original_crm, temp_am_name')
+        .eq('client_code', c.clientCode).single();
+
+      if (!client) continue;
+
+      const updates = {
+        temp_am_name: null, temp_ads_manager: null, temp_crm_executive: null,
+        temp_start_date: null, temp_end_date: null,
+        temp_original_am: null, temp_original_ads: null, temp_original_crm: null,
+      };
+
+      // Restore originals
+      if (client.temp_original_am) updates.am_name = client.temp_original_am;
+      if (client.temp_original_ads) updates.ads_manager = client.temp_original_ads;
+      if (client.temp_original_crm) updates.crm_executive = client.temp_original_crm;
+
+      await supabase.from('clients').update(updates).eq('client_code', c.clientCode);
+      successCount++;
+    }
+
+    res.json({ success: true, restored: successCount });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST original transfer request ───────────────────────────
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { exiting_user, transfer_to, transfer_type, fields_to_transfer, reason, effective_date } = req.body;
+    const { error } = await supabase.from('staff_transfers').insert({
+      exiting_user, transfer_to, transfer_type,
+      fields_to_transfer, reason, effective_date,
+      status: 'pending',
+      requested_by: req.user.name,
+    });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH approve/reject ──────────────────────────────────────
+router.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { status, admin_remark } = req.body;
+
+    if (status === 'approved') {
+      const { data: transfer } = await supabase.from('staff_transfers')
+        .select('*').eq('id', req.params.id).single();
+
+      if (transfer) {
+        const fields = transfer.fields_to_transfer || ['am_name', 'ads_manager', 'crm_executive'];
+        const updates = {};
+        if (fields.includes('am_name')) updates.am_name = transfer.transfer_to;
+        if (fields.includes('ads_manager')) updates.ads_manager = transfer.transfer_to;
+        if (fields.includes('crm_executive')) updates.crm_executive = transfer.transfer_to;
+
+        if (Object.keys(updates).length) {
+          for (const field of fields) {
+            await supabase.from('clients').update(updates)
+              .ilike(field, `%${transfer.exiting_user}%`);
+          }
+        }
+      }
+    }
+
+    await supabase.from('staff_transfers').update({
+      status, admin_remark,
+      resolved_by: req.user.name,
+      resolved_at: new Date(),
+    }).eq('id', req.params.id);
+
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

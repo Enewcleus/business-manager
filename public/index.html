@@ -713,7 +713,7 @@ async function loadDSRPage() {
 
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
 
-  const [clients, alerts, dsrData] = await Promise.all([
+  const [clients, alertsRaw, dsrData] = await Promise.all([
     getClients(),
     api('GET', '/dsr/alerts'),
     api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate)
@@ -733,6 +733,10 @@ async function loadDSRPage() {
              (crm && (crm.includes(uname) || uname.includes(crm)));
     });
   }
+
+  // Filter alerts to only show user's clients
+  const myClientCodes = new Set(myClients.map(c => c.clientCode));
+  const alerts = isLead ? (alertsRaw||[]) : (alertsRaw||[]).filter(a => myClientCodes.has(a.client_code));
 
   const filedCodes = new Set((dsrData||[]).map(d => d.client_code || d.clientCode));
   const pending = myClients.filter(c => !filedCodes.has(c.clientCode));
@@ -2418,16 +2422,20 @@ async function renderCSI(){
   window._csiDateFrom = window._csiDateFrom || '';
   window._csiDateTo = window._csiDateTo || '';
 
-  const [clients, csiData] = await Promise.all([getClients(), api('GET','/csi')]);
+  const [clients, csiRaw] = await Promise.all([getClients(), api('GET','/csi')]);
   if(clients) APP.clients = clients;
 
-  window._csiAllData = csiData || [];
+  // Handle new format {list, all} or old array format
+  const csiList = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.list || []);
+  const csiAll  = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.all  || []);
+
+  window._csiAllData = csiAll;  // full history including notes
+  window._csiListData = csiList; // main list (latest per client)
   window._csiClients = clients || [];
 
   var csiMap = {};
-  (csiData||[]).forEach(function(r){
-    if(!csiMap[r.clientCode] || r.reviewDate > csiMap[r.clientCode].reviewDate)
-      csiMap[r.clientCode] = r;
+  csiList.forEach(function(r){
+    if(!csiMap[r.clientCode]) csiMap[r.clientCode] = r;
   });
   window._csiMap = csiMap;
 
@@ -3682,7 +3690,7 @@ function filterWorkLog(type) {
 
 function openQuickWorkLog(){
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client (optional)</label>
+    <div class="form-group"><label>Client *</label>
       <div id="qwl-client-wrap"></div>
     </div>
     <div class="form-row">
@@ -3698,13 +3706,15 @@ function openQuickWorkLog(){
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
     <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save Work Log</button>`);
-  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Client select karo...'), 100);
 }
 
 async function submitQuickWorkLog(){
-  const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const desc=document.getElementById('qwl-desc').value.trim();
+  if(!desc){showToast('Description required','error');return;}
   const clientCode=getSearchableVal('qwl-client-wrap')||'';
   const clientName=document.getElementById('qwl-client-wrap_search')?.value?.split(' (')[0]||'';
+  if(!clientCode){showToast('Client select karna zaroori hai!','error');return;}
   const r=await api('POST','/tasks/worklog',{clientCode,clientName,workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
   if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
 }

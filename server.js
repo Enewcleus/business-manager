@@ -63,6 +63,7 @@ app.use('/api/hurdles',          require('./routes/allroutes').hurdleRouter);
 app.use('/api/renewal-history',  require('./routes/allroutes').renewalHistoryRouter);
 app.use('/api/report-analyzer',  require('./routes/allroutes').reportAnalyzerRouter);
 app.use('/api/expectations',     require('./routes/allroutes').expectationsRouter);
+app.use('/api/monthly-reports',  require('./routes/allroutes').monthlyReportsRouter);
 app.use('/api/chat',             require('./routes/chat'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────

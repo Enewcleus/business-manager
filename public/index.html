@@ -3889,34 +3889,6 @@ function sortRenewals(col) {
   var tbody=document.getElementById('renewals-tbody');
   if(tbody) tbody.innerHTML=rows||'<tr><td colspan="9" style="text-align:center;padding:20px;">No data</td></tr>';
 }
-  function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
-  function actionBtns(r){
-    var rid=r.renewalId; var rname=(r.clientName||"").replace(/['"]/g,"");
-    var h='<div style="display:flex;gap:4px;flex-wrap:wrap;">';
-    if(r.status!=="Confirmed") h+='<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
-    if(r.status!=="Lost"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
-    if(r.status!=="Hold"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
-    h+='<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
-    if(isCRM) h+='<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
-    return h+'</div>';
-  }
-  var rows='';
-  data.forEach(function(r){
-    rows+='<tr>'+
-      '<td><strong>'+r.clientName+'</strong></td>'+
-      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
-      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
-      '<td>'+(r.renewalDate||'—')+'</td>'+
-      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
-      '<td style="font-size:12px;">'+r.owner+'</td>'+
-      '<td><span class="badge '+(r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber')+'">'+(r.status||'Pending')+'</span></td>'+
-      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
-      '<td>'+actionBtns(r)+'</td>'+
-    '</tr>';
-  });
-  var el=document.getElementById('renewals-tbody');
-  if(el) el.innerHTML=rows;
-}
 
 function openEditRenewal(id, name) {
   var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};

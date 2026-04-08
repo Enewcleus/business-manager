@@ -3738,25 +3738,157 @@ async function renderRenewals(){
   html += '<div class="card">'+
     '<div class="card-header"><span class="card-title">🔄 All Renewals ('+allRenewals.length+')</span>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+      '<input type="text" class="form-control" style="width:180px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterRenewals(\'\',this.value)">'+
       '<select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterRenewals(this.value)">'+
         '<option value="">All Status</option><option>Pending</option><option>Confirmed</option><option>Lost</option><option>Hold</option>'+
       '</select>'+
       (isAdmin?'<button class="btn btn-sm btn-warning" onclick="triggerRenewalReminders()">📨 Reminders</button>':'')+
     '</div></div>'+
     '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
-      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+
-      '<th>Date</th><th>Days Left</th><th>Owner</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead>'+
+      '<thead><tr>'+
+        '<th onclick="sortRenewals(\'clientName\')" style="cursor:pointer;">Client <span id="sort-clientName">↕</span></th>'+
+        '<th>Plan</th>'+
+        (canSeeAmount?'<th onclick="sortRenewals(\'amount\')" style="cursor:pointer;">Amount <span id="sort-amount">↕</span></th>':'')+
+        '<th onclick="sortRenewals(\'renewalDate\')" style="cursor:pointer;">Date <span id="sort-renewalDate">↕</span></th>'+
+        '<th onclick="sortRenewals(\'daysLeft\')" style="cursor:pointer;">Days Left <span id="sort-daysLeft">↕</span></th>'+
+        '<th onclick="sortRenewals(\'owner\')" style="cursor:pointer;">Owner <span id="sort-owner">↕</span></th>'+
+        '<th>Status</th><th>Comment</th><th>Action</th>'+
+      '</tr></thead>'+
       '<tbody id="renewals-tbody">'+allRows+'</tbody>'+
     '</table></div></div></div>';
 
   document.getElementById('page-content').innerHTML = html;
 }
 
-function filterRenewals(status){
+function filterRenewals(status, search){
   var u=APP.user;
   var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
   var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
-  var data=status?(window._allRenewals||[]).filter(function(r){return r.status===status;}):(window._allRenewals||[]);
+
+  // Get current status from select if not passed
+  if(status===undefined||status===null) {
+    var sel=document.querySelector('#renewals-tbody')?.closest('.card')?.querySelector('select');
+    status=sel?sel.value:'';
+  }
+  if(search===undefined||search===null) {
+    var inp=document.querySelector('#renewals-tbody')?.closest('.card')?.querySelector('input[type=text]');
+    search=inp?inp.value:'';
+  }
+
+  var data=(window._allRenewals||[]).filter(function(r){
+    if(status && r.status!==status) return false;
+    if(search && !(r.clientName||'').toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  window._renewalsFiltered = data;
+
+  function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
+  function actionBtns(r){
+    var rid=r.renewalId; var rname=(r.clientName||"").replace(/['"]/g,"");
+    var h='<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    if(r.status!=="Confirmed") h+='<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
+    if(r.status!=="Lost"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
+    if(r.status!=="Hold"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
+    h+='<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
+    if(isCRM) h+='<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
+    return h+'</div>';
+  }
+  var rows='';
+  data.forEach(function(r){
+    rows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td><span class="badge '+(r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber')+'">'+(r.status||'Pending')+'</span></td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+  var tbody=document.getElementById('renewals-tbody');
+  if(tbody) tbody.innerHTML=rows||'<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+}
+
+// Sort state
+var _renewalSortCol = 'daysLeft';
+var _renewalSortDir = 1; // 1=asc, -1=desc
+
+function sortRenewals(col) {
+  if(_renewalSortCol === col) {
+    _renewalSortDir *= -1; // toggle direction
+  } else {
+    _renewalSortCol = col;
+    _renewalSortDir = col === 'daysLeft' ? 1 : 1;
+  }
+
+  // Update header arrows
+  ['clientName','amount','renewalDate','daysLeft','owner'].forEach(function(c){
+    var el = document.getElementById('sort-'+c);
+    if(el) el.textContent = c===col ? (_renewalSortDir===1?'↑':'↓') : '↕';
+  });
+
+  var u=APP.user;
+  var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+
+  var data = (window._renewalsFiltered || window._allRenewals || []).slice();
+
+  data.sort(function(a, b) {
+    var av = a[col], bv = b[col];
+    if(col === 'daysLeft') {
+      // Overdue (negative) sort
+      av = av != null ? av : 9999;
+      bv = bv != null ? bv : 9999;
+      return (av - bv) * _renewalSortDir;
+    }
+    if(col === 'amount') {
+      av = parseFloat(av) || 0;
+      bv = parseFloat(bv) || 0;
+      return (av - bv) * _renewalSortDir;
+    }
+    if(col === 'renewalDate') {
+      av = av ? new Date(av).getTime() : 0;
+      bv = bv ? new Date(bv).getTime() : 0;
+      return (av - bv) * _renewalSortDir;
+    }
+    // String sort
+    av = (av||'').toLowerCase();
+    bv = (bv||'').toLowerCase();
+    return av < bv ? -_renewalSortDir : av > bv ? _renewalSortDir : 0;
+  });
+
+  function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
+  function actionBtns(r){
+    var rid=r.renewalId; var rname=(r.clientName||"").replace(/['"]/g,"");
+    var h='<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    if(r.status!=="Confirmed") h+='<button class="btn btn-sm btn-success" data-id="'+rid+'" data-s="Confirmed" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">✅</button>';
+    if(r.status!=="Lost"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-danger" data-id="'+rid+'" data-s="Lost" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">❌</button>';
+    if(r.status!=="Hold"&&r.status!=="Confirmed") h+='<button class="btn btn-sm btn-warning" style="background:#f39c12;color:#fff;border:none;" data-id="'+rid+'" data-s="Hold" onclick="var b=this;updateRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-s\'))">⏸</button>';
+    h+='<button class="btn btn-sm btn-outline" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openEditRenewal(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">✏️</button>';
+    if(isCRM) h+='<button class="btn btn-sm btn-secondary" data-id="'+rid+'" data-cn="'+rname+'" onclick="var b=this;openRenewalPayment(b.getAttribute(\'data-id\'),b.getAttribute(\'data-cn\'))">💰</button>';
+    return h+'</div>';
+  }
+
+  var rows='';
+  data.forEach(function(r){
+    rows+='<tr>'+
+      '<td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="font-size:12px;">'+r.servicePlan+'</td>'+
+      (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+      '<td>'+(r.renewalDate||'—')+'</td>'+
+      '<td>'+(r.daysLeft!=null?'<strong style="color:'+(r.isOverdue?'var(--red)':r.daysLeft<=7?'var(--red)':r.daysLeft<=15?'var(--amber)':'var(--green)')+';">'+(r.isOverdue?'OVERDUE':r.daysLeft+'d')+'</strong>':'—')+'</td>'+
+      '<td style="font-size:12px;">'+r.owner+'</td>'+
+      '<td><span class="badge '+(r.status==='Confirmed'?'badge-green':r.status==='Lost'?'badge-red':r.status==='Hold'?'badge-purple':'badge-amber')+'">'+(r.status||'Pending')+'</span></td>'+
+      '<td style="font-size:12px;max-width:150px;color:var(--text-muted);">'+(r.crmComment||'—')+'</td>'+
+      '<td>'+actionBtns(r)+'</td>'+
+    '</tr>';
+  });
+  var tbody=document.getElementById('renewals-tbody');
+  if(tbody) tbody.innerHTML=rows||'<tr><td colspan="9" style="text-align:center;padding:20px;">No data</td></tr>';
+}
   function amtCell(r){return canSeeAmount?(r.amount?'₹'+Number(r.amount).toLocaleString('en-IN'):'—'):'—';}
   function actionBtns(r){
     var rid=r.renewalId; var rname=(r.clientName||"").replace(/['"]/g,"");
@@ -4163,6 +4295,148 @@ function filterAMPerfReport(){
   }
 }
 
+// ── MONTHLY DSR REPORT ────────────────────────────────────────
+function renderMonthlyDSRReport(data, el, from, to) {
+  if(!data||!data.length){el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><div class="emoji">📊</div><h3>Is period mein koi DSR data nahi</h3></div></div></div>';return;}
+  const totalSales=data.reduce((s,r)=>s+r.totalSales,0);
+  const totalOrders=data.reduce((s,r)=>s+r.totalOrders,0);
+  const totalAdSpend=data.reduce((s,r)=>s+r.totalAdSpend,0);
+  const period=from+' to '+to;
+
+  el.innerHTML=
+    '<div class="kpi-grid" style="margin-bottom:16px;">'+
+      '<div class="kpi-card blue"><div class="kpi-label">Total Clients</div><div class="kpi-value">'+data.length+'</div></div>'+
+      '<div class="kpi-card green"><div class="kpi-label">Total Sales</div><div class="kpi-value" style="font-size:18px;">₹'+Math.round(totalSales/100000)+'L</div></div>'+
+      '<div class="kpi-card amber"><div class="kpi-label">Total Orders</div><div class="kpi-value">'+totalOrders.toLocaleString('en-IN')+'</div></div>'+
+      '<div class="kpi-card red"><div class="kpi-label">Total Ad Spend</div><div class="kpi-value" style="font-size:18px;">₹'+Math.round(totalAdSpend/100000)+'L</div></div>'+
+    '</div>'+
+    '<div id="ai-analysis-box" style="margin-bottom:16px;"></div>'+
+    '<div class="card">'+
+      '<div class="card-header">'+
+        '<span class="card-title">📅 Client-wise Sales Report ('+data.length+' clients)</span>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button class="btn btn-sm" style="background:#8e44ad;color:#fff;" onclick="getAIAnalysis(\'dsr\',\''+period+'\')">🤖 AI Analysis</button>'+
+          '<button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Excel</button>'+
+        '</div>'+
+      '</div>'+
+      '<div style="padding:8px 12px;border-bottom:1px solid var(--border);">'+
+        '<input type="text" class="form-control" style="max-width:300px;" placeholder="🔍 Client search..." oninput="filterMonthlyDSR(this.value)">'+
+      '</div>'+
+      '<div class="table-wrap"><table id="monthly-dsr-table">'+
+        '<thead><tr><th>#</th><th>Client Name</th><th style="text-align:right;">Total Sales</th><th style="text-align:center;">Orders</th><th style="text-align:right;">Ad Spend</th><th style="text-align:center;">ACOS</th><th style="text-align:center;">Avg Return%</th><th style="text-align:center;">Days Reported</th></tr></thead>'+
+        '<tbody id="monthly-dsr-tbody">'+
+          data.map(function(r,i){
+            const acosColor=r.acos>30?'color:var(--red)':r.acos>20?'color:var(--amber)':'color:var(--green)';
+            return '<tr>'+
+              '<td>'+(i+1)+'</td>'+
+              '<td><strong>'+r.clientName+'</strong></td>'+
+              '<td style="text-align:right;font-weight:700;color:var(--green);">₹'+Math.round(r.totalSales).toLocaleString('en-IN')+'</td>'+
+              '<td style="text-align:center;">'+r.totalOrders.toLocaleString('en-IN')+'</td>'+
+              '<td style="text-align:right;">₹'+Math.round(r.totalAdSpend).toLocaleString('en-IN')+'</td>'+
+              '<td style="text-align:center;'+acosColor+'font-weight:600;">'+r.acos+'%</td>'+
+              '<td style="text-align:center;"><span class="badge '+(r.avgReturnRate>10?'badge-red':r.avgReturnRate>5?'badge-amber':'badge-green')+'">'+r.avgReturnRate+'%</span></td>'+
+              '<td style="text-align:center;color:var(--text-muted);">'+r.daysReported+'</td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody>'+
+      '</table></div>'+
+    '</div>';
+  window._monthlyDSRData = data;
+  window._reportData = data;
+}
+
+function filterMonthlyDSR(q) {
+  const data = window._monthlyDSRData || [];
+  const filtered = q ? data.filter(function(r){return r.clientName.toLowerCase().includes(q.toLowerCase());}) : data;
+  const tbody = document.getElementById('monthly-dsr-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = filtered.map(function(r,i){
+    const acosColor=r.acos>30?'color:var(--red)':r.acos>20?'color:var(--amber)':'color:var(--green)';
+    return '<tr><td>'+(i+1)+'</td><td><strong>'+r.clientName+'</strong></td>'+
+      '<td style="text-align:right;font-weight:700;color:var(--green);">₹'+Math.round(r.totalSales).toLocaleString('en-IN')+'</td>'+
+      '<td style="text-align:center;">'+r.totalOrders.toLocaleString('en-IN')+'</td>'+
+      '<td style="text-align:right;">₹'+Math.round(r.totalAdSpend).toLocaleString('en-IN')+'</td>'+
+      '<td style="text-align:center;'+acosColor+'font-weight:600;">'+r.acos+'%</td>'+
+      '<td style="text-align:center;"><span class="badge '+(r.avgReturnRate>10?'badge-red':'badge-green')+'">'+r.avgReturnRate+'%</span></td>'+
+      '<td style="text-align:center;">'+r.daysReported+'</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+  window._reportData = filtered;
+}
+
+// ── EXECUTIVE PERFORMANCE REPORT ─────────────────────────────
+function renderExecPerformanceReport(data, el, from, to) {
+  if(!data||!data.length){el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><div class="emoji">👥</div><h3>Is period mein koi activity nahi mili</h3></div></div></div>';return;}
+  const period=from+' to '+to;
+  const gradeColors={'A':'#27ae60','B':'#2980b9','C':'#f39c12','D':'#e74c3c'};
+
+  el.innerHTML=
+    '<div class="kpi-grid" style="margin-bottom:16px;">'+
+      '<div class="kpi-card green"><div class="kpi-label">Grade A (Top)</div><div class="kpi-value">'+data.filter(function(e){return e.grade==='A';}).length+'</div></div>'+
+      '<div class="kpi-card blue"><div class="kpi-label">Grade B (Good)</div><div class="kpi-value">'+data.filter(function(e){return e.grade==='B';}).length+'</div></div>'+
+      '<div class="kpi-card amber"><div class="kpi-label">Grade C (Average)</div><div class="kpi-value">'+data.filter(function(e){return e.grade==='C';}).length+'</div></div>'+
+      '<div class="kpi-card red"><div class="kpi-label">Grade D (Poor)</div><div class="kpi-value">'+data.filter(function(e){return e.grade==='D';}).length+'</div></div>'+
+    '</div>'+
+    '<div id="ai-analysis-box" style="margin-bottom:16px;"></div>'+
+    '<div class="card">'+
+      '<div class="card-header">'+
+        '<span class="card-title">🤖 Executive Performance Report ('+data.length+' executives)</span>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button class="btn btn-sm" style="background:#8e44ad;color:#fff;" onclick="getAIAnalysis(\'executive\',\''+period+'\')">🤖 AI Analysis</button>'+
+          '<button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Excel</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="table-wrap"><table>'+
+        '<thead><tr><th>#</th><th>Name</th><th>Role</th><th style="text-align:center;">Score</th><th style="text-align:center;">Grade</th><th style="text-align:center;">Tasks Done</th><th style="text-align:center;">Pending</th><th style="text-align:center;">Tickets</th><th style="text-align:center;">CRM Calls</th><th style="text-align:center;">DSR Entries</th></tr></thead>'+
+        '<tbody>'+
+          data.map(function(e,i){
+            const scoreColor=e.performanceScore>=80?'var(--green)':e.performanceScore>=60?'#2980b9':e.performanceScore>=40?'var(--amber)':'var(--red)';
+            return '<tr>'+
+              '<td>'+(i+1)+'</td>'+
+              '<td><strong>'+e.name+'</strong><div style="font-size:11px;color:var(--text-muted);">'+e.designation+'</div></td>'+
+              '<td style="font-size:12px;">'+e.role+'</td>'+
+              '<td style="text-align:center;">'+
+                '<div style="display:flex;align-items:center;gap:6px;justify-content:center;">'+
+                  '<div style="width:60px;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">'+
+                    '<div style="width:'+e.performanceScore+'%;height:100%;background:'+scoreColor+';border-radius:4px;"></div>'+
+                  '</div>'+
+                  '<span style="font-weight:700;color:'+scoreColor+';">'+e.performanceScore+'</span>'+
+                '</div>'+
+              '</td>'+
+              '<td style="text-align:center;"><span style="background:'+gradeColors[e.grade]+';color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;">'+e.grade+'</span></td>'+
+              '<td style="text-align:center;color:var(--green);font-weight:600;">'+e.tasksDone+'</td>'+
+              '<td style="text-align:center;color:var(--red);">'+e.tasksPending+'</td>'+
+              '<td style="text-align:center;">'+e.ticketsClosed+'</td>'+
+              '<td style="text-align:center;">'+e.connectedCalls+'/'+e.crmCalls+'</td>'+
+              '<td style="text-align:center;">'+e.dsrEntries+'</td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody>'+
+      '</table></div>'+
+    '</div>';
+  window._reportData = data;
+}
+
+// ── AI ANALYSIS ───────────────────────────────────────────────
+async function getAIAnalysis(reportType, period) {
+  const box = document.getElementById('ai-analysis-box');
+  if(!box) return;
+  box.innerHTML = '<div style="padding:16px;background:var(--bg-card);border-radius:10px;border:1px solid var(--border);text-align:center;"><div class="spinner" style="display:inline-block;"></div> 🤖 AI analysis generate ho rahi hai...</div>';
+
+  const r = await api('POST', '/monthly-reports/ai-analysis', {
+    reportType: reportType, period: period,
+    data: (window._reportData || []).slice(0, 30),
+  });
+
+  if(r && r.analysis) {
+    box.innerHTML = '<div style="padding:16px;background:linear-gradient(135deg,#eef2ff,#f5eef8);border-radius:10px;border:1px solid #c5b3e6;">'+
+      '<div style="font-weight:700;font-size:14px;margin-bottom:10px;color:#6c3483;">🤖 AI Analysis — '+period+'</div>'+
+      '<div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;">'+r.analysis+'</div>'+
+    '</div>';
+  } else {
+    box.innerHTML = '<div style="padding:12px;background:#fdf2f2;border-radius:8px;color:var(--red);">AI analysis fail ho gayi: '+((r&&r.error)||'Unknown error')+'<br><small>ANTHROPIC_API_KEY Railway pe set hai kya?</small></div>';
+  }
+}
+
 async function renderReports(){
   const clients=await getClients();if(clients) APP.clients=clients;
   const today=new Date().toISOString().split('T')[0],monthStart=today.slice(0,7)+'-01';
@@ -4182,6 +4456,8 @@ async function renderReports(){
           <button class="btn btn-secondary" style="background:#16a085;color:#fff;" onclick="window._currentReport='executive_retention';generateReport()">👤 Executive Retention</button>
           <button class="btn btn-secondary" style="background:#2980b9;color:#fff;" onclick="window._currentReport='marketplace_retention';generateReport()">🛒 Marketplace Retention</button>
           <button class="btn btn-secondary" style="background:#c0392b;color:#fff;" onclick="window._currentReport='am_performance';generateReport()">📋 AM Performance</button>
+          <button class="btn btn-secondary" style="background:#1a5276;color:#fff;" onclick="window._currentReport='monthly_dsr';generateReport()">📅 Monthly Client Sales</button>
+          <button class="btn btn-secondary" style="background:#1e8449;color:#fff;" onclick="window._currentReport='monthly_exec';generateReport()">🤖 Executive Performance</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -4401,6 +4677,20 @@ async function generateReport(){
     const processed=buildAMPerformanceData(hist||[],usersData||[],clientsData||[]);
     window._reportData=processed;window._reportType='am_performance';
     renderAMPerformanceReport(processed,el);return;
+  } else if(type==='monthly_dsr'){
+    const from=document.getElementById('rpt-from')?.value;
+    const to=document.getElementById('rpt-to')?.value;
+    if(!from||!to){showToast('From aur To date select karo!','error');return;}
+    const data=await api('GET','/monthly-reports/dsr?from='+from+'&to='+to+'&_='+Date.now())||[];
+    window._reportData=data;window._reportType='monthly_dsr';
+    renderMonthlyDSRReport(data,el,from,to);return;
+  } else if(type==='monthly_exec'){
+    const from=document.getElementById('rpt-from')?.value;
+    const to=document.getElementById('rpt-to')?.value;
+    if(!from||!to){showToast('From aur To date select karo!','error');return;}
+    const data=await api('GET','/monthly-reports/executive?from='+from+'&to='+to+'&_='+Date.now())||[];
+    window._reportData=data;window._reportType='monthly_exec';
+    renderExecPerformanceReport(data,el,from,to);return;
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   }
 }
@@ -4441,6 +4731,8 @@ function exportExcel(){
   else if(type==='ticket'){csv='ID,Date,Seller,Subject,Priority,Status,AssignedTo\n';csv+=data.map(d=>[d.ticketId||'',d.createdAt?new Date(d.createdAt).toLocaleDateString('en-IN'):'',d.clientName||'','"'+(d.subject||'')+'"',d.priority||'',d.status||'',d.assignedTo||''].join(',')).join('\n');}
   else if(type==='team'){csv='Name,Role,ActionsToday,TicketsClosed,Status\n';csv+=data.map(d=>[d.name,d.role,d.todayActivity||0,d.ticketsClosed||0,d.performanceScore||''].join(',')).join('\n');}
   else if(type==='am_performance'){csv='Store Name,Store Ageing,Account Manager,AM Ageing,No. of Stores,Eligible for Renewal,Marketplace,Total Revenue (Sales),Renewal Count,Renewal %,Revenue After Renewal\n';csv+=data.map(function(r){return['"'+(r.busy_name||'').replace(/"/g,'')+ '"',r.store_aging||'—','"'+(r.am_name||'').replace(/"/g,'')+'"',r.am_aging||'—',r.no_of_stores||0,r.eligible||0,r.marketplace||'—',r.total_rev||0,r.renewal_count||0,(r.renewal_pct||0)+'%',r.active_rev||0].join(',');}).join('\n');}
+  else if(type==='monthly_dsr'){csv='Client Name,Total Sales (₹),Total Orders,Ad Spend (₹),ACOS %,Avg Return %,Days Reported\n';csv+=data.map(function(r){return['"'+(r.clientName||'').replace(/"/g,'')+'"',Math.round(r.totalSales||0),r.totalOrders||0,Math.round(r.totalAdSpend||0),r.acos||0,r.avgReturnRate||0,r.daysReported||0].join(',');}).join('\n');}
+  else if(type==='monthly_exec'){csv='Name,Role,Score,Grade,Tasks Done,Tasks Pending,Tickets Closed,CRM Calls,Connected Calls,DSR Entries\n';csv+=data.map(function(r){return['"'+(r.name||'')+'"',r.role||'',r.performanceScore||0,r.grade||'',r.tasksDone||0,r.tasksPending||0,r.ticketsClosed||0,r.crmCalls||0,r.connectedCalls||0,r.dsrEntries||0].join(',');}).join('\n');}
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
   showToast('Excel download ho raha hai!','success');

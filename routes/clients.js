@@ -7,7 +7,8 @@ async function getFilteredClients(user) {
   const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
     ? user.marketplaceAccess : null;
 
-  if (['Admin', 'Ops Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin'].includes(role)) {
+  // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive — sab clients
+  if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive'].includes(role)) {
     let q = supabase.from('clients').select('*').order('busy_name');
     if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
     const { data, error } = await q;
@@ -17,14 +18,6 @@ async function getFilteredClients(user) {
 
   if (role === 'Account Manager') {
     let q = supabase.from('clients').select('*').ilike('am_name', `%${name}%`).order('busy_name');
-    if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
-    const { data, error } = await q;
-    if (error) throw error;
-    return data || [];
-  }
-
-  if (role === 'CRM Executive') {
-    let q = supabase.from('clients').select('*').ilike('crm_executive', `%${name}%`).order('busy_name');
     if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
     const { data, error } = await q;
     if (error) throw error;
@@ -54,6 +47,7 @@ async function getFilteredClients(user) {
     return data || [];
   }
 
+  // Default — assigned clients only
   let q = supabase.from('clients').select('*')
     .or(`am_name.ilike.%${name}%,ads_manager.ilike.%${name}%,crm_executive.ilike.%${name}%`)
     .order('busy_name');
@@ -84,6 +78,14 @@ function formatClient(c) {
     contactNumber: c.phone || '',
     paymentCycle: c.payment_cycle || 1,
     sellerAging: c.seller_aging || 0,
+    tempAmName: c.temp_am_name || null,
+    tempEndDate: c.temp_end_date || null,
+    tempStartDate: c.temp_start_date || null,
+    tempOriginalAm: c.temp_original_am || null,
+    tempAdsManager: c.temp_ads_manager || null,
+    tempCrmExecutive: c.temp_crm_executive || null,
+    tempOriginalAds: c.temp_original_ads || null,
+    tempOriginalCrm: c.temp_original_crm || null,
   };
 }
 

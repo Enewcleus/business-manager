@@ -2675,6 +2675,7 @@ async function showCSIHistory(btn){
     var rowBg = r.isNote ? 'background:#f0f4ff;' : '';
     rows+='<tr style="'+rowBg+'">'+
       '<td style="font-size:12px;">'+r.reviewDate+'</td>'+
+      '<td style="font-size:12px;white-space:nowrap;">'+(r.reviewDate||'—')+'</td>'+
       '<td>'+(r.isNote ? '<span class="badge badge-blue" style="font-size:10px;">📝 Note</span>' : '<strong style="color:'+col+';">'+r.csiPercent+'%</strong>')+'</td>'+
       '<td>'+(r.isNote ? '—' : '<span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span>')+'</td>'+
       '<td style="font-size:12px;">'+trend+'</td>'+

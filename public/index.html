@@ -2422,15 +2422,17 @@ async function renderCSI(){
   window._csiDateFrom = window._csiDateFrom || '';
   window._csiDateTo = window._csiDateTo || '';
 
-  const [clients, csiRaw] = await Promise.all([getClients(), api('GET','/csi')]);
+  const [clients, csiRaw] = await Promise.all([
+    getClients(),
+    api('GET', '/csi?_='+Date.now()),
+  ]);
   if(clients) APP.clients = clients;
 
-  // Handle new format {list, all} or old array format
-  const csiList = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.list || []);
-  const csiAll  = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.all  || []);
+  // csiRaw is always an array
+  const csiList = Array.isArray(csiRaw) ? csiRaw : [];
 
-  window._csiAllData = csiAll;  // full history including notes
-  window._csiListData = csiList; // main list (latest per client)
+  window._csiAllData = csiList;
+  window._csiListData = csiList;
   window._csiClients = clients || [];
 
   var csiMap = {};
@@ -2653,40 +2655,41 @@ function buildCSITable(){
   wrap.innerHTML='<table>'+thead+'<tbody>'+rows+'</tbody></table>';
 }
 
-function showCSIHistory(btn){
+async function showCSIHistory(btn){
   var cc = btn.getAttribute('data-cc');
   var cn = btn.getAttribute('data-cn');
-  var allData = window._csiAllData || [];
-  var history = allData.filter(function(r){return r.clientCode===cc;})
-    .sort(function(a,b){return b.reviewDate.localeCompare(a.reviewDate);});
+
+  // Fetch full history including notes from dedicated endpoint
+  const history = await api('GET', '/csi/history/'+cc+'?_='+Date.now()) || [];
 
   var rows='';
   history.forEach(function(r,i){
     var prev = history[i+1];
     var trend = '';
-    if(prev){
-      if(r.csiPercent > prev.csiPercent) trend='<span style="color:var(--green);">▲ +'+( r.csiPercent-prev.csiPercent)+'%</span>';
+    if(prev && !r.isNote && !prev.isNote){
+      if(r.csiPercent > prev.csiPercent) trend='<span style="color:var(--green);">▲ +'+(r.csiPercent-prev.csiPercent)+'%</span>';
       else if(r.csiPercent < prev.csiPercent) trend='<span style="color:var(--red);">▼ '+(r.csiPercent-prev.csiPercent)+'%</span>';
       else trend='<span style="color:var(--text-muted);">→ Same</span>';
     }
     var col = r.csiPercent>=80?'var(--green)':r.csiPercent>=50?'var(--amber)':'var(--red)';
-    rows+='<tr>'+
+    var rowBg = r.isNote ? 'background:#f0f4ff;' : '';
+    rows+='<tr style="'+rowBg+'">'+
       '<td style="font-size:12px;">'+r.reviewDate+'</td>'+
-      '<td><strong style="color:'+col+';">'+r.csiPercent+'%</strong></td>'+
-      '<td><span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span></td>'+
+      '<td>'+(r.isNote ? '<span class="badge badge-blue" style="font-size:10px;">📝 Note</span>' : '<strong style="color:'+col+';">'+r.csiPercent+'%</strong>')+'</td>'+
+      '<td>'+(r.isNote ? '—' : '<span class="badge '+(r.csiPercent>=80?'badge-green':r.csiPercent>=50?'badge-amber':'badge-red')+'">'+r.healthStatus+'</span>')+'</td>'+
       '<td style="font-size:12px;">'+trend+'</td>'+
-      '<td style="font-size:11px;color:var(--text-muted);">'+( r.reviewedBy||'—')+'</td>'+
-      '<td style="font-size:12px;max-width:200px;">'+( r.remarks?'<div style="line-height:1.5;">'+r.remarks+'</div>':'—')+'</td>'+
-      '<td style="font-size:12px;max-width:200px;">'+(r.actionTaken?'<div style="color:var(--secondary);line-height:1.5;">'+r.actionTaken+'</div>':'—')+'</td>'+
-      '<td>'+(r.actionStatus?'<span class="badge badge-blue" style="font-size:11px;">'+r.actionStatus+'</span>':'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--text-muted);">'+(r.reviewedBy||'—')+'</td>'+
+      '<td style="font-size:12px;max-width:180px;">'+(r.remarks?'<div style="line-height:1.5;">'+r.remarks+'</div>':'—')+'</td>'+
+      '<td style="font-size:12px;max-width:180px;">'+(r.actionTaken?'<div style="color:var(--secondary);line-height:1.5;">'+r.actionTaken+'</div>':'—')+'</td>'+
+      '<td>'+(r.actionStatus?'<span class="badge badge-blue" style="font-size:10px;">'+r.actionStatus+'</span>':'—')+'</td>'+
     '</tr>';
   });
 
-  // Add note button
+  var canFill = window._csiCanFill;
   var addNoteHtml = canFill ? '<button class="btn btn-sm btn-primary" onclick="openCSINote(\''+cc+'\',\''+cn.replace(/'/g,'')+'\')">➕ Add Action Note</button>' : '';
   openPanel('📈 CSI History — '+cn,
     '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">'+
-      '<span><strong>'+cn+'</strong> · Total '+history.length+' reviews</span>'+
+      '<span><strong>'+cn+'</strong> · Total '+history.length+' records</span>'+
       addNoteHtml+
     '</div>'+
     '<div class="table-wrap">'+

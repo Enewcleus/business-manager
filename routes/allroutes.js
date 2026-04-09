@@ -125,7 +125,6 @@ csiRouter.get('/', authMiddleware, async (req, res) => {
   data.forEach(r => {
     if (!r.is_note && !map[r.client_code]) map[r.client_code] = r;
   });
-
   // Also include latest note if no non-note exists
   data.forEach(r => {
     if (!map[r.client_code]) map[r.client_code] = r;
@@ -142,11 +141,28 @@ csiRouter.get('/', authMiddleware, async (req, res) => {
     reviewDate: r.review_date ? new Date(r.review_date).toLocaleDateString('en-IN') : '',
   });
 
-  // Return main list + full history for all records
-  res.json({
-    list: Object.values(map).map(format),
-    all: data.map(format),
-  });
+  // Return array (backward compatible) with _all embedded
+  const list = Object.values(map).map(format);
+  list._all = data.map(format); // attach full history
+  res.json(list);
+});
+
+// GET /api/csi/history/:clientCode — full history including notes
+csiRouter.get('/history/:clientCode', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('csi_data')
+      .select('*').eq('client_code', req.params.clientCode)
+      .order('review_date', { ascending: false }).limit(50);
+    if (error) throw error;
+    res.json((data||[]).map(r => ({
+      csiId: r.csi_id, clientCode: r.client_code, clientName: r.client_name,
+      reviewedBy: r.reviewed_by, q1: r.q1, q2: r.q2, q3: r.q3, q4: r.q4, q5: r.q5,
+      csiScore: r.csi_score, csiPercent: r.csi_percent, healthStatus: r.health_status,
+      remarks: r.remarks, actionTaken: r.action_taken || null,
+      actionStatus: r.action_status || null, isNote: r.is_note || false,
+      reviewDate: r.review_date ? new Date(r.review_date).toLocaleDateString('en-IN') : '',
+    })));
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 csiRouter.post('/', authMiddleware, async (req, res) => {

@@ -372,6 +372,7 @@ const NAV_CONFIG = {
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Account Manager': [
+    {id:'execperf',icon:'📈',label:'My Performance'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'clients',icon:'👥',label:'My Clients'},
@@ -689,11 +690,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -2020,7 +2021,7 @@ async function renderTickets(){
   const open=tickets.filter(t=>t.status!=='Done').length;
   const pendingApproval=tickets.filter(t=>t.status==='Pending Approval').length;
   const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
-  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
@@ -2043,7 +2044,7 @@ async function renderTickets(){
 
 function ticketCards(tickets){
   if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
-  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
   return [...tickets].sort((a,b)=>{
     const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
     return (order[a.status]||0)-(order[b.status]||0);
@@ -2082,7 +2083,7 @@ function viewTicketDetail(el){
   const tid = el.getAttribute('data-tid');
   const t = (APP.tickets||[]).find(x=>x.ticketId===tid);
   if(!t) return;
-  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
   const pendingApproval = t.status==='Pending Approval';
 
   openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
@@ -2544,6 +2545,13 @@ async function renderCSI(){
     controls.appendChild(fillBtn);
   }
 
+  // Download button — always visible
+  var dlBtn = document.createElement('button');
+  dlBtn.className = 'btn btn-success btn-sm';
+  dlBtn.textContent = '📥 Download';
+  dlBtn.onclick = function(){ exportCSIReport(); };
+  controls.appendChild(dlBtn);
+
   header.appendChild(controls);
   card.appendChild(header);
 
@@ -2651,6 +2659,7 @@ function buildCSITable(){
       '<td><strong>'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
       '<td>'+phoneHtml+'</td>'+
       '<td><span class="badge badge-blue">'+c.marketplace+'</span></td>'+
+      '<td style="font-size:12px;color:var(--text-muted);">'+(c.amName||'—')+'</td>'+
       '<td>'+scoreHtml+'</td>'+
       '<td>'+healthBadge(health)+'</td>'+
       '<td style="font-size:11px;">'+historyBtn+'</td>'+
@@ -2660,11 +2669,51 @@ function buildCSITable(){
     '</tr>';
   });
 
-  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>CSI%</th><th>Health</th><th>History</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
+  var thead='<thead><tr><th>#</th><th>Seller</th><th>Phone</th><th>Market</th><th>AM</th><th>CSI%</th><th>Health</th><th>History</th><th>Last Review</th><th>By</th>'+(canFill?'<th>Action</th>':'')+'</tr></thead>';
   wrap.innerHTML='<table>'+thead+'<tbody>'+rows+'</tbody></table>';
+
+  // Store for download
+  window._csiTableData = filtered.map(function(c){
+    var csi = filteredCsiMap[c.clientCode];
+    return { client: c, csi: csi };
+  });
 }
 
-async function showCSIHistory(btn){
+function exportCSIReport() {
+  const data = window._csiTableData || [];
+  if(!data.length){ showToast('Pehle CSI table load karo','error'); return; }
+
+  function stars(pct) {
+    if(pct === null || pct === undefined) return '—';
+    const s = Math.round(pct / 20); // 0-100 → 0-5 stars
+    return '⭐'.repeat(s) + '☆'.repeat(5-s) + ' ('+pct+'%)';
+  }
+
+  let csv = '#,Seller,Client Code,Marketplace,AM Name,CSI Score,Stars,Health,Last Review Date,Reviewed By,Remarks\n';
+  data.forEach(function(d, i) {
+    const c = d.client, csi = d.csi;
+    csv += [
+      i+1,
+      '"'+(c.busyName||'').replace(/"/g,'')+'"',
+      c.clientCode||'',
+      c.marketplace||'',
+      '"'+(c.amName||'—')+'"',
+      csi ? csi.csiPercent+'%' : 'Not Done',
+      csi ? '"'+stars(csi.csiPercent)+'"' : '—',
+      csi ? (csi.healthStatus||'—') : 'Not Reviewed',
+      csi ? (csi.reviewDate||'—') : '—',
+      '"'+(csi&&csi.reviewedBy ? csi.reviewedBy : '—')+'"',
+      '"'+(csi&&csi.remarks ? csi.remarks.replace(/"/g,'') : '—')+'"',
+    ].join(',') + '\n';
+  });
+
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'CSI_Report_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  showToast('✅ CSI Report download ho raha hai!','success');
+}
   var cc = btn.getAttribute('data-cc');
   var cn = btn.getAttribute('data-cn');
 
@@ -3382,6 +3431,19 @@ async function openCreateTask(parentTaskId = '', parentTitle = '', mode = '') {
       <input type="date" class="form-control" id="tsk-deadline">
     </div>
 
+    ${['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'].includes(APP.user.role) ? `
+    <div class="form-group" style="background:#e8f8f5;border-radius:8px;padding:12px;border-left:3px solid #27ae60;">
+      <label style="color:#1e8449;font-weight:700;">📱 WhatsApp Update</label>
+      <div style="display:flex;gap:16px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+          <input type="radio" name="tsk-whatsapp" id="tsk-wa-yes" value="yes"> ✅ Haan — seller ko WhatsApp pe update kiya
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+          <input type="radio" name="tsk-whatsapp" id="tsk-wa-no" value="no"> ❌ Nahi kiya
+        </label>
+      </div>
+    </div>` : ''}
+
     <button class="btn btn-primary btn-full" onclick="submitCreateTask('${parentTaskId}')">
       📝 ${isSubTask ? 'Create Sub-Task' : 'Create Task'}
     </button>
@@ -3544,6 +3606,7 @@ async function submitCreateTask(parentTaskId = '') {
     category: document.getElementById('tsk-cat').value,
     deadline: document.getElementById('tsk-deadline').value || null,
     parentTaskId: parentTaskId || null,
+    whatsappUpdated: document.querySelector('input[name="tsk-whatsapp"]:checked')?.value || null,
   });
   if (r?.success) {
     showToast('✅ Task created: ' + r.taskId, 'success');
@@ -3648,13 +3711,206 @@ function globalSearch(q) {
   }, 300); // 300ms debounce
 }
 // ── WORK LOG ─────────────────────────────────────────────────
+// ── EXECUTIVE PERFORMANCE DASHBOARD ─────────────────────────
+async function renderExecPerf() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading performance data...</div>';
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(u.role);
+
+  const today = new Date().toISOString().split('T')[0];
+  const day3ago = new Date(Date.now()-3*86400000).toISOString().split('T')[0];
+  const weekStart = new Date(Date.now()-7*86400000).toISOString().split('T')[0];
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+  const [clients, tasks, worklogs, crmCalls, tickets] = await Promise.all([
+    getClients(true),
+    api('GET', '/tasks?_='+Date.now()),
+    api('GET', '/tasks/worklog?_='+Date.now()),
+    api('GET', '/crm?_='+Date.now()),
+    api('GET', '/tickets?_='+Date.now()),
+  ]);
+  if(clients) APP.clients = clients;
+
+  const uname = u.name.trim().toLowerCase();
+  const myClients = (clients||[]).filter(c =>
+    (c.amName||'').toLowerCase().includes(uname) ||
+    (c.adsManager||'').toLowerCase().includes(uname) ||
+    (c.crmExecutive||'').toLowerCase().includes(uname)
+  );
+
+  // Work log filtering
+  const myLogs = (worklogs||[]).filter(l => (l.executiveName||'').toLowerCase().includes(uname));
+  const todayLogs = myLogs.filter(l => (l.logDate||l.loggedAt||'').includes(today));
+  const last3Logs = myLogs.filter(l => (l.logDate||l.loggedAt||'') >= day3ago);
+
+  // Clients worked on last 3 days
+  const workedCodes3 = new Set(last3Logs.map(l=>l.clientCode).filter(Boolean));
+  const workedToday = new Set(todayLogs.map(l=>l.clientCode).filter(Boolean));
+
+  // CRM calls
+  const myCRM = (crmCalls||[]).filter(c => (c.crmExecutive||c.executiveName||'').toLowerCase().includes(uname));
+  const todayCRM = myCRM.filter(c => (c.createdAt||c.callDate||'').includes(today));
+
+  // Tickets
+  const myTickets = (tickets||[]).filter(t =>
+    (t.assignedTo||'').toLowerCase().includes(uname) ||
+    (t.raisedBy||'').toLowerCase().includes(uname)
+  );
+  const openTickets = myTickets.filter(t => t.status !== 'Done');
+
+  // Tasks
+  const myTasks = (tasks||[]).filter(t => (t.assignedTo||'').toLowerCase().includes(uname));
+  const pendingTasks = myTasks.filter(t => t.status !== 'Completed' && t.status !== 'Done');
+  const doneTasks = myTasks.filter(t => t.status === 'Completed' || t.status === 'Done');
+
+  // Clients NOT worked in last 3 days
+  const notWorked3 = myClients.filter(c => !workedCodes3.has(c.clientCode));
+  const notWorkedToday = myClients.filter(c => !workedToday.has(c.clientCode));
+
+  // Weekly breakdown (Week1-4 of current month)
+  const now = new Date();
+  const w1s = new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+  const w1e = new Date(now.getFullYear(),now.getMonth(),7).toISOString().split('T')[0];
+  const w2s = new Date(now.getFullYear(),now.getMonth(),8).toISOString().split('T')[0];
+  const w2e = new Date(now.getFullYear(),now.getMonth(),14).toISOString().split('T')[0];
+  const w3s = new Date(now.getFullYear(),now.getMonth(),15).toISOString().split('T')[0];
+  const w3e = new Date(now.getFullYear(),now.getMonth(),21).toISOString().split('T')[0];
+  const w4s = new Date(now.getFullYear(),now.getMonth(),22).toISOString().split('T')[0];
+  const w4e = new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+
+  function weekWork(logs, from, to) {
+    return new Set(logs.filter(l=>{
+      const d = (l.logDate||l.loggedAt||'').slice(0,10);
+      return d>=from && d<=to;
+    }).map(l=>l.clientCode).filter(Boolean)).size;
+  }
+
+  const w1 = weekWork(myLogs,w1s,w1e);
+  const w2 = weekWork(myLogs,w2s,w2e);
+  const w3 = weekWork(myLogs,w3s,w3e);
+  const w4 = weekWork(myLogs,w4s,w4e);
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:18px;font-weight:800;color:var(--primary);">📈 ${u.name} — Performance Dashboard</div>
+      <div style="font-size:13px;color:var(--text-muted);">${today}</div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue"><div class="kpi-label">My Sellers</div><div class="kpi-value">${myClients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Worked Today</div><div class="kpi-value">${workedToday.size}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Pending Today</div><div class="kpi-value">${notWorkedToday.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Not Worked (3d)</div><div class="kpi-value">${notWorked3.length}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">CRM Calls Today</div><div class="kpi-value">${todayCRM.length}</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">Open Tickets</div><div class="kpi-value">${openTickets.length}</div></div>
+    </div>
+
+    <!-- Weekly Breakdown -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">📅 This Month — Weekly Breakdown</span></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;">
+          ${[['Week 1\n(1-7)','badge-blue',w1],['Week 2\n(8-14)','badge-green',w2],['Week 3\n(15-21)','badge-amber',w3],['Week 4\n(22+)','badge-purple',w4]].map(([label,badge,val])=>`
+          <div style="background:var(--bg);border-radius:10px;padding:16px;border:2px solid var(--border);">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">${label.replace('\n','<br>')}</div>
+            <div style="font-size:28px;font-weight:800;color:var(--primary);">${val}</div>
+            <div style="font-size:11px;color:var(--text-muted);">sellers worked</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Not Worked in Last 3 Days -->
+    <div class="card" style="border-left:4px solid var(--red);margin-bottom:12px;">
+      <div class="card-header" style="background:#fdf2f2;">
+        <span class="card-title">🔴 Last 3 Days Mein Kaam Nahi Hua (${notWorked3.length} sellers)</span>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${!notWorked3.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Sab sellers covered!</h3></div>' :
+        '<div class="table-wrap"><table><thead><tr><th>#</th><th>Seller</th><th>Market</th><th>Health</th><th>Renewal</th><th>Action</th></tr></thead><tbody>'+
+        notWorked3.map((c,i) => {
+          const rd = c.renewalDate ? Math.ceil((new Date(c.renewalDate)-new Date())/86400000) : null;
+          const rdHtml = rd!==null ? `<span style="color:${rd<=7?'var(--red)':rd<=30?'var(--amber)':'var(--green)'};">${rd<0?'OVERDUE':rd+'d'}</span>` : '—';
+          return `<tr style="background:#fff9f9;">
+            <td>${i+1}</td>
+            <td><strong>${c.busyName}</strong><br><small style="color:var(--text-muted);">${c.clientCode}</small></td>
+            <td><span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span></td>
+            <td>${healthBadge(c.healthStatus)}</td>
+            <td>${rdHtml}</td>
+            <td><button class="btn btn-sm btn-primary" data-cc="${c.clientCode}" data-cn="${c.busyName.replace(/"/g,'')}" onclick="navigate('crm');setTimeout(()=>{document.getElementById('crm-client').value=this.getAttribute('data-cc');loadCRMHistory(this.getAttribute('data-cc'));},500);">📞 Log Call</button></td>
+          </tr>`;
+        }).join('')+
+        '</tbody></table></div>'}
+      </div>
+    </div>
+
+    <!-- Today ka kaam hua / nahi hua -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- Worked today -->
+      <div class="card" style="border-left:4px solid var(--green);">
+        <div class="card-header" style="background:#eafaf1;"><span class="card-title">✅ Aaj Kaam Hua (${workedToday.size})</span></div>
+        <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
+          ${!workedToday.size ? '<div style="padding:16px;text-align:center;color:var(--text-muted);">Abhi tak koi kaam nahi</div>' :
+          '<table><tbody>'+[...workedToday].map(cc=>{
+            const c = myClients.find(x=>x.clientCode===cc)||{busyName:cc};
+            return `<tr><td style="padding:8px 12px;font-size:13px;"><strong>${c.busyName}</strong></td></tr>`;
+          }).join('')+'</tbody></table>'}
+        </div>
+      </div>
+      <!-- Not worked today -->
+      <div class="card" style="border-left:4px solid var(--amber);">
+        <div class="card-header" style="background:#fef9e7;"><span class="card-title">⏳ Aaj Bacha Hua (${notWorkedToday.length})</span></div>
+        <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto;">
+          ${!notWorkedToday.length ? '<div style="padding:16px;text-align:center;color:var(--green);font-weight:700;">🎉 Sab done!</div>' :
+          '<table><tbody>'+notWorkedToday.map(c=>`
+            <tr><td style="padding:8px 12px;font-size:13px;"><strong>${c.busyName}</strong><br>
+            <span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span> ${healthBadge(c.healthStatus)}</td></tr>
+          `).join('')+'</tbody></table>'}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tasks Status -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">📝 Tasks — ${pendingTasks.length} pending, ${doneTasks.length} done this month</span></div>
+      <div class="card-body" style="padding:0;">
+        ${!pendingTasks.length ? '<div class="empty-state"><div class="emoji">✅</div><h3>Koi pending task nahi!</h3></div>' :
+        '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Client</th><th>Priority</th><th>Deadline</th><th>Status</th></tr></thead><tbody>'+
+        pendingTasks.map(t=>`<tr>
+          <td><strong style="font-size:13px;">${t.title}</strong></td>
+          <td style="font-size:12px;">${t.clientName||'—'}</td>
+          <td><span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-amber':'badge-blue'}">${t.priority||'—'}</span></td>
+          <td style="font-size:12px;${t.deadline&&t.deadline<today?'color:var(--red);font-weight:700;':''}">${t.deadline||'—'}</td>
+          <td><span class="badge badge-amber">${t.status}</span></td>
+        </tr>`).join('')+
+        '</tbody></table></div>'}
+      </div>
+    </div>
+  `;
+}
+
 async function renderWorkLog(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
   const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),getClients()]);
   if(clients) APP.clients=clients;
-  const myLogs = logs||[];
-  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(new Date().toLocaleDateString('en-IN').split('/').reverse().join('-').slice(0,10)));
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','Viewer'].includes(u.role);
+
+  // Role-based: exec sirf apna
+  let myLogs = (logs||[]);
+  if(!isLead) {
+    myLogs = myLogs.filter(l => (l.executiveName||'').toLowerCase().includes(u.name.toLowerCase()));
+  }
+
+  window._allWorkLogs = myLogs;
+  const todayStr = new Date().toLocaleDateString('en-IN');
+  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(todayStr));
   const totalMins = myLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+
+  // Exec filter for leads
+  const execList = isLead ? [...new Set(myLogs.map(l=>l.executiveName).filter(Boolean))].sort() : [];
+
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${myLogs.length}</div></div>
@@ -3665,12 +3921,17 @@ async function renderWorkLog(){
       <div class="card-header">
         <span class="card-title">📓 Work Log</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${isLead && execList.length ? `<select class="form-control" style="width:170px;padding:6px;font-size:13px;" onchange="filterWorkLogByExec(this.value)">
+            <option value="">All Executives</option>
+            ${execList.map(e=>`<option value="${e}">${e}</option>`).join('')}
+          </select>` : ''}
           <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
             <option value="">All Types</option>
             <option>Call</option><option>Meeting</option><option>Listing Update</option>
             <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
             <option>Follow-up</option><option>Store Visit</option><option>Other</option>
           </select>
+          <input type="text" class="form-control" style="width:180px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterWorkLogByClient(this.value)">
           <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
         </div>
       </div>
@@ -3678,7 +3939,18 @@ async function renderWorkLog(){
         ${renderWorkLogTable(myLogs)}
       </div>
     </div>`;
-  window._allWorkLogs = myLogs;
+}
+
+function filterWorkLogByExec(exec) {
+  const base = window._allWorkLogs||[];
+  const filtered = exec ? base.filter(l=>l.executiveName===exec) : base;
+  document.getElementById('worklog-table').innerHTML = renderWorkLogTable(filtered);
+}
+
+function filterWorkLogByClient(q) {
+  const base = window._allWorkLogs||[];
+  const filtered = q ? base.filter(l=>(l.clientName||'').toLowerCase().includes(q.toLowerCase())) : base;
+  document.getElementById('worklog-table').innerHTML = renderWorkLogTable(filtered);
 }
 
 function renderWorkLogTable(logs) {
@@ -4497,6 +4769,90 @@ function renderExecPerformanceReport(data, el, from, to) {
 }
 
 // ── AI ANALYSIS ───────────────────────────────────────────────
+function renderSeller360Report(clients, csiMap, ticketMap, dsrMap, el) {
+  if(!clients||!clients.length){el.innerHTML='<div class="empty-state"><div class="emoji">🔍</div><h3>No data</h3></div>';return;}
+  window._s360ReportData = {clients,csiMap,ticketMap,dsrMap};
+
+  function stars(pct){
+    if(!pct&&pct!==0)return'—';
+    const s=Math.round(pct/20);
+    return'⭐'.repeat(s)+'☆'.repeat(5-s);
+  }
+  function fmt(n){return n?'₹'+Math.round(n).toLocaleString('en-IN'):'—';}
+
+  el.innerHTML='<div class="card">'+
+    '<div class="card-header">'+
+      '<span class="card-title">🔍 Seller 360 Report ('+clients.length+' sellers)</span>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Seller search..." oninput="filterS360Report(this.value)">'+
+        '<button class="btn btn-success btn-sm" onclick="exportSeller360Report()">📥 Excel Download</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="table-wrap"><table id="s360-table">'+
+      '<thead><tr>'+
+        '<th>#</th><th>Seller</th><th>Market</th><th>AM</th><th>Aging</th>'+
+        '<th>CSI Score</th><th>Health</th>'+
+        '<th>Week1</th><th>Week2</th><th>Week3</th><th>Week4</th><th>Total Sales</th>'+
+        '<th>Tickets</th><th>Open Tickets</th><th>CRM Comment</th>'+
+      '</tr></thead>'+
+      '<tbody id="s360-tbody">'+
+        clients.map(function(c,i){
+          const csi = csiMap[c.clientCode];
+          const tkts = ticketMap[c.clientCode]||[];
+          const openTkts = tkts.filter(t=>t.status!=='Done').length;
+          const dsr = dsrMap[c.clientCode]||{w1:0,w2:0,w3:0,w4:0,total:0};
+          const pct = csi?csi.csiPercent:null;
+          return '<tr>'+
+            '<td>'+(i+1)+'</td>'+
+            '<td><strong style="font-size:13px;">'+c.busyName+'</strong><br><small style="color:var(--text-muted);">'+c.clientCode+'</small></td>'+
+            '<td><span class="badge badge-blue" style="font-size:10px;">'+c.marketplace+'</span></td>'+
+            '<td style="font-size:12px;">'+(c.amName||'—')+'</td>'+
+            '<td style="text-align:center;font-weight:600;">'+(c.sellerAging||'—')+'d</td>'+
+            '<td style="text-align:center;">'+(pct!==null?'<strong style="color:'+(pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)')+';">'+stars(pct)+'</strong>':'<span style="color:var(--text-muted);">Not Done</span>')+'</td>'+
+            '<td>'+healthBadge(c.healthStatus||'—')+'</td>'+
+            '<td style="text-align:right;font-size:12px;">'+fmt(dsr.w1)+'</td>'+
+            '<td style="text-align:right;font-size:12px;">'+fmt(dsr.w2)+'</td>'+
+            '<td style="text-align:right;font-size:12px;">'+fmt(dsr.w3)+'</td>'+
+            '<td style="text-align:right;font-size:12px;">'+fmt(dsr.w4)+'</td>'+
+            '<td style="text-align:right;font-weight:700;color:var(--green);">'+fmt(dsr.total)+'</td>'+
+            '<td style="text-align:center;">'+tkts.length+'</td>'+
+            '<td style="text-align:center;color:'+(openTkts>0?'var(--red)':'var(--green)')+';">'+openTkts+'</td>'+
+            '<td style="font-size:11px;max-width:150px;color:var(--text-muted);">'+(csi&&csi.remarks?csi.remarks.slice(0,60)+(csi.remarks.length>60?'...':''):'—')+'</td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody>'+
+    '</table></div>'+
+  '</div>';
+}
+
+function filterS360Report(q) {
+  const d = window._s360ReportData;
+  if(!d) return;
+  const filtered = q ? d.clients.filter(c=>c.busyName.toLowerCase().includes(q.toLowerCase())) : d.clients;
+  const tbody = document.getElementById('s360-tbody');
+  if(!tbody) return;
+  function stars(pct){if(!pct&&pct!==0)return'—';const s=Math.round(pct/20);return'⭐'.repeat(s)+'☆'.repeat(5-s);}
+  function fmt(n){return n?'₹'+Math.round(n).toLocaleString('en-IN'):'—';}
+  tbody.innerHTML = filtered.map(function(c,i){
+    const csi=d.csiMap[c.clientCode],tkts=d.ticketMap[c.clientCode]||[],openTkts=tkts.filter(t=>t.status!=='Done').length,dsr=d.dsrMap[c.clientCode]||{w1:0,w2:0,w3:0,w4:0,total:0},pct=csi?csi.csiPercent:null;
+    return '<tr><td>'+(i+1)+'</td><td><strong>'+c.busyName+'</strong></td><td><span class="badge badge-blue" style="font-size:10px;">'+c.marketplace+'</span></td><td style="font-size:12px;">'+(c.amName||'—')+'</td><td style="text-align:center;">'+(c.sellerAging||'—')+'d</td><td style="text-align:center;">'+(pct!==null?stars(pct):'—')+'</td><td>'+healthBadge(c.healthStatus||'—')+'</td><td style="text-align:right;font-size:12px;">'+fmt(dsr.w1)+'</td><td style="text-align:right;font-size:12px;">'+fmt(dsr.w2)+'</td><td style="text-align:right;font-size:12px;">'+fmt(dsr.w3)+'</td><td style="text-align:right;font-size:12px;">'+fmt(dsr.w4)+'</td><td style="text-align:right;font-weight:700;color:var(--green);">'+fmt(dsr.total)+'</td><td style="text-align:center;">'+tkts.length+'</td><td style="text-align:center;">'+openTkts+'</td><td style="font-size:11px;">'+(csi&&csi.remarks?csi.remarks.slice(0,60):'—')+'</td></tr>';
+  }).join('');
+}
+
+function exportSeller360Report() {
+  const d = window._s360ReportData;
+  if(!d||!d.clients.length){showToast('Pehle report generate karo','error');return;}
+  function stars(pct){if(!pct&&pct!==0)return'';const s=Math.round(pct/20);return'*'.repeat(s)+'('+pct+'%)';}
+  let csv='#,Seller,Client Code,Marketplace,AM,Aging,CSI Stars,CSI%,Health,Week1 Sales,Week2 Sales,Week3 Sales,Week4 Sales,Total Sales,Total Tickets,Open Tickets,CRM Remarks\n';
+  d.clients.forEach(function(c,i){
+    const csi=d.csiMap[c.clientCode],tkts=d.ticketMap[c.clientCode]||[],openTkts=tkts.filter(t=>t.status!=='Done').length,dsr=d.dsrMap[c.clientCode]||{w1:0,w2:0,w3:0,w4:0,total:0};
+    csv+=[i+1,'"'+c.busyName.replace(/"/g,'')+'"',c.clientCode,c.marketplace,'"'+(c.amName||'')+'"',c.sellerAging||0,csi?stars(csi.csiPercent):'Not Done',csi?csi.csiPercent+'%':'',csi?csi.healthStatus||'':'Not Reviewed',Math.round(dsr.w1),Math.round(dsr.w2),Math.round(dsr.w3),Math.round(dsr.w4),Math.round(dsr.total),tkts.length,openTkts,'"'+(csi&&csi.remarks?csi.remarks.replace(/"/g,''):'—')+'"'].join(',')+'\n';
+  });
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Seller360_Report_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+  showToast('✅ Seller 360 Report download ho raha hai!','success');
+}
+
 async function getAIAnalysis(reportType, period) {
   const box = document.getElementById('ai-analysis-box');
   if(!box) return;
@@ -4538,6 +4894,7 @@ async function renderReports(){
           <button class="btn btn-secondary" style="background:#c0392b;color:#fff;" onclick="window._currentReport='am_performance';generateReport()">📋 AM Performance</button>
           <button class="btn btn-secondary" style="background:#1a5276;color:#fff;" onclick="window._currentReport='monthly_dsr';generateReport()">📅 Monthly Client Sales</button>
           <button class="btn btn-secondary" style="background:#1e8449;color:#fff;" onclick="window._currentReport='monthly_exec';generateReport()">🤖 Executive Performance</button>
+          <button class="btn btn-secondary" style="background:#6c3483;color:#fff;" onclick="window._currentReport='seller360_report';generateReport()">🔍 Seller 360 Report</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -4771,6 +5128,38 @@ async function generateReport(){
     const data=await api('GET','/monthly-reports/executive?from='+from+'&to='+to+'&_='+Date.now())||[];
     window._reportData=data;window._reportType='monthly_exec';
     renderExecPerformanceReport(data,el,from,to);return;
+  } else if(type==='seller360_report'){
+    el.innerHTML='<div class="loading"><div class="spinner"></div> Loading Seller 360 Report...</div>';
+    const [clients, csiRaw, ticketsData, dsr] = await Promise.all([
+      getClients(true),
+      api('GET','/csi?_='+Date.now()),
+      api('GET','/tickets?_='+Date.now()),
+      api('GET','/dsr?_='+Date.now()+'&from='+new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0]+'&to='+new Date().toISOString().split('T')[0]),
+    ]);
+    const csiList = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.list||[]);
+    const csiMap = {};
+    csiList.forEach(function(r){if(!csiMap[r.clientCode])csiMap[r.clientCode]=r;});
+    const ticketMap = {};
+    (ticketsData||[]).forEach(function(t){
+      if(!ticketMap[t.clientCode]) ticketMap[t.clientCode]=[];
+      ticketMap[t.clientCode].push(t);
+    });
+    // DSR week-wise
+    const now2 = new Date();
+    const dsrMap = {};
+    (dsr||[]).forEach(function(d){
+      const cc = d.client_code||d.clientCode;
+      if(!dsrMap[cc]) dsrMap[cc]={w1:0,w2:0,w3:0,w4:0,total:0};
+      const day = new Date(d.report_date).getDate();
+      const sales = parseFloat(d.sales_amount||0);
+      if(day<=7) dsrMap[cc].w1+=sales;
+      else if(day<=14) dsrMap[cc].w2+=sales;
+      else if(day<=21) dsrMap[cc].w3+=sales;
+      else dsrMap[cc].w4+=sales;
+      dsrMap[cc].total+=sales;
+    });
+    window._reportData=clients||[];window._reportType='seller360_report';
+    renderSeller360Report(clients||[],csiMap,ticketMap,dsrMap,el);return;
     el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
   }
 }
@@ -4813,6 +5202,7 @@ function exportExcel(){
   else if(type==='am_performance'){csv='Store Name,Store Ageing,Account Manager,AM Ageing,No. of Stores,Eligible for Renewal,Marketplace,Total Revenue (Sales),Renewal Count,Renewal %,Revenue After Renewal\n';csv+=data.map(function(r){return['"'+(r.busy_name||'').replace(/"/g,'')+ '"',r.store_aging||'—','"'+(r.am_name||'').replace(/"/g,'')+'"',r.am_aging||'—',r.no_of_stores||0,r.eligible||0,r.marketplace||'—',r.total_rev||0,r.renewal_count||0,(r.renewal_pct||0)+'%',r.active_rev||0].join(',');}).join('\n');}
   else if(type==='monthly_dsr'){csv='Client Name,Total Sales (₹),Total Orders,Ad Spend (₹),ACOS %,Avg Return %,Days Reported\n';csv+=data.map(function(r){return['"'+(r.clientName||'').replace(/"/g,'')+'"',Math.round(r.totalSales||0),r.totalOrders||0,Math.round(r.totalAdSpend||0),r.acos||0,r.avgReturnRate||0,r.daysReported||0].join(',');}).join('\n');}
   else if(type==='monthly_exec'){csv='Name,Role,Score,Grade,Tasks Done,Tasks Pending,Tickets Closed,CRM Calls,Connected Calls,DSR Entries\n';csv+=data.map(function(r){return['"'+(r.name||'')+'"',r.role||'',r.performanceScore||0,r.grade||'',r.tasksDone||0,r.tasksPending||0,r.ticketsClosed||0,r.crmCalls||0,r.connectedCalls||0,r.dsrEntries||0].join(',');}).join('\n');}
+  else if(type==='seller360_report'){exportSeller360Report();return;}
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
   showToast('Excel download ho raha hai!','success');

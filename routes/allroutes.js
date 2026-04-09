@@ -10,7 +10,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
-  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
     query = query.eq('crm_executive', name);
   }
   const { data, error } = await query;
@@ -54,7 +54,7 @@ crmRouter.get('/', authMiddleware, async (req, res) => {
   const { client } = req.query;
   let query = supabase.from('crm_calls').select('*').order('created_at', { ascending: false }).limit(500);
   if (client) query = query.eq('client_code', client);
-  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) query = query.eq('crm_executive', name);
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) query = query.eq('crm_executive', name);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(c => ({
@@ -119,15 +119,34 @@ const csiRouter = require('express').Router();
 csiRouter.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('csi_data').select('*').order('review_date', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
+
+  // For main list — latest NON-note record per client
   const map = {};
-  data.forEach(r => { if (!map[r.client_code]) map[r.client_code] = r; });
-  res.json(Object.values(map).map(r => ({
+  data.forEach(r => {
+    if (!r.is_note && !map[r.client_code]) map[r.client_code] = r;
+  });
+
+  // Also include latest note if no non-note exists
+  data.forEach(r => {
+    if (!map[r.client_code]) map[r.client_code] = r;
+  });
+
+  const format = r => ({
     csiId: r.csi_id, clientCode: r.client_code, clientName: r.client_name,
     reviewedBy: r.reviewed_by, q1: r.q1, q2: r.q2, q3: r.q3, q4: r.q4, q5: r.q5,
     csiScore: r.csi_score, csiPercent: r.csi_percent, healthStatus: r.health_status,
     remarks: r.remarks, nextReviewDate: r.next_review_date,
+    actionTaken: r.action_taken || null,
+    actionStatus: r.action_status || null,
+    isNote: r.is_note || false,
     reviewDate: r.review_date ? new Date(r.review_date).toLocaleDateString('en-IN') : '',
-  })));
+  });
+
+  // Return main list + full history for all records
+  res.json({
+    list: Object.values(map).map(format),
+    all: data.map(format),
+  });
 });
 
 csiRouter.post('/', authMiddleware, async (req, res) => {
@@ -193,7 +212,7 @@ tasksRouter.get('/ads', authMiddleware, async (req, res) => {
 tasksRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false });
-  if (!['Admin', 'Ops Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
     query = query.or(`assigned_to.ilike.%${name}%,assigned_by.ilike.%${name}%`);
   }
   const { data, error } = await query.limit(200);
@@ -262,7 +281,7 @@ tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(100);
-  if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) query = query.eq('executive_name', name);
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead'].includes(role)) query = query.eq('executive_name', name);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(l => ({
@@ -302,9 +321,8 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   try {
     let clientQuery = supabase.from('clients').select('health_status, status');
-    if (!['Admin', 'Ops Lead', 'CSI Lead'].includes(role)) {
+    if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive'].includes(role)) {
       if (role === 'Account Manager') clientQuery = clientQuery.eq('am_name', name);
-      else if (role === 'CRM Executive') clientQuery = clientQuery.eq('crm_executive', name);
       else if (role === 'Ads Executive') clientQuery = clientQuery.eq('ads_manager', name);
       else clientQuery = clientQuery.or(`am_name.eq.${name},ads_manager.eq.${name},crm_executive.eq.${name}`);
     }
@@ -549,7 +567,7 @@ const hurdleRouter = require('express').Router();
 hurdleRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   let query = supabase.from('hurdles').select('*').order('created_at', { ascending: false });
-  if (!['Admin', 'Ops Lead', 'CSI Lead', 'SME', 'Team Lead'].includes(role)) {
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'SME', 'Team Lead'].includes(role)) {
     query = query.eq('added_by', name);
   }
   const { data, error } = await query;

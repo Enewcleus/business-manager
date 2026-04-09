@@ -342,6 +342,23 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
+  'CRM Lead': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
+    {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
+    {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'dsr',icon:'📊',label:'Daily Sales Report'},
+    {id:'seller360',icon:'🔍',label:'Seller 360 View'},
+    {id:'reports',icon:'📋',label:'Reports'},
+    {id:'payments',icon:'💰',label:'Payment Manager'},
+    {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
+    {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
+    {id:'stafftransfer',icon:'🔁',label:'Staff Transfer'},
+    {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+  ],
   'CSI Lead': [
     {id:'dashboard',icon:'🏠',label:'Dashboard'},
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
@@ -378,13 +395,16 @@ const NAV_CONFIG = {
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Executive': [
+    {id:'dashboard',icon:'🏠',label:'Dashboard'},
+    {id:'clients',icon:'👥',label:'Client Manager'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'crm',icon:'📞',label:'CRM Log'},
-    {id:'csi',icon:'📊',label:'CSI Forms'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -689,11 +709,11 @@ function dsrSetDate(val) {
 async function loadDSRPage() {
   const selDate = window._dsrDate || new Date().toISOString().split('T')[0];
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive','CRM Executive'].includes(u.role);
 
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading DSR...</div>';
 
-  const [clients, alerts, dsrData] = await Promise.all([
+  const [clients, alertsRaw, dsrData] = await Promise.all([
     getClients(),
     api('GET', '/dsr/alerts'),
     api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate)
@@ -713,6 +733,10 @@ async function loadDSRPage() {
              (crm && (crm.includes(uname) || uname.includes(crm)));
     });
   }
+
+  // Filter alerts to only show user's clients
+  const myClientCodes = new Set(myClients.map(c => c.clientCode));
+  const alerts = isLead ? (alertsRaw||[]) : (alertsRaw||[]).filter(a => myClientCodes.has(a.client_code));
 
   const filedCodes = new Set((dsrData||[]).map(d => d.client_code || d.clientCode));
   const pending = myClients.filter(c => !filedCodes.has(c.clientCode));
@@ -1546,7 +1570,7 @@ async function renderPayments() {
 
 function buildPaymentLayout() {
   const u = APP.user;
-  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(u.role);
+  const canRecord = ['Admin','Ops Lead','CRM Lead','Sub Admin','CRM Executive','Team Lead'].includes(u.role);
   const pc = document.getElementById('page-content');
   pc.innerHTML = '';
 
@@ -1685,7 +1709,7 @@ async function selectPaySeller(cc) {
 }
 
 function renderPayDetail(client, history) {
-  const canRecord = ['Admin','Ops Lead','Sub Admin','CRM Executive','Team Lead'].includes(APP.user.role);
+  const canRecord = ['Admin','Ops Lead','CRM Lead','Sub Admin','CRM Executive','Team Lead'].includes(APP.user.role);
   const today = new Date();
   const rd = client.renewalDate ? new Date(client.renewalDate) : null;
   const daysLeft = rd ? Math.ceil((rd-today)/(1000*60*60*24)) : null;
@@ -1987,7 +2011,7 @@ async function renderTickets(){
   const open=tickets.filter(t=>t.status!=='Done').length;
   const pendingApproval=tickets.filter(t=>t.status==='Pending Approval').length;
   const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
-  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
@@ -2010,7 +2034,7 @@ async function renderTickets(){
 
 function ticketCards(tickets){
   if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
-  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
   return [...tickets].sort((a,b)=>{
     const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
     return (order[a.status]||0)-(order[b.status]||0);
@@ -2049,7 +2073,7 @@ function viewTicketDetail(el){
   const tid = el.getAttribute('data-tid');
   const t = (APP.tickets||[]).find(x=>x.ticketId===tid);
   if(!t) return;
-  const isLead=['Admin','Ops Lead','CSI Lead','Sub Admin','SME','Team Lead'].includes(APP.user.role);
+  const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive'].includes(APP.user.role);
   const pendingApproval = t.status==='Pending Approval';
 
   openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
@@ -2219,11 +2243,13 @@ async function renderCRM(){
   const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
   if(clients&&clients.length) APP.clients=clients;
 
-  // Role-based filtering — CRM Executive sees only assigned sellers
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isCRM = u.role === 'CRM Executive';
   let myClients = APP.clients || [];
-  if (!isLead) {
+
+  // Non-lead, non-CRM: sirf apne clients
+  if (!isLead && !isCRM) {
     const uname = u.name.trim().toLowerCase();
     myClients = myClients.filter(c => {
       const am  = (c.amName||'').trim().toLowerCase();
@@ -2235,34 +2261,50 @@ async function renderCRM(){
     });
   }
 
-  renderCRMPage(myClients, todayCalls||[]);
-  setTimeout(() => {
-    buildSearchableSelect('crm-client-wrap', myClients, '', '🔍 Search client...');
-    // Watch for selection change
-    const wrap = document.getElementById('crm-client-wrap');
-    if (wrap) {
-      const origSelect = selectSearchableItem;
-      window._crmSelectItem = function(id, code, name) {
-        selectSearchableItem(id, code, name);
-        if (id === 'crm-client-wrap') loadCRMHistory(code);
-      };
-      wrap.querySelectorAll('.dropdown-item').forEach(item => {
-        item.onmousedown = function() {
-          const code = item.getAttribute('onmousedown')?.match(/'([^']+)'/)?.[1] || '';
-        };
-      });
-    }
-  }, 100);
+  window._crmAllClients = myClients;
+
+  // CRM Executives list for filter
+  const crmExecs = [...new Set(myClients.map(c=>c.crmExecutive).filter(Boolean))].sort();
+
+  // Default filter — CRM Executive apna naam se
+  let filteredClients = myClients;
+  if (isCRM) {
+    const uname = u.name.trim().toLowerCase();
+    filteredClients = myClients.filter(c =>
+      (c.crmExecutive||'').trim().toLowerCase().includes(uname)
+    );
+    window._crmExecFilter = u.name;
+  } else {
+    window._crmExecFilter = '';
+  }
+
+  window._crmFilteredClients = filteredClients;
+  renderCRMPage(filteredClients, todayCalls||[], crmExecs, isLead||isCRM);
 }
 
-function renderCRMPage(clients,todayCalls){
+function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
+  const u = APP.user;
+  const isCRM = u.role === 'CRM Executive';
+  const execFilter = window._crmExecFilter || '';
+
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">My Clients</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">${isCRM?'My Clients':'Total Clients'}</div><div class="kpi-value">${clients.length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Calls Today</div><div class="kpi-value">${todayCalls.length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('Connected')).length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('No Response')).length}</div></div>
     </div>
+
+    ${showFilter && crmExecs && crmExecs.length ? `
+    <div class="card" style="margin-bottom:12px;border-left:4px solid #3498db;">
+      <div class="card-body" style="padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-weight:700;font-size:13px;">👤 CRM Executive Filter:</span>
+        <button onclick="filterCRMByExec('')" class="btn btn-sm ${!execFilter?'btn-primary':'btn-outline'}">All (${(window._crmAllClients||[]).length})</button>
+        ${crmExecs.map(e=>`<button onclick="filterCRMByExec('${e.replace(/'/g,'')}')" class="btn btn-sm ${execFilter===e?'btn-primary':'btn-outline'}">${e.split(' ')[0]} (${(window._crmAllClients||[]).filter(c=>c.crmExecutive===e).length})</button>`).join('')}
+        <input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterCRMBySearch(this.value)">
+      </div>
+    </div>` : ''}
+
     <div class="card">
       <div class="card-header"><span class="card-title">📞 Log a Call</span></div>
       <div class="card-body">
@@ -2270,7 +2312,7 @@ function renderCRMPage(clients,todayCalls){
           <div class="form-group"><label>Client *</label>
             <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value)">
               <option value="">Select...</option>
-              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName} (${c.clientCode})</option>`).join('')}
+              ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName}${c.crmExecutive?' (CRM: '+c.crmExecutive.split(' ')[0]+')':''}</option>`).join('')}
             </select>
           </div>
           <div class="form-group"><label>Call Outcome</label>
@@ -2290,17 +2332,64 @@ function renderCRMPage(clients,todayCalls){
         </div>
       </div>
     </div>
+
     <div class="card">
       <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
       <div class="card-body" style="padding:0;">
-        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
-        <tbody>${todayCalls.map(c=>`<tr><td><strong>${c.clientName}</strong></td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td></tr>`).join('')}</tbody></table></div>`}
+        ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>By</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
+        <tbody>${todayCalls.map(c=>`<tr><td><strong>${c.clientName}</strong></td><td style="font-size:11px;color:var(--text-muted);">${c.crmExecutive||u.name}</td><td><span class="badge ${c.callOutcome?.includes('Connected')?'badge-green':'badge-amber'}">${c.callOutcome}</span></td><td style="font-size:12px;max-width:160px;">${c.sellerComment||'—'}</td><td><span class="badge ${c.severity==='Critical'?'badge-red':c.severity==='High'?'badge-orange':'badge-gray'}">${c.severity}</span></td></tr>`).join('')}</tbody></table></div>`}
       </div>
     </div>
-    <div class="card" id="crm-history-card" style="display:none;">
+
+    <!-- Client List with CRM column -->
+    <div class="card" style="margin-top:12px;">
+      <div class="card-header"><span class="card-title">👥 Client List (${clients.length})</span></div>
+      <div class="card-body" style="padding:0;"><div class="table-wrap" id="crm-client-list-table"><table>
+        <thead><tr><th>#</th><th>Client</th><th>Market</th><th>AM</th><th>CRM Executive</th><th>Health</th><th>Action</th></tr></thead>
+        <tbody id="crm-client-tbody">
+          ${clients.map((c,i)=>`<tr>
+            <td>${i+1}</td>
+            <td><strong>${c.busyName}</strong></td>
+            <td><span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span></td>
+            <td style="font-size:12px;">${c.amName||'—'}</td>
+            <td style="font-size:12px;${(c.crmExecutive||'').toLowerCase().includes((u.name||'').toLowerCase())?'font-weight:700;color:var(--primary);':'color:var(--text-muted);'}">${c.crmExecutive||'—'}</td>
+            <td>${healthBadge(c.healthStatus)}</td>
+            <td><button class="btn btn-sm btn-outline" data-cc="${c.clientCode}" onclick="var cc=this.getAttribute('data-cc');loadCRMHistory(cc);document.getElementById('crm-client').value=cc;">📞 Select</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+    </div>
+
+    <div class="card" id="crm-history-card" style="display:none;margin-top:12px;">
       <div class="card-header"><span class="card-title" id="crm-hist-title">📋 Call History</span></div>
       <div class="card-body" id="crm-history"></div>
     </div>`;
+}
+
+function filterCRMByExec(exec) {
+  window._crmExecFilter = exec;
+  const all = window._crmAllClients || [];
+  const filtered = exec ? all.filter(c => c.crmExecutive === exec) : all;
+  window._crmFilteredClients = filtered;
+  const crmExecs = [...new Set(all.map(c=>c.crmExecutive).filter(Boolean))].sort();
+  const todayCalls = []; // preserve today's calls
+  renderCRMPage(filtered, todayCalls, crmExecs, true);
+}
+
+function filterCRMBySearch(q) {
+  const base = window._crmFilteredClients || window._crmAllClients || [];
+  const filtered = q.trim() ? base.filter(c => c.busyName.toLowerCase().includes(q.toLowerCase())) : base;
+  const tbody = document.getElementById('crm-client-tbody');
+  const u = APP.user;
+  if(tbody) tbody.innerHTML = filtered.map((c,i)=>`<tr>
+    <td>${i+1}</td>
+    <td><strong>${c.busyName}</strong></td>
+    <td><span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span></td>
+    <td style="font-size:12px;">${c.amName||'—'}</td>
+    <td style="font-size:12px;${(c.crmExecutive||'').toLowerCase().includes((u.name||'').toLowerCase())?'font-weight:700;color:var(--primary);':'color:var(--text-muted);'}">${c.crmExecutive||'—'}</td>
+    <td>${healthBadge(c.healthStatus)}</td>
+    <td><button class="btn btn-sm btn-outline" data-cc="${c.clientCode}" onclick="var cc=this.getAttribute('data-cc');loadCRMHistory(cc);document.getElementById('crm-client').value=cc;">📞 Select</button></td>
+  </tr>`).join('');
 }
 
 async function saveCRMCall(andTicket){
@@ -2333,16 +2422,20 @@ async function renderCSI(){
   window._csiDateFrom = window._csiDateFrom || '';
   window._csiDateTo = window._csiDateTo || '';
 
-  const [clients, csiData] = await Promise.all([getClients(), api('GET','/csi')]);
+  const [clients, csiRaw] = await Promise.all([getClients(), api('GET','/csi')]);
   if(clients) APP.clients = clients;
 
-  window._csiAllData = csiData || [];
+  // Handle new format {list, all} or old array format
+  const csiList = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.list || []);
+  const csiAll  = Array.isArray(csiRaw) ? csiRaw : (csiRaw?.all  || []);
+
+  window._csiAllData = csiAll;  // full history including notes
+  window._csiListData = csiList; // main list (latest per client)
   window._csiClients = clients || [];
 
   var csiMap = {};
-  (csiData||[]).forEach(function(r){
-    if(!csiMap[r.clientCode] || r.reviewDate > csiMap[r.clientCode].reviewDate)
-      csiMap[r.clientCode] = r;
+  csiList.forEach(function(r){
+    if(!csiMap[r.clientCode]) csiMap[r.clientCode] = r;
   });
   window._csiMap = csiMap;
 
@@ -2788,7 +2881,7 @@ async function renderTasks() {
   _allTasksCache = tasks;
 
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive','CRM Executive'].includes(u.role);
   const pending = tasks.filter(t => t.status === 'Pending');
   const inprog  = tasks.filter(t => t.status === 'In Progress');
   const done    = tasks.filter(t => t.status === 'Completed' && isToday(t.completedAt));
@@ -2865,7 +2958,7 @@ function switchTaskTab(tab) {
 
 function buildMyTasksTab(tasks) {
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive','CRM Executive'].includes(u.role);
   const myTasks = tasks.filter(t => t.assignedTo === u.name || t.assignedBy === u.name);
 
   const overdue   = myTasks.filter(t => t.isOverdue && t.status !== 'Completed');
@@ -3013,7 +3106,7 @@ function twTaskCard(task, allTasks) {
           ${t.status === 'In Progress' ? `<button class="btn btn-sm btn-success" onclick="promptCompleteTask('${t.taskId}','${safeTitle}')">✅ Complete</button>` : ''}
           <button class="btn btn-sm btn-outline" onclick="openCreateTask('${t.taskId}','${safeTitle}')">➕ Sub-task</button>
           <button class="btn btn-sm btn-outline" onclick="openWorkLogEntry('${t.taskId}','${t.clientCode||''}','${safeClientName}')">📓 Log</button>
-          ${['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
+          ${['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive','CRM Executive'].includes(APP.user.role) ? `<button class="btn btn-sm" style="background:var(--bg);color:var(--text-muted);border:1.5px solid var(--border);" onclick="openEditTask('${t.taskId}')">✏️</button>` : ''}
         </div>
       ` : `<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ ${t.completedAt || ''}${t.workLog ? ' — "'+t.workLog+'"' : ''}</div>`}
     </div>
@@ -3191,7 +3284,7 @@ async function viewPersonTasksFromOverview(name) {
   openPanel('📝 Tasks: ' + name, '<div class="loading"><div class="spinner"></div> Loading...</div>');
   const tasks = _allTasksCache.length ? _allTasksCache : await api('GET','/tasks');
   const myTasks = (tasks||[]).filter(t => t.assignedTo === name);
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive'].includes(APP.user.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CSI Executive','CRM Executive'].includes(APP.user.role);
 
   document.getElementById('panel-body').innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
@@ -3597,7 +3690,7 @@ function filterWorkLog(type) {
 
 function openQuickWorkLog(){
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client (optional)</label>
+    <div class="form-group"><label>Client *</label>
       <div id="qwl-client-wrap"></div>
     </div>
     <div class="form-row">
@@ -3613,13 +3706,15 @@ function openQuickWorkLog(){
     <div class="form-group"><label>Kya kaam kiya? *</label><textarea class="form-control" id="qwl-desc" placeholder="Detailed description..." rows="4"></textarea></div>
     <div class="form-group"><label>Outcome</label><input type="text" class="form-control" id="qwl-outcome" placeholder="Result..."></div>
     <button class="btn btn-primary btn-full" onclick="submitQuickWorkLog()">📓 Save Work Log</button>`);
-  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+  setTimeout(()=>buildSearchableSelect('qwl-client-wrap', APP.clients, '', '🔍 Client select karo...'), 100);
 }
 
 async function submitQuickWorkLog(){
-  const desc=document.getElementById('qwl-desc').value.trim();if(!desc){showToast('Description required','error');return;}
+  const desc=document.getElementById('qwl-desc').value.trim();
+  if(!desc){showToast('Description required','error');return;}
   const clientCode=getSearchableVal('qwl-client-wrap')||'';
   const clientName=document.getElementById('qwl-client-wrap_search')?.value?.split(' (')[0]||'';
+  if(!clientCode){showToast('Client select karna zaroori hai!','error');return;}
   const r=await api('POST','/tasks/worklog',{clientCode,clientName,workType:document.getElementById('qwl-type').value,description:desc,outcome:document.getElementById('qwl-outcome').value,timeSpent:document.getElementById('qwl-time').value});
   if(r?.success){showToast('✅ Work logged!','success');closePanel();renderWorkLog();}
 }
@@ -3650,9 +3745,9 @@ async function renderRenewals(){
   window._allRenewals = allRenewals;
 
   const u = APP.user;
-  const canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  const canSeeAmount = ['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
   const isAdmin = ['Admin','Ops Lead','Sub Admin','CSI Lead','CSI Executive'].includes(u.role);
-  const isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+  const isCRM = ['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(u.role);
 
   const today = new Date(); today.setHours(0,0,0,0);
   const next30 = new Date(today); next30.setDate(today.getDate()+30);
@@ -3762,8 +3857,8 @@ async function renderRenewals(){
 
 function filterRenewals(status, search){
   var u=APP.user;
-  var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
-  var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+  var canSeeAmount=['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  var isCRM=['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(u.role);
 
   // Get current status from select if not passed
   if(status===undefined||status===null) {
@@ -3831,8 +3926,8 @@ function sortRenewals(col) {
   });
 
   var u=APP.user;
-  var canSeeAmount=['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
-  var isCRM=['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(u.role);
+  var canSeeAmount=['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(u.role);
+  var isCRM=['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(u.role);
 
   var data = (window._renewalsFiltered || window._allRenewals || []).slice();
 
@@ -3892,8 +3987,8 @@ function sortRenewals(col) {
 
 function openEditRenewal(id, name) {
   var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
-  var isCRM = ['CRM Executive','Admin','Ops Lead','CSI Lead','Team Lead'].includes(APP.user.role);
-  var canSeeAmount = ['Admin','Ops Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+  var isCRM = ['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(APP.user.role);
+  var canSeeAmount = ['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
   openPanel('✏️ Renewal — '+name,
     '<div class="form-group"><label>Renewal Date (Seller ne bataya)</label>'+
     '<input type="date" class="form-control" id="er-date" value="'+(renewal.renewalDate||'')+'"></div>'+
@@ -5842,7 +5937,7 @@ async function openClientDetail(cc) {
   const client = APP.clients.find(c=>c.clientCode===cc);
   if (!client) return;
   // Admin/Lead/CRM — full page view
-  if (['Admin','Ops Lead','CSI Lead','CRM Executive','SME','Team Lead'].includes(APP.user.role)) {
+  if (['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','SME','Team Lead'].includes(APP.user.role)) {
     navigateClientPage(cc);
     return;
   }
@@ -6304,7 +6399,7 @@ let _dsrAllData = [];
 
 function injectDSRExecFilter(data) {
   _dsrAllData = data || [];
-  const isLead = ['Admin','Ops Lead','CSI Lead','Team Lead','SME'].includes(APP.user.role);
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead','SME'].includes(APP.user.role);
   if (!isLead) return;
   if (document.getElementById('dsr-exec-filter')) return;
   const execs = [...new Set((_dsrAllData).map(d => d.entered_by).filter(Boolean))].sort();

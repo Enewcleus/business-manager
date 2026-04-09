@@ -475,6 +475,15 @@ const NAV_CONFIG = {
     {id:'csi', label:'CSI Health', icon:'📊'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
+  'Viewer': [
+    {id:'dashboard', label:'Dashboard', icon:'🏠'},
+    {id:'clients', label:'Client Manager', icon:'👥'},
+    {id:'tickets', label:'Tickets', icon:'🎫'},
+    {id:'csi', label:'CSI Health', icon:'📊'},
+    {id:'renewals', label:'Renewals', icon:'🔄'},
+    {id:'reports', label:'Reports', icon:'📋'},
+    {id:'seller360', label:'Seller 360 View', icon:'🔍'},
+  ],
 
 };
 
@@ -2441,7 +2450,7 @@ async function renderCSI(){
   });
   window._csiMap = csiMap;
 
-  var canFill = ['CRM Executive','Admin','CSI Lead','CSI Executive'].includes(APP.user.role);
+  var canFill = ['CRM Executive','CRM Lead','Admin','Ops Lead','CSI Lead','CSI Executive','Sub Admin'].includes(APP.user.role);
   window._csiCanFill = canFill;
 
   var reviewed = Object.keys(csiMap).length;

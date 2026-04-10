@@ -7,8 +7,8 @@ async function getFilteredClients(user) {
   const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
     ? user.marketplaceAccess : null;
 
-  // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive — sab clients
-  if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive'].includes(role)) {
+  // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive, CRM Lead, Viewer — sab clients
+  if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive', 'Viewer'].includes(role)) {
     let q = supabase.from('clients').select('*').order('busy_name');
     if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
     const { data, error } = await q;

@@ -10,7 +10,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
   let query = supabase.from('crm_calls').select('*')
     .gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
-  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) {
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME', 'Viewer'].includes(role)) {
     query = query.eq('crm_executive', name);
   }
   const { data, error } = await query;
@@ -54,7 +54,7 @@ crmRouter.get('/', authMiddleware, async (req, res) => {
   const { client } = req.query;
   let query = supabase.from('crm_calls').select('*').order('created_at', { ascending: false }).limit(500);
   if (client) query = query.eq('client_code', client);
-  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME'].includes(role)) query = query.eq('crm_executive', name);
+  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Team Lead', 'SME', 'Viewer'].includes(role)) query = query.eq('crm_executive', name);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(c => ({

@@ -4897,6 +4897,7 @@ async function renderReports(){
           <button class="btn btn-secondary" style="background:#1a5276;color:#fff;" onclick="window._currentReport='monthly_dsr';generateReport()">📅 Monthly Client Sales</button>
           <button class="btn btn-secondary" style="background:#1e8449;color:#fff;" onclick="window._currentReport='monthly_exec';generateReport()">🤖 Executive Performance</button>
           <button class="btn btn-secondary" style="background:#6c3483;color:#fff;" onclick="window._currentReport='seller360_report';generateReport()">🔍 Seller 360 Report</button>
+          <button class="btn btn-secondary" style="background:#17202a;color:#fff;" onclick="window._currentReport='staff_aging';generateReport()">👥 Staff Aging Report</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -5162,7 +5163,47 @@ async function generateReport(){
     });
     window._reportData=clients||[];window._reportType='seller360_report';
     renderSeller360Report(clients||[],csiMap,ticketMap,dsrMap,el);return;
-    el.innerHTML=`<div class="card"><div class="card-header"><span class="card-title">👥 Team Performance</span></div><div class="card-body" style="padding:0;">${!data.length?'<div class="empty-state"><div class="emoji">👥</div><h3>No team data</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Actions Today</th><th>Tickets Closed</th><th>Status</th></tr></thead><tbody>${data.map(d=>`<tr style="${d.performanceScore==='No Activity'?'background:#fdf2f2;':''}"><td><strong>${d.name}</strong></td><td><span class="badge badge-blue">${d.role}</span></td><td>${d.todayActivity||0}</td><td>${d.ticketsClosed||0}</td><td>${d.performanceScore==='No Activity'?'<span class="badge badge-red">No Activity</span>':'<span class="badge badge-green">Active</span>'}</td></tr>`).join('')}</tbody></table></div>`}</div></div>`;
+  } else if(type==='staff_aging'){
+    el.innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
+    const users = await api('GET','/users?_='+Date.now())||[];
+    const active = users.filter(u=>u.isActive && u.joiningDate);
+    active.sort((a,b)=>(b.staffAgingDays||0)-(a.staffAgingDays||0));
+    window._reportData=active; window._reportType='staff_aging';
+
+    const senior = active.filter(u=>u.staffAgingDays>=365);
+    const mid = active.filter(u=>u.staffAgingDays>=90&&u.staffAgingDays<365);
+    const fresher = active.filter(u=>u.staffAgingDays<90);
+
+    el.innerHTML='<div class="kpi-grid" style="margin-bottom:16px;">'+
+      '<div class="kpi-card green"><div class="kpi-label">Senior (1+ yr)</div><div class="kpi-value">'+senior.length+'</div></div>'+
+      '<div class="kpi-card amber"><div class="kpi-label">Mid (3-12 mo)</div><div class="kpi-value">'+mid.length+'</div></div>'+
+      '<div class="kpi-card red"><div class="kpi-label">Fresher (<3 mo)</div><div class="kpi-value">'+fresher.length+'</div></div>'+
+      '<div class="kpi-card blue"><div class="kpi-label">Total Active</div><div class="kpi-value">'+active.length+'</div></div>'+
+    '</div>'+
+    '<div class="card"><div class="card-header">'+
+      '<span class="card-title">👥 Staff Aging Report</span>'+
+      '<button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Excel</button>'+
+    '</div><div class="table-wrap"><table>'+
+      '<thead><tr><th>#</th><th>Name</th><th>Role</th><th>Department</th><th>Joining Date</th><th>Staff Aging</th><th>Category</th></tr></thead>'+
+      '<tbody>'+active.map((u,i)=>{
+        const cat = u.staffAgingDays>=365
+          ? '<span class="badge badge-green">Senior</span>'
+          : u.staffAgingDays>=90
+          ? '<span class="badge badge-amber">Mid Level</span>'
+          : '<span class="badge badge-red">Fresher</span>';
+        const agingColor = u.staffAgingDays>=365?'var(--green)':u.staffAgingDays>=90?'var(--amber)':'var(--red)';
+        return '<tr>'+
+          '<td>'+(i+1)+'</td>'+
+          '<td><strong>'+u.name+'</strong></td>'+
+          '<td style="font-size:12px;">'+u.role+'</td>'+
+          '<td style="font-size:12px;">'+(u.department||'—')+'</td>'+
+          '<td style="font-size:12px;">'+u.joiningDate+'</td>'+
+          '<td style="font-weight:700;color:'+agingColor+';">'+u.staffAgingLabel+'</td>'+
+          '<td>'+cat+'</td>'+
+        '</tr>';
+      }).join('')+
+    '</tbody></table></div></div>';
+    return;
   }
 }
 
@@ -5205,6 +5246,13 @@ function exportExcel(){
   else if(type==='monthly_dsr'){csv='Client Name,Total Sales (₹),Total Orders,Ad Spend (₹),ACOS %,Avg Return %,Days Reported\n';csv+=data.map(function(r){return['"'+(r.clientName||'').replace(/"/g,'')+'"',Math.round(r.totalSales||0),r.totalOrders||0,Math.round(r.totalAdSpend||0),r.acos||0,r.avgReturnRate||0,r.daysReported||0].join(',');}).join('\n');}
   else if(type==='monthly_exec'){csv='Name,Role,Score,Grade,Tasks Done,Tasks Pending,Tickets Closed,CRM Calls,Connected Calls,DSR Entries\n';csv+=data.map(function(r){return['"'+(r.name||'')+'"',r.role||'',r.performanceScore||0,r.grade||'',r.tasksDone||0,r.tasksPending||0,r.ticketsClosed||0,r.crmCalls||0,r.connectedCalls||0,r.dsrEntries||0].join(',');}).join('\n');}
   else if(type==='seller360_report'){exportSeller360Report();return;}
+  else if(type==='staff_aging'){
+    csv='Name,Role,Department,Joining Date,Staff Aging,Days,Category\n';
+    csv+=data.map(function(u){
+      const cat=u.staffAgingDays>=365?'Senior':u.staffAgingDays>=90?'Mid Level':'Fresher';
+      return['"'+u.name+'"',u.role||'',u.department||'',u.joiningDate||'',u.staffAgingLabel||'',u.staffAgingDays||0,cat].join(',');
+    }).join('\n');
+  }
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`eNewcleus_${type}_${new Date().toISOString().split('T')[0]}.csv`;a.click();
   showToast('Excel download ho raha hai!','success');
@@ -5233,8 +5281,23 @@ async function renderAdmin(){
         </div>
       </div>
       <div class="card-body" style="padding:0;"><div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>${users.map((u,i)=>{const manager=users.find(m=>m.id===u.reportingTo);return `<tr><td>${i+1}</td><td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td><td>${u.designation||'<span style="color:#ccc;">—</span>'}</td><td>${u.department||'<span style="color:#ccc;">—</span>'}</td><td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td><td style="font-size:12px;">${u.email}</td><td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td><td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td></tr>`;}).join('')}</tbody>
+        <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Reports To</th><th>Email</th><th>Joining Date</th><th>Staff Aging</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${users.map((u,i)=>{
+          const manager=users.find(m=>m.id===u.reportingTo);
+          const agingColor = u.staffAgingDays ? (u.staffAgingDays>=365?'var(--green)':u.staffAgingDays>=180?'var(--amber)':'var(--red)') : 'var(--text-muted)';
+          return `<tr>
+            <td>${i+1}</td>
+            <td><strong>${u.name}</strong>${u.designation?`<br><span style="font-size:11px;color:#666;">${u.designation}</span>`:''}</td>
+            <td>${u.designation||'<span style="color:#ccc;">—</span>'}</td>
+            <td>${u.department||'<span style="color:#ccc;">—</span>'}</td>
+            <td>${manager?manager.name:'<span style="color:#ccc;">Top Level</span>'}</td>
+            <td style="font-size:12px;">${u.email}</td>
+            <td style="font-size:12px;color:var(--text-muted);">${u.joiningDate||'—'}</td>
+            <td style="font-size:12px;font-weight:600;color:${agingColor};">${u.staffAgingLabel||'—'}</td>
+            <td>${u.isActive?'<span class="badge badge-green">Active</span>':'<span class="badge badge-red">Inactive</span>'}</td>
+            <td><button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openEditUser('${u.userId}')">✏️ Edit</button></td>
+          </tr>`;
+        }).join('')}</tbody>
       </table></div></div>
     </div>
     <div class="card" id="hierarchy-card" style="display:none;">

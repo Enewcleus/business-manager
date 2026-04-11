@@ -3742,8 +3742,8 @@ async function renderExecPerf() {
 
   // Work log filtering
   const myLogs = (worklogs||[]).filter(l => (l.executiveName||'').toLowerCase().includes(uname));
-  const todayLogs = myLogs.filter(l => (l.logDate||l.loggedAt||'').includes(today));
-  const last3Logs = myLogs.filter(l => (l.logDate||l.loggedAt||'') >= day3ago);
+  const todayLogs = myLogs.filter(l => (l.logDate||'') === today);
+  const last3Logs = myLogs.filter(l => (l.logDate||'') >= day3ago);
 
   // Clients worked on last 3 days
   const workedCodes3 = new Set(last3Logs.map(l=>l.clientCode).filter(Boolean));
@@ -3782,7 +3782,7 @@ async function renderExecPerf() {
 
   function weekWork(logs, from, to) {
     return new Set(logs.filter(l=>{
-      const d = (l.logDate||l.loggedAt||'').slice(0,10);
+      const d = (l.logDate||'');
       return d>=from && d<=to;
     }).map(l=>l.clientCode).filter(Boolean)).size;
   }

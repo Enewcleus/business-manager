@@ -305,6 +305,7 @@ tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
     clientCode: l.client_code, clientName: l.client_name, workType: l.work_type,
     description: l.description, outcome: l.outcome, timeSpent: l.time_spent,
     loggedAt: new Date(l.created_at).toLocaleString('en-IN'),
+    logDate: new Date(l.created_at).toISOString().split('T')[0], // ISO date for comparisons
   })));
 });
 

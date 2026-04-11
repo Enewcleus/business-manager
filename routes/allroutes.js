@@ -415,12 +415,25 @@ const usersRouter = require('express').Router();
 usersRouter.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('users').select('user_code, name, email, role, designation, department, reporting_to_name, is_active, last_login, joining_date').order('name');
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data.map(u => ({
-    userId: u.user_code, name: u.name, email: u.email, role: u.role,
-    designation: u.designation, department: u.department,
-    reportingToName: u.reporting_to_name, isActive: u.is_active,
-    joiningDate: u.joining_date || null,
-  })));
+  res.json(data.map(u => {
+    const today = new Date();
+    const joining = u.joining_date ? new Date(u.joining_date) : null;
+    const staffAgingDays = joining ? Math.floor((today - joining) / 86400000) : null;
+    const staffAgingYears = staffAgingDays ? Math.floor(staffAgingDays / 365) : null;
+    const staffAgingMonths = staffAgingDays ? Math.floor((staffAgingDays % 365) / 30) : null;
+    return {
+      userId: u.user_code, name: u.name, email: u.email, role: u.role,
+      designation: u.designation, department: u.department,
+      reportingToName: u.reporting_to_name, isActive: u.is_active,
+      joiningDate: u.joining_date || null,
+      staffAgingDays,
+      staffAgingLabel: staffAgingDays
+        ? (staffAgingYears > 0
+            ? staffAgingYears + 'y ' + staffAgingMonths + 'm'
+            : staffAgingMonths + ' months')
+        : '—',
+    };
+  }));
 });
 
 usersRouter.get('/hierarchy', authMiddleware, async (req, res) => {

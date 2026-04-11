@@ -6345,6 +6345,7 @@ async function navigateClientPage(cc) {
   const crmCalls = timeline?.crmCalls||[];
   const tickets = timeline?.tickets||[];
   const tasks = timeline?.tasks||[];
+  window._clientTimeline = { crmCalls, tickets, tasks };
   const hColor = client?.healthStatus==='Healthy'?'#27ae60':client?.healthStatus==='Warning'?'#f39c12':'#e74c3c';
 
   document.getElementById('page-content').innerHTML = `
@@ -6419,6 +6420,22 @@ async function navigateClientPage(cc) {
       <button class="btn btn-primary" onclick="openRaiseTicketFor('${cc}','${client?.busyName||''}')">🎫 Raise Ticket</button>
       <button class="btn btn-success" onclick="openCreateTask('','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📝 Create Task</button>
       <button class="btn btn-secondary" onclick="logCRMCallFor('${cc}','${(client?.busyName||'').replace(/'/g,'&#39;')}')">📞 Log Call</button>
+    </div>
+
+    <!-- Activity Summary -->
+    <div class="card" style="border-left:4px solid #8e44ad;margin-bottom:12px;">
+      <div class="card-header" style="background:#f5eef8;">
+        <span class="card-title">📊 Activity Summary</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" id="act-btn-7" onclick="filterClientActivity('${cc}',7)">Last 7d</button>
+          <button class="btn btn-sm btn-primary" id="act-btn-30" onclick="filterClientActivity('${cc}',30)">Last 30d</button>
+          <button class="btn btn-sm btn-outline" id="act-btn-90" onclick="filterClientActivity('${cc}',90)">Last 90d</button>
+          <button class="btn btn-sm btn-outline" id="act-btn-180" onclick="filterClientActivity('${cc}',180)">Last 180d</button>
+        </div>
+      </div>
+      <div id="client-activity-summary" class="card-body">
+        ${buildClientActivitySummary(tickets, tasks, crmCalls, 30)}
+      </div>
     </div>
 
     <!-- CRM Calls -->
@@ -6538,6 +6555,98 @@ async function navigateClientPage(cc) {
         </div>`).join('')}
       </div>
     </div>`;
+}
+
+function buildClientActivitySummary(tickets, tasks, crmCalls, days) {
+  const cutoff = new Date(Date.now() - days * 86400000);
+
+  // Filter by date
+  const tkts = (tickets||[]).filter(function(t){ return t.createdAt && new Date(t.createdAt) >= cutoff; });
+  const tsks = (tasks||[]).filter(function(t){ return t.createdAt && new Date(t.createdAt) >= cutoff; });
+  const crms = (crmCalls||[]).filter(function(c){ return c.created_at && new Date(c.created_at) >= cutoff; });
+
+  // Ticket stats
+  const tktOpen = tkts.filter(t=>t.status==='Open').length;
+  const tktInProgress = tkts.filter(t=>t.status==='In Progress'||t.status==='Pending Approval').length;
+  const tktClosed = tkts.filter(t=>t.status==='Done').length;
+
+  // Task stats
+  const tskDone = tsks.filter(t=>t.status==='Completed'||t.status==='Done').length;
+  const tskPending = tsks.filter(t=>t.status!=='Completed'&&t.status!=='Done').length;
+
+  // CRM stats
+  const crmConnected = crms.filter(c=>(c.callOutcome||c.call_outcome||'').includes('Connected')).length;
+  const crmNoResponse = crms.filter(c=>(c.callOutcome||c.call_outcome||'').includes('No Response')).length;
+
+  // Ads optimization — from tasks with category Ads
+  const adsOpt = tsks.filter(t=>(t.category||'').toLowerCase().includes('ads')).length;
+  const adsOptDone = tsks.filter(t=>(t.category||'').toLowerCase().includes('ads')&&(t.status==='Completed'||t.status==='Done')).length;
+
+  const total = tkts.length + tsks.length + crms.length;
+
+  if(!total) return '<div style="text-align:center;padding:20px;color:var(--text-muted);">Last '+days+' days mein koi activity nahi 📭</div>';
+
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">'+
+    // Tickets
+    '<div style="background:#fdf2f2;border-radius:10px;padding:12px;border-left:3px solid var(--red);">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:8px;">🎫 TICKETS</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--text);">'+tkts.length+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+
+        '<span style="color:var(--red);">'+tktOpen+' open</span> · '+
+        '<span style="color:var(--amber);">'+tktInProgress+' progress</span> · '+
+        '<span style="color:var(--green);">'+tktClosed+' closed</span>'+
+      '</div>'+
+    '</div>'+
+    // Tasks
+    '<div style="background:#f5eef8;border-radius:10px;padding:12px;border-left:3px solid #8e44ad;">'+
+      '<div style="font-size:11px;font-weight:700;color:#8e44ad;margin-bottom:8px;">📝 TASKS</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--text);">'+tsks.length+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+
+        '<span style="color:var(--green);">'+tskDone+' done</span> · '+
+        '<span style="color:var(--amber);">'+tskPending+' pending</span>'+
+      '</div>'+
+    '</div>'+
+    // CRM Calls
+    '<div style="background:#eaf4fd;border-radius:10px;padding:12px;border-left:3px solid #2980b9;">'+
+      '<div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:8px;">📞 CRM CALLS</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--text);">'+crms.length+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+
+        '<span style="color:var(--green);">'+crmConnected+' connected</span> · '+
+        '<span style="color:var(--red);">'+crmNoResponse+' no response</span>'+
+      '</div>'+
+    '</div>'+
+    // Ads Optimization
+    '<div style="background:#fef9e7;border-radius:10px;padding:12px;border-left:3px solid #f39c12;">'+
+      '<div style="font-size:11px;font-weight:700;color:#d35400;margin-bottom:8px;">📢 ADS WORK</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--text);">'+adsOpt+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+
+        '<span style="color:var(--green);">'+adsOptDone+' completed</span>'+
+      '</div>'+
+    '</div>'+
+    // Total Activity Score
+    '<div style="background:#eafaf1;border-radius:10px;padding:12px;border-left:3px solid var(--green);">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:8px;">⚡ TOTAL ACTIVITY</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--text);">'+total+'</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last '+days+' days mein</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function filterClientActivity(cc, days) {
+  // Update active button
+  [7,30,90,180].forEach(function(d){
+    const btn = document.getElementById('act-btn-'+d);
+    if(btn) btn.className = d===days?'btn btn-sm btn-primary':'btn btn-sm btn-outline';
+  });
+  const box = document.getElementById('client-activity-summary');
+  if(!box) return;
+  const client = APP.clients.find(function(c){return c.clientCode===cc;});
+  // Get cached data
+  const timeline = window._clientTimeline || {};
+  const tickets = timeline.tickets || [];
+  const tasks = timeline.tasks || [];
+  const crmCalls = timeline.crmCalls || [];
+  box.innerHTML = buildClientActivitySummary(tickets, tasks, crmCalls, days);
 }
 
 function navigateBack() {

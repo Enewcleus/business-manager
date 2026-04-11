@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SellerComm — eNewcleus</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0d1117;
+  --surface:#161b22;
+  --surface2:#21262d;
+  --border:#30363d;
+  --green:#25d366;
+  --green-dim:#1a9e4a;
+  --green-glow:rgba(37,211,102,0.15);
+  --text:#e6edf3;
+  --text-dim:#7d8590;
+  --red:#f85149;
+  --yellow:#d29922;
+  --blue:#58a6ff;
+  --radius:10px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* SIDEBAR */
+.sidebar{
+  position:fixed;left:0;top:0;width:220px;height:100vh;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:100;
+}
+.logo{
+  padding:20px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.logo-icon{
+  width:34px;height:34px;background:var(--green);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.logo-text{font-size:15px;font-weight:700;color:var(--text);}
+.logo-sub{font-size:10px;color:var(--text-dim);font-family:'DM Mono',monospace;}
+
+nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;
+  border-radius:7px;cursor:pointer;font-size:13.5px;color:var(--text-dim);
+  transition:all .15s;border:none;background:none;width:100%;text-align:left;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:var(--green-glow);color:var(--green);font-weight:600;}
+.nav-item .icon{font-size:16px;width:20px;text-align:center;}
+.nav-label{font-size:10px;color:var(--text-dim);padding:10px 10px 4px;font-family:'DM Mono',monospace;letter-spacing:.05em;}
+
+.sidebar-footer{
+  padding:14px;border-top:1px solid var(--border);
+  font-size:12px;color:var(--text-dim);
+}
+.status-dot{
+  display:inline-block;width:7px;height:7px;background:var(--green);
+  border-radius:50%;margin-right:6px;animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* MAIN */
+.main{margin-left:220px;padding:28px;min-height:100vh;}
+
+/* HEADER */
+.page-header{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;
+}
+.page-title{font-size:22px;font-weight:700;}
+.page-title span{color:var(--green);}
+.header-actions{display:flex;gap:10px;align-items:center;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px;position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--green);opacity:0;transition:.3s;
+}
+.stat-card:hover::before{opacity:1;}
+.stat-label{font-size:12px;color:var(--text-dim);margin-bottom:8px;font-family:'DM Mono',monospace;}
+.stat-value{font-size:28px;font-weight:700;color:var(--text);}
+.stat-value.green{color:var(--green);}
+.stat-sub{font-size:12px;color:var(--text-dim);margin-top:4px;}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;}
+.tab{
+  flex:1;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;
+  font-weight:500;color:var(--text-dim);border:none;background:none;transition:.15s;
+}
+.tab.active{background:var(--green);color:#000;font-weight:700;}
+.tab:hover:not(.active){background:var(--surface2);color:var(--text);}
+
+/* CONTENT PANELS */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.search-box{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:0 14px;
+}
+.search-box input{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-size:13.5px;padding:10px 0;font-family:'DM Sans',sans-serif;
+}
+.search-box input::placeholder{color:var(--text-dim);}
+
+/* BUTTONS */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 16px;
+  border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;
+  border:none;transition:all .15s;font-family:'DM Sans',sans-serif;
+}
+.btn-primary{background:var(--green);color:#000;}
+.btn-primary:hover{background:#1fb358;transform:translateY(-1px);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border);}
+.btn-danger{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.btn-danger:hover{background:rgba(248,81,73,.25);}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-icon{padding:8px;width:36px;height:36px;justify-content:center;}
+
+/* TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead tr{border-bottom:1px solid var(--border);}
+th{padding:11px 16px;font-size:12px;color:var(--text-dim);font-weight:600;text-align:left;font-family:'DM Mono',monospace;letter-spacing:.04em;}
+td{padding:13px 16px;font-size:13.5px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+.empty-row td{text-align:center;color:var(--text-dim);padding:40px;font-size:14px;}
+
+/* BADGES */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:20px;font-size:11.5px;font-weight:600;
+}
+.badge-green{background:rgba(37,211,102,.15);color:var(--green);}
+.badge-blue{background:rgba(88,166,255,.15);color:var(--blue);}
+.badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow);}
+.badge-red{background:rgba(248,81,73,.15);color:var(--red);}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* MODAL */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  width:480px;max-width:95vw;animation:modalIn .2s ease;
+}
+@keyframes modalIn{from{transform:scale(.95);opacity:0;}to{transform:scale(1);opacity:1;}}
+.modal-header{
+  padding:20px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{
+  background:none;border:none;color:var(--text-dim);cursor:pointer;
+  font-size:20px;line-height:1;transition:.15s;
+}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:24px;}
+.modal-footer{
+  padding:16px 24px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:10px;
+}
+
+/* FORM */
+.form-group{margin-bottom:16px;}
+.form-label{font-size:12px;color:var(--text-dim);margin-bottom:6px;display:block;font-family:'DM Mono',monospace;}
+.form-input{
+  width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:10px 14px;color:var(--text);font-size:13.5px;outline:none;
+  font-family:'DM Sans',sans-serif;transition:.15s;
+}
+.form-input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-glow);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* BROADCAST */
+.broadcast-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:14px;
+}
+.broadcast-meta{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.broadcast-msg{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:14px;font-size:13.5px;line-height:1.6;color:var(--text);
+  margin-bottom:12px;white-space:pre-wrap;
+}
+.broadcast-stats{display:flex;gap:20px;}
+.bc-stat{font-size:12px;color:var(--text-dim);}
+.bc-stat strong{color:var(--text);}
+
+/* COMPOSE */
+.compose-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:20px;
+}
+.compose-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+textarea.form-input{resize:vertical;min-height:100px;}
+.filter-row{display:flex;gap:10px;margin-bottom:14px;}
+.filter-row select{flex:1;}
+
+/* TOAST */
+#toast{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  background:var(--surface2);border:1px solid var(--border);border-radius:9px;
+  padding:12px 18px;font-size:13.5px;transform:translateY(80px);opacity:0;
+  transition:.3s;display:flex;align-items:center;gap:10px;
+}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.success{border-color:var(--green);color:var(--green);}
+#toast.error{border-color:var(--red);color:var(--red);}
+
+/* LOADING */
+.spinner{
+  width:18px;height:18px;border:2px solid var(--border);
+  border-top-color:var(--green);border-radius:50%;
+  animation:spin .7s linear infinite;display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* GROUP STATUS */
+.group-status{display:flex;align-items:center;gap:6px;font-size:12.5px;}
+.no-group{color:var(--text-dim);}
+.has-group{color:var(--green);}
+
+/* PHONE */
+.phone-display{font-family:'DM Mono',monospace;font-size:13px;color:var(--text-dim);}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">💬</div>
+    <div>
+      <div class="logo-text">SellerComm</div>
+      <div class="logo-sub">by eNewcleus</div>
+    </div>
+  </div>
+  <nav>
+    <div class="nav-label">MENU</div>
+    <button class="nav-item active" onclick="showPage('dashboard')">
+      <span class="icon">📊</span> Dashboard
+    </button>
+    <button class="nav-item" onclick="showPage('sellers')">
+      <span class="icon">🏪</span> Sellers
+    </button>
+    <button class="nav-item" onclick="showPage('agents')">
+      <span class="icon">👥</span> Agents
+    </button>
+    <button class="nav-item" onclick="showPage('broadcast')">
+      <span class="icon">📢</span> Broadcast
+    </button>
+    <button class="nav-item" onclick="showPage('history')">
+      <span class="icon">📋</span> History
+    </button>
+    <div class="nav-label">SYSTEM</div>
+    <button class="nav-item" onclick="testAPI()">
+      <span class="icon">🔗</span> Test API
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>
+    <span id="apiStatus">Checking API...</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="panel active">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Welcome, <span>eNewcleus</span> 👋</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-top:4px;">SellerComm — WhatsApp Group Manager</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="showPage('broadcast')">📢 New Broadcast</button>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">TOTAL SELLERS</div>
+        <div class="stat-value" id="stat-sellers">—</div>
+        <div class="stat-sub">Registered</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">GROUPS CREATED</div>
+        <div class="stat-value green" id="stat-groups">—</div>
+        <div class="stat-sub">WhatsApp Groups</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">TOTAL AGENTS</div>
+        <div class="stat-value" id="stat-agents">—</div>
+        <div class="stat-sub">Staff Members</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">BROADCASTS SENT</div>
+        <div class="stat-value" id="stat-broadcasts">—</div>
+        <div class="stat-sub">Total Messages</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:14px;">🚀 Quick Actions</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <button class="btn btn-secondary" onclick="openAddSeller()" style="flex-direction:column;height:80px;gap:6px;">
+          <span style="font-size:24px;">➕</span>
+          <span>Add Seller</span>
+        </button>
+        <button class="btn btn-secondary" onclick="openAddAgent()" style="flex-direction:column;height:80px;gap:6px;">
+          <span style="font-size:24px;">👤</span>
+          <span>Add Agent</span>
+        </button>
+        <button class="btn btn-secondary" onclick="showPage('broadcast')" style="flex-direction:column;height:80px;gap:6px;">
+          <span style="font-size:24px;">📢</span>
+          <span>Broadcast</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SELLERS -->
+  <div id="page-sellers" class="panel">
+    <div class="page-header">
+      <div class="page-title">🏪 <span>Sellers</span></div>
+      <button class="btn btn-primary" onclick="openAddSeller()">➕ Add Seller</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" placeholder="Search by name, store, phone..." id="sellerSearch" oninput="filterSellers()"/>
+      </div>
+      <select class="form-input" style="width:150px;" id="platformFilter" onchange="filterSellers()">
+        <option value="">All Platforms</option>
+        <option value="amazon">Amazon</option>
+        <option value="flipkart">Flipkart</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>SELLER NAME</th>
+            <th>STORE</th>
+            <th>WHATSAPP</th>
+            <th>PLATFORM</th>
+            <th>WA GROUP</th>
+            <th>STATUS</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="sellersTable">
+          <tr class="empty-row"><td colspan="7"><div class="spinner"></div> Loading sellers...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AGENTS -->
+  <div id="page-agents" class="panel">
+    <div class="page-header">
+      <div class="page-title">👥 <span>Agents</span></div>
+      <button class="btn btn-primary" onclick="openAddAgent()">➕ Add Agent</button>
+    </div>
+    <div class="toolbar">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" placeholder="Search agents..." id="agentSearch" oninput="filterAgents()"/>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>NAME</th>
+            <th>WHATSAPP</th>
+            <th>ROLE</th>
+            <th>STATUS</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="agentsTable">
+          <tr class="empty-row"><td colspan="5"><div class="spinner"></div> Loading agents...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BROADCAST -->
+  <div id="page-broadcast" class="panel">
+    <div class="page-header">
+      <div class="page-title">📢 <span>Broadcast Message</span></div>
+    </div>
+
+    <div class="compose-box">
+      <div class="compose-title">✍️ Compose Message</div>
+
+      <div class="form-group">
+        <label class="form-label">MESSAGE TYPE</label>
+        <select class="form-input" id="msgType">
+          <option value="utility">Utility (₹0.13/msg) — Store updates, reports</option>
+          <option value="marketing">Marketing (₹0.99/msg) — Offers, promotions</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <select class="form-input" id="bcPlatform">
+          <option value="">All Platforms</option>
+          <option value="amazon">Amazon Only</option>
+          <option value="flipkart">Flipkart Only</option>
+          <option value="both">Both Platforms</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">MESSAGE</label>
+        <textarea class="form-input" id="broadcastMsg" placeholder="Type your message here...&#10;&#10;You can use variables like:&#10;Hi {seller_name}! Aaj ka update: {message}"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div id="recipientCount" style="font-size:13px;color:var(--text-dim);">
+          📊 Loading recipient count...
+        </div>
+        <button class="btn btn-primary" onclick="sendBroadcast()" id="sendBtn">
+          📤 Send Broadcast
+        </button>
+      </div>
+    </div>
+
+    <!-- Individual Message -->
+    <div class="compose-box">
+      <div class="compose-title">🎯 Individual Seller Message</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">SELECT SELLER</label>
+          <select class="form-input" id="individualSeller">
+            <option value="">Choose seller...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">MESSAGE</label>
+          <input class="form-input" type="text" id="individualMsg" placeholder="Enter message for this seller..."/>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="sendIndividual()">📤 Send to Seller</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="page-history" class="panel">
+    <div class="page-header">
+      <div class="page-title">📋 <span>Broadcast History</span></div>
+      <button class="btn btn-secondary" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+    <div id="historyList">
+      <div style="text-align:center;padding:40px;color:var(--text-dim);">
+        <div class="spinner"></div>
+        <div style="margin-top:10px;">Loading history...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD SELLER MODAL -->
+<div class="modal-overlay" id="addSellerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">➕ Add New Seller</div>
+      <button class="modal-close" onclick="closeModal('addSellerModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">SELLER NAME *</label>
+          <input class="form-input" type="text" id="sellerName" placeholder="Rahul Sharma"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">STORE NAME</label>
+          <input class="form-input" type="text" id="sellerStore" placeholder="Rahul Electronics"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">WHATSAPP NUMBER *</label>
+          <input class="form-input" type="text" id="sellerPhone" placeholder="919876543210"/>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Country code + number (no +)</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PLATFORM</label>
+          <select class="form-input" id="sellerPlatform">
+            <option value="amazon">Amazon</option>
+            <option value="flipkart">Flipkart</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('addSellerModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addSeller()" id="addSellerBtn">Add Seller</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD AGENT MODAL -->
+<div class="modal-overlay" id="addAgentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">👤 Add New Agent</div>
+      <button class="modal-close" onclick="closeModal('addAgentModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">AGENT NAME *</label>
+          <input class="form-input" type="text" id="agentName" placeholder="Priya Singh"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">WHATSAPP NUMBER *</label>
+          <input class="form-input" type="text" id="agentPhone" placeholder="919876543210"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ROLE</label>
+        <select class="form-input" id="agentRole">
+          <option value="executive">Executive</option>
+          <option value="crm_lead">CRM Lead</option>
+          <option value="asst_manager">Assistant Manager</option>
+          <option value="account_manager">Account Manager</option>
+          <option value="team_lead">Team Lead</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('addAgentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addAgent()" id="addAgentBtn">Add Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE GROUP MODAL -->
+<div class="modal-overlay" id="createGroupModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">💬 Create WhatsApp Group</div>
+      <button class="modal-close" onclick="closeModal('createGroupModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13.5px;">Creating group for: <strong id="groupSellerName"></strong></div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Seller + assigned agents will be added automatically</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ASSIGN AGENTS (select multiple)</label>
+        <div id="agentCheckboxes" style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:10px;"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createGroup()" id="createGroupBtn">🚀 Create Group</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const API = '';  // same origin — Railway mein same server hai
+let allSellers = [];
+let allAgents = [];
+let currentGroupSellerId = null;
+
+// ── INIT ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  testAPI();
+  loadDashboardStats();
+});
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  event?.target?.closest('.nav-item')?.classList.add('active');
+  
+  if (page === 'sellers') loadSellers();
+  if (page === 'agents') loadAgents();
+  if (page === 'broadcast') { loadSellers(); updateRecipientCount(); }
+  if (page === 'history') loadHistory();
+  if (page === 'dashboard') loadDashboardStats();
+}
+
+// ── API TEST ──────────────────────────────────────────────────
+async function testAPI() {
+  try {
+    const res = await fetch(`${API}/api/whatsapp/test`);
+    const data = await res.json();
+    const el = document.getElementById('apiStatus');
+    if (data.success) {
+      el.innerHTML = `${data.name || 'Connected'}`;
+      el.style.color = 'var(--green)';
+    } else {
+      el.textContent = 'Token needed';
+      el.style.color = 'var(--yellow)';
+    }
+  } catch(e) {
+    document.getElementById('apiStatus').textContent = 'API Offline';
+  }
+}
+
+// ── DASHBOARD STATS ───────────────────────────────────────────
+async function loadDashboardStats() {
+  try {
+    const [sellersRes, agentsRes, bcRes] = await Promise.all([
+      fetch(`${API}/api/whatsapp/sellers`),
+      fetch(`${API}/api/whatsapp/agents`),
+      fetch(`${API}/api/whatsapp/broadcasts`)
+    ]);
+    const sellers = await sellersRes.json();
+    const agents = await agentsRes.json();
+    const bc = await bcRes.json();
+
+    if (sellers.sellers) {
+      document.getElementById('stat-sellers').textContent = sellers.sellers.length;
+      const groups = sellers.sellers.filter(s => s.wa_group_id).length;
+      document.getElementById('stat-groups').textContent = groups;
+      allSellers = sellers.sellers;
+    }
+    if (agents.agents) {
+      document.getElementById('stat-agents').textContent = agents.agents.length;
+    }
+    if (bc.broadcasts) {
+      document.getElementById('stat-broadcasts').textContent = bc.broadcasts.length;
+    }
+  } catch(e) {}
+}
+
+// ── SELLERS ───────────────────────────────────────────────────
+async function loadSellers() {
+  try {
+    const res = await fetch(`${API}/api/whatsapp/sellers`);
+    const data = await res.json();
+    allSellers = data.sellers || [];
+    renderSellers(allSellers);
+    updateIndividualDropdown();
+    updateRecipientCount();
+  } catch(e) {
+    document.getElementById('sellersTable').innerHTML = `<tr class="empty-row"><td colspan="7">Error loading sellers</td></tr>`;
+  }
+}
+
+function renderSellers(sellers) {
+  const tbody = document.getElementById('sellersTable');
+  if (!sellers.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No sellers yet — <button class="btn btn-primary btn-sm" onclick="openAddSeller()">Add First Seller</button></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sellers.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.store_name || '<span style="color:var(--text-dim)">—</span>'}</td>
+      <td class="phone-display">${s.whatsapp}</td>
+      <td>${platformBadge(s.platform)}</td>
+      <td>
+        ${s.wa_group_id 
+          ? `<span class="group-status has-group">✅ Active</span>`
+          : `<button class="btn btn-secondary btn-sm" onclick="openCreateGroup('${s.id}','${s.name}')">Create Group</button>`
+        }
+      </td>
+      <td><span class="badge badge-green"><span class="badge-dot"></span>${s.status || 'active'}</span></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openCreateGroup('${s.id}','${s.name}')">⚙️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterSellers() {
+  const q = document.getElementById('sellerSearch').value.toLowerCase();
+  const pf = document.getElementById('platformFilter').value;
+  const filtered = allSellers.filter(s => {
+    const match = !q || s.name?.toLowerCase().includes(q) || s.store_name?.toLowerCase().includes(q) || s.whatsapp?.includes(q);
+    const pMatch = !pf || s.platform === pf;
+    return match && pMatch;
+  });
+  renderSellers(filtered);
+}
+
+function platformBadge(p) {
+  if (p === 'amazon') return '<span class="badge badge-yellow">Amazon</span>';
+  if (p === 'flipkart') return '<span class="badge badge-blue">Flipkart</span>';
+  if (p === 'both') return '<span class="badge badge-green">Both</span>';
+  return '<span class="badge" style="background:var(--surface2)">—</span>';
+}
+
+// ── ADD SELLER ────────────────────────────────────────────────
+function openAddSeller() { openModal('addSellerModal'); }
+
+async function addSeller() {
+  const name = document.getElementById('sellerName').value.trim();
+  const whatsapp = document.getElementById('sellerPhone').value.trim();
+  const store_name = document.getElementById('sellerStore').value.trim();
+  const platform = document.getElementById('sellerPlatform').value;
+
+  if (!name || !whatsapp) return showToast('Name aur WhatsApp required hai!', 'error');
+
+  const btn = document.getElementById('addSellerBtn');
+  btn.innerHTML = '<span class="spinner"></span> Adding...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/whatsapp/sellers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, whatsapp, store_name, platform })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${name} added!`, 'success');
+      closeModal('addSellerModal');
+      document.getElementById('sellerName').value = '';
+      document.getElementById('sellerPhone').value = '';
+      document.getElementById('sellerStore').value = '';
+      loadSellers();
+    } else {
+      showToast(data.error || 'Error!', 'error');
+    }
+  } catch(e) {
+    showToast('Server error!', 'error');
+  }
+
+  btn.innerHTML = 'Add Seller';
+  btn.disabled = false;
+}
+
+// ── AGENTS ────────────────────────────────────────────────────
+async function loadAgents() {
+  try {
+    const res = await fetch(`${API}/api/whatsapp/agents`);
+    const data = await res.json();
+    allAgents = data.agents || [];
+    renderAgents(allAgents);
+  } catch(e) {
+    document.getElementById('agentsTable').innerHTML = `<tr class="empty-row"><td colspan="5">Error loading agents</td></tr>`;
+  }
+}
+
+function renderAgents(agents) {
+  const tbody = document.getElementById('agentsTable');
+  if (!agents.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No agents yet — <button class="btn btn-primary btn-sm" onclick="openAddAgent()">Add First Agent</button></td></tr>`;
+    return;
+  }
+  const roleColors = {
+    executive: 'badge-blue', crm_lead: 'badge-yellow',
+    asst_manager: 'badge-green', account_manager: 'badge-green', team_lead: 'badge-yellow'
+  };
+  tbody.innerHTML = agents.map(a => `
+    <tr>
+      <td><strong>${a.name}</strong></td>
+      <td class="phone-display">${a.whatsapp}</td>
+      <td><span class="badge ${roleColors[a.role] || 'badge-blue'}">${a.role?.replace('_',' ') || '—'}</span></td>
+      <td><span class="badge badge-green"><span class="badge-dot"></span>active</span></td>
+      <td><button class="btn btn-danger btn-sm">Remove</button></td>
+    </tr>
+  `).join('');
+}
+
+function filterAgents() {
+  const q = document.getElementById('agentSearch').value.toLowerCase();
+  const filtered = allAgents.filter(a => a.name?.toLowerCase().includes(q) || a.whatsapp?.includes(q));
+  renderAgents(filtered);
+}
+
+function openAddAgent() { openModal('addAgentModal'); }
+
+async function addAgent() {
+  const name = document.getElementById('agentName').value.trim();
+  const whatsapp = document.getElementById('agentPhone').value.trim();
+  const role = document.getElementById('agentRole').value;
+
+  if (!name || !whatsapp) return showToast('Name aur WhatsApp required hai!', 'error');
+
+  const btn = document.getElementById('addAgentBtn');
+  btn.innerHTML = '<span class="spinner"></span> Adding...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/whatsapp/agents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, whatsapp, role })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${name} added!`, 'success');
+      closeModal('addAgentModal');
+      document.getElementById('agentName').value = '';
+      document.getElementById('agentPhone').value = '';
+      loadAgents();
+    } else {
+      showToast(data.error || 'Error!', 'error');
+    }
+  } catch(e) {
+    showToast('Server error!', 'error');
+  }
+
+  btn.innerHTML = 'Add Agent';
+  btn.disabled = false;
+}
+
+// ── CREATE GROUP ──────────────────────────────────────────────
+async function openCreateGroup(sellerId, sellerName) {
+  currentGroupSellerId = sellerId;
+  document.getElementById('groupSellerName').textContent = sellerName;
+
+  // Load agents for checkboxes
+  if (!allAgents.length) {
+    const res = await fetch(`${API}/api/whatsapp/agents`);
+    const data = await res.json();
+    allAgents = data.agents || [];
+  }
+
+  const container = document.getElementById('agentCheckboxes');
+  if (!allAgents.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);font-size:13px;">No agents found — add agents first!</div>';
+  } else {
+    container.innerHTML = allAgents.map(a => `
+      <label style="display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;font-size:13px;">
+        <input type="checkbox" value="${a.id}" style="accent-color:var(--green);width:15px;height:15px;"/>
+        <span>${a.name}</span>
+        <span style="color:var(--text-dim);font-size:12px;">(${a.role?.replace('_',' ')})</span>
+      </label>
+    `).join('');
+  }
+
+  openModal('createGroupModal');
+}
+
+async function createGroup() {
+  const btn = document.getElementById('createGroupBtn');
+  btn.innerHTML = '<span class="spinner"></span> Creating...';
+  btn.disabled = true;
+
+  // First assign selected agents
+  const checkboxes = document.querySelectorAll('#agentCheckboxes input:checked');
+  for (const cb of checkboxes) {
+    await fetch(`${API}/api/whatsapp/assign-agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seller_id: currentGroupSellerId, agent_id: cb.value })
+    });
+  }
+
+  // Then create group
+  try {
+    const res = await fetch(`${API}/api/whatsapp/create-group`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seller_id: currentGroupSellerId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ Group created! ${data.participants} members added`, 'success');
+      closeModal('createGroupModal');
+      loadSellers();
+    } else {
+      showToast(data.error?.error_data?.details || data.error || 'Error creating group!', 'error');
+    }
+  } catch(e) {
+    showToast('Server error!', 'error');
+  }
+
+  btn.innerHTML = '🚀 Create Group';
+  btn.disabled = false;
+}
+
+// ── BROADCAST ─────────────────────────────────────────────────
+function updateRecipientCount() {
+  const platform = document.getElementById('bcPlatform')?.value;
+  let count = allSellers.filter(s => {
+    const hasGroup = s.wa_group_id;
+    const pfMatch = !platform || s.platform === platform;
+    return hasGroup && pfMatch && s.status === 'active';
+  }).length;
+  const el = document.getElementById('recipientCount');
+  if (el) el.textContent = `📊 ${count} seller groups will receive this message`;
+}
+
+document.addEventListener('change', e => {
+  if (e.target.id === 'bcPlatform') updateRecipientCount();
+});
+
+async function sendBroadcast() {
+  const message = document.getElementById('broadcastMsg').value.trim();
+  const platform = document.getElementById('bcPlatform').value;
+  const msg_type = document.getElementById('msgType').value;
+
+  if (!message) return showToast('Message likhna zaroori hai!', 'error');
+
+  const btn = document.getElementById('sendBtn');
+  btn.innerHTML = '<span class="spinner"></span> Sending...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/whatsapp/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, platform: platform || undefined, msg_type })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ Sent to ${data.sent}/${data.total} sellers!`, 'success');
+      document.getElementById('broadcastMsg').value = '';
+    } else {
+      showToast(data.error || 'Error!', 'error');
+    }
+  } catch(e) {
+    showToast('Server error!', 'error');
+  }
+
+  btn.innerHTML = '📤 Send Broadcast';
+  btn.disabled = false;
+}
+
+async function sendIndividual() {
+  const seller_id = document.getElementById('individualSeller').value;
+  const message = document.getElementById('individualMsg').value.trim();
+
+  if (!seller_id) return showToast('Seller select karo!', 'error');
+  if (!message) return showToast('Message likhna zaroori hai!', 'error');
+
+  try {
+    const res = await fetch(`${API}/api/whatsapp/send-message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seller_id, message })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Message sent!', 'success');
+      document.getElementById('individualMsg').value = '';
+    } else {
+      showToast(data.error || 'Error!', 'error');
+    }
+  } catch(e) {
+    showToast('Server error!', 'error');
+  }
+}
+
+function updateIndividualDropdown() {
+  const sel = document.getElementById('individualSeller');
+  if (!sel) return;
+  const withGroups = allSellers.filter(s => s.wa_group_id);
+  sel.innerHTML = '<option value="">Choose seller...</option>' +
+    withGroups.map(s => `<option value="${s.id}">${s.name} — ${s.store_name || s.whatsapp}</option>`).join('');
+}
+
+// ── HISTORY ───────────────────────────────────────────────────
+async function loadHistory() {
+  const container = document.getElementById('historyList');
+  try {
+    const res = await fetch(`${API}/api/whatsapp/broadcasts`);
+    const data = await res.json();
+    const broadcasts = data.broadcasts || [];
+
+    if (!broadcasts.length) {
+      container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text-dim);">No broadcasts yet</div>`;
+      return;
+    }
+
+    container.innerHTML = broadcasts.map(b => `
+      <div class="broadcast-card">
+        <div class="broadcast-meta">
+          <span class="badge ${b.msg_type === 'utility' ? 'badge-blue' : 'badge-yellow'}">${b.msg_type}</span>
+          <span class="badge badge-green">${b.status}</span>
+          <span style="font-size:12px;color:var(--text-dim);margin-left:auto;">
+            ${new Date(b.created_at).toLocaleString('en-IN')}
+          </span>
+        </div>
+        <div class="broadcast-msg">${b.message}</div>
+        <div class="broadcast-stats">
+          <div class="bc-stat">Total: <strong>${b.total_sent || 0}</strong></div>
+          <div class="bc-stat">Delivered: <strong>${b.total_delivered || 0}</strong></div>
+          <div class="bc-stat">Target: <strong>${b.target || 'all'}</strong></div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--red);">Error loading history</div>`;
+  }
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  setTimeout(() => t.className = '', 3000);
+}
+</script>
+</body>
+</html>

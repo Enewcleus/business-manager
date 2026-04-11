@@ -319,6 +319,7 @@ const NAV_CONFIG = {
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'adstasks',icon:'📋',label:'Ads Tasks'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -353,6 +354,7 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
@@ -367,6 +369,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -690,11 +693,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -3713,6 +3716,287 @@ function globalSearch(q) {
   }, 300); // 300ms debounce
 }
 // ── WORK LOG ─────────────────────────────────────────────────
+// ── MIS REPORT PAGE ───────────────────────────────────────────
+async function renderMISReport() {
+  const allowed = ['Admin','CSI Lead','CRM Lead'];
+  if (!allowed.includes(APP.user.role)) {
+    document.getElementById('page-content').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><div class="emoji">🔒</div><h3>Access Denied</h3><p>Sirf Admin, CSI Lead, CRM Lead dekh sakte hain</p></div></div></div>';
+    return;
+  }
+
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> MIS Report load ho raha hai...</div>';
+
+  const data = await api('GET', '/mis/data?_='+Date.now());
+  if (!data) return;
+
+  const today = new Date().toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'});
+
+  // Tab state
+  window._misData = data;
+  window._misTab = 'sellers';
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:var(--primary);">📑 MIS Report — eNewcleus</div>
+        <div style="font-size:12px;color:var(--text-muted);">Generated: ${today} | Total Sellers: ${data.totalSellers} | AMs: ${data.totalAMs}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-success btn-sm" onclick="exportMISExcel()">📥 Download Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="renderMISReport()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" style="margin-bottom:16px;">
+      <div class="kpi-card blue"><div class="kpi-label">Total Active Sellers</div><div class="kpi-value">${data.totalSellers}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Account Managers</div><div class="kpi-value">${data.totalAMs}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Renewal Records</div><div class="kpi-value">${data.renewals.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">Received ${Math.round(data.renewals.filter(r=>r.mis_status==='Received').length/Math.max(data.renewals.length,1)*100)}%</div><div class="kpi-value">${data.renewals.filter(r=>r.mis_status==='Received').length}</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;">
+      <button id="mis-tab-sellers" class="btn btn-primary btn-sm" style="border-radius:8px 8px 0 0;margin-right:4px;" onclick="showMISTab('sellers')">📋 Paid Active Sellers (${data.totalSellers})</button>
+      <button id="mis-tab-am" class="btn btn-outline btn-sm" style="border-radius:8px 8px 0 0;margin-right:4px;" onclick="showMISTab('am')">👥 AM Performance Pivot</button>
+      <button id="mis-tab-renewals" class="btn btn-outline btn-sm" style="border-radius:8px 8px 0 0;" onclick="showMISTab('renewals')">🔄 Renewals Data</button>
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="mis-content-sellers">${buildMISSellersTab(data)}</div>
+    <div id="mis-content-am" style="display:none;">${buildMISAmTab(data)}</div>
+    <div id="mis-content-renewals" style="display:none;">${buildMISRenewalsTab(data)}</div>
+  `;
+}
+
+function showMISTab(tab) {
+  ['sellers','am','renewals'].forEach(function(t) {
+    document.getElementById('mis-content-'+t).style.display = t===tab?'':'none';
+    const btn = document.getElementById('mis-tab-'+t);
+    if(btn) btn.className = t===tab?'btn btn-primary btn-sm':'btn btn-outline btn-sm';
+    if(btn) btn.style.borderRadius='8px 8px 0 0';
+    if(btn) btn.style.marginRight='4px';
+  });
+  window._misTab = tab;
+}
+
+function buildMISSellersTab(data) {
+  const sellers = data.sellers || [];
+  const amAgingMap = {};
+  (data.amSummary||[]).forEach(function(a){ amAgingMap[a.am_name] = a.staffAging; });
+
+  return '<div class="card">'+
+    '<div class="card-header">'+
+      '<span class="card-title">📋 Paid Active Sellers ('+sellers.length+')</span>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Search seller/AM..." oninput="filterMISSellers(this.value)">'+
+        '<select class="form-control" style="width:140px;padding:6px;font-size:13px;" onchange="filterMISSellers(\'\',this.value)">'+
+          '<option value="">All Markets</option>'+
+          [...new Set(sellers.map(function(s){return s.marketplace;}).filter(Boolean))].sort().map(function(m){return '<option>'+m+'</option>';}).join('')+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div class="table-wrap"><table id="mis-sellers-table">'+
+      '<thead><tr>'+
+        '<th>#</th><th>Seller Name</th><th>Market</th><th>Service Plan</th>'+
+        '<th>Account Manager</th><th style="text-align:center;">AM Staff Aging</th>'+
+        '<th style="text-align:center;">Seller Aging</th><th>Health</th><th>Renewal Date</th>'+
+      '</tr></thead>'+
+      '<tbody id="mis-sellers-tbody">'+
+        sellers.map(function(s,i){
+          const amAging = amAgingMap[(s.am_name||'').trim()] || '—';
+          const rd = s.renewal_date ? Math.ceil((new Date(s.renewal_date)-new Date())/86400000) : null;
+          const rdColor = rd===null?'var(--text-muted)':rd<0?'var(--red)':rd<=30?'var(--amber)':'var(--green)';
+          const rdText = rd===null?'—':rd<0?'OVERDUE':rd+'d left';
+          return '<tr>'+
+            '<td style="font-size:11px;">'+(i+1)+'</td>'+
+            '<td><strong style="font-size:13px;">'+s.busy_name+'</strong><br><small style="color:var(--text-muted);">'+s.client_code+'</small></td>'+
+            '<td><span class="badge badge-blue" style="font-size:10px;">'+(s.marketplace||'—')+'</span></td>'+
+            '<td style="font-size:12px;">'+(s.service_plan||'—')+'</td>'+
+            '<td style="font-size:12px;font-weight:600;">'+(s.am_name||'—')+'</td>'+
+            '<td style="text-align:center;"><span style="background:#e8f4fd;color:#1a5276;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;">'+amAging+'</span></td>'+
+            '<td style="text-align:center;font-size:12px;font-weight:600;">'+(s.seller_aging||'—')+'d</td>'+
+            '<td>'+healthBadge(s.health_status||'—')+'</td>'+
+            '<td style="font-size:12px;color:'+rdColor+';font-weight:600;">'+rdText+'</td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody>'+
+    '</table></div>'+
+  '</div>';
+}
+
+window._misSellersSearch = '';
+window._misSellersMarket = '';
+function filterMISSellers(search, market) {
+  if(search !== undefined) window._misSellersSearch = search;
+  if(market !== undefined) window._misSellersMarket = market;
+  const q = (window._misSellersSearch||'').toLowerCase();
+  const mp = window._misSellersMarket||'';
+  const sellers = (window._misData?.sellers||[]).filter(function(s){
+    if(q && !(s.busy_name||'').toLowerCase().includes(q) && !(s.am_name||'').toLowerCase().includes(q)) return false;
+    if(mp && s.marketplace !== mp) return false;
+    return true;
+  });
+  const amAgingMap = {};
+  (window._misData?.amSummary||[]).forEach(function(a){ amAgingMap[a.am_name] = a.staffAging; });
+  const tbody = document.getElementById('mis-sellers-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = sellers.map(function(s,i){
+    const amAging = amAgingMap[(s.am_name||'').trim()] || '—';
+    const rd = s.renewal_date ? Math.ceil((new Date(s.renewal_date)-new Date())/86400000) : null;
+    const rdColor = rd===null?'var(--text-muted)':rd<0?'var(--red)':rd<=30?'var(--amber)':'var(--green)';
+    const rdText = rd===null?'—':rd<0?'OVERDUE':rd+'d left';
+    return '<tr>'+
+      '<td style="font-size:11px;">'+(i+1)+'</td>'+
+      '<td><strong style="font-size:13px;">'+s.busy_name+'</strong><br><small style="color:var(--text-muted);">'+s.client_code+'</small></td>'+
+      '<td><span class="badge badge-blue" style="font-size:10px;">'+(s.marketplace||'—')+'</span></td>'+
+      '<td style="font-size:12px;">'+(s.service_plan||'—')+'</td>'+
+      '<td style="font-size:12px;font-weight:600;">'+(s.am_name||'—')+'</td>'+
+      '<td style="text-align:center;"><span style="background:#e8f4fd;color:#1a5276;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;">'+amAging+'</span></td>'+
+      '<td style="text-align:center;font-size:12px;font-weight:600;">'+(s.seller_aging||'—')+'d</td>'+
+      '<td>'+healthBadge(s.health_status||'—')+'</td>'+
+      '<td style="font-size:12px;color:'+rdColor+';font-weight:600;">'+rdText+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">No results</td></tr>';
+}
+
+function buildMISAmTab(data) {
+  const ams = data.amSummary || [];
+  return '<div class="card">'+
+    '<div class="card-header"><span class="card-title">👥 AM Performance Pivot ('+ams.length+' AMs)</span></div>'+
+    '<div class="table-wrap"><table>'+
+      '<thead><tr>'+
+        '<th>#</th><th>AM Name</th><th style="text-align:center;">Staff Aging</th>'+
+        '<th style="text-align:center;">Total Sellers</th><th>Marketplaces</th>'+
+        '<th style="text-align:center;">🟢 Healthy</th><th style="text-align:center;">🟡 Warning</th><th style="text-align:center;">🔴 At Risk</th>'+
+        '<th style="text-align:center;">Renewals</th><th style="text-align:center;">Received%</th><th style="text-align:center;">Churn%</th>'+
+      '</tr></thead>'+
+      '<tbody>'+
+        ams.map(function(am,i){
+          const rcvPct = am.receivedPct !== null ? am.receivedPct+'%' : '—';
+          const churnPct = am.churnPct !== null ? am.churnPct+'%' : '—';
+          const rcvColor = am.receivedPct>=70?'var(--green)':am.receivedPct>=50?'var(--amber)':'var(--red)';
+          return '<tr>'+
+            '<td>'+(i+1)+'</td>'+
+            '<td><strong>'+am.am_name+'</strong></td>'+
+            '<td style="text-align:center;"><span style="background:#e8f4fd;color:#1a5276;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;">'+am.staffAging+'</span></td>'+
+            '<td style="text-align:center;font-size:18px;font-weight:800;color:var(--primary);">'+am.total_accounts+'</td>'+
+            '<td style="font-size:11px;color:var(--text-muted);">'+am.marketplaceList+'</td>'+
+            '<td style="text-align:center;color:var(--green);font-weight:700;">'+(am.health['Healthy']||0)+'</td>'+
+            '<td style="text-align:center;color:var(--amber);font-weight:700;">'+(am.health['Warning']||0)+'</td>'+
+            '<td style="text-align:center;color:var(--red);font-weight:700;">'+(am.health['At Risk']||0)+'</td>'+
+            '<td style="text-align:center;">'+(am.renewals.total||0)+'</td>'+
+            '<td style="text-align:center;font-weight:700;color:'+rcvColor+';">'+rcvPct+'</td>'+
+            '<td style="text-align:center;color:var(--red);">'+churnPct+'</td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody>'+
+    '</table></div>'+
+  '</div>';
+}
+
+function buildMISRenewalsTab(data) {
+  const renewals = data.renewals || [];
+  const statusColors = {
+    'Received':'badge-green','Churn':'badge-red','Pending':'badge-amber',
+    'Fallout':'badge-red','Extension':'badge-blue'
+  };
+
+  // Group by status summary
+  const statusMap = {};
+  renewals.forEach(function(r){
+    const s = r.mis_status||'Unknown';
+    statusMap[s] = (statusMap[s]||0)+1;
+  });
+
+  return '<div class="kpi-grid" style="margin-bottom:12px;">'+
+    Object.entries(statusMap).sort((a,b)=>b[1]-a[1]).map(function(e){
+      const colors = {'Received':'green','Churn':'red','Pending':'amber','Fallout':'red','Extension':'blue'};
+      const col = colors[e[0]]||'blue';
+      return '<div class="kpi-card '+col+'"><div class="kpi-label">'+e[0]+'</div><div class="kpi-value">'+e[1]+'</div></div>';
+    }).join('')+
+  '</div>'+
+  '<div class="card">'+
+    '<div class="card-header">'+
+      '<span class="card-title">🔄 Renewals Data ('+renewals.length+' records)</span>'+
+      '<input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Search..." oninput="filterMISRenewals(this.value)">'+
+    '</div>'+
+    '<div class="table-wrap"><table id="mis-renewals-table">'+
+      '<thead><tr><th>#</th><th>Seller</th><th>Market</th><th>AM</th><th>CRM</th><th>Service</th><th>Status</th></tr></thead>'+
+      '<tbody id="mis-renewals-tbody">'+
+        renewals.map(function(r,i){
+          const badge = statusColors[r.mis_status]||'badge-amber';
+          return '<tr>'+
+            '<td>'+(i+1)+'</td>'+
+            '<td><strong style="font-size:12px;">'+(r.busy_name||'—')+'</strong></td>'+
+            '<td><span class="badge badge-blue" style="font-size:10px;">'+(r.marketplace||'—')+'</span></td>'+
+            '<td style="font-size:12px;">'+(r.am_name||'—')+'</td>'+
+            '<td style="font-size:12px;color:var(--text-muted);">'+(r.crm_executive||'—')+'</td>'+
+            '<td style="font-size:11px;">'+(r.service_plan||'—')+'</td>'+
+            '<td><span class="badge '+badge+'">'+(r.mis_status||'—')+'</span></td>'+
+          '</tr>';
+        }).join('')+
+      '</tbody>'+
+    '</table></div>'+
+  '</div>';
+}
+
+function filterMISRenewals(q) {
+  const renewals = window._misData?.renewals || [];
+  const filtered = q ? renewals.filter(function(r){
+    return (r.busy_name||'').toLowerCase().includes(q.toLowerCase()) ||
+           (r.am_name||'').toLowerCase().includes(q.toLowerCase());
+  }) : renewals;
+  const tbody = document.getElementById('mis-renewals-tbody');
+  const statusColors = {'Received':'badge-green','Churn':'badge-red','Pending':'badge-amber','Fallout':'badge-red','Extension':'badge-blue'};
+  if(tbody) tbody.innerHTML = filtered.map(function(r,i){
+    const badge = statusColors[r.mis_status]||'badge-amber';
+    return '<tr><td>'+(i+1)+'</td><td><strong style="font-size:12px;">'+(r.busy_name||'—')+'</strong></td>'+
+      '<td><span class="badge badge-blue" style="font-size:10px;">'+(r.marketplace||'—')+'</span></td>'+
+      '<td style="font-size:12px;">'+(r.am_name||'—')+'</td>'+
+      '<td style="font-size:12px;color:var(--text-muted);">'+(r.crm_executive||'—')+'</td>'+
+      '<td style="font-size:11px;">'+(r.service_plan||'—')+'</td>'+
+      '<td><span class="badge '+badge+'">'+(r.mis_status||'—')+'</span></td></tr>';
+  }).join('');
+}
+
+function exportMISExcel() {
+  const tab = window._misTab || 'sellers';
+  const data = window._misData;
+  if(!data){ showToast('Data load karo pehle','error'); return; }
+  let csv = '';
+
+  if(tab === 'sellers') {
+    const amAgingMap = {};
+    (data.amSummary||[]).forEach(function(a){ amAgingMap[a.am_name] = a.staffAging; });
+    csv = '#,Client Code,Seller Name,Marketplace,Service Plan,Account Manager,AM Staff Aging,Seller Aging (Days),Health,Renewal Status\n';
+    csv += (data.sellers||[]).map(function(s,i){
+      const amAging = amAgingMap[(s.am_name||'').trim()]||'—';
+      const rd = s.renewal_date ? Math.ceil((new Date(s.renewal_date)-new Date())/86400000) : null;
+      const rdText = rd===null?'—':rd<0?'OVERDUE':rd+'d left';
+      return [i+1,s.client_code,'"'+(s.busy_name||'').replace(/"/g,'')+'"',s.marketplace||'',s.service_plan||'','"'+(s.am_name||'')+'"',amAging,s.seller_aging||'',s.health_status||'',rdText].join(',');
+    }).join('\n');
+  } else if(tab === 'am') {
+    csv = '#,AM Name,Staff Aging,Total Sellers,Marketplaces,Healthy,Warning,At Risk,Total Renewals,Received%,Churn%\n';
+    csv += (data.amSummary||[]).map(function(am,i){
+      return [i+1,'"'+am.am_name+'"',am.staffAging,am.total_accounts,'"'+am.marketplaceList+'"',am.health['Healthy']||0,am.health['Warning']||0,am.health['At Risk']||0,am.renewals.total||0,am.receivedPct!==null?am.receivedPct+'%':'—',am.churnPct!==null?am.churnPct+'%':'—'].join(',');
+    }).join('\n');
+  } else {
+    csv = '#,Client Code,Seller Name,Marketplace,AM,CRM,Service,Status\n';
+    csv += (data.renewals||[]).map(function(r,i){
+      return [i+1,r.client_code,'"'+(r.busy_name||'').replace(/"/g,'')+'"',r.marketplace||'','"'+(r.am_name||'')+'"','"'+(r.crm_executive||'')+'"',r.service_plan||'',r.mis_status||''].join(',');
+    }).join('\n');
+  }
+
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'MIS_Report_'+tab+'_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+  showToast('✅ MIS Report download ho raha hai!','success');
+}
+
 // ── EXECUTIVE PERFORMANCE DASHBOARD ─────────────────────────
 async function renderExecPerf() {
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading performance data...</div>';

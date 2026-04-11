@@ -5,16 +5,30 @@ const { authMiddleware } = require('../middleware/auth');
 // GET all users
 router.get('/', authMiddleware, async (req, res) => {
   const { data, error } = await supabase.from('users')
-    .select('id, user_code, name, email, role, department, designation, reporting_to, is_active, last_login, permissions, marketplace_access')
+    .select('id, user_code, name, email, role, department, designation, reporting_to, is_active, last_login, permissions, marketplace_access, joining_date')
     .order('name');
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data.map(u => ({
-    id: u.id, userId: u.user_code, name: u.name, email: u.email,
-    role: u.role, department: u.department, designation: u.designation,
-    reportingTo: u.reporting_to, isActive: u.is_active,
-    permissions: u.permissions || {},
-    marketplaceAccess: u.marketplace_access || null,
-  })));
+  res.json(data.map(u => {
+    const today = new Date();
+    const joining = u.joining_date ? new Date(u.joining_date) : null;
+    const staffAgingDays = joining ? Math.floor((today - joining) / 86400000) : null;
+    const staffAgingYears = staffAgingDays ? Math.floor(staffAgingDays / 365) : null;
+    const staffAgingMonths = staffAgingDays ? Math.floor((staffAgingDays % 365) / 30) : null;
+    return {
+      id: u.id, userId: u.user_code, name: u.name, email: u.email,
+      role: u.role, department: u.department, designation: u.designation,
+      reportingTo: u.reporting_to, isActive: u.is_active,
+      permissions: u.permissions || {},
+      marketplaceAccess: u.marketplace_access || null,
+      joiningDate: u.joining_date || null,
+      staffAgingDays,
+      staffAgingLabel: staffAgingDays
+        ? (staffAgingYears > 0
+            ? staffAgingYears + 'y ' + staffAgingMonths + 'm'
+            : staffAgingMonths + ' months')
+        : '—',
+    };
+  }));
 });
 
 // GET hierarchy
@@ -46,7 +60,7 @@ router.get('/my-team', authMiddleware, async (req, res) => {
 // POST — create user
 router.post('/', authMiddleware, async (req, res) => {
   if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin only' });
-  const { name, email, password, role, department, designation, reportingTo, marketplaceAccess } = req.body;
+  const { name, email, password, role, department, designation, reportingTo, marketplaceAccess, joiningDate } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, password required' });
 
   const userCode = 'USR' + Date.now().toString().slice(-5);
@@ -62,7 +76,8 @@ router.post('/', authMiddleware, async (req, res) => {
     password_hash: password, role: role || 'Executive',
     department: department || null, designation: designation || null,
     reporting_to: reportingToId, is_active: true,
-    marketplace_access: marketplaceAccess || null,  // ✅ NEW
+    marketplace_access: marketplaceAccess || null,
+    joining_date: joiningDate || null,
   });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true, userId: userCode });
@@ -71,7 +86,7 @@ router.post('/', authMiddleware, async (req, res) => {
 // PATCH update user
 router.patch('/:code', authMiddleware, async (req, res) => {
   if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Admin only' });
-  const { name, email, role, department, designation, reportingTo, isActive, marketplaceAccess } = req.body;
+  const { name, email, role, department, designation, reportingTo, isActive, marketplaceAccess, joiningDate } = req.body;
 
   let reportingToId = undefined;
   if (reportingTo !== undefined) {
@@ -90,7 +105,8 @@ router.patch('/:code', authMiddleware, async (req, res) => {
   if (designation !== undefined) updates.designation = designation;
   if (reportingToId !== undefined) updates.reporting_to = reportingToId;
   if (isActive !== undefined)   updates.is_active    = isActive;
-  if (marketplaceAccess !== undefined) updates.marketplace_access = marketplaceAccess || null; // ✅ NEW
+  if (marketplaceAccess !== undefined) updates.marketplace_access = marketplaceAccess || null;
+  if (joiningDate !== undefined) updates.joining_date = joiningDate || null;
 
   const { error } = await supabase.from('users').update(updates).eq('user_code', req.params.code);
   if (error) return res.status(500).json({ error: error.message });

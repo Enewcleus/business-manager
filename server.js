@@ -64,6 +64,7 @@ app.use('/api/renewal-history',  require('./routes/allroutes').renewalHistoryRou
 app.use('/api/report-analyzer',  require('./routes/allroutes').reportAnalyzerRouter);
 app.use('/api/expectations',     require('./routes/allroutes').expectationsRouter);
 app.use('/api/monthly-reports',  require('./routes/allroutes').monthlyReportsRouter);
+app.use('/api/mis',              require('./routes/allroutes').misRouter);
 app.use('/api/chat',             require('./routes/chat'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────

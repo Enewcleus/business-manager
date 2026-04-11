@@ -55,6 +55,7 @@ app.use('/api/ads',             require('./routes/ads'));
 app.use('/api/dashboard',       require('./routes/dashboard'));
 app.use('/api/notifications',   require('./routes/notifications'));
 app.use('/api/users',           require('./routes/allroutes').usersRouter);
+app.use('/api/users',           require('./routes/users'));
 app.use('/api/dsr',             require('./routes/dsr'));
 app.use('/api/close-requests',  require('./routes/close_requests'));
 app.use('/api/settings',        require('./routes/settings'));

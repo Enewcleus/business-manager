@@ -992,10 +992,118 @@ Keep response under 250 words. Use Hinglish naturally.`;
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── MIS REPORT ────────────────────────────────────────────────
+const misRouter = require('express').Router();
+
+misRouter.get('/data', authMiddleware, async (req, res) => {
+  try {
+    const allowedRoles = ['Admin', 'CSI Lead', 'CRM Lead'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get clients with full data
+    const { data: clients, error: cErr } = await supabase
+      .from('clients')
+      .select('client_code, busy_name, marketplace, service_plan, am_name, seller_aging, status, renewal_date, health_status')
+      .eq('status', 'Active')
+      .order('busy_name');
+    if (cErr) throw cErr;
+
+    // Get users for AM staff aging
+    const { data: users } = await supabase
+      .from('users')
+      .select('name, role, joining_date, designation')
+      .eq('is_active', true);
+
+    const today = new Date();
+
+    // Build AM staff aging map
+    const amAgingMap = {};
+    (users || []).forEach(u => {
+      if (u.joining_date) {
+        const days = Math.floor((today - new Date(u.joining_date)) / 86400000);
+        const years = Math.floor(days / 365);
+        const months = Math.floor((days % 365) / 30);
+        amAgingMap[u.name] = {
+          staffAgingDays: days,
+          staffAgingLabel: years > 0 ? years + 'y ' + months + 'm' : months + ' months',
+        };
+      }
+    });
+
+    // Get renewals (last 2 months)
+    const twoMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1).toISOString().split('T')[0];
+    const { data: renewalHistory } = await supabase
+      .from('renewal_history')
+      .select('client_code, busy_name, marketplace, service_plan, am_name, mis_status, amount')
+      .gte('created_at', twoMonthsAgo)
+      .order('created_at', { ascending: false });
+
+    // AM-wise summary
+    const amMap = {};
+    (clients || []).forEach(c => {
+      const am = (c.am_name || '').trim();
+      if (!am) return;
+      if (!amMap[am]) {
+        amMap[am] = {
+          am_name: am,
+          staffAging: amAgingMap[am]?.staffAgingLabel || '—',
+          staffAgingDays: amAgingMap[am]?.staffAgingDays || 0,
+          total_accounts: 0,
+          marketplaces: {},
+          health: { Healthy: 0, Warning: 0, 'At Risk': 0, 'Not Reviewed': 0 },
+        };
+      }
+      amMap[am].total_accounts++;
+      const mp = c.marketplace || 'Other';
+      amMap[am].marketplaces[mp] = (amMap[am].marketplaces[mp] || 0) + 1;
+      const h = c.health_status || 'Not Reviewed';
+      amMap[am].health[h] = (amMap[am].health[h] || 0) + 1;
+    });
+
+    // Add renewal stats to AM map
+    const renewalMap = {};
+    (renewalHistory || []).forEach(r => {
+      const am = (r.am_name || '').trim();
+      const status = (r.mis_status || '').trim();
+      const key = am;
+      if (!renewalMap[key]) renewalMap[key] = { received: 0, churn: 0, pending: 0, total: 0 };
+      renewalMap[key].total++;
+      if (status === 'Received' || status === 'received') renewalMap[key].received++;
+      else if (status === 'Churn' || status === 'churn') renewalMap[key].churn++;
+      else if (status === 'Pending' || status === 'pending') renewalMap[key].pending++;
+    });
+
+    const amSummary = Object.values(amMap).map(am => ({
+      ...am,
+      marketplaceList: Object.entries(am.marketplaces)
+        .sort((a,b) => b[1]-a[1])
+        .map(([mp, cnt]) => mp.replace('Amazon.in','AMZ.in').replace('Flipkart.com','FK').replace('Amazon.com','AMZ.com') + '(' + cnt + ')')
+        .join(', '),
+      renewals: renewalMap[am.am_name] || { received: 0, churn: 0, pending: 0, total: 0 },
+      receivedPct: renewalMap[am.am_name]?.total
+        ? Math.round(renewalMap[am.am_name].received / renewalMap[am.am_name].total * 100)
+        : null,
+      churnPct: renewalMap[am.am_name]?.total
+        ? Math.round(renewalMap[am.am_name].churn / renewalMap[am.am_name].total * 100)
+        : null,
+    })).sort((a, b) => b.total_accounts - a.total_accounts);
+
+    res.json({
+      sellers: clients || [],
+      amSummary,
+      renewals: renewalHistory || [],
+      totalSellers: (clients || []).length,
+      totalAMs: amSummary.length,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  expectationsRouter, monthlyReportsRouter,
+  expectationsRouter, monthlyReportsRouter, misRouter,
 };

@@ -2253,11 +2253,15 @@ async function submitTicket(){
 // ── CRM ──────────────────────────────────────────────────────
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
-  const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
+  const [clients,todayCalls,recentCalls]=await Promise.all([
+    getClients(true),
+    api('GET','/crm/today'),
+    api('GET','/crm?_='+Date.now()),
+  ]);
   if(clients&&clients.length) APP.clients=clients;
 
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CRM Lead'].includes(u.role);
   const isCRM = u.role === 'CRM Executive';
   let myClients = APP.clients || [];
 
@@ -2275,6 +2279,27 @@ async function renderCRM(){
   }
 
   window._crmAllClients = myClients;
+  window._crmRecentCalls = recentCalls || [];
+
+  // Build last-call-date map per seller per executive
+  const lastCallMap = {}; // clientCode -> {date, executive, outcome}
+  const today = new Date().toISOString().split('T')[0];
+  const day3ago = new Date(Date.now()-3*86400000).toISOString().split('T')[0];
+
+  (recentCalls||[]).forEach(function(c){
+    const cc = c.clientCode || c.client_code;
+    const callDate = (c.createdAt||c.created_at||'').slice(0,10);
+    if(!cc) return;
+    if(!lastCallMap[cc] || callDate > lastCallMap[cc].date) {
+      lastCallMap[cc] = {
+        date: callDate,
+        executive: c.crmExecutive || c.crm_executive || '',
+        outcome: c.callOutcome || c.call_outcome || '',
+        daysAgo: callDate ? Math.floor((new Date(today)-new Date(callDate))/86400000) : 999,
+      };
+    }
+  });
+  window._crmLastCallMap = lastCallMap;
 
   // CRM Executives list for filter
   const crmExecs = [...new Set(myClients.map(c=>c.crmExecutive).filter(Boolean))].sort();
@@ -2298,27 +2323,75 @@ async function renderCRM(){
 function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
   const u = APP.user;
   const isCRM = u.role === 'CRM Executive';
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CRM Lead'].includes(u.role);
   const execFilter = window._crmExecFilter || '';
+  const lastCallMap = window._crmLastCallMap || {};
+  const today = new Date().toISOString().split('T')[0];
+
+  // Call tracker stats for current view
+  const calledToday = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date === today; });
+  const called1_2days = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return d===1||d===2; });
+  const overdue3plus = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return d===undefined||d===null||d>2; });
+  const neverCalled = clients.filter(function(c){ return !lastCallMap[c.clientCode]; });
+  const progressPct = clients.length ? Math.round(calledToday.length/clients.length*100) : 0;
 
   document.getElementById('page-content').innerHTML=`
+    <!-- KPI Cards -->
     <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">${isCRM?'My Clients':'Total Clients'}</div><div class="kpi-value">${clients.length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Calls Today</div><div class="kpi-value">${todayCalls.length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('Connected')).length}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('No Response')).length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">My Sellers</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Called Today</div><div class="kpi-value">${calledToday.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">🔴 Pending Today</div><div class="kpi-value">${clients.length - calledToday.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">⚠️ 3+ Days Pending</div><div class="kpi-value">${overdue3plus.length}</div></div>
     </div>
 
     ${showFilter && crmExecs && crmExecs.length ? `
     <div class="card" style="margin-bottom:12px;border-left:4px solid #3498db;">
       <div class="card-body" style="padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="font-weight:700;font-size:13px;">👤 CRM Executive Filter:</span>
+        <span style="font-weight:700;font-size:13px;">👤 Filter:</span>
         <button onclick="filterCRMByExec('')" class="btn btn-sm ${!execFilter?'btn-primary':'btn-outline'}">All (${(window._crmAllClients||[]).length})</button>
         ${crmExecs.map(e=>`<button onclick="filterCRMByExec('${e.replace(/'/g,'')}')" class="btn btn-sm ${execFilter===e?'btn-primary':'btn-outline'}">${e.split(' ')[0]} (${(window._crmAllClients||[]).filter(c=>c.crmExecutive===e).length})</button>`).join('')}
         <input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterCRMBySearch(this.value)">
       </div>
     </div>` : ''}
 
-    <div class="card">
+    <!-- DAILY CALL TRACKER -->
+    <div class="card" style="border-left:4px solid #27ae60;margin-bottom:12px;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">📞 Daily Call Tracker</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--text-muted);">Target: Har 2-3 din mein sab sellers se connect karo</span>
+          <button class="btn btn-sm btn-outline" onclick="renderCRM()">🔄</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Progress Bar -->
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:700;">Aaj ka progress: ${calledToday.length}/${clients.length} sellers</span>
+            <span style="font-size:14px;font-weight:800;color:${progressPct>=80?'var(--green)':progressPct>=50?'var(--amber)':'var(--red)'};">${progressPct}%</span>
+          </div>
+          <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;">
+            <div style="width:${progressPct}%;height:100%;background:${progressPct>=80?'var(--green)':progressPct>=50?'var(--amber)':'var(--red)'};border-radius:6px;transition:width 0.3s;"></div>
+          </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-primary" id="ct-btn-all" onclick="filterCallTracker('all')">All (${clients.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-pending" onclick="filterCallTracker('pending')" style="border-color:var(--red);color:var(--red);">🔴 Pending Today (${clients.length-calledToday.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-done" onclick="filterCallTracker('done')" style="border-color:var(--green);color:var(--green);">✅ Called Today (${calledToday.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-overdue" onclick="filterCallTracker('overdue')" style="border-color:var(--amber);color:var(--amber);">⚠️ 3+ Days (${overdue3plus.length})</button>
+        </div>
+
+        <!-- Seller Cards Grid -->
+        <div id="call-tracker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:400px;overflow-y:auto;">
+          ${buildCallTrackerCards(clients, lastCallMap, today)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Log a Call -->
+    <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">📞 Log a Call</span></div>
       <div class="card-body">
         <div class="form-row">
@@ -2346,7 +2419,8 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       </div>
     </div>
 
-    <div class="card">
+    <!-- Today's Calls -->
+    <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
       <div class="card-body" style="padding:0;">
         ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>By</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
@@ -2354,29 +2428,84 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       </div>
     </div>
 
-    <!-- Client List with CRM column -->
-    <div class="card" style="margin-top:12px;">
-      <div class="card-header"><span class="card-title">👥 Client List (${clients.length})</span></div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap" id="crm-client-list-table"><table>
-        <thead><tr><th>#</th><th>Client</th><th>Market</th><th>AM</th><th>CRM Executive</th><th>Health</th><th>Action</th></tr></thead>
-        <tbody id="crm-client-tbody">
-          ${clients.map((c,i)=>`<tr>
-            <td>${i+1}</td>
-            <td><strong>${c.busyName}</strong></td>
-            <td><span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span></td>
-            <td style="font-size:12px;">${c.amName||'—'}</td>
-            <td style="font-size:12px;${(c.crmExecutive||'').toLowerCase().includes((u.name||'').toLowerCase())?'font-weight:700;color:var(--primary);':'color:var(--text-muted);'}">${c.crmExecutive||'—'}</td>
-            <td>${healthBadge(c.healthStatus)}</td>
-            <td><button class="btn btn-sm btn-outline" data-cc="${c.clientCode}" onclick="var cc=this.getAttribute('data-cc');loadCRMHistory(cc);document.getElementById('crm-client').value=cc;">📞 Select</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div></div>
-    </div>
-
     <div class="card" id="crm-history-card" style="display:none;margin-top:12px;">
       <div class="card-header"><span class="card-title" id="crm-hist-title">📋 Call History</span></div>
       <div class="card-body" id="crm-history"></div>
     </div>`;
+}
+
+function buildCallTrackerCards(clients, lastCallMap, today) {
+  return clients.map(function(c){
+    const info = lastCallMap[c.clientCode];
+    const calledToday = info?.date === today;
+    const daysAgo = info?.daysAgo;
+    const neverCalled = !info;
+
+    let statusColor, statusBg, statusText, statusIcon;
+    if(calledToday) {
+      statusColor='#1e8449';statusBg='#d5f5e3';statusText='Called Today';statusIcon='✅';
+    } else if(daysAgo===1) {
+      statusColor='#2980b9';statusBg='#d6eaf8';statusText='Called Yesterday';statusIcon='🔵';
+    } else if(daysAgo===2) {
+      statusColor='#d35400';statusBg='#fdebd0';statusText='2 Days Ago';statusIcon='🟡';
+    } else if(daysAgo&&daysAgo>2) {
+      statusColor='#c0392b';statusBg='#fdf2f2';statusText=daysAgo+'d ago';statusIcon='🔴';
+    } else {
+      statusColor='#7f8c8d';statusBg='#f2f3f4';statusText='Never Called';statusIcon='⚫';
+    }
+
+    const safeCC = c.clientCode;
+    const safeName = (c.busyName||'').replace(/'/g,'').replace(/"/g,'');
+
+    return `<div style="background:${statusBg};border:1px solid ${statusColor}30;border-radius:10px;padding:10px;cursor:pointer;transition:transform 0.1s;" onclick="selectClientForCall('${safeCC}','${safeName}')">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:4px;">
+        <div style="font-size:12px;font-weight:700;line-height:1.3;flex:1;">${c.busyName}</div>
+        <span style="font-size:14px;">${statusIcon}</span>
+      </div>
+      <div style="font-size:10px;color:${statusColor};font-weight:600;margin-top:4px;">${statusText}</div>
+      <div style="font-size:10px;color:#666;margin-top:2px;">${c.marketplace||''} · ${c.healthStatus||'—'}</div>
+      ${info?.outcome?`<div style="font-size:10px;color:#666;margin-top:2px;">Last: ${info.outcome.replace('Called — ','')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function filterCallTracker(filter) {
+  const clients = window._crmFilteredClients || window._crmAllClients || [];
+  const lastCallMap = window._crmLastCallMap || {};
+  const today = new Date().toISOString().split('T')[0];
+
+  // Update tab buttons
+  ['all','pending','done','overdue'].forEach(function(f){
+    const btn = document.getElementById('ct-btn-'+f);
+    if(btn) {
+      if(f===filter) { btn.className='btn btn-sm btn-primary'; btn.style.cssText=''; }
+      else {
+        btn.className='btn btn-sm btn-outline';
+        if(f==='pending') btn.style.cssText='border-color:var(--red);color:var(--red);';
+        else if(f==='done') btn.style.cssText='border-color:var(--green);color:var(--green);';
+        else if(f==='overdue') btn.style.cssText='border-color:var(--amber);color:var(--amber);';
+        else btn.style.cssText='';
+      }
+    }
+  });
+
+  let filtered = clients;
+  if(filter==='pending') filtered = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date !== today; });
+  else if(filter==='done') filtered = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date === today; });
+  else if(filter==='overdue') filtered = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return !d||d>2; });
+
+  const grid = document.getElementById('call-tracker-grid');
+  if(grid) grid.innerHTML = buildCallTrackerCards(filtered, lastCallMap, today);
+}
+
+function selectClientForCall(cc, cn) {
+  // Select in dropdown
+  const sel = document.getElementById('crm-client');
+  if(sel) { sel.value = cc; loadCRMHistory(cc); }
+  // Scroll to log form
+  const logCard = document.querySelector('#crm-client')?.closest('.card');
+  if(logCard) logCard.scrollIntoView({behavior:'smooth', block:'center'});
+  showToast('📞 '+cn+' selected — call log karo!','info');
 }
 
 function filterCRMByExec(exec) {
@@ -2410,7 +2539,31 @@ async function saveCRMCall(andTicket){
   const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
   if(!cc){showToast('Select a client','error');return;}
   const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
-  if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
+  if(r?.success){
+    showToast('✅ Call logged!','success');
+    document.getElementById('crm-comment').value='';
+    document.getElementById('crm-followup').value='';
+    loadCRMHistory(cc);
+    if(andTicket) openRaiseTicketFor(cc,cn);
+
+    // Auto-update tracker — mark seller as called today
+    const today = new Date().toISOString().split('T')[0];
+    if(!window._crmLastCallMap) window._crmLastCallMap = {};
+    window._crmLastCallMap[cc] = {
+      date: today,
+      daysAgo: 0,
+      outcome: document.getElementById('crm-outcome')?.value || 'Called',
+    };
+    // Refresh tracker grid
+    const clients = window._crmFilteredClients || window._crmAllClients || [];
+    const grid = document.getElementById('call-tracker-grid');
+    if(grid) grid.innerHTML = buildCallTrackerCards(clients, window._crmLastCallMap, today);
+    // Update progress bar
+    const calledToday = clients.filter(function(c){ return window._crmLastCallMap[c.clientCode]?.date === today; });
+    const pct = clients.length ? Math.round(calledToday.length/clients.length*100) : 0;
+    const bar = document.querySelector('#call-tracker-grid')?.closest('.card')?.querySelector('div[style*="height:12px"]>div');
+    if(bar) bar.style.width = pct+'%';
+  }
 }
 
 async function loadCRMHistory(cc){

@@ -2124,9 +2124,46 @@ function viewTicketDetail(el){
   );
 }
 
-function viewTaskDetail(tid){
+async function viewTaskDetail(tid){
   const t = (_allTasksCache||[]).find(x=>x.taskId===tid) || (APP.tasks||[]).find(x=>x.taskId===tid);
   if(!t) return;
+
+  // Fetch attached docs
+  let docsHtml = '';
+  if(t.clientCode) {
+    const docs = await api('GET', '/documents/'+t.clientCode+'?_='+Date.now()) || [];
+    const taskDocs = docs.filter(d => d.description && d.description.includes(tid));
+    const allDocs = docs;
+
+    if(taskDocs.length) {
+      docsHtml = '<div style="margin-top:12px;">'+
+        '<div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#1a5276;">📎 Attached Files ('+taskDocs.length+'):</div>'+
+        taskDocs.map(function(d){
+          const ext = (d.fileName||'').split('.').pop().toLowerCase();
+          const sizeText = d.fileSize?(d.fileSize>1048576?(d.fileSize/1048576).toFixed(1)+'MB':(d.fileSize/1024).toFixed(0)+'KB'):'';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#eaf4fd;border-radius:8px;margin-bottom:6px;">'+
+            '<span style="font-size:16px;">📄</span>'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+d.fileName+'</div>'+
+              '<div style="font-size:10px;color:var(--text-muted);">'+d.category+' · '+sizeText+' · by '+d.uploadedBy+'</div>'+
+            '</div>'+
+            '<a href="'+d.fileUrl+'" target="_blank" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:11px;">👁️</a>'+
+            '<a href="'+d.fileUrl+'" download="'+d.fileName+'" class="btn btn-sm btn-success" style="padding:3px 8px;font-size:11px;">📥</a>'+
+          '</div>';
+        }).join('')+
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">'+
+          'Seller ke total docs: '+allDocs.length+' · '+
+          '<a href="javascript:void(0)" onclick="closePanel();navigateClientPage(\''+t.clientCode+'\')" style="color:var(--primary);">Vault mein dekho →</a>'+
+        '</div>'+
+      '</div>';
+    } else if(t.clientCode) {
+      docsHtml = '<div style="margin-top:12px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:12px;color:var(--text-muted);">'+
+        '📎 Is task se koi file attach nahi hai · '+
+        '<a href="javascript:void(0)" onclick="closePanel();navigateClientPage(\''+t.clientCode+'\')" style="color:var(--primary);">Document Vault dekhne click karo →</a>'+
+      '</div>';
+    }
+  }
+
   openPanel('📋 Task — '+(t.clientName||'General'),
     '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
       '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
@@ -2143,6 +2180,7 @@ function viewTaskDetail(tid){
     (t.description?
       '<div style="font-weight:600;margin-bottom:6px;">📝 Description:</div>'+
       '<div style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;">'+t.description+'</div>':'')
+    + docsHtml
   );
 }
 
@@ -2253,11 +2291,15 @@ async function submitTicket(){
 // ── CRM ──────────────────────────────────────────────────────
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
-  const [clients,todayCalls]=await Promise.all([getClients(true),api('GET','/crm/today')]);
+  const [clients,todayCalls,recentCalls]=await Promise.all([
+    getClients(true),
+    api('GET','/crm/today'),
+    api('GET','/crm?_='+Date.now()),
+  ]);
   if(clients&&clients.length) APP.clients=clients;
 
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CRM Lead'].includes(u.role);
   const isCRM = u.role === 'CRM Executive';
   let myClients = APP.clients || [];
 
@@ -2275,6 +2317,27 @@ async function renderCRM(){
   }
 
   window._crmAllClients = myClients;
+  window._crmRecentCalls = recentCalls || [];
+
+  // Build last-call-date map per seller per executive
+  const lastCallMap = {}; // clientCode -> {date, executive, outcome}
+  const today = new Date().toISOString().split('T')[0];
+  const day3ago = new Date(Date.now()-3*86400000).toISOString().split('T')[0];
+
+  (recentCalls||[]).forEach(function(c){
+    const cc = c.clientCode || c.client_code;
+    const callDate = (c.createdAt||c.created_at||'').slice(0,10);
+    if(!cc) return;
+    if(!lastCallMap[cc] || callDate > lastCallMap[cc].date) {
+      lastCallMap[cc] = {
+        date: callDate,
+        executive: c.crmExecutive || c.crm_executive || '',
+        outcome: c.callOutcome || c.call_outcome || '',
+        daysAgo: callDate ? Math.floor((new Date(today)-new Date(callDate))/86400000) : 999,
+      };
+    }
+  });
+  window._crmLastCallMap = lastCallMap;
 
   // CRM Executives list for filter
   const crmExecs = [...new Set(myClients.map(c=>c.crmExecutive).filter(Boolean))].sort();
@@ -2298,27 +2361,75 @@ async function renderCRM(){
 function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
   const u = APP.user;
   const isCRM = u.role === 'CRM Executive';
+  const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CRM Lead'].includes(u.role);
   const execFilter = window._crmExecFilter || '';
+  const lastCallMap = window._crmLastCallMap || {};
+  const today = new Date().toISOString().split('T')[0];
+
+  // Call tracker stats for current view
+  const calledToday = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date === today; });
+  const called1_2days = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return d===1||d===2; });
+  const overdue3plus = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return d===undefined||d===null||d>2; });
+  const neverCalled = clients.filter(function(c){ return !lastCallMap[c.clientCode]; });
+  const progressPct = clients.length ? Math.round(calledToday.length/clients.length*100) : 0;
 
   document.getElementById('page-content').innerHTML=`
+    <!-- KPI Cards -->
     <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">${isCRM?'My Clients':'Total Clients'}</div><div class="kpi-value">${clients.length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Calls Today</div><div class="kpi-value">${todayCalls.length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Connected</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('Connected')).length}</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">No Response</div><div class="kpi-value">${todayCalls.filter(c=>c.callOutcome?.includes('No Response')).length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">My Sellers</div><div class="kpi-value">${clients.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Called Today</div><div class="kpi-value">${calledToday.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">🔴 Pending Today</div><div class="kpi-value">${clients.length - calledToday.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">⚠️ 3+ Days Pending</div><div class="kpi-value">${overdue3plus.length}</div></div>
     </div>
 
     ${showFilter && crmExecs && crmExecs.length ? `
     <div class="card" style="margin-bottom:12px;border-left:4px solid #3498db;">
       <div class="card-body" style="padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <span style="font-weight:700;font-size:13px;">👤 CRM Executive Filter:</span>
+        <span style="font-weight:700;font-size:13px;">👤 Filter:</span>
         <button onclick="filterCRMByExec('')" class="btn btn-sm ${!execFilter?'btn-primary':'btn-outline'}">All (${(window._crmAllClients||[]).length})</button>
         ${crmExecs.map(e=>`<button onclick="filterCRMByExec('${e.replace(/'/g,'')}')" class="btn btn-sm ${execFilter===e?'btn-primary':'btn-outline'}">${e.split(' ')[0]} (${(window._crmAllClients||[]).filter(c=>c.crmExecutive===e).length})</button>`).join('')}
         <input type="text" class="form-control" style="width:200px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterCRMBySearch(this.value)">
       </div>
     </div>` : ''}
 
-    <div class="card">
+    <!-- DAILY CALL TRACKER -->
+    <div class="card" style="border-left:4px solid #27ae60;margin-bottom:12px;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">📞 Daily Call Tracker</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--text-muted);">Target: Har 2-3 din mein sab sellers se connect karo</span>
+          <button class="btn btn-sm btn-outline" onclick="renderCRM()">🔄</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Progress Bar -->
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:13px;font-weight:700;">Aaj ka progress: ${calledToday.length}/${clients.length} sellers</span>
+            <span style="font-size:14px;font-weight:800;color:${progressPct>=80?'var(--green)':progressPct>=50?'var(--amber)':'var(--red)'};">${progressPct}%</span>
+          </div>
+          <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;">
+            <div style="width:${progressPct}%;height:100%;background:${progressPct>=80?'var(--green)':progressPct>=50?'var(--amber)':'var(--red)'};border-radius:6px;transition:width 0.3s;"></div>
+          </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-primary" id="ct-btn-all" onclick="filterCallTracker('all')">All (${clients.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-pending" onclick="filterCallTracker('pending')" style="border-color:var(--red);color:var(--red);">🔴 Pending Today (${clients.length-calledToday.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-done" onclick="filterCallTracker('done')" style="border-color:var(--green);color:var(--green);">✅ Called Today (${calledToday.length})</button>
+          <button class="btn btn-sm btn-outline" id="ct-btn-overdue" onclick="filterCallTracker('overdue')" style="border-color:var(--amber);color:var(--amber);">⚠️ 3+ Days (${overdue3plus.length})</button>
+        </div>
+
+        <!-- Seller Cards Grid -->
+        <div id="call-tracker-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;max-height:400px;overflow-y:auto;">
+          ${buildCallTrackerCards(clients, lastCallMap, today)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Log a Call -->
+    <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">📞 Log a Call</span></div>
       <div class="card-body">
         <div class="form-row">
@@ -2346,7 +2457,8 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       </div>
     </div>
 
-    <div class="card">
+    <!-- Today's Calls -->
+    <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">📋 Today's Calls (${todayCalls.length})</span></div>
       <div class="card-body" style="padding:0;">
         ${!todayCalls.length?'<div class="empty-state"><div class="emoji">📭</div><h3>No calls today yet</h3></div>':`<div class="table-wrap"><table><thead><tr><th>Client</th><th>By</th><th>Outcome</th><th>Feedback</th><th>Severity</th></tr></thead>
@@ -2354,29 +2466,84 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       </div>
     </div>
 
-    <!-- Client List with CRM column -->
-    <div class="card" style="margin-top:12px;">
-      <div class="card-header"><span class="card-title">👥 Client List (${clients.length})</span></div>
-      <div class="card-body" style="padding:0;"><div class="table-wrap" id="crm-client-list-table"><table>
-        <thead><tr><th>#</th><th>Client</th><th>Market</th><th>AM</th><th>CRM Executive</th><th>Health</th><th>Action</th></tr></thead>
-        <tbody id="crm-client-tbody">
-          ${clients.map((c,i)=>`<tr>
-            <td>${i+1}</td>
-            <td><strong>${c.busyName}</strong></td>
-            <td><span class="badge badge-blue" style="font-size:10px;">${c.marketplace}</span></td>
-            <td style="font-size:12px;">${c.amName||'—'}</td>
-            <td style="font-size:12px;${(c.crmExecutive||'').toLowerCase().includes((u.name||'').toLowerCase())?'font-weight:700;color:var(--primary);':'color:var(--text-muted);'}">${c.crmExecutive||'—'}</td>
-            <td>${healthBadge(c.healthStatus)}</td>
-            <td><button class="btn btn-sm btn-outline" data-cc="${c.clientCode}" onclick="var cc=this.getAttribute('data-cc');loadCRMHistory(cc);document.getElementById('crm-client').value=cc;">📞 Select</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div></div>
-    </div>
-
     <div class="card" id="crm-history-card" style="display:none;margin-top:12px;">
       <div class="card-header"><span class="card-title" id="crm-hist-title">📋 Call History</span></div>
       <div class="card-body" id="crm-history"></div>
     </div>`;
+}
+
+function buildCallTrackerCards(clients, lastCallMap, today) {
+  return clients.map(function(c){
+    const info = lastCallMap[c.clientCode];
+    const calledToday = info?.date === today;
+    const daysAgo = info?.daysAgo;
+    const neverCalled = !info;
+
+    let statusColor, statusBg, statusText, statusIcon;
+    if(calledToday) {
+      statusColor='#1e8449';statusBg='#d5f5e3';statusText='Called Today';statusIcon='✅';
+    } else if(daysAgo===1) {
+      statusColor='#2980b9';statusBg='#d6eaf8';statusText='Called Yesterday';statusIcon='🔵';
+    } else if(daysAgo===2) {
+      statusColor='#d35400';statusBg='#fdebd0';statusText='2 Days Ago';statusIcon='🟡';
+    } else if(daysAgo&&daysAgo>2) {
+      statusColor='#c0392b';statusBg='#fdf2f2';statusText=daysAgo+'d ago';statusIcon='🔴';
+    } else {
+      statusColor='#7f8c8d';statusBg='#f2f3f4';statusText='Never Called';statusIcon='⚫';
+    }
+
+    const safeCC = c.clientCode;
+    const safeName = (c.busyName||'').replace(/'/g,'').replace(/"/g,'');
+
+    return `<div style="background:${statusBg};border:1px solid ${statusColor}30;border-radius:10px;padding:10px;cursor:pointer;transition:transform 0.1s;" onclick="selectClientForCall('${safeCC}','${safeName}')">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:4px;">
+        <div style="font-size:12px;font-weight:700;line-height:1.3;flex:1;">${c.busyName}</div>
+        <span style="font-size:14px;">${statusIcon}</span>
+      </div>
+      <div style="font-size:10px;color:${statusColor};font-weight:600;margin-top:4px;">${statusText}</div>
+      <div style="font-size:10px;color:#666;margin-top:2px;">${c.marketplace||''} · ${c.healthStatus||'—'}</div>
+      ${info?.outcome?`<div style="font-size:10px;color:#666;margin-top:2px;">Last: ${info.outcome.replace('Called — ','')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function filterCallTracker(filter) {
+  const clients = window._crmFilteredClients || window._crmAllClients || [];
+  const lastCallMap = window._crmLastCallMap || {};
+  const today = new Date().toISOString().split('T')[0];
+
+  // Update tab buttons
+  ['all','pending','done','overdue'].forEach(function(f){
+    const btn = document.getElementById('ct-btn-'+f);
+    if(btn) {
+      if(f===filter) { btn.className='btn btn-sm btn-primary'; btn.style.cssText=''; }
+      else {
+        btn.className='btn btn-sm btn-outline';
+        if(f==='pending') btn.style.cssText='border-color:var(--red);color:var(--red);';
+        else if(f==='done') btn.style.cssText='border-color:var(--green);color:var(--green);';
+        else if(f==='overdue') btn.style.cssText='border-color:var(--amber);color:var(--amber);';
+        else btn.style.cssText='';
+      }
+    }
+  });
+
+  let filtered = clients;
+  if(filter==='pending') filtered = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date !== today; });
+  else if(filter==='done') filtered = clients.filter(function(c){ return lastCallMap[c.clientCode]?.date === today; });
+  else if(filter==='overdue') filtered = clients.filter(function(c){ const d=lastCallMap[c.clientCode]?.daysAgo; return !d||d>2; });
+
+  const grid = document.getElementById('call-tracker-grid');
+  if(grid) grid.innerHTML = buildCallTrackerCards(filtered, lastCallMap, today);
+}
+
+function selectClientForCall(cc, cn) {
+  // Select in dropdown
+  const sel = document.getElementById('crm-client');
+  if(sel) { sel.value = cc; loadCRMHistory(cc); }
+  // Scroll to log form
+  const logCard = document.querySelector('#crm-client')?.closest('.card');
+  if(logCard) logCard.scrollIntoView({behavior:'smooth', block:'center'});
+  showToast('📞 '+cn+' selected — call log karo!','info');
 }
 
 function filterCRMByExec(exec) {
@@ -2410,7 +2577,31 @@ async function saveCRMCall(andTicket){
   const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
   if(!cc){showToast('Select a client','error');return;}
   const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
-  if(r?.success){showToast('✅ Call logged!','success');document.getElementById('crm-comment').value='';document.getElementById('crm-followup').value='';loadCRMHistory(cc);if(andTicket)openRaiseTicketFor(cc,cn);}
+  if(r?.success){
+    showToast('✅ Call logged!','success');
+    document.getElementById('crm-comment').value='';
+    document.getElementById('crm-followup').value='';
+    loadCRMHistory(cc);
+    if(andTicket) openRaiseTicketFor(cc,cn);
+
+    // Auto-update tracker — mark seller as called today
+    const today = new Date().toISOString().split('T')[0];
+    if(!window._crmLastCallMap) window._crmLastCallMap = {};
+    window._crmLastCallMap[cc] = {
+      date: today,
+      daysAgo: 0,
+      outcome: document.getElementById('crm-outcome')?.value || 'Called',
+    };
+    // Refresh tracker grid
+    const clients = window._crmFilteredClients || window._crmAllClients || [];
+    const grid = document.getElementById('call-tracker-grid');
+    if(grid) grid.innerHTML = buildCallTrackerCards(clients, window._crmLastCallMap, today);
+    // Update progress bar
+    const calledToday = clients.filter(function(c){ return window._crmLastCallMap[c.clientCode]?.date === today; });
+    const pct = clients.length ? Math.round(calledToday.length/clients.length*100) : 0;
+    const bar = document.querySelector('#call-tracker-grid')?.closest('.card')?.querySelector('div[style*="height:12px"]>div');
+    if(bar) bar.style.width = pct+'%';
+  }
 }
 
 async function loadCRMHistory(cc){
@@ -3436,6 +3627,23 @@ async function openCreateTask(parentTaskId = '', parentTitle = '', mode = '') {
       <input type="date" class="form-control" id="tsk-deadline">
     </div>
 
+    <!-- File Attachment -->
+    <div class="form-group" style="background:#eaf4fd;border-radius:8px;padding:12px;border-left:3px solid #2980b9;">
+      <label style="color:#1a5276;font-weight:700;">📎 File Attach karo (Optional)</label>
+      <div style="font-size:11px;color:#5d6d7e;margin-bottom:8px;">Task se related files — automatically seller ke Document Vault mein save hongi</div>
+      <input type="file" class="form-control" id="tsk-files" multiple style="margin-bottom:8px;">
+      <select class="form-control" id="tsk-file-cat" style="font-size:13px;">
+        <option value="Other">Category select karo...</option>
+        <option value="Listing">🛍️ Listing</option>
+        <option value="Price Sheet">💰 Price Sheet</option>
+        <option value="Brand Asset">🎨 Brand Asset</option>
+        <option value="Image">🖼️ Image</option>
+        <option value="Agreement">📜 Agreement</option>
+        <option value="Other">📄 Other</option>
+      </select>
+      <div id="tsk-file-preview" style="margin-top:8px;"></div>
+    </div>
+
     ${['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'].includes(APP.user.role) ? `
     <div class="form-group" style="background:#e8f8f5;border-radius:8px;padding:12px;border-left:3px solid #27ae60;">
       <label style="color:#1e8449;font-weight:700;">📱 WhatsApp Update</label>
@@ -3454,7 +3662,23 @@ async function openCreateTask(parentTaskId = '', parentTitle = '', mode = '') {
     </button>
   `);
 
-  setTimeout(() => buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...'), 100);
+  setTimeout(() => {
+    buildSearchableSelect('tsk-client-wrap', APP.clients, '', '🔍 Search client (optional)...');
+    // File preview
+    const fileInput = document.getElementById('tsk-files');
+    if(fileInput) fileInput.addEventListener('change', function(){
+      const preview = document.getElementById('tsk-file-preview');
+      if(!preview) return;
+      const files = Array.from(this.files);
+      if(!files.length){ preview.innerHTML=''; return; }
+      preview.innerHTML = '<div style="font-size:12px;font-weight:700;color:#1a5276;margin-bottom:6px;">'+files.length+' file(s) selected:</div>'+
+        files.map(f=>{
+          const size = f.size>1048576?(f.size/1048576).toFixed(1)+'MB':(f.size/1024).toFixed(0)+'KB';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:#fff;border-radius:6px;margin-bottom:4px;font-size:12px;">'+
+            '<span>📄</span><span style="flex:1;">'+f.name+'</span><span style="color:var(--text-muted);">'+size+'</span></div>';
+        }).join('');
+    });
+  }, 100);
   window._assigneeList = allUsers;
 }
 
@@ -3601,6 +3825,8 @@ async function submitCreateTask(parentTaskId = '') {
   const clientCode = getSearchableVal('tsk-client-wrap') || '';
   const clientName = document.getElementById('tsk-client-wrap_search')?.value?.split(' (')[0] || '';
   const u = APP.user;
+
+  // Create task first
   const r = await api('POST', '/tasks', {
     title,
     description: document.getElementById('tsk-desc').value,
@@ -3613,11 +3839,79 @@ async function submitCreateTask(parentTaskId = '') {
     parentTaskId: parentTaskId || null,
     whatsappUpdated: document.querySelector('input[name="tsk-whatsapp"]:checked')?.value || null,
   });
-  if (r?.success) {
-    showToast('✅ Task created: ' + r.taskId, 'success');
+
+  if (!r?.success) return;
+
+  const taskId = r.taskId;
+  showToast('✅ Task created: ' + taskId, 'success');
+
+  // Handle file uploads if any
+  const files = document.getElementById('tsk-files')?.files;
+  if(files && files.length && clientCode) {
+    const cat = document.getElementById('tsk-file-cat')?.value || 'Other';
+    closePanel();
+    await uploadTaskFiles(files, taskId, clientCode, clientName, cat, title);
+  } else {
     closePanel();
     renderTasks();
   }
+}
+
+async function uploadTaskFiles(files, taskId, clientCode, clientName, category, taskTitle) {
+  // Check existing docs for duplicates
+  const existingDocs = await api('GET', '/documents/'+clientCode+'?_='+Date.now()) || [];
+  const token = localStorage.getItem('enewcleus_token');
+
+  let uploaded = 0;
+  let skipped = 0;
+  const total = files.length;
+
+  // Show progress toast
+  showToast('📤 Files upload ho rahi hain...', 'info');
+
+  for(let i=0; i<files.length; i++) {
+    const file = files[i];
+
+    // Duplicate check
+    const existing = existingDocs.find(d => d.fileName === file.name && d.clientCode === clientCode);
+    if(existing) {
+      const overwrite = confirm(
+        '⚠️ "'+file.name+'" pehle se upload hai!\n\n'+
+        'Uploaded by: '+existing.uploadedBy+'\n'+
+        'Date: '+existing.uploadedAt+'\n\n'+
+        'Wapas update karna hai kya?'
+      );
+      if(!overwrite) { skipped++; continue; }
+      // Delete old one first
+      await api('DELETE', '/documents/'+existing.docId);
+    }
+
+    // Upload
+    const docId = 'DOC'+Date.now()+i;
+    const path = clientCode+'/'+category.replace(/ /g,'_')+'/'+docId+'_'+file.name;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('docId', docId);
+    formData.append('clientCode', clientCode);
+    formData.append('clientName', clientName);
+    formData.append('category', category);
+    formData.append('description', 'Task: '+taskTitle+' ('+taskId+')');
+    formData.append('path', path);
+    formData.append('taskId', taskId);
+
+    try {
+      const resp = await fetch('/api/documents/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token },
+        body: formData,
+      });
+      const result = await resp.json();
+      if(result.success) uploaded++;
+    } catch(e) { console.error('Upload error:', e); }
+  }
+
+  showToast('✅ '+uploaded+'/'+total+' files uploaded!'+(skipped?' ('+skipped+' skipped)':''), 'success');
+  renderTasks();
 }
 
 async function submitAssignTask() {
@@ -6330,6 +6624,7 @@ function parseBulkCSV(input) {
 // Full page client view for Admin/Lead/CRM
 async function navigateClientPage(cc) {
   APP.page = 'clientdetail';
+  window._currentClientCode = cc;
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   const client = APP.clients.find(c=>c.clientCode===cc);
   document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
@@ -6554,7 +6849,184 @@ async function navigateClientPage(cc) {
           <div style="font-size:11px;color:var(--text-muted);">by ${l.userName||'—'}</div>
         </div>`).join('')}
       </div>
+    </div>
+
+    <!-- Document Vault -->
+    <div class="card" id="cd-docs" style="margin-bottom:12px;border-left:4px solid #1a5276;">
+      <div class="card-header" style="background:#eaf4fd;">
+        <span class="card-title">📁 Document Vault</span>
+        <button class="btn btn-primary btn-sm" onclick="openDocUpload('${cc}','${client?.busyName||''}')">📤 Upload File</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="doc-vault-body">
+        <div style="padding:12px;text-align:center;color:var(--text-muted);">
+          <div class="spinner" style="display:inline-block;"></div> Loading documents...
+        </div>
+      </div>
     </div>`;
+
+  // Load documents after render
+  loadClientDocs(cc);
+}
+
+// ── DOCUMENT VAULT ────────────────────────────────────────────
+async function loadClientDocs(cc) {
+  const box = document.getElementById('doc-vault-body');
+  if(!box) return;
+  const docs = await api('GET', '/documents/'+cc+'?_='+Date.now()) || [];
+  window._clientDocs = docs;
+
+  if(!docs.length) {
+    box.innerHTML = '<div class="empty-state"><div class="emoji">📁</div><h3>Koi document nahi</h3><p style="color:var(--text-muted);">Upload karo — agreements, price sheets, brand assets sab yahan save rahega</p></div>';
+    return;
+  }
+
+  const catIcons = {'Agreement':'📜','Listing':'🛍️','Price Sheet':'💰','Brand Asset':'🎨','Image':'🖼️','Other':'📄'};
+  const cats = [...new Set(docs.map(d=>d.category))];
+
+  box.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;font-weight:700;color:var(--text-muted);">Filter:</span>
+      <button class="btn btn-sm btn-primary" onclick="filterDocs('')">All (${docs.length})</button>
+      ${cats.map(c=>`<button class="btn btn-sm btn-outline" onclick="filterDocs('${c}')">${catIcons[c]||'📄'} ${c} (${docs.filter(d=>d.category===c).length})</button>`).join('')}
+    </div>
+    <div id="doc-list" style="padding:8px;">
+      ${renderDocList(docs)}
+    </div>`;
+}
+
+function renderDocList(docs) {
+  const catIcons = {'Agreement':'📜','Listing':'🛍️','Price Sheet':'💰','Brand Asset':'🎨','Image':'🖼️','Other':'📄'};
+  const typeColors = {'pdf':'#e74c3c','xlsx':'#27ae60','xls':'#27ae60','csv':'#27ae60','jpg':'#3498db','jpeg':'#3498db','png':'#3498db','docx':'#2980b9','doc':'#2980b9','zip':'#8e44ad'};
+
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">'+
+    docs.map(function(d){
+      const ext = (d.fileName||'').split('.').pop().toLowerCase();
+      const typeColor = typeColors[ext] || '#7f8c8d';
+      const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+      const sizeText = d.fileSize ? (d.fileSize>1048576?(d.fileSize/1048576).toFixed(1)+'MB':(d.fileSize/1024).toFixed(0)+'KB') : '';
+
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--card);position:relative;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:20px;">${isImage?'🖼️':catIcons[d.category]||'📄'}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.fileName}">${d.fileName}</div>
+            <div style="font-size:10px;color:var(--text-muted);">${sizeText} · ${d.uploadedBy||'—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;justify-content:space-between;">
+          <span style="background:${typeColor}20;color:${typeColor};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">.${ext}</span>
+          <div style="display:flex;gap:4px;">
+            <a href="${d.fileUrl}" target="_blank" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:11px;">👁️ View</a>
+            <a href="${d.fileUrl}" download="${d.fileName}" class="btn btn-sm btn-success" style="padding:3px 8px;font-size:11px;">📥</a>
+            <button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" data-did="${d.docId}" onclick="deleteDoc(this.getAttribute('data-did'))">🗑️</button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">${d.category} · ${d.uploadedAt||''}</div>
+        ${d.description?`<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic;">${d.description}</div>`:''}
+      </div>`;
+    }).join('')+
+  '</div>';
+}
+
+function filterDocs(cat) {
+  const docs = window._clientDocs || [];
+  const filtered = cat ? docs.filter(d=>d.category===cat) : docs;
+  const box = document.getElementById('doc-list');
+  if(box) box.innerHTML = renderDocList(filtered);
+}
+
+function openDocUpload(cc, cn) {
+  openPanel('📤 Upload Document — '+cn,`
+    <div class="form-group"><label>Category *</label>
+      <select class="form-control" id="doc-cat">
+        <option>Agreement</option>
+        <option>Listing</option>
+        <option>Price Sheet</option>
+        <option>Brand Asset</option>
+        <option>Image</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Description</label>
+      <input type="text" class="form-control" id="doc-desc" placeholder="e.g. Q1 2026 Price Sheet, Brand Logo...">
+    </div>
+    <div class="form-group"><label>File * (Max 50MB)</label>
+      <input type="file" class="form-control" id="doc-file" multiple>
+    </div>
+    <div id="doc-upload-progress" style="display:none;margin-bottom:8px;"></div>
+    <button class="btn btn-primary btn-full" onclick="submitDocUpload('${cc}','${cn.replace(/'/g,'')}')">📤 Upload</button>
+    <div style="margin-top:12px;background:#fef9e7;border-radius:8px;padding:10px;font-size:12px;color:#7d6608;">
+      💡 <strong>Tip:</strong> Multiple files ek saath upload kar sakte ho. Listing images ke liye "Listing" category select karo.
+    </div>
+  `);
+}
+
+async function submitDocUpload(cc, cn) {
+  const files = document.getElementById('doc-file')?.files;
+  const cat = document.getElementById('doc-cat')?.value || 'Other';
+  const desc = document.getElementById('doc-desc')?.value || '';
+  const progBox = document.getElementById('doc-upload-progress');
+
+  if(!files || !files.length) { showToast('File select karo!','error'); return; }
+
+  progBox.style.display = '';
+  progBox.innerHTML = '<div style="font-size:13px;color:var(--primary);">Uploading...</div>';
+
+  let success = 0;
+  const total = files.length;
+
+  for(let i=0; i<files.length; i++) {
+    const file = files[i];
+    const docId = 'DOC'+Date.now()+i;
+    const path = cc+'/'+cat.replace(/ /g,'_')+'/'+docId+'_'+file.name;
+
+    progBox.innerHTML = `<div style="font-size:13px;color:var(--primary);">Uploading ${i+1}/${total}: ${file.name}</div>
+      <div style="height:8px;background:var(--border);border-radius:4px;margin-top:4px;overflow:hidden;">
+        <div style="width:${Math.round((i/total)*100)}%;height:100%;background:var(--primary);border-radius:4px;"></div>
+      </div>`;
+
+    try {
+      // Upload to Supabase Storage via backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docId', docId);
+      formData.append('clientCode', cc);
+      formData.append('clientName', cn);
+      formData.append('category', cat);
+      formData.append('description', desc);
+      formData.append('path', path);
+
+      const token = localStorage.getItem('enewcleus_token');
+      const resp = await fetch('/api/documents/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token },
+        body: formData,
+      });
+      const result = await resp.json();
+      if(result.success) success++;
+    } catch(e) {
+      console.error('Upload error:', e);
+    }
+  }
+
+  progBox.innerHTML = `<div style="color:var(--green);font-weight:700;">✅ ${success}/${total} files uploaded!</div>`;
+  setTimeout(function(){
+    closePanel();
+    loadClientDocs(cc);
+  }, 1000);
+}
+
+async function deleteDoc(docId) {
+  if(!confirm('Is document ko delete karna hai?')) return;
+  const r = await api('DELETE', '/documents/'+docId);
+  if(r?.success) {
+    showToast('✅ Document deleted!','success');
+    // Reload docs for current client
+    const cc = window._currentClientCode;
+    if(cc) loadClientDocs(cc);
+  } else {
+    showToast('Delete failed: '+(r?.error||'Error'),'error');
+  }
 }
 
 function buildClientActivitySummary(tickets, tasks, crmCalls, days) {

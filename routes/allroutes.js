@@ -992,6 +992,89 @@ Keep response under 250 words. Use Hinglish naturally.`;
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── DOCUMENT VAULT ────────────────────────────────────────────
+const docsRouter = require('express').Router();
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50*1024*1024 } });
+
+docsRouter.get('/:clientCode', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('seller_documents')
+      .select('*').eq('client_code', req.params.clientCode)
+      .order('uploaded_at', { ascending: false });
+    if(error) throw error;
+    res.json((data||[]).map(d=>({
+      docId: d.doc_id, clientCode: d.client_code, clientName: d.client_name,
+      fileName: d.file_name, fileUrl: d.file_url, category: d.category||'Other',
+      description: d.description||'', fileSize: d.file_size, fileType: d.file_type,
+      uploadedBy: d.uploaded_by,
+      uploadedAt: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString('en-IN') : '',
+    })));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+docsRouter.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    const { docId, clientCode, clientName, category, description, path } = req.body;
+    const file = req.file;
+    if(!file) return res.status(400).json({ error: 'No file' });
+
+    // Upload to Supabase Storage
+    const { data: storageData, error: storageErr } = await supabase.storage
+      .from('seller-documents')
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+    if(storageErr) throw storageErr;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('seller-documents')
+      .getPublicUrl(path);
+
+    const fileUrl = urlData.publicUrl;
+
+    // Save to DB
+    const { error: dbErr } = await supabase.from('seller_documents').insert({
+      doc_id: docId,
+      client_code: clientCode,
+      client_name: clientName,
+      file_name: file.originalname,
+      file_url: fileUrl,
+      category: category || 'Other',
+      description: description || null,
+      file_size: file.size,
+      file_type: file.mimetype,
+      uploaded_by: req.user.name,
+      task_id: req.body.taskId || null,
+    });
+    if(dbErr) throw dbErr;
+
+    res.json({ success: true, fileUrl });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+docsRouter.delete('/:docId', authMiddleware, async (req, res) => {
+  try {
+    // Get file path
+    const { data: doc } = await supabase.from('seller_documents')
+      .select('file_url, client_code').eq('doc_id', req.params.docId).single();
+
+    if(doc?.file_url) {
+      // Extract path from URL
+      const url = new URL(doc.file_url);
+      const pathParts = url.pathname.split('/seller-documents/');
+      if(pathParts[1]) {
+        await supabase.storage.from('seller-documents').remove([decodeURIComponent(pathParts[1])]);
+      }
+    }
+
+    await supabase.from('seller_documents').delete().eq('doc_id', req.params.docId);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── MIS REPORT ────────────────────────────────────────────────
 const misRouter = require('express').Router();
 
@@ -1105,5 +1188,5 @@ module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  expectationsRouter, monthlyReportsRouter, misRouter,
+  expectationsRouter, monthlyReportsRouter, misRouter, docsRouter,
 };

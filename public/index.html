@@ -6483,6 +6483,7 @@ function parseBulkCSV(input) {
 // Full page client view for Admin/Lead/CRM
 async function navigateClientPage(cc) {
   APP.page = 'clientdetail';
+  window._currentClientCode = cc;
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   const client = APP.clients.find(c=>c.clientCode===cc);
   document.getElementById('page-title').textContent = '📋 ' + (client?.busyName||cc);
@@ -6707,7 +6708,184 @@ async function navigateClientPage(cc) {
           <div style="font-size:11px;color:var(--text-muted);">by ${l.userName||'—'}</div>
         </div>`).join('')}
       </div>
+    </div>
+
+    <!-- Document Vault -->
+    <div class="card" id="cd-docs" style="margin-bottom:12px;border-left:4px solid #1a5276;">
+      <div class="card-header" style="background:#eaf4fd;">
+        <span class="card-title">📁 Document Vault</span>
+        <button class="btn btn-primary btn-sm" onclick="openDocUpload('${cc}','${client?.busyName||''}')">📤 Upload File</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="doc-vault-body">
+        <div style="padding:12px;text-align:center;color:var(--text-muted);">
+          <div class="spinner" style="display:inline-block;"></div> Loading documents...
+        </div>
+      </div>
     </div>`;
+
+  // Load documents after render
+  loadClientDocs(cc);
+}
+
+// ── DOCUMENT VAULT ────────────────────────────────────────────
+async function loadClientDocs(cc) {
+  const box = document.getElementById('doc-vault-body');
+  if(!box) return;
+  const docs = await api('GET', '/documents/'+cc+'?_='+Date.now()) || [];
+  window._clientDocs = docs;
+
+  if(!docs.length) {
+    box.innerHTML = '<div class="empty-state"><div class="emoji">📁</div><h3>Koi document nahi</h3><p style="color:var(--text-muted);">Upload karo — agreements, price sheets, brand assets sab yahan save rahega</p></div>';
+    return;
+  }
+
+  const catIcons = {'Agreement':'📜','Listing':'🛍️','Price Sheet':'💰','Brand Asset':'🎨','Image':'🖼️','Other':'📄'};
+  const cats = [...new Set(docs.map(d=>d.category))];
+
+  box.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;font-weight:700;color:var(--text-muted);">Filter:</span>
+      <button class="btn btn-sm btn-primary" onclick="filterDocs('')">All (${docs.length})</button>
+      ${cats.map(c=>`<button class="btn btn-sm btn-outline" onclick="filterDocs('${c}')">${catIcons[c]||'📄'} ${c} (${docs.filter(d=>d.category===c).length})</button>`).join('')}
+    </div>
+    <div id="doc-list" style="padding:8px;">
+      ${renderDocList(docs)}
+    </div>`;
+}
+
+function renderDocList(docs) {
+  const catIcons = {'Agreement':'📜','Listing':'🛍️','Price Sheet':'💰','Brand Asset':'🎨','Image':'🖼️','Other':'📄'};
+  const typeColors = {'pdf':'#e74c3c','xlsx':'#27ae60','xls':'#27ae60','csv':'#27ae60','jpg':'#3498db','jpeg':'#3498db','png':'#3498db','docx':'#2980b9','doc':'#2980b9','zip':'#8e44ad'};
+
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">'+
+    docs.map(function(d){
+      const ext = (d.fileName||'').split('.').pop().toLowerCase();
+      const typeColor = typeColors[ext] || '#7f8c8d';
+      const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+      const sizeText = d.fileSize ? (d.fileSize>1048576?(d.fileSize/1048576).toFixed(1)+'MB':(d.fileSize/1024).toFixed(0)+'KB') : '';
+
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--card);position:relative;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:20px;">${isImage?'🖼️':catIcons[d.category]||'📄'}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.fileName}">${d.fileName}</div>
+            <div style="font-size:10px;color:var(--text-muted);">${sizeText} · ${d.uploadedBy||'—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;justify-content:space-between;">
+          <span style="background:${typeColor}20;color:${typeColor};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">.${ext}</span>
+          <div style="display:flex;gap:4px;">
+            <a href="${d.fileUrl}" target="_blank" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:11px;">👁️ View</a>
+            <a href="${d.fileUrl}" download="${d.fileName}" class="btn btn-sm btn-success" style="padding:3px 8px;font-size:11px;">📥</a>
+            <button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" data-did="${d.docId}" onclick="deleteDoc(this.getAttribute('data-did'))">🗑️</button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">${d.category} · ${d.uploadedAt||''}</div>
+        ${d.description?`<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic;">${d.description}</div>`:''}
+      </div>`;
+    }).join('')+
+  '</div>';
+}
+
+function filterDocs(cat) {
+  const docs = window._clientDocs || [];
+  const filtered = cat ? docs.filter(d=>d.category===cat) : docs;
+  const box = document.getElementById('doc-list');
+  if(box) box.innerHTML = renderDocList(filtered);
+}
+
+function openDocUpload(cc, cn) {
+  openPanel('📤 Upload Document — '+cn,`
+    <div class="form-group"><label>Category *</label>
+      <select class="form-control" id="doc-cat">
+        <option>Agreement</option>
+        <option>Listing</option>
+        <option>Price Sheet</option>
+        <option>Brand Asset</option>
+        <option>Image</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Description</label>
+      <input type="text" class="form-control" id="doc-desc" placeholder="e.g. Q1 2026 Price Sheet, Brand Logo...">
+    </div>
+    <div class="form-group"><label>File * (Max 50MB)</label>
+      <input type="file" class="form-control" id="doc-file" multiple>
+    </div>
+    <div id="doc-upload-progress" style="display:none;margin-bottom:8px;"></div>
+    <button class="btn btn-primary btn-full" onclick="submitDocUpload('${cc}','${cn.replace(/'/g,'')}')">📤 Upload</button>
+    <div style="margin-top:12px;background:#fef9e7;border-radius:8px;padding:10px;font-size:12px;color:#7d6608;">
+      💡 <strong>Tip:</strong> Multiple files ek saath upload kar sakte ho. Listing images ke liye "Listing" category select karo.
+    </div>
+  `);
+}
+
+async function submitDocUpload(cc, cn) {
+  const files = document.getElementById('doc-file')?.files;
+  const cat = document.getElementById('doc-cat')?.value || 'Other';
+  const desc = document.getElementById('doc-desc')?.value || '';
+  const progBox = document.getElementById('doc-upload-progress');
+
+  if(!files || !files.length) { showToast('File select karo!','error'); return; }
+
+  progBox.style.display = '';
+  progBox.innerHTML = '<div style="font-size:13px;color:var(--primary);">Uploading...</div>';
+
+  let success = 0;
+  const total = files.length;
+
+  for(let i=0; i<files.length; i++) {
+    const file = files[i];
+    const docId = 'DOC'+Date.now()+i;
+    const path = cc+'/'+cat.replace(/ /g,'_')+'/'+docId+'_'+file.name;
+
+    progBox.innerHTML = `<div style="font-size:13px;color:var(--primary);">Uploading ${i+1}/${total}: ${file.name}</div>
+      <div style="height:8px;background:var(--border);border-radius:4px;margin-top:4px;overflow:hidden;">
+        <div style="width:${Math.round((i/total)*100)}%;height:100%;background:var(--primary);border-radius:4px;"></div>
+      </div>`;
+
+    try {
+      // Upload to Supabase Storage via backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docId', docId);
+      formData.append('clientCode', cc);
+      formData.append('clientName', cn);
+      formData.append('category', cat);
+      formData.append('description', desc);
+      formData.append('path', path);
+
+      const token = localStorage.getItem('enewcleus_token');
+      const resp = await fetch('/api/documents/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer '+token },
+        body: formData,
+      });
+      const result = await resp.json();
+      if(result.success) success++;
+    } catch(e) {
+      console.error('Upload error:', e);
+    }
+  }
+
+  progBox.innerHTML = `<div style="color:var(--green);font-weight:700;">✅ ${success}/${total} files uploaded!</div>`;
+  setTimeout(function(){
+    closePanel();
+    loadClientDocs(cc);
+  }, 1000);
+}
+
+async function deleteDoc(docId) {
+  if(!confirm('Is document ko delete karna hai?')) return;
+  const r = await api('DELETE', '/documents/'+docId);
+  if(r?.success) {
+    showToast('✅ Document deleted!','success');
+    // Reload docs for current client
+    const cc = window._currentClientCode;
+    if(cc) loadClientDocs(cc);
+  } else {
+    showToast('Delete failed: '+(r?.error||'Error'),'error');
+  }
 }
 
 function buildClientActivitySummary(tickets, tasks, crmCalls, days) {

@@ -1047,6 +1047,7 @@ docsRouter.post('/upload', authMiddleware, upload.single('file'), async (req, re
       file_size: file.size,
       file_type: file.mimetype,
       uploaded_by: req.user.name,
+      task_id: req.body.taskId || null,
     });
     if(dbErr) throw dbErr;
 

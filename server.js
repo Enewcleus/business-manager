@@ -65,8 +65,8 @@ app.use('/api/report-analyzer',  require('./routes/allroutes').reportAnalyzerRou
 app.use('/api/expectations',     require('./routes/allroutes').expectationsRouter);
 app.use('/api/monthly-reports',  require('./routes/allroutes').monthlyReportsRouter);
 app.use('/api/mis',              require('./routes/allroutes').misRouter);
+app.use('/api/documents',        require('./routes/allroutes').docsRouter);
 app.use('/api/chat',             require('./routes/chat'));
-app.use('/api/whatsapp',         require('./routes/whatsapp'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

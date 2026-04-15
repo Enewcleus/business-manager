@@ -347,5 +347,20 @@ router.get('/broadcasts', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
+// ── REGISTER PHONE NUMBER ─────────────────────────────────────
+router.post('/register-number', async (req, res) => {
+  try {
+    const response = await axios.post(
+      `${WA_API}/${PHONE_NUMBER_ID}/register`,
+      {
+        messaging_product: 'whatsapp',
+        pin: '123456'
+      },
+      { headers: { Authorization: `Bearer ${WA_TOKEN}` } }
+    );
+    res.json({ success: true, data: response.data });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
 module.exports = router;

@@ -1193,8 +1193,11 @@ async function openEditClient(cc) {
       </div>
       <div class="form-group"><label>Status</label>
         <select class="form-control" id="ec-status">
-          <option ${client.status==='Active'?'selected':''}>Active</option>
-          <option ${client.status==='Inactive'?'selected':''}>Inactive</option>
+          <option value="Active" ${client.status==='Active'?'selected':''}>✅ Active</option>
+          <option value="Inactive" ${client.status==='Inactive'?'selected':''}>❌ Inactive</option>
+          <option value="Hold" ${client.status==='Hold'?'selected':''}>⏸️ Hold</option>
+          <option value="Closed" ${client.status==='Closed'?'selected':''}>🔒 Closed</option>
+          <option value="No Response" ${client.status==='No Response'?'selected':''}>📵 No Response</option>
         </select>
       </div>
     </div>
@@ -1843,19 +1846,39 @@ async function renderClients() {
 
 function renderClientsUI(clients) {
   const u=APP.user,qa=QUICK_ACTIONS[u.role]||[],canAdd=['Admin','Ops Lead'].includes(u.role);
+  // Default: show Active only
+  if(_cf.status === undefined) _cf.status = 'Active';
+  const filtered = _cf.status ? clients.filter(c=>c.status===_cf.status) : clients;
+
   document.getElementById('page-content').innerHTML=`
     <div class="card">
       <div class="card-header">
-        <span class="card-title">👥 Clients (${clients.length})</span>
+        <span class="card-title">👥 Clients (${filtered.length}${_cf.status?' — '+_cf.status:''})</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select class="form-control" style="width:120px;padding:6px;font-size:13px;" onchange="filterClientsByStatus(this.value)">
+            <option value="">All Status</option>
+            <option value="Active" ${_cf.status==='Active'?'selected':''}>✅ Active</option>
+            <option value="Inactive" ${_cf.status==='Inactive'?'selected':''}>❌ Inactive</option>
+            <option value="Hold" ${_cf.status==='Hold'?'selected':''}>⏸️ Hold</option>
+            <option value="Closed" ${_cf.status==='Closed'?'selected':''}>🔒 Closed</option>
+            <option value="No Response" ${_cf.status==='No Response'?'selected':''}>📵 No Response</option>
+          </select>
           <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByHealth(this.value)"><option value="">All Health</option><option>Healthy</option><option>Warning</option><option>At Risk</option></select>
           <select class="form-control" style="width:130px;padding:6px;font-size:13px;" onchange="filterClientsByMarket(this.value)"><option value="">All Markets</option><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select>
           ${canAdd?'<button class="btn btn-primary btn-sm" onclick="openAddClient()">➕ Add Client</button><button class="btn btn-secondary btn-sm" onclick="openBulkUpload()">📥 Bulk Upload</button>':''}
         </div>
       </div>
+      <div style="display:flex;gap:6px;padding:8px 16px;background:#f8f9fa;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        ${['','Active','Inactive','Hold','Closed','No Response'].map(s=>{
+          const count = s ? clients.filter(c=>c.status===s).length : clients.length;
+          const colors = {'Active':'var(--green)','Inactive':'var(--red)','Hold':'var(--amber)','Closed':'#666','No Response':'#8e44ad','':`var(--primary)`};
+          const labels = {'Active':'✅ Active','Inactive':'❌ Inactive','Hold':'⏸️ Hold','Closed':'🔒 Closed','No Response':'📵 No Response','':'All'};
+          return `<button onclick="filterClientsByStatus('${s}')" class="btn btn-sm" style="background:${_cf.status===s?(colors[s]||'var(--primary)'):'#fff'};color:${_cf.status===s?'#fff':(colors[s]||'var(--primary)')};border:1.5px solid ${colors[s]||'var(--primary)'};font-weight:600;">${labels[s]} (${count})</button>`;
+        }).join('')}
+      </div>
       <div class="card-body" style="padding:0;">
-        <div class="table-wrap" id="clients-table">${clientTableRows(clients,qa)}</div>
-        <div class="mobile-cards" id="clients-cards" style="padding:12px;">${clientCards(clients)}</div>
+        <div class="table-wrap" id="clients-table">${clientTableRows(filtered,qa)}</div>
+        <div class="mobile-cards" id="clients-cards" style="padding:12px;">${clientCards(filtered)}</div>
       </div>
     </div>`;
 }
@@ -1894,11 +1917,13 @@ function clientCards(clients) {
     </div>`).join('');
 }
 
-let _cf={health:'',market:''};
+let _cf={health:'',market:'',status:'Active'};
+function filterClientsByStatus(v){_cf.status=v;renderClientsUI(APP.clients);}
 function filterClientsByHealth(v){_cf.health=v;applyClientFilters();}
 function filterClientsByMarket(v){_cf.market=v;applyClientFilters();}
 function applyClientFilters(){
   let f=APP.clients;
+  if(_cf.status) f=f.filter(c=>c.status===_cf.status);
   if(_cf.health) f=f.filter(c=>c.healthStatus===_cf.health);
   if(_cf.market) f=f.filter(c=>c.marketplace===_cf.market);
   const qa=QUICK_ACTIONS[APP.user.role]||[];
@@ -2301,7 +2326,8 @@ async function renderCRM(){
   const u = APP.user;
   const isLead = ['Admin','Ops Lead','Sub Admin','CSI Lead','SME','Team Lead','CRM Lead'].includes(u.role);
   const isCRM = u.role === 'CRM Executive';
-  let myClients = APP.clients || [];
+  // Exclude Inactive/Closed sellers from CRM
+  let myClients = (APP.clients || []).filter(c => !['Inactive','Closed'].includes(c.status));
 
   // Non-lead, non-CRM: sirf apne clients
   if (!isLead && !isCRM) {
@@ -2632,12 +2658,13 @@ async function renderCSI(){
   ]);
   if(clients) APP.clients = clients;
 
-  // csiRaw is always an array
+  // Exclude Inactive/Closed sellers from CSI
+  const activeClients = (clients||[]).filter(c => !['Inactive','Closed'].includes(c.status));
   const csiList = Array.isArray(csiRaw) ? csiRaw : [];
 
   window._csiAllData = csiList;
   window._csiListData = csiList;
-  window._csiClients = clients || [];
+  window._csiClients = activeClients;
 
   var csiMap = {};
   csiList.forEach(function(r){
@@ -4589,11 +4616,14 @@ async function renderRenewals(){
   const [renewals, stats, clients] = await Promise.all([api('GET','/renewals'), api('GET','/renewals/stats'), getClients()]);
   if(clients) APP.clients = clients;
 
+  // Exclude Inactive/Closed sellers from Renewals
+  const activeClients = (APP.clients||[]).filter(c => !['Inactive','Closed'].includes(c.status));
+
   // Merge clients renewal dates if renewals table is sparse
   let allRenewals = renewals || [];
-  if (allRenewals.length < (APP.clients||[]).filter(c=>c.renewalDate).length) {
+  if (allRenewals.length < activeClients.filter(c=>c.renewalDate).length) {
     const existingCodes = new Set(allRenewals.map(r=>r.clientCode||r.client_code));
-    const fromClients = (APP.clients||[]).filter(c=>c.renewalDate && !existingCodes.has(c.clientCode)).map(c=>{
+    const fromClients = activeClients.filter(c=>c.renewalDate && !existingCodes.has(c.clientCode)).map(c=>{
       const d = new Date(c.renewalDate); d.setHours(0,0,0,0);
       const today = new Date(); today.setHours(0,0,0,0);
       const daysLeft = Math.ceil((d-today)/86400000);
@@ -7688,7 +7718,10 @@ async function submitTaskFromCall(clientCode, clientName) {
 
 // ── HELPERS ──────────────────────────────────────────────────
 function healthBadge(s){const m={'Healthy':'badge-green','Warning':'badge-amber','At Risk':'badge-red'};const d={'Healthy':'🟢','Warning':'🟡','At Risk':'🔴'};return `<span class="badge ${m[s]||'badge-gray'}">${d[s]||''} ${s||'Unknown'}</span>`;}
-function statusBadge(s){return `<span class="badge ${s==='Active'?'badge-green':s==='Inactive'?'badge-red':'badge-gray'}">${s||'—'}</span>`;}
+function statusBadge(s){
+  const map={'Active':'badge-green','Inactive':'badge-red','Hold':'badge-amber','Closed':'badge-gray','No Response':'badge-purple'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${s||'—'}</span>`;
+}
 function renewalBadge(d){if(!d)return '—';try{const days=Math.ceil((new Date(d)-new Date())/86400000);return `<span class="badge ${days<=7?'badge-red':days<=15?'badge-amber':'badge-green'}">${new Date(d).toLocaleDateString('en-IN')} (${days}d)</span>`;}catch(e){return d;}}
 function isToday(ds){if(!ds)return false;try{const d=new Date(ds),t=new Date();return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear();}catch(e){return false;}}
 function dateAfterDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}

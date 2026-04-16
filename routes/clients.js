@@ -145,15 +145,17 @@ router.put('/:code', authMiddleware, async (req, res) => {
 
 router.get('/:code/timeline', authMiddleware, async (req, res) => {
   const cc = req.params.code;
-  const [crmCalls, tickets, csiData, tasks] = await Promise.all([
+  const [crmCalls, tickets, csiData, tasks, workLogs] = await Promise.all([
     supabase.from('crm_calls').select('*').eq('client_code', cc).order('created_at', { ascending: false }).limit(10),
     supabase.from('tickets').select('*').eq('client_code', cc).order('created_at', { ascending: false }).limit(10),
     supabase.from('csi_data').select('*').eq('client_code', cc).order('review_date', { ascending: false }).limit(5),
     supabase.from('tasks').select('*').eq('client_code', cc).order('created_at', { ascending: false }).limit(10),
+    supabase.from('work_log').select('*').eq('client_code', cc).order('created_at', { ascending: false }).limit(20),
   ]);
   res.json({
     crmCalls: crmCalls.data || [], tickets: tickets.data || [],
     csiData: csiData.data || [], tasks: tasks.data || [],
+    workLogs: workLogs.data || [],
   });
 });
 

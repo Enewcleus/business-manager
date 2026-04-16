@@ -19,6 +19,7 @@ crmRouter.get('/today', authMiddleware, async (req, res) => {
     callId: c.call_id, clientCode: c.client_code, clientName: c.client_name,
     callOutcome: c.call_outcome, sellerComment: c.seller_comment,
     severity: c.severity, nextFollowUp: c.next_follow_up,
+    crmExecutive: c.crm_executive,
     callDate: new Date(c.created_at).toLocaleString('en-IN'),
   })));
 });

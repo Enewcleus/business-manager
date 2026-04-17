@@ -335,6 +335,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -443,6 +444,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -466,6 +468,7 @@ const NAV_CONFIG = {
     {id:'tasks', label:'Task Manager', icon:'📋'},
     {id:'tickets', label:'Tickets', icon:'🎫'},
     {id:'crm', label:'CRM Log', icon:'📞'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'csi', label:'CSI Health', icon:'📊'},
     {id:'renewals', label:'Renewals', icon:'🔄'},
     {id:'dsr', label:'Daily Sales Report', icon:'📈'},
@@ -482,6 +485,7 @@ const NAV_CONFIG = {
   'Viewer': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
     {id:'clients', label:'Client Manager', icon:'👥'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'tickets', label:'Tickets', icon:'🎫'},
     {id:'csi', label:'CSI Health', icon:'📊'},
     {id:'renewals', label:'Renewals', icon:'🔄'},
@@ -4521,51 +4525,71 @@ async function renderExecPerf() {
 
 async function renderWorkLog(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
-  const [logs,clients]=await Promise.all([api('GET','/tasks/worklog'),getClients()]);
-  if(clients) APP.clients=clients;
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','Viewer'].includes(u.role);
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
 
-  // Role-based: exec sirf apna
-  let myLogs = (logs||[]);
-  if(!isLead) {
-    myLogs = myLogs.filter(l => (l.executiveName||'').toLowerCase().includes(u.name.toLowerCase()));
+  // Default date range — last 7 days
+  if(!window._wlFrom) {
+    const d = new Date(); d.setDate(d.getDate()-6);
+    window._wlFrom = d.toISOString().split('T')[0];
+    window._wlTo = new Date().toISOString().split('T')[0];
   }
 
-  window._allWorkLogs = myLogs;
-  const todayStr = new Date().toLocaleDateString('en-IN');
-  const todayLogs = myLogs.filter(l=>l.loggedAt&&l.loggedAt.includes(todayStr));
-  const totalMins = myLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+  const params = `from=${window._wlFrom}&to=${window._wlTo}`;
+  const [logs, clients] = await Promise.all([
+    api('GET', '/tasks/worklog?'+params),
+    getClients()
+  ]);
+  if(clients) APP.clients = clients;
+  window._allWorkLogs = logs || [];
 
-  // Exec filter for leads
-  const execList = isLead ? [...new Set(myLogs.map(l=>l.executiveName).filter(Boolean))].sort() : [];
+  const execList = isLead ? [...new Set((logs||[]).map(l=>l.executiveName).filter(Boolean))].sort() : [];
+  const totalMins = (logs||[]).reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayLogs = (logs||[]).filter(l=>l.logDate===todayStr);
 
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${myLogs.length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${(logs||[]).length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Today</div><div class="kpi-value">${todayLogs.length}</div></div>
       <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Executives</div><div class="kpi-value">${execList.length||1}</div></div>
     </div>
+
     <div class="card">
       <div class="card-header">
         <span class="card-title">📓 Work Log</span>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${isLead && execList.length ? `<select class="form-control" style="width:170px;padding:6px;font-size:13px;" onchange="filterWorkLogByExec(this.value)">
-            <option value="">All Executives</option>
-            ${execList.map(e=>`<option value="${e}">${e}</option>`).join('')}
-          </select>` : ''}
-          <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
-            <option value="">All Types</option>
-            <option>Call</option><option>Meeting</option><option>Listing Update</option>
-            <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
-            <option>Follow-up</option><option>Store Visit</option><option>Other</option>
-          </select>
-          <input type="text" class="form-control" style="width:180px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterWorkLogByClient(this.value)">
-          <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:12px;white-space:nowrap;">From:</label>
+            <input type="date" class="form-control" style="padding:5px;font-size:13px;width:140px;" value="${window._wlFrom}" onchange="window._wlFrom=this.value;renderWorkLog()">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label style="font-size:12px;white-space:nowrap;">To:</label>
+            <input type="date" class="form-control" style="padding:5px;font-size:13px;width:140px;" value="${window._wlTo}" onchange="window._wlTo=this.value;renderWorkLog()">
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="window._wlFrom=new Date().toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">Today</button>
+          <button class="btn btn-sm btn-outline" onclick="var d=new Date();d.setDate(d.getDate()-6);window._wlFrom=d.toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">7 Days</button>
+          <button class="btn btn-sm btn-outline" onclick="var d=new Date();d.setDate(d.getDate()-29);window._wlFrom=d.toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">30 Days</button>
         </div>
       </div>
+      <div class="card-body" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+        ${isLead && execList.length ? `
+          <select class="form-control" style="width:170px;padding:6px;font-size:13px;" onchange="filterWorkLogByExec(this.value)" id="wl-exec-filter">
+            <option value="">👥 All Executives</option>
+            ${execList.map(e=>`<option value="${e}">${e}</option>`).join('')}
+          </select>` : ''}
+        <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
+          <option value="">All Types</option>
+          <option>Call</option><option>Meeting</option><option>Listing Update</option>
+          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
+          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
+        </select>
+        <input type="text" class="form-control" style="width:180px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterWorkLogByClient(this.value)">
+        <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
+      </div>
       <div class="card-body" style="padding:0;" id="worklog-table">
-        ${renderWorkLogTable(myLogs)}
+        ${renderWorkLogTable(logs||[])}
       </div>
     </div>`;
 }
@@ -4583,18 +4607,67 @@ function filterWorkLogByClient(q) {
 }
 
 function renderWorkLogTable(logs) {
-  if (!logs?.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No work logged yet</h3><p style="color:var(--text-muted);">Log Work button se kaam record karo!</p></div>';
-  return `<div class="table-wrap"><table>
-    <thead><tr><th>Time</th><th>Executive</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
-    <tbody>${logs.map(l=>`<tr>
-      <td style="font-size:11px;white-space:nowrap;">${l.loggedAt||'—'}</td>
-      <td><strong>${l.executiveName||'—'}</strong></td>
-      <td style="font-size:12px;">${l.clientName||'—'}</td>
-      <td><span class="badge badge-blue">${l.workType||'—'}</span></td>
-      <td style="font-size:12px;max-width:200px;">${l.description||'—'}</td>
-      <td style="font-size:12px;">${l.outcome||'—'}</td>
-      <td>${l.timeSpent||'—'}</td>
-    </tr>`).join('')}</tbody></table></div>`;
+  if (!logs?.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>Is date range mein koi log nahi</h3><p style="color:var(--text-muted);">Date range change karo ya Log Work button se kaam record karo!</p></div>';
+
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
+
+  // Group by date
+  const grouped = {};
+  logs.forEach(l => {
+    const date = l.logDate || l.loggedAt?.split(',')[0] || '—';
+    if(!grouped[date]) grouped[date] = [];
+    grouped[date].push(l);
+  });
+
+  const sortedDates = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+
+  return sortedDates.map(date => {
+    const dateLogs = grouped[date];
+    const dayMins = dateLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+    const execsToday = [...new Set(dateLogs.map(l=>l.executiveName).filter(Boolean))];
+
+    // Format date nicely
+    let displayDate = date;
+    try {
+      const d = new Date(date);
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
+      if(date === today) displayDate = '📅 Today — '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+      else if(date === yesterday) displayDate = '📅 Yesterday — '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+      else displayDate = '📅 '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+    } catch(e) {}
+
+    return `
+    <div style="margin-bottom:4px;">
+      <div style="padding:8px 16px;background:#f0f4ff;border-bottom:2px solid #2E75B6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:700;color:#1C4E80;">${displayDate}</div>
+        <div style="display:flex;gap:12px;align-items:center;font-size:12px;color:var(--text-muted);">
+          <span>📝 ${dateLogs.length} logs</span>
+          <span>⏱ ${Math.floor(dayMins/60)}h ${dayMins%60}m</span>
+          ${isLead ? `<span>👤 ${execsToday.join(', ')}</span>` : ''}
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Time</th>
+          ${isLead ? '<th>Executive</th>' : ''}
+          <th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th>
+        </tr></thead>
+        <tbody>
+          ${dateLogs.map(l=>`<tr>
+            <td style="font-size:11px;white-space:nowrap;color:var(--text-muted);">${l.loggedAt?.split(',')[1]?.trim()||l.loggedAt||'—'}</td>
+            ${isLead ? `<td><strong style="font-size:12px;">${l.executiveName||'—'}</strong><br><span style="font-size:10px;color:var(--text-muted);">${l.executiveRole||''}</span></td>` : ''}
+            <td style="font-size:12px;">${l.clientName||'<span style="color:var(--text-muted);">General</span>'}</td>
+            <td><span class="badge badge-blue" style="font-size:10px;">${l.workType||'—'}</span></td>
+            <td style="font-size:12px;max-width:220px;">${l.description||'—'}</td>
+            <td style="font-size:12px;color:var(--text-muted);">${l.outcome||'—'}</td>
+            <td style="text-align:center;font-size:12px;">${l.timeSpent?l.timeSpent+'m':'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }).join('');
 }
 
 function filterWorkLog(type) {

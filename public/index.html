@@ -353,6 +353,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -360,7 +361,6 @@ const NAV_CONFIG = {
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
-    {id:'stafftransfer',icon:'🔁',label:'Staff Transfer'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Lead': [
@@ -1872,7 +1872,7 @@ async function renderClients() {
 }
 
 function renderClientsUI(clients) {
-  const u=APP.user,qa=QUICK_ACTIONS[u.role]||[],canAdd=['Admin','Ops Lead'].includes(u.role);
+  const u=APP.user,qa=QUICK_ACTIONS[u.role]||[],canAdd=['Admin','Ops Lead','CRM Lead'].includes(u.role);
   // Default: show Active only
   if(_cf.status === undefined) _cf.status = 'Active';
   const filtered = _cf.status ? clients.filter(c=>c.status===_cf.status) : clients;
@@ -1923,7 +1923,7 @@ function clientTableRows(clients,qa) {
       <button class="btn btn-sm btn-primary" onclick="openClientDetail('${c.clientCode}')">👁️</button>
       <button class="btn btn-sm btn-outline" onclick="viewTimeline('${c.clientCode}','${c.busyName}')">📋</button>
       <button class="btn btn-sm btn-danger" onclick="openRaiseTicketFor('${c.clientCode}','${c.busyName}')">🎫</button>
-      ${['Admin','Ops Lead'].includes(APP.user.role)?'<button class="btn btn-sm btn-secondary" onclick="openEditClient(\''+c.clientCode+'\')">✏️</button>':''}
+      ${['Admin','Ops Lead','CRM Lead'].includes(APP.user.role)?'<button class="btn btn-sm btn-secondary" onclick="openEditClient(\''+c.clientCode+'\')">✏️</button>':''}
       ${['Admin','Ops Lead'].includes(APP.user.role)?`<button class="btn btn-sm" style="background:#e74c3c;color:#fff;" onclick="deleteClient('${c.clientCode}','${c.busyName}')">🗑️</button>`:''}
     </div></td>
   </tr>`).join('')}</tbody></table>`;

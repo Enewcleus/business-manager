@@ -315,6 +315,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
@@ -4524,74 +4525,155 @@ async function renderExecPerf() {
 }
 
 async function renderWorkLog(){
-  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading work logs...</div>';
+  document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading...</div>';
   const u = APP.user;
   const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
 
-  // Default date range — last 7 days
-  if(!window._wlFrom) {
-    const d = new Date(); d.setDate(d.getDate()-6);
-    window._wlFrom = d.toISOString().split('T')[0];
-    window._wlTo = new Date().toISOString().split('T')[0];
+  // Get users list for leads
+  let execList = [];
+  if(isLead) {
+    const users = await api('GET','/users') || [];
+    execList = users.filter(usr=>usr.isActive && !['Admin','Viewer'].includes(usr.role))
+      .sort((a,b)=>a.name.localeCompare(b.name));
   }
 
-  const params = `from=${window._wlFrom}&to=${window._wlTo}`;
-  const [logs, clients] = await Promise.all([
-    api('GET', '/tasks/worklog?'+params),
-    getClients()
-  ]);
-  if(clients) APP.clients = clients;
-  window._allWorkLogs = logs || [];
-
-  const execList = isLead ? [...new Set((logs||[]).map(l=>l.executiveName).filter(Boolean))].sort() : [];
-  const totalMins = (logs||[]).reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayLogs = (logs||[]).filter(l=>l.logDate===todayStr);
+  // Default date — today
+  if(!window._wlFrom) window._wlFrom = new Date().toISOString().split('T')[0];
+  if(!window._wlTo)   window._wlTo   = new Date().toISOString().split('T')[0];
+  if(!window._wlExec) window._wlExec = isLead ? '' : u.name;
 
   document.getElementById('page-content').innerHTML=`
-    <div class="kpi-grid">
-      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${(logs||[]).length}</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Today</div><div class="kpi-value">${todayLogs.length}</div></div>
-      <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
-      <div class="kpi-card amber"><div class="kpi-label">Executives</div><div class="kpi-value">${execList.length||1}</div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header" style="background:#f0f4ff;">
         <span class="card-title">📓 Work Log</span>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <label style="font-size:12px;white-space:nowrap;">From:</label>
-            <input type="date" class="form-control" style="padding:5px;font-size:13px;width:140px;" value="${window._wlFrom}" onchange="window._wlFrom=this.value;renderWorkLog()">
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <label style="font-size:12px;white-space:nowrap;">To:</label>
-            <input type="date" class="form-control" style="padding:5px;font-size:13px;width:140px;" value="${window._wlTo}" onchange="window._wlTo=this.value;renderWorkLog()">
-          </div>
-          <button class="btn btn-sm btn-outline" onclick="window._wlFrom=new Date().toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">Today</button>
-          <button class="btn btn-sm btn-outline" onclick="var d=new Date();d.setDate(d.getDate()-6);window._wlFrom=d.toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">7 Days</button>
-          <button class="btn btn-sm btn-outline" onclick="var d=new Date();d.setDate(d.getDate()-29);window._wlFrom=d.toISOString().split('T')[0];window._wlTo=new Date().toISOString().split('T')[0];renderWorkLog()">30 Days</button>
-        </div>
-      </div>
-      <div class="card-body" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
-        ${isLead && execList.length ? `
-          <select class="form-control" style="width:170px;padding:6px;font-size:13px;" onchange="filterWorkLogByExec(this.value)" id="wl-exec-filter">
-            <option value="">👥 All Executives</option>
-            ${execList.map(e=>`<option value="${e}">${e}</option>`).join('')}
-          </select>` : ''}
-        <select class="form-control" style="width:150px;padding:6px;font-size:13px;" onchange="filterWorkLog(this.value)">
-          <option value="">All Types</option>
-          <option>Call</option><option>Meeting</option><option>Listing Update</option>
-          <option>Health Fix</option><option>Ads Optimization</option><option>CSI Review</option>
-          <option>Follow-up</option><option>Store Visit</option><option>Other</option>
-        </select>
-        <input type="text" class="form-control" style="width:180px;padding:6px;font-size:13px;" placeholder="🔍 Client search..." oninput="filterWorkLogByClient(this.value)">
         <button class="btn btn-primary btn-sm" onclick="openQuickWorkLog()">➕ Log Work</button>
       </div>
-      <div class="card-body" style="padding:0;" id="worklog-table">
-        ${renderWorkLogTable(logs||[])}
+      <div class="card-body" style="padding:14px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+          ${isLead ? `
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">👤 Executive</label>
+            <select class="form-control" style="width:200px;padding:7px;font-size:13px;" id="wl-exec-select" onchange="window._wlExec=this.value">
+              <option value="">-- Select Executive --</option>
+              ${execList.map(e=>`<option value="${e.name}" ${window._wlExec===e.name?'selected':''}>${e.name} (${e.role})</option>`).join('')}
+            </select>
+          </div>` : ''}
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">📅 From</label>
+            <input type="date" class="form-control" style="padding:7px;font-size:13px;width:150px;" value="${window._wlFrom}" id="wl-from-date">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">📅 To</label>
+            <input type="date" class="form-control" style="padding:7px;font-size:13px;width:150px;" value="${window._wlTo}" id="wl-to-date">
+          </div>
+          <div style="display:flex;gap:6px;padding-bottom:2px;">
+            <button class="btn btn-sm btn-outline" onclick="setWlRange(0)">Today</button>
+            <button class="btn btn-sm btn-outline" onclick="setWlRange(6)">7d</button>
+            <button class="btn btn-sm btn-outline" onclick="setWlRange(29)">30d</button>
+            <button class="btn btn-primary btn-sm" onclick="loadWorkLogs()">🔍 Load</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="worklog-results">
+      <div style="text-align:center;padding:40px;color:var(--text-muted);">
+        ${isLead ? '👆 Executive select karo aur Load karo' : '👆 Date select karo aur Load karo'}
       </div>
     </div>`;
+
+  // Auto-load for executives (non-leads)
+  if(!isLead) loadWorkLogs();
+}
+
+function setWlRange(days) {
+  const d = new Date(); d.setDate(d.getDate()-days);
+  window._wlFrom = d.toISOString().split('T')[0];
+  window._wlTo   = new Date().toISOString().split('T')[0];
+  const f = document.getElementById('wl-from-date');
+  const t = document.getElementById('wl-to-date');
+  if(f) f.value = window._wlFrom;
+  if(t) t.value = window._wlTo;
+}
+
+async function loadWorkLogs() {
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
+
+  window._wlFrom = document.getElementById('wl-from-date')?.value || window._wlFrom;
+  window._wlTo   = document.getElementById('wl-to-date')?.value   || window._wlTo;
+  if(isLead) window._wlExec = document.getElementById('wl-exec-select')?.value || '';
+
+  const box = document.getElementById('worklog-results');
+  if(!box) return;
+
+  if(isLead && !window._wlExec) {
+    box.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">👆 Pehle executive select karo</div>';
+    return;
+  }
+
+  box.innerHTML='<div class="loading"><div class="spinner"></div> Loading logs...</div>';
+
+  let url = `/tasks/worklog?from=${window._wlFrom}&to=${window._wlTo}`;
+  if(window._wlExec) url += `&exec=${encodeURIComponent(window._wlExec)}`;
+
+  const logs = await api('GET', url) || [];
+  window._allWorkLogs = logs;
+
+  if(!logs.length) {
+    box.innerHTML='<div class="empty-state"><div class="emoji">📭</div><h3>Is period mein koi log nahi</h3><p style="color:var(--text-muted);">Date range change karo ya koi kaam log karo</p></div>';
+    return;
+  }
+
+  const totalMins = logs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+  const execName = window._wlExec || u.name;
+
+  // Group by date
+  const grouped = {};
+  logs.forEach(l => {
+    const date = l.logDate || '—';
+    if(!grouped[date]) grouped[date] = [];
+    grouped[date].push(l);
+  });
+  const sortedDates = Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
+
+  box.innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">Total Logs</div><div class="kpi-value">${logs.length}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Time</div><div class="kpi-value" style="font-size:18px;">${Math.floor(totalMins/60)}h ${totalMins%60}m</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Days Active</div><div class="kpi-value">${sortedDates.length}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Avg/Day</div><div class="kpi-value">${sortedDates.length?Math.round(logs.length/sortedDates.length):0}</div></div>
+    </div>
+    ${sortedDates.map(date => {
+      const dateLogs = grouped[date];
+      const dayMins = dateLogs.reduce((s,l)=>s+(parseInt(l.timeSpent)||0),0);
+      let displayDate = date;
+      try {
+        const d = new Date(date);
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now()-86400000).toISOString().split('T')[0];
+        if(date===today) displayDate='📅 Today — '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+        else if(date===yesterday) displayDate='📅 Yesterday — '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'});
+        else displayDate='📅 '+d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+      } catch(e){}
+
+      return `<div style="margin-bottom:8px;" class="card">
+        <div style="padding:8px 16px;background:#f0f4ff;border-bottom:2px solid #2E75B6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+          <div style="font-size:13px;font-weight:700;color:#1C4E80;">${displayDate}</div>
+          <div style="font-size:12px;color:var(--text-muted);">📝 ${dateLogs.length} logs &nbsp;⏱ ${Math.floor(dayMins/60)}h ${dayMins%60}m</div>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Time</th><th>Client</th><th>Work Type</th><th>Description</th><th>Outcome</th><th>Mins</th></tr></thead>
+          <tbody>${dateLogs.map(l=>`<tr>
+            <td style="font-size:11px;white-space:nowrap;color:var(--text-muted);">${l.loggedAt?.split(',')[1]?.trim()||'—'}</td>
+            <td style="font-size:12px;">${l.clientName||'<span style="color:var(--text-muted);">General</span>'}</td>
+            <td><span class="badge badge-blue" style="font-size:10px;">${l.workType||'—'}</span></td>
+            <td style="font-size:12px;max-width:250px;">${l.description||'—'}</td>
+            <td style="font-size:12px;color:var(--text-muted);">${l.outcome||'—'}</td>
+            <td style="text-align:center;font-size:12px;">${l.timeSpent?l.timeSpent+'m':'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    }).join('')}`;
 }
 
 function filterWorkLogByExec(exec) {

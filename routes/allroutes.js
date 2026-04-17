@@ -297,8 +297,24 @@ tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
 
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
-  let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(100);
-  if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead'].includes(role)) query = query.eq('executive_name', name);
+  const { from, to, exec } = req.query;
+
+  const leadRoles = ['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'Viewer'];
+  const isLead = leadRoles.includes(role);
+
+  let query = supabase.from('work_log').select('*').order('created_at', { ascending: false }).limit(500);
+
+  // Date filter
+  if (from) query = query.gte('created_at', from + 'T00:00:00');
+  if (to)   query = query.lte('created_at', to + 'T23:59:59');
+
+  // Role filter
+  if (!isLead) {
+    query = query.eq('executive_name', name);
+  } else if (exec) {
+    query = query.eq('executive_name', exec);
+  }
+
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(l => ({
@@ -306,7 +322,7 @@ tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
     clientCode: l.client_code, clientName: l.client_name, workType: l.work_type,
     description: l.description, outcome: l.outcome, timeSpent: l.time_spent,
     loggedAt: new Date(l.created_at).toLocaleString('en-IN'),
-    logDate: new Date(l.created_at).toISOString().split('T')[0], // ISO date for comparisons
+    logDate: new Date(l.created_at).toISOString().split('T')[0],
   })));
 });
 

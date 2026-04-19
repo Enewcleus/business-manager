@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>eNewcleus Business Manager</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --primary:#1C2B2D; --secondary:#D4A03D; --accent:#C8903A;
@@ -9491,6 +9492,163 @@ function raRenderResults() {
   }
 
   document.getElementById('ra-results').innerHTML = html;
+
+  // Add PDF download button at top of results
+  const resultsDiv = document.getElementById('ra-results');
+  const pdfBar = document.createElement('div');
+  pdfBar.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;';
+  pdfBar.innerHTML = `
+    <button class="btn btn-success" onclick="downloadRAPDF()" style="font-weight:700;">
+      📄 Download PDF (eNewcleus Report)
+    </button>`;
+  resultsDiv.insertBefore(pdfBar, resultsDiv.firstChild);
+}
+
+
+function downloadRAPDF() {
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...','error'); return; }
+
+  const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
+  const sellerName = client?.busyName || _ra.clientCode || 'Report';
+  const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const tasks = _ra.tasks || [];
+  const urgent = tasks.filter(t=>t.priority==='urgent');
+  const high = tasks.filter(t=>t.priority==='high');
+  const medium = tasks.filter(t=>t.priority==='medium');
+
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, pageH=297, sideW=12, margin=18;
+  const contentW = pageW - sideW - margin - 8;
+  const BLUE=[28,78,128], LB=[214,228,240], RED=[231,76,60], ORANGE=[211,84,0];
+  const AMBER=[212,160,61], GREEN=[39,174,96], GRAY=[245,245,245];
+  const DG=[100,100,100], WHITE=[255,255,255];
+  let pageNum=1;
+
+  function drawSidebar(){
+    doc.setFillColor(...BLUE);
+    doc.rect(0,0,sideW,pageH,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(7);
+    doc.setFont('helvetica','bold');
+    'eNewcleus'.split('').forEach(function(l,i){
+      doc.text(l, sideW/2, pageH-15-(i*5), {align:'center'});
+    });
+    doc.setFontSize(7);
+    doc.text(String(pageNum), sideW/2, pageH-5, {align:'center'});
+    doc.setDrawColor(...LB);
+    doc.setLineWidth(0.3);
+    doc.line(sideW,0,sideW,pageH);
+  }
+
+  function drawHeader(){
+    doc.setFillColor(...BLUE);
+    doc.rect(sideW,0,pageW-sideW,28,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.text('Amazon Report Analyzer', sideW+6, 11);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.text('Seller: '+sellerName, sideW+6, 18);
+    doc.text('Date: '+today, sideW+6, 23);
+    doc.text('Tasks: '+tasks.length+' | Urgent: '+urgent.length+' | High: '+high.length, pageW-8, 18, {align:'right'});
+  }
+
+  function newPage(){
+    doc.addPage(); pageNum++;
+    drawSidebar();
+    // mini header
+    doc.setFillColor(...BLUE);
+    doc.rect(sideW,0,pageW-sideW,10,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(8);
+    doc.setFont('helvetica','bold');
+    doc.text('eNewcleus — '+sellerName+' Report', sideW+4, 7);
+    return 16;
+  }
+
+  function drawSecHeader(y, title, color){
+    if(y>pageH-30){ y=newPage(); }
+    doc.setFillColor(...color);
+    doc.roundedRect(sideW+4,y,contentW+4,8,2,2,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(10);
+    doc.setFont('helvetica','bold');
+    doc.text(title, sideW+8, y+5.5);
+    return y+12;
+  }
+
+  function drawTask(y, t){
+    const lines = doc.splitTextToSize(t.title||'—', contentW-4);
+    const dlines = doc.splitTextToSize(t.description||'', contentW-4);
+    const h = 7+(lines.length*5)+(dlines.length*4)+4;
+    if(y+h>pageH-15){ y=newPage(); }
+    doc.setFillColor(...GRAY);
+    doc.roundedRect(sideW+4,y,contentW+4,h,2,2,'F');
+    const pc=t.priority==='urgent'?RED:t.priority==='high'?ORANGE:AMBER;
+    doc.setFillColor(...pc);
+    doc.roundedRect(sideW+5,y+1.5,22,4.5,1,1,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica','bold');
+    doc.text((t.priority||'').toUpperCase(), sideW+16, y+4.5, {align:'center'});
+    doc.setFillColor(...LB);
+    doc.roundedRect(sideW+29,y+1.5,30,4.5,1,1,'F');
+    doc.setTextColor(...BLUE);
+    doc.setFontSize(6.5);
+    doc.text(t.category||'General', sideW+44, y+4.5, {align:'center'});
+    doc.setTextColor(30,30,30);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.text(lines, sideW+6, y+9);
+    if(dlines.length){
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...DG);
+      doc.text(dlines, sideW+6, y+9+(lines.length*5));
+    }
+    return y+h+3;
+  }
+
+  // Page 1
+  drawSidebar();
+  drawHeader();
+  let y=33;
+
+  // KPI row
+  const kpis=[['Urgent',urgent.length,RED],['High',high.length,ORANGE],['Medium',medium.length,AMBER],['Total',tasks.length,GREEN]];
+  const kw=contentW/kpis.length;
+  kpis.forEach(function(k,i){
+    const x=sideW+4+i*kw;
+    doc.setFillColor(...k[2]);
+    doc.roundedRect(x,y,kw-3,14,2,2,'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(14);
+    doc.setFont('helvetica','bold');
+    doc.text(String(k[1]), x+kw/2-1.5, y+8, {align:'center'});
+    doc.setFontSize(7);
+    doc.setFont('helvetica','normal');
+    doc.text(k[0], x+kw/2-1.5, y+12.5, {align:'center'});
+  });
+  y+=20;
+
+  if(urgent.length){ y=drawSecHeader(y,'URGENT — Abhi Karo',RED); urgent.forEach(function(t){y=drawTask(y,t);}); }
+  if(high.length){ y=drawSecHeader(y,'HIGH PRIORITY — Is Hafte',ORANGE); high.forEach(function(t){y=drawTask(y,t);}); }
+  if(medium.length){ y=drawSecHeader(y,'MEDIUM — Is Mahine',AMBER); medium.forEach(function(t){y=drawTask(y,t);}); }
+
+  // Footer
+  const tp=doc.getNumberOfPages();
+  for(let i=1;i<=tp;i++){
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(...DG);
+    doc.setFont('helvetica','normal');
+    doc.text('eNewcleus Technology — Confidential | '+today, pageW/2+sideW/2, pageH-3, {align:'center'});
+  }
+
+  doc.save('eNewcleus_'+sellerName.replace(/\s+/g,'_')+'_Analysis_'+new Date().toISOString().split('T')[0]+'.pdf');
+  showToast('PDF download ho raha hai!','success');
 }
 
 async function viewRALog(logId) {

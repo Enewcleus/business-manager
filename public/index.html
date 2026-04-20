@@ -317,7 +317,7 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
-    {id:'csi',icon:'📊',label:'CSI Health'},
+    {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -352,9 +352,8 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'csi',icon:'📊',label:'CSI Health'},
-    {id:'renewals',icon:'🔄',label:'Renewals'},
-    {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -381,6 +380,7 @@ const NAV_CONFIG = {
     {id:'execperf',icon:'📈',label:'My Performance'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'clients',icon:'👥',label:'My Clients'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
@@ -396,6 +396,7 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
@@ -406,6 +407,7 @@ const NAV_CONFIG = {
     {id:'clients',icon:'👥',label:'Client Manager'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'csi',icon:'📊',label:'CSI Health'},
@@ -699,11 +701,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -1117,8 +1119,42 @@ async function load360(cc) {
             </table></div>`
         }
       </div>
+    </div>
+
+    <!-- Approval Requests in 360 -->
+    <div class="card" style="border-left:4px solid #27ae60;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">✅ Approval Requests</span>
+        <button class="btn btn-success btn-sm" onclick="openRaiseApproval('${cc}','${(client?.busyName||'').replace(/'/g,'')}')">➕ New Request</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="s360-approvals-body">
+        <div style="padding:12px;text-align:center;color:var(--text-muted);"><div class="spinner" style="display:inline-block;"></div></div>
+      </div>
     </div>`;
+
   if(dsrData&&dsrData.length) setTimeout(()=>draw360Charts(dsrData),100);
+
+  // Load approvals for this seller
+  api('GET', '/approvals/client/'+cc+'?_='+Date.now()).then(function(reqs){
+    const box = document.getElementById('s360-approvals-body');
+    if(!box) return;
+    const typeColors = {'Refund':'badge-red','Service Closed':'badge-gray','Package Change':'badge-blue','New Product Sale':'badge-green','Service Hold':'badge-amber','Discount / Exception':'badge-purple','Custom':'badge-blue'};
+    if(!(reqs||[]).length){ box.innerHTML='<div style="padding:16px;text-align:center;color:var(--text-muted);">Koi approval request nahi</div>'; return; }
+    box.innerHTML = (reqs||[]).map(function(r){
+      const sc=r.status==='Approved'?'var(--green)':r.status==='Rejected'?'var(--red)':'var(--amber)';
+      const sb=r.status==='Approved'?'#eafaf1':r.status==='Rejected'?'#fdf2f2':'#fef9e7';
+      return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);background:'+sb+';">'+
+        '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">'+
+          '<span class="badge '+(typeColors[r.requestType]||'badge-blue')+'" style="font-size:10px;">'+r.requestType+'</span>'+
+          '<span style="font-size:11px;font-weight:700;color:'+sc+';">● '+r.status+'</span>'+
+          '<span style="font-size:11px;color:var(--text-muted);">'+r.requestedAt+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;">'+r.description+'</div>'+
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">By: '+r.requestedBy+'</div>'+
+        (r.reviewRemarks?'<div style="font-size:12px;color:'+sc+';margin-top:3px;font-style:italic;">→ '+r.reviewedBy+': '+r.reviewRemarks+'</div>':'')+
+      '</div>';
+    }).join('');
+  });
 }
 
 // View tasks of a specific person from Seller 360
@@ -7172,10 +7208,24 @@ async function navigateClientPage(cc) {
           <div class="spinner" style="display:inline-block;"></div> Loading documents...
         </div>
       </div>
+    </div>
+
+    <!-- Approval Requests -->
+    <div class="card" id="cd-approvals" style="margin-bottom:12px;border-left:4px solid #27ae60;">
+      <div class="card-header" style="background:#eafaf1;">
+        <span class="card-title">✅ Approval Requests</span>
+        <button class="btn btn-success btn-sm" onclick="openRaiseApproval('${cc}','${(client?.busyName||'').replace(/'/g,'')}')">➕ New Request</button>
+      </div>
+      <div class="card-body" style="padding:0;" id="client-approvals-body">
+        <div style="padding:12px;text-align:center;color:var(--text-muted);">
+          <div class="spinner" style="display:inline-block;"></div> Loading...
+        </div>
+      </div>
     </div>`;
 
-  // Load documents after render
+  // Load documents and approvals after render
   loadClientDocs(cc);
+  loadClientApprovals(cc);
 }
 
 // ── DOCUMENT VAULT ────────────────────────────────────────────
@@ -7337,6 +7387,198 @@ async function deleteDoc(docId) {
   } else {
     showToast('Delete failed: '+(r?.error||'Error'),'error');
   }
+}
+
+// ── APPROVAL REQUESTS SYSTEM ──────────────────────────────────
+async function renderApprovals() {
+  document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const u = APP.user;
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(u.role);
+  const requests = await api('GET', '/approvals?_='+Date.now()) || [];
+
+  const pending = requests.filter(r=>r.status==='Pending');
+  const approved = requests.filter(r=>r.status==='Approved');
+  const rejected = requests.filter(r=>r.status==='Rejected');
+
+  const typeColors = {
+    'Refund':'badge-red','Service Closed':'badge-gray','Package Change':'badge-blue',
+    'New Product Sale':'badge-green','Service Hold':'badge-amber',
+    'Discount / Exception':'badge-purple','Custom':'badge-blue',
+  };
+
+  function reqCard(r) {
+    const statusColor = r.status==='Approved'?'var(--green)':r.status==='Rejected'?'var(--red)':'var(--amber)';
+    const statusBg = r.status==='Approved'?'#eafaf1':r.status==='Rejected'?'#fdf2f2':'#fef9e7';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:${statusBg};border-left:4px solid ${statusColor};">
+      <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+        <div style="flex:1;">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+            <span class="badge ${typeColors[r.requestType]||'badge-blue'}" style="font-size:11px;">${r.requestType}</span>
+            <span style="font-size:11px;font-weight:700;color:${statusColor};">● ${r.status}</span>
+            <span style="font-size:11px;color:var(--text-muted);">#${r.requestId}</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;">${r.clientName||'—'}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${r.clientCode}</div>
+          <div style="font-size:13px;margin-top:6px;line-height:1.5;">${r.description||'—'}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+            Requested by: <strong>${r.requestedBy}</strong> · ${new Date(r.requestedAt).toLocaleString('en-IN')}
+          </div>
+          ${r.reviewRemarks?`<div style="margin-top:6px;padding:8px;background:#fff;border-radius:6px;border-left:3px solid ${statusColor};font-size:12px;">
+            <strong>${r.reviewedBy}</strong>: ${r.reviewRemarks}
+            <span style="color:var(--text-muted);font-size:11px;"> · ${r.reviewedAt?new Date(r.reviewedAt).toLocaleString('en-IN'):''}</span>
+          </div>`:''}
+        </div>
+        ${isLead && r.status==='Pending' ? `
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:120px;">
+          <button class="btn btn-success btn-sm" data-rid="${r.requestId}" onclick="openApprovalReview(this.getAttribute('data-rid'),'approve')">✅ Approve</button>
+          <button class="btn btn-sm" style="background:#e74c3c;color:#fff;" data-rid="${r.requestId}" onclick="openApprovalReview(this.getAttribute('data-rid'),'reject')">❌ Reject</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('page-content').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card amber"><div class="kpi-label">⏳ Pending</div><div class="kpi-value">${pending.length}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Approved</div><div class="kpi-value">${approved.length}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">❌ Rejected</div><div class="kpi-value">${rejected.length}</div></div>
+      <div class="kpi-card blue"><div class="kpi-label">Total</div><div class="kpi-value">${requests.length}</div></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" onclick="filterApprovals('all')">All (${requests.length})</button>
+        <button class="btn btn-outline btn-sm" onclick="filterApprovals('Pending')" style="border-color:var(--amber);color:var(--amber);">⏳ Pending (${pending.length})</button>
+        <button class="btn btn-outline btn-sm" onclick="filterApprovals('Approved')" style="border-color:var(--green);color:var(--green);">✅ Approved</button>
+        <button class="btn btn-outline btn-sm" onclick="filterApprovals('Rejected')" style="border-color:var(--red);color:var(--red);">❌ Rejected</button>
+      </div>
+      <button class="btn btn-primary" onclick="openRaiseApproval()">➕ New Request</button>
+    </div>
+
+    <div id="approvals-list">
+      ${requests.length ? requests.map(reqCard).join('') : '<div class="empty-state"><div class="emoji">✅</div><h3>Koi request nahi</h3></div>'}
+    </div>`;
+
+  window._allApprovals = requests;
+  window._approvalReqCard = reqCard;
+}
+
+function filterApprovals(status) {
+  const all = window._allApprovals || [];
+  const filtered = status==='all' ? all : all.filter(r=>r.status===status);
+  document.getElementById('approvals-list').innerHTML = filtered.length
+    ? filtered.map(window._approvalReqCard).join('')
+    : '<div class="empty-state"><div class="emoji">📭</div><h3>Koi nahi</h3></div>';
+}
+
+function openRaiseApproval(cc, cn) {
+  const clients = APP.clients || [];
+  openPanel('➕ Approval Request Raise Karo', `
+    <div class="form-group"><label>Client *</label>
+      <div id="apr-client-wrap"></div>
+    </div>
+    <div class="form-group"><label>Request Type *</label>
+      <select class="form-control" id="apr-type">
+        <option value="">-- Select Type --</option>
+        <option>Refund</option>
+        <option>Service Closed</option>
+        <option>Package Change</option>
+        <option>New Product Sale</option>
+        <option>Service Hold</option>
+        <option>Discount / Exception</option>
+        <option>Custom</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Details / Reason *</label>
+      <textarea class="form-control" id="apr-desc" rows="4" 
+        placeholder="Kya approval chahiye? Seller ne kya kaha? Details mein likho..."></textarea>
+    </div>
+    <div style="background:#fef9e7;border-radius:8px;padding:10px;font-size:12px;margin-bottom:12px;">
+      💡 Yeh request Admin/Lead ke paas jayegi — woh approve/reject karenge aur seller ke profile mein record rahega.
+    </div>
+    <button class="btn btn-primary btn-full" onclick="submitApprovalRequest()">📤 Request Bhejo</button>
+  `);
+  setTimeout(function(){
+    buildSearchableSelect('apr-client-wrap', clients, cc||'', '🔍 Search client...');
+  }, 100);
+}
+
+async function submitApprovalRequest() {
+  const cc = getSearchableVal('apr-client-wrap') || '';
+  const cn = document.getElementById('apr-client-wrap_search')?.value?.split(' (')[0] || '';
+  const type = document.getElementById('apr-type')?.value;
+  const desc = document.getElementById('apr-desc')?.value?.trim();
+  if(!cc) { showToast('Client select karo!','error'); return; }
+  if(!type) { showToast('Request type select karo!','error'); return; }
+  if(!desc) { showToast('Details likho!','error'); return; }
+  const r = await api('POST', '/approvals', { clientCode:cc, clientName:cn, requestType:type, description:desc });
+  if(r?.success) {
+    showToast('✅ Request bhej di! Admin se approval milega.','success');
+    closePanel();
+    if(APP.page==='approvals') renderApprovals();
+  }
+}
+
+function openApprovalReview(requestId, action) {
+  const label = action==='approve' ? 'Approve ✅' : 'Reject ❌';
+  const color = action==='approve' ? 'btn-success' : '';
+  const style = action==='reject' ? 'background:#e74c3c;color:#fff;' : '';
+  openPanel((action==='approve'?'✅ Approve':'❌ Reject')+' Request', `
+    <div class="form-group">
+      <label>Remarks (optional)</label>
+      <textarea class="form-control" id="apr-review-remarks" rows="3" 
+        placeholder="${action==='approve'?'Approval note...':'Rejection reason...'}"></textarea>
+    </div>
+    <button class="btn ${color} btn-full" style="${style}" 
+      data-rid="${requestId}" data-action="${action}"
+      onclick="submitApprovalReview(this.getAttribute('data-rid'),this.getAttribute('data-action'))">
+      ${label}
+    </button>
+  `);
+}
+
+async function submitApprovalReview(requestId, action) {
+  const remarks = document.getElementById('apr-review-remarks')?.value?.trim();
+  const r = await api('PATCH', '/approvals/'+requestId, { action, reviewRemarks: remarks });
+  if(r?.success) {
+    showToast(action==='approve'?'✅ Approved!':'❌ Rejected!', 'success');
+    closePanel();
+    if(APP.page==='approvals') renderApprovals();
+  }
+}
+
+async function loadClientApprovals(cc) {
+  const box = document.getElementById('client-approvals-body');
+  if(!box) return;
+  const reqs = await api('GET', '/approvals/client/'+cc+'?_='+Date.now()) || [];
+
+  const typeColors = {
+    'Refund':'badge-red','Service Closed':'badge-gray','Package Change':'badge-blue',
+    'New Product Sale':'badge-green','Service Hold':'badge-amber',
+    'Discount / Exception':'badge-purple','Custom':'badge-blue',
+  };
+
+  if(!reqs.length) {
+    box.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);">Koi approval request nahi</div>';
+    return;
+  }
+
+  box.innerHTML = reqs.map(function(r){
+    const sc = r.status==='Approved'?'var(--green)':r.status==='Rejected'?'var(--red)':'var(--amber)';
+    const sb = r.status==='Approved'?'#eafaf1':r.status==='Rejected'?'#fdf2f2':'#fef9e7';
+    return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);background:${sb};">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="badge ${typeColors[r.requestType]||'badge-blue'}" style="font-size:10px;">${r.requestType}</span>
+          <span style="font-size:11px;font-weight:700;color:${sc};">● ${r.status}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-muted);">${r.requestedAt}</span>
+      </div>
+      <div style="font-size:13px;margin-top:4px;">${r.description||'—'}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">By: ${r.requestedBy}</div>
+      ${r.reviewRemarks?`<div style="font-size:12px;color:${sc};margin-top:4px;font-style:italic;">→ ${r.reviewedBy}: ${r.reviewRemarks}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 function buildClientActivitySummary(tickets, tasks, crmCalls, days) {

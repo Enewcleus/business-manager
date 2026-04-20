@@ -1092,6 +1092,82 @@ docsRouter.delete('/:docId', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── APPROVAL REQUESTS ─────────────────────────────────────────
+const approvalRouter = require('express').Router();
+
+// GET all — Admin/Lead sees all, others see own
+approvalRouter.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(role);
+    let query = supabase.from('approval_requests').select('*').order('requested_at', { ascending: false });
+    if(!isLead) query = query.eq('requested_by', name);
+    const { data, error } = await query;
+    if(error) throw error;
+    res.json((data||[]).map(r=>({
+      requestId: r.request_id, clientCode: r.client_code, clientName: r.client_name,
+      requestType: r.request_type, description: r.description,
+      requestedBy: r.requested_by, requestedByRole: r.requested_by_role,
+      requestedAt: r.requested_at, status: r.status,
+      reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at,
+      reviewRemarks: r.review_remarks,
+    })));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET by client
+approvalRouter.get('/client/:code', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('approval_requests')
+      .select('*').eq('client_code', req.params.code)
+      .order('requested_at', { ascending: false });
+    if(error) throw error;
+    res.json((data||[]).map(r=>({
+      requestId: r.request_id, clientCode: r.client_code, clientName: r.client_name,
+      requestType: r.request_type, description: r.description,
+      requestedBy: r.requested_by, requestedByRole: r.requested_by_role,
+      requestedAt: new Date(r.requested_at).toLocaleString('en-IN'),
+      status: r.status, reviewedBy: r.reviewed_by,
+      reviewedAt: r.reviewed_at ? new Date(r.reviewed_at).toLocaleString('en-IN') : null,
+      reviewRemarks: r.review_remarks,
+    })));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST — raise new request
+approvalRouter.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { clientCode, clientName, requestType, description } = req.body;
+    if(!clientCode || !requestType) return res.status(400).json({ error: 'clientCode and requestType required' });
+    const requestId = 'APR' + Date.now().toString().slice(-7);
+    const { error } = await supabase.from('approval_requests').insert({
+      request_id: requestId, client_code: clientCode, client_name: clientName,
+      request_type: requestType, description: description || null,
+      requested_by: req.user.name, requested_by_role: req.user.role,
+      status: 'Pending',
+    });
+    if(error) throw error;
+    res.json({ success: true, requestId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH — approve or reject
+approvalRouter.patch('/:id', authMiddleware, async (req, res) => {
+  try {
+    const allowedRoles = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    if(!allowedRoles.includes(req.user.role)) return res.status(403).json({ error: 'Not authorized' });
+    const { action, reviewRemarks } = req.body;
+    const status = action === 'approve' ? 'Approved' : 'Rejected';
+    const { error } = await supabase.from('approval_requests').update({
+      status, reviewed_by: req.user.name,
+      reviewed_at: new Date().toISOString(),
+      review_remarks: reviewRemarks || null,
+    }).eq('request_id', req.params.id);
+    if(error) throw error;
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── MIS REPORT ────────────────────────────────────────────────
 const misRouter = require('express').Router();
 
@@ -1205,5 +1281,5 @@ module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  expectationsRouter, monthlyReportsRouter, misRouter, docsRouter,
+  expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
 };

@@ -25,7 +25,9 @@ async function getFilteredClients(user) {
   }
 
   if (role === 'Ads Executive') {
-    let q = supabase.from('clients').select('*').ilike('ads_manager', `%${name}%`).order('busy_name');
+    let q = supabase.from('clients').select('*')
+      .or(`ads_manager.ilike.%${name}%,am_name.ilike.%${name}%`)
+      .order('busy_name');
     if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
     const { data, error } = await q;
     if (error) throw error;

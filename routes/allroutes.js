@@ -1295,10 +1295,567 @@ misRouter.get('/data', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// ── AI PRODUCTIVITY REPORT ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+// ── AI PROVIDER ABSTRACTION ──────────────────────────────────
+// Swappable: set AI_PROVIDER env var to 'gemini' (default) or 'anthropic'
+async function callAI(prompt, options = {}) {
+  const provider = (process.env.AI_PROVIDER || 'gemini').toLowerCase();
+  const maxTokens = options.maxTokens || 800;
+  try {
+    if (provider === 'anthropic' || provider === 'claude') return await callClaude(prompt, maxTokens);
+    return await callGemini(prompt, maxTokens);
+  } catch(e) {
+    console.error('AI call failed:', e.message);
+    return null;
+  }
+}
+
+async function callGemini(prompt, maxTokens) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+  if (!response.ok) throw new Error('Gemini API error: ' + response.status);
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function callClaude(prompt, maxTokens) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!response.ok) throw new Error('Claude API error: ' + response.status);
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+
+// ── AI CACHE (in-memory, 30 min TTL) ─────────────────────────
+const _aiInsightsCache = new Map();
+const AI_CACHE_TTL_MS = 30 * 60 * 1000;
+function _cacheKey(from, to, userNamesSignature) {
+  return from + '|' + to + '|' + userNamesSignature;
+}
+function _getCachedInsights(key) {
+  const entry = _aiInsightsCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > AI_CACHE_TTL_MS) { _aiInsightsCache.delete(key); return null; }
+  return entry.data;
+}
+function _setCachedInsights(key, data) {
+  _aiInsightsCache.set(key, { data, timestamp: Date.now() });
+}
+
+// ── PRODUCTIVITY SCORE CALCULATION (role-aware multi-metric) ──
+// Domain Excellence calculator per role
+function _domainExcellencePct(user, ctx) {
+  const { tasks, tickets, crm, csi } = ctx;
+  const name = user.name;
+  const role = user.role || '';
+  const myTasks = tasks.filter(t => t.assigned_to === name);
+  const myTickets = tickets.filter(t => t.assigned_to === name || t.resolved_by === name);
+  const myCRM = crm.filter(c => c.crm_executive === name);
+
+  if (role === 'Account Manager') {
+    if (!myTickets.length) return 0;
+    const closed = myTickets.filter(t => t.status === 'Done').length;
+    return Math.round((closed / myTickets.length) * 100);
+  }
+  if (role === 'Ads Executive') {
+    const ADS_CATS = ['Campaign Optimization','New Campaign Live','Campaign Paused','Keyword Research','A/B Testing','Report Review','Client Approval Pending'];
+    const myAds = myTasks.filter(t => ADS_CATS.includes(t.category));
+    if (!myAds.length) return 0;
+    const done = myAds.filter(t => t.status === 'Completed' || t.status === 'Done').length;
+    return Math.round((done / myAds.length) * 100);
+  }
+  if (role === 'CRM Executive') {
+    if (!myCRM.length) return 0;
+    const connected = myCRM.filter(c => (c.call_outcome || '').toLowerCase().includes('connected')).length;
+    return Math.round((connected / myCRM.length) * 100);
+  }
+  if (role === 'CSI Executive') {
+    // No strict CSI count available; use task completion as proxy
+    if (!myTasks.length) return 0;
+    const done = myTasks.filter(t => t.status === 'Completed' || t.status === 'Done').length;
+    return Math.round((done / myTasks.length) * 100);
+  }
+  // For leads/admins: team avg task completion
+  if (['Team Lead','SME','Senior Executive','CRM Lead','CSI Lead','Ops Lead','Admin','Sub Admin'].includes(role)) {
+    if (!tasks.length) return 0;
+    const done = tasks.filter(t => t.status === 'Completed' || t.status === 'Done').length;
+    return Math.round((done / tasks.length) * 100);
+  }
+  return 0;
+}
+
+// Count working days in [from, to] (inclusive). India: Mon-Sat.
+function _workingDaysBetween(from, to) {
+  const start = new Date(from);
+  const end = new Date(to);
+  let count = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    const day = d.getDay(); // 0=Sun, 6=Sat
+    if (day !== 0) count++; // Skip Sunday
+    d.setDate(d.getDate() + 1);
+  }
+  return Math.max(1, count);
+}
+
+function _daysActiveInPeriod(name, ctx) {
+  const { tasks, tickets, crm, worklog, dsr } = ctx;
+  const days = new Set();
+  const addDay = (dateStr) => { if (dateStr) days.add(new Date(dateStr).toISOString().split('T')[0]); };
+  tasks.filter(t => t.assigned_to === name).forEach(t => addDay(t.created_at));
+  tasks.filter(t => t.assigned_to === name && t.completed_at).forEach(t => addDay(t.completed_at));
+  tickets.filter(t => t.resolved_by === name || t.assigned_to === name).forEach(t => addDay(t.created_at));
+  crm.filter(c => c.crm_executive === name).forEach(c => addDay(c.created_at));
+  worklog.filter(w => w.executive_name === name).forEach(w => addDay(w.created_at));
+  dsr.filter(d => d.entered_by === name).forEach(d => addDay(d.report_date));
+  return days.size;
+}
+
+function _lastActivityDate(name, ctx) {
+  const { tasks, tickets, crm, worklog, dsr } = ctx;
+  const allDates = [];
+  tasks.filter(t => t.assigned_to === name).forEach(t => { if (t.created_at) allDates.push(new Date(t.created_at)); });
+  tickets.filter(t => t.resolved_by === name || t.assigned_to === name).forEach(t => { if (t.created_at) allDates.push(new Date(t.created_at)); });
+  crm.filter(c => c.crm_executive === name).forEach(c => { if (c.created_at) allDates.push(new Date(c.created_at)); });
+  worklog.filter(w => w.executive_name === name).forEach(w => { if (w.created_at) allDates.push(new Date(w.created_at)); });
+  dsr.filter(d => d.entered_by === name).forEach(d => { if (d.report_date) allDates.push(new Date(d.report_date)); });
+  if (!allDates.length) return null;
+  return new Date(Math.max(...allDates.map(d => d.getTime())));
+}
+
+function computeUserScore(user, ctx) {
+  const name = user.name;
+  const role = user.role || '';
+  const today = new Date();
+
+  // Filter data for this user
+  const myTasks = ctx.tasks.filter(t => t.assigned_to === name);
+  const myTasksDone = myTasks.filter(t => t.status === 'Completed' || t.status === 'Done');
+  const myTickets = ctx.tickets.filter(t => t.resolved_by === name || t.assigned_to === name);
+  const myTicketsClosed = myTickets.filter(t => t.status === 'Done');
+  const myCRM = ctx.crm.filter(c => c.crm_executive === name);
+  const connectedCalls = myCRM.filter(c => (c.call_outcome || '').toLowerCase().includes('connected'));
+  const myWorklog = ctx.worklog.filter(w => w.executive_name === name);
+  const myDSR = ctx.dsr.filter(d => d.entered_by === name);
+
+  // 1. Task Completion (25 pts)
+  const completionPct = myTasks.length ? Math.round((myTasksDone.length / myTasks.length) * 100) : 0;
+  const taskCompletionScore = (completionPct / 100) * 25;
+
+  // 2. Task Timeliness (15 pts)
+  const doneOnTime = myTasksDone.filter(t => {
+    if (!t.deadline || !t.completed_at) return false;
+    return new Date(t.completed_at) <= new Date(t.deadline);
+  }).length;
+  const timelinessPct = myTasksDone.length ? Math.round((doneOnTime / myTasksDone.length) * 100) : 0;
+  const timelinessScore = (timelinessPct / 100) * 15;
+
+  // 3. Domain Excellence (25 pts) — role-specific
+  const domainPct = _domainExcellencePct(user, ctx);
+  const domainScore = (domainPct / 100) * 25;
+
+  // 4. Activity Consistency (20 pts)
+  const workingDays = _workingDaysBetween(ctx.from, ctx.to);
+  const daysActive = _daysActiveInPeriod(name, ctx);
+  const consistencyPct = Math.round((daysActive / workingDays) * 100);
+  const consistencyScore = (Math.min(consistencyPct, 100) / 100) * 20;
+
+  // 5. Ticket SLA Score (15 pts)
+  const noBreachTickets = myTicketsClosed.filter(t => {
+    if (!t.hours_to_close) return true;
+    const slaMap = { Critical: 4, High: 12, Medium: 24, Low: 48 };
+    const sla = slaMap[t.priority] || 24;
+    return t.hours_to_close <= sla;
+  }).length;
+  const slaPct = myTicketsClosed.length ? Math.round((noBreachTickets / myTicketsClosed.length) * 100) : (myTickets.length ? 0 : 100);
+  const slaScore = (slaPct / 100) * 15;
+
+  const baseScore = taskCompletionScore + timelinessScore + domainScore + consistencyScore + slaScore;
+
+  // Bonuses / Penalties
+  let bonus = 0;
+  const bonusReasons = [];
+  let penalty = 0;
+  const penaltyReasons = [];
+
+  // Aged tickets
+  const agedTickets = myTickets.filter(t => {
+    if (t.status === 'Done') return false;
+    if (!t.created_at) return false;
+    const ageDays = Math.floor((today - new Date(t.created_at)) / 86400000);
+    return ageDays > 10;
+  });
+  if (agedTickets.length === 0 && myTickets.length > 0) {
+    bonus += 5; bonusReasons.push('No aged tickets');
+  } else if (agedTickets.length > 0) {
+    penalty += 5; penaltyReasons.push(agedTickets.length + ' aged ticket(s)');
+  }
+
+  // Inactive 3+ days
+  const lastAct = _lastActivityDate(name, ctx);
+  let daysIdle = null;
+  if (lastAct) {
+    daysIdle = Math.floor((today - lastAct) / 86400000);
+    if (daysIdle >= 3) { penalty += 10; penaltyReasons.push('Inactive ' + daysIdle + 'd'); }
+  } else {
+    penalty += 10; penaltyReasons.push('No activity in period');
+    daysIdle = workingDays;
+  }
+
+  // Staff aging label
+  const joining = user.joining_date ? new Date(user.joining_date) : null;
+  const staffAgingDays = joining ? Math.floor((today - joining) / 86400000) : null;
+  const staffAgingLabel = staffAgingDays != null
+    ? (Math.floor(staffAgingDays / 365) > 0
+        ? Math.floor(staffAgingDays / 365) + 'y ' + Math.floor((staffAgingDays % 365) / 30) + 'm'
+        : Math.floor((staffAgingDays % 365) / 30) + ' months')
+    : '—';
+
+  // Avg days to close tasks
+  const taskClosureDurations = myTasksDone
+    .filter(t => t.completed_at && t.created_at)
+    .map(t => (new Date(t.completed_at) - new Date(t.created_at)) / 86400000);
+  const avgDaysToClose = taskClosureDurations.length
+    ? Math.round((taskClosureDurations.reduce((s,d)=>s+d,0) / taskClosureDurations.length) * 10) / 10
+    : null;
+
+  // Avg ticket hours
+  const ticketHours = myTicketsClosed.map(t => t.hours_to_close).filter(h => h != null);
+  const avgTicketHours = ticketHours.length
+    ? Math.round(ticketHours.reduce((s,h)=>s+h,0) / ticketHours.length)
+    : null;
+
+  // Final cap 0-100
+  const finalScore = Math.max(0, Math.min(100, Math.round(baseScore + bonus - penalty)));
+
+  // Grade
+  let grade = 'F', gradeLabel = '🚨 Critical';
+  if (finalScore >= 90) { grade = 'A+'; gradeLabel = '🌟 Outstanding'; }
+  else if (finalScore >= 80) { grade = 'A'; gradeLabel = '🏆 Excellent'; }
+  else if (finalScore >= 65) { grade = 'B'; gradeLabel = '👍 Good'; }
+  else if (finalScore >= 50) { grade = 'C'; gradeLabel = '⚠️ Average'; }
+  else if (finalScore >= 35) { grade = 'D'; gradeLabel = '🔴 Needs Improvement'; }
+
+  return {
+    name, role,
+    designation: user.designation || role,
+    staffAging: staffAgingLabel, staffAgingDays,
+    tasksAssigned: myTasks.length,
+    tasksDone: myTasksDone.length,
+    tasksOverdue: myTasks.filter(t => t.deadline && t.status !== 'Done' && t.status !== 'Completed' && new Date(t.deadline) < today).length,
+    completionPct,
+    avgDaysToClose,
+    timelinessPct,
+    ticketsHandled: myTickets.length,
+    ticketsClosed: myTicketsClosed.length,
+    avgTicketHours,
+    slaPct,
+    crmCallsTotal: myCRM.length,
+    crmCallsConnected: connectedCalls.length,
+    crmConnectedPct: myCRM.length ? Math.round((connectedCalls.length / myCRM.length) * 100) : 0,
+    dsrEntries: myDSR.length,
+    workLogCount: myWorklog.length,
+    daysActive, workingDays, consistencyPct,
+    domainPct,
+    baseScore: Math.round(baseScore * 10) / 10,
+    bonus, bonusReasons,
+    penalty, penaltyReasons,
+    score: finalScore,
+    grade, gradeLabel,
+    flags: {
+      inactive: daysIdle !== null && daysIdle >= 3,
+      daysIdle,
+      agedTicketCount: agedTickets.length,
+      lastActiveDate: lastAct ? lastAct.toLocaleDateString('en-IN') : 'Never',
+    },
+  };
+}
+
+// ── REPORT ANALYZER EXECUTION SCORES ─────────────────────────
+function computeReportAnalyzerScores(reportLogs) {
+  const userMap = {};
+  (reportLogs || []).forEach(log => {
+    const user = log.analyzed_by || 'Unknown';
+    if (!userMap[user]) userMap[user] = {
+      user, role: log.analyzed_by_role || '',
+      timesUsed: 0, sellersAnalyzed: new Set(),
+      tasksGenerated: 0, tasksDone: 0, tasksPending: 0,
+      lastUsed: null,
+    };
+    const entry = userMap[user];
+    entry.timesUsed++;
+    if (log.client_code) entry.sellersAnalyzed.add(log.client_code);
+    const tasks = log.tasks_generated || [];
+    entry.tasksGenerated += tasks.length;
+    entry.tasksDone += tasks.filter(t => t.status === 'done').length;
+    entry.tasksPending += tasks.filter(t => t.status !== 'done').length;
+    const lu = log.analyzed_at ? new Date(log.analyzed_at) : null;
+    if (lu && (!entry.lastUsed || lu > entry.lastUsed)) entry.lastUsed = lu;
+  });
+  return Object.values(userMap).map(e => {
+    const executionPct = e.tasksGenerated ? Math.round((e.tasksDone / e.tasksGenerated) * 100) : 0;
+    let flag = null;
+    if (e.tasksGenerated > 20 && executionPct < 30) flag = '🚨 Low execution despite heavy use';
+    else if (e.tasksGenerated > 10 && executionPct < 40) flag = '⚠️ Execution below benchmark';
+    return {
+      user: e.user, role: e.role,
+      timesUsed: e.timesUsed,
+      sellersAnalyzed: e.sellersAnalyzed.size,
+      tasksGenerated: e.tasksGenerated,
+      tasksDone: e.tasksDone,
+      tasksPending: e.tasksPending,
+      executionPct,
+      lastUsed: e.lastUsed ? e.lastUsed.toLocaleDateString('en-IN') : '—',
+      flag,
+    };
+  }).sort((a, b) => b.executionPct - a.executionPct);
+}
+
+// ── ALERTS COMPUTATION ───────────────────────────────────────
+function computeAlerts(leaderboard, tickets) {
+  const idle = leaderboard
+    .filter(e => e.flags.inactive)
+    .map(e => ({ name: e.name, role: e.role, lastActive: e.flags.lastActiveDate, daysIdle: e.flags.daysIdle }))
+    .sort((a, b) => b.daysIdle - a.daysIdle);
+
+  const backlogGrowing = leaderboard
+    .filter(e => e.tasksAssigned > 5 && e.tasksDone < e.tasksAssigned * 0.5)
+    .map(e => ({ name: e.name, role: e.role, assigned: e.tasksAssigned, done: e.tasksDone, pendingRatio: Math.round(((e.tasksAssigned - e.tasksDone) / e.tasksAssigned) * 100) }));
+
+  const agedTickets = leaderboard
+    .filter(e => e.flags.agedTicketCount > 0)
+    .map(e => ({ name: e.name, role: e.role, count: e.flags.agedTicketCount }));
+
+  const lowCompletion = leaderboard
+    .filter(e => e.tasksAssigned > 5 && e.completionPct < 20)
+    .map(e => ({ name: e.name, role: e.role, completionPct: e.completionPct, tasksAssigned: e.tasksAssigned }));
+
+  return { idle, backlogGrowing, agedTickets, lowCompletion };
+}
+
+// ── AI INSIGHTS PROMPT BUILDER ───────────────────────────────
+function buildAIPrompt(leaderboard, reportScores, alerts, from, to) {
+  const top5 = leaderboard.slice().sort((a,b) => b.score - a.score).slice(0, 5);
+  const bottom5 = leaderboard.slice().sort((a,b) => a.score - b.score).slice(0, 5);
+
+  const formatPerson = (e) => `- ${e.name} (${e.role}): Score ${e.score}/100 [${e.grade}], Tasks ${e.tasksDone}/${e.tasksAssigned} (${e.completionPct}%), Tickets ${e.ticketsClosed} closed, CRM ${e.crmCallsConnected} connected, ${e.daysActive}/${e.workingDays} active days`;
+
+  const formatRA = (r) => `- ${r.user}: Used ${r.timesUsed}x → Generated ${r.tasksGenerated} tasks → Done ${r.tasksDone} (${r.executionPct}%)${r.flag ? ' ' + r.flag : ''}`;
+
+  const prompt = `You are an HR + productivity analyst for eNewcleus (Amazon seller management company in Indore, India). Analyze this team performance data from ${from} to ${to} and respond in natural Hinglish (Hindi + English mix, written in Roman/English letters).
+
+TOTAL EXECUTIVES: ${leaderboard.length}
+ACTIVE: ${leaderboard.filter(e => !e.flags.inactive).length}
+
+TOP 5 PERFORMERS:
+${top5.map(formatPerson).join('\n')}
+
+BOTTOM 5 PERFORMERS:
+${bottom5.map(formatPerson).join('\n')}
+
+REPORT ANALYZER (AI tool) USAGE:
+${reportScores.slice(0, 8).map(formatRA).join('\n') || 'No usage data'}
+
+ALERTS:
+- Idle (3+ days no activity): ${alerts.idle.map(a => a.name + ' (' + a.daysIdle + 'd)').join(', ') || 'None'}
+- Backlog growing: ${alerts.backlogGrowing.map(a => a.name).join(', ') || 'None'}
+- Aged tickets holders: ${alerts.agedTickets.map(a => a.name + ' (' + a.count + ')').join(', ') || 'None'}
+
+Generate a productivity analysis. Return ONLY a valid JSON object with this exact shape:
+{
+  "summary": "3-4 sentence Hinglish overview of team health",
+  "topPerformers": [{"name": "...", "highlight": "1-line Hinglish praise with specific data"}],
+  "concerns": [{"name": "...", "issue": "1-line empathetic Hinglish framing with possible reason"}],
+  "recommendations": ["action 1", "action 2", "action 3"]
+}
+
+Rules:
+- 3 top performers, 3 concerns, 3 recommendations
+- Use actual names from the data
+- Recommendations should be specific and actionable (not generic)
+- Hinglish tone: warm but direct, like a COO talking to fellow leader
+- Reference specific numbers/metrics where possible
+- Keep each field concise; total JSON should be under 1500 characters`;
+
+  return prompt;
+}
+
+async function getAIInsightsCached(leaderboard, reportScores, alerts, from, to) {
+  const userSig = leaderboard.map(e => e.name).sort().join(',');
+  const key = _cacheKey(from, to, userSig);
+  const cached = _getCachedInsights(key);
+  if (cached) return { ...cached, fromCache: true };
+
+  const prompt = buildAIPrompt(leaderboard, reportScores, alerts, from, to);
+  const rawResponse = await callAI(prompt, { maxTokens: 1000 });
+  if (!rawResponse) {
+    return {
+      summary: 'AI insights abhi generate nahi ho paaye. Data review kar sakte ho table mein.',
+      topPerformers: [], concerns: [], recommendations: [],
+      aiProvider: (process.env.AI_PROVIDER || 'gemini'),
+      error: true,
+    };
+  }
+
+  let parsed;
+  try {
+    // Clean any markdown fences
+    const cleaned = rawResponse.replace(/```json|```/g, '').trim();
+    parsed = JSON.parse(cleaned);
+  } catch(e) {
+    parsed = {
+      summary: rawResponse.slice(0, 500),
+      topPerformers: [], concerns: [], recommendations: [],
+      parseError: true,
+    };
+  }
+
+  const result = {
+    ...parsed,
+    generatedAt: new Date().toISOString(),
+    aiProvider: (process.env.AI_PROVIDER || 'gemini').toLowerCase() === 'anthropic' ? 'claude-haiku-4-5' : 'gemini-2.5-flash',
+  };
+  _setCachedInsights(key, result);
+  return result;
+}
+
+// ── PRODUCTIVITY ROUTER ──────────────────────────────────────
+const productivityRouter = require('express').Router();
+
+const PROD_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra'];
+
+productivityRouter.get('/productivity', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const lowerName = (name || '').toLowerCase();
+    const isNamedAdmin = PROD_NAMED_ADMINS.some(n => lowerName.includes(n));
+    // Full access roles see everyone with names
+    const FULL_ACCESS_ROLES = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    const canViewAll = FULL_ACCESS_ROLES.includes(role) || isNamedAdmin;
+
+    // Default date range: last 7 days
+    const now = new Date();
+    const defaultTo = now.toISOString().split('T')[0];
+    const defaultFromDate = new Date(now); defaultFromDate.setDate(defaultFromDate.getDate() - 6);
+    const defaultFrom = defaultFromDate.toISOString().split('T')[0];
+    const from = (req.query.from || defaultFrom);
+    const to   = (req.query.to   || defaultTo);
+    const fromISO = from + 'T00:00:00';
+    const toISO   = to   + 'T23:59:59';
+
+    // Parallel fetch
+    const [usersRes, tasksRes, ticketsRes, crmRes, worklogRes, dsrRes, reportLogsRes] = await Promise.all([
+      supabase.from('users').select('name, role, designation, joining_date, is_active').eq('is_active', true).not('role', 'in', '("Viewer","CSI Executive")'),
+      supabase.from('tasks').select('task_id, title, assigned_to, assigned_by, category, status, deadline, created_at, completed_at, priority').gte('created_at', fromISO).lte('created_at', toISO),
+      supabase.from('tickets').select('ticket_id, assigned_to, resolved_by, status, created_at, approved_at, hours_to_close, priority').gte('created_at', fromISO).lte('created_at', toISO),
+      supabase.from('crm_calls').select('call_id, crm_executive, call_outcome, created_at').gte('created_at', fromISO).lte('created_at', toISO),
+      supabase.from('work_log').select('log_id, executive_name, work_type, created_at').gte('created_at', fromISO).lte('created_at', toISO),
+      supabase.from('dsr_data').select('entered_by, report_date').gte('report_date', from).lte('report_date', to),
+      supabase.from('report_analyzer_logs').select('log_id, client_code, analyzed_by, analyzed_by_role, tasks_generated, analyzed_at').gte('analyzed_at', fromISO).lte('analyzed_at', toISO),
+    ]);
+
+    const users = usersRes.data || [];
+    const ctx = {
+      tasks: tasksRes.data || [], tickets: ticketsRes.data || [],
+      crm: crmRes.data || [], worklog: worklogRes.data || [], dsr: dsrRes.data || [],
+      from, to,
+    };
+
+    let leaderboard = users.map(u => computeUserScore(u, ctx))
+      .filter(e => e.tasksAssigned > 0 || e.ticketsHandled > 0 || e.crmCallsTotal > 0 || e.workLogCount > 0 || e.dsrEntries > 0 || e.flags.inactive)
+      .sort((a, b) => b.score - a.score);
+
+    let reportScores = computeReportAnalyzerScores(reportLogsRes.data || []);
+    let alerts = computeAlerts(leaderboard, ctx.tickets);
+
+    // Access control: non-full-access sees only own data
+    if (!canViewAll) {
+      leaderboard = leaderboard.filter(e => e.name === name);
+      reportScores = reportScores.filter(e => e.user === name);
+      alerts = { idle: [], backlogGrowing: [], agedTickets: [], lowCompletion: [] };
+    }
+
+    // AI insights (only for full access, non-empty leaderboard)
+    let aiInsights = null;
+    if (canViewAll && leaderboard.length > 0 && req.query.skipAI !== '1') {
+      aiInsights = await getAIInsightsCached(leaderboard, reportScores, alerts, from, to);
+    }
+
+    // Summary
+    const totalTasksDone = leaderboard.reduce((s, e) => s + e.tasksDone, 0);
+    const avgCompletion = leaderboard.length ? Math.round(leaderboard.reduce((s, e) => s + e.completionPct, 0) / leaderboard.length) : 0;
+
+    res.json({
+      period: { from, to, days: _workingDaysBetween(from, to) },
+      summary: {
+        totalExecutives: leaderboard.length,
+        activeExecutives: leaderboard.filter(e => !e.flags.inactive).length,
+        totalTasksCompleted: totalTasksDone,
+        avgCompletionRate: avgCompletion,
+      },
+      leaderboard,
+      reportAnalyzerScore: reportScores,
+      alerts,
+      aiInsights,
+      canViewAll,
+    });
+  } catch(e) {
+    console.error('Productivity report error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Force regenerate AI insights (bypasses cache)
+productivityRouter.post('/productivity/regenerate-ai', authMiddleware, async (req, res) => {
+  try {
+    // Clear cache for this period
+    const { from, to } = req.body;
+    if (from && to) {
+      for (const key of _aiInsightsCache.keys()) {
+        if (key.startsWith(from + '|' + to + '|')) _aiInsightsCache.delete(key);
+      }
+    } else {
+      _aiInsightsCache.clear();
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
+  productivityRouter,
 };

@@ -318,6 +318,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -338,6 +339,7 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -353,6 +355,7 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -371,6 +374,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
@@ -701,11 +705,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -2107,7 +2111,28 @@ async function submitAddClient(){
 }
 
 // ── TICKETS ──────────────────────────────────────────────────
+// Helper: days since a date string (calendar days). Returns integer ≥ 0.
+function ticketAgingDays(dateStr){
+  if(!dateStr) return 0;
+  const d = new Date(dateStr);
+  if(isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+// Helper: aging badge HTML — color coded
+function ticketAgingBadge(days){
+  if(days <= 0) return '<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🆕 Today</span>';
+  if(days <= 2)  return '<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟢 '+days+'d old</span>';
+  if(days <= 5)  return '<span style="background:#fef9e7;color:var(--amber);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟡 '+days+'d old</span>';
+  if(days <= 10) return '<span style="background:#fff3cd;color:#d35400;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟠 '+days+'d old</span>';
+  return '<span style="background:#fdf2f2;color:var(--red);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🔴 '+days+'d old</span>';
+}
+
 async function renderTickets(){
+  // Ensure clients are loaded (for seller aging + exec mapping)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
   const tickets=await api('GET','/tickets');if(!tickets) return;
   APP.tickets=tickets;
   const open=tickets.filter(t=>t.status!=='Done').length;
@@ -2115,6 +2140,12 @@ async function renderTickets(){
   const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
   const u=APP.user;
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(u.role);
+
+  // Build client-code → seller-aging map (used for seller aging column on ticket cards)
+  const clientSellerAgingMap = {};
+  (APP.clients||[]).forEach(c => { clientSellerAgingMap[c.clientCode] = c.sellerAging || 0; });
+  window._clientSellerAgingMap = clientSellerAgingMap;
+
 
   // Executive-wise summary for leads
   let execSummaryHtml = '';
@@ -2141,14 +2172,20 @@ async function renderTickets(){
         am = t.assignedTo || 'Unassigned';
       }
 
-      if(!execMap[am]) execMap[am]={name:am,open:0,inProgress:0,pending:0,total:0};
+      if(!execMap[am]) execMap[am]={name:am,open:0,inProgress:0,pending:0,total:0,ageSum:0,oldest:0};
       execMap[am].total++;
       if(t.status==='Open') execMap[am].open++;
       else if(t.status==='In Progress') execMap[am].inProgress++;
       else if(t.status==='Pending Approval') execMap[am].pending++;
+      // Track aging
+      const age = ticketAgingDays(t.createdAt);
+      execMap[am].ageSum += age;
+      if(age > execMap[am].oldest) execMap[am].oldest = age;
     });
 
     const execList = Object.values(execMap).sort((a,b)=>b.total-a.total);
+    // Compute avg age per exec
+    execList.forEach(e => { e.avgAge = e.total ? Math.round(e.ageSum / e.total) : 0; });
     if(execList.length) {
       execSummaryHtml = `
       <div class="card" style="margin-bottom:12px;border-left:4px solid #8e44ad;">
@@ -2170,7 +2207,10 @@ async function renderTickets(){
                   ${e.inProgress?`<span style="background:#fef9e7;color:var(--amber);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">🟡 ${e.inProgress} WIP</span>`:''}
                   ${e.pending?`<span style="background:#eaf4fd;color:#2980b9;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">⏳ ${e.pending} Pending</span>`:''}
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Total: ${e.total} open</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;justify-content:space-between;">
+                  <span>Total: ${e.total} open</span>
+                  <span style="color:${e.oldest>10?'var(--red)':e.oldest>5?'#d35400':'var(--text-muted)'};font-weight:600;">⏱ avg ${e.avgAge}d · max ${e.oldest}d</span>
+                </div>
               </div>`).join('')}
           </div>
         </div>
@@ -2178,12 +2218,19 @@ async function renderTickets(){
     }
   }
 
+  // Stale tickets = open and > 10 days old
+  const openTickets = tickets.filter(t=>t.status!=='Done');
+  const staleCount = openTickets.filter(t => ticketAgingDays(t.createdAt) > 10).length;
+  const avgOpenAge = openTickets.length ? Math.round(openTickets.reduce((s,t)=>s+ticketAgingDays(t.createdAt),0) / openTickets.length) : 0;
+
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">In Progress</div><div class="kpi-value">${tickets.filter(t=>t.status==='In Progress').length}</div></div>
       <div class="kpi-card blue"><div class="kpi-label">⏳ Pending Approval</div><div class="kpi-value">${pendingApproval}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${tickets.filter(t=>t.resolvedAt&&isToday(t.resolvedAt)).length}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fff3cd,#fef9e7);border-left:4px solid #d35400;"><div class="kpi-label">⏱ Avg Age (Open)</div><div class="kpi-value" style="color:#d35400;">${avgOpenAge}d</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fdf2f2,#fbe9e7);border-left:4px solid var(--red);"><div class="kpi-label">🔴 Stale (10+d)</div><div class="kpi-value" style="color:var(--red);">${staleCount}</div></div>
     </div>
     ${execSummaryHtml}
     <div class="card">
@@ -2239,12 +2286,16 @@ function filterTicketsByExecName(name) {
 function ticketCards(tickets){
   if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
+  const sellerAgingMap = window._clientSellerAgingMap || {};
   return [...tickets].sort((a,b)=>{
     const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
     return (order[a.status]||0)-(order[b.status]||0);
   }).map(t=>{
     const statusColor = t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber';
     const pendingApproval = t.status==='Pending Approval';
+    const ageDays = ticketAgingDays(t.createdAt);
+    const sellerAge = sellerAgingMap[t.clientCode] || 0;
+    const purpose = t.purpose || '';
     return `
     <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}" style="${pendingApproval?'border-left:4px solid #3498db;background:#eaf4fd;':''}">
       <div class="ticket-header">
@@ -2253,6 +2304,11 @@ function ticketCards(tickets){
           <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
           <span class="badge ${statusColor}">${t.status}</span>
         </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px 0;">
+        ${t.status!=='Done'?ticketAgingBadge(ageDays):''}
+        ${sellerAge?`<span style="background:#eaf4fd;color:#1a5276;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">👤 Seller ${sellerAge}d</span>`:''}
+        ${purpose?`<span style="background:#f5eef8;color:#6c3483;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🎯 ${purpose}</span>`:''}
       </div>
       <div class="ticket-desc" style="cursor:pointer;" onclick="viewTicketDetail(this)" data-tid="${t.ticketId}">${t.category} — ${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);font-size:11px;"> ...read more</span>':''}</div>
       ${pendingApproval?`<div style="font-size:12px;color:#2980b9;padding:4px 0;"><strong>⏳ Close request by:</strong> ${t.closeRequestedBy||'—'} · ${t.closeRequestedAt||'—'}</div>`:''}
@@ -2279,13 +2335,21 @@ function viewTicketDetail(el){
   if(!t) return;
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
   const pendingApproval = t.status==='Pending Approval';
+  const ageDays = ticketAgingDays(t.createdAt);
+  const sellerAgingMap = window._clientSellerAgingMap || {};
+  const sellerAge = sellerAgingMap[t.clientCode] || 0;
 
   openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
     '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
-      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'+
         '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span>'+
         '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
         '<span class="badge badge-blue">'+t.category+'</span>'+
+        (t.purpose?'<span style="background:#f5eef8;color:#6c3483;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;">🎯 '+t.purpose+'</span>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'+
+        (t.status!=='Done'?ticketAgingBadge(ageDays):'<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">✅ Closed in '+(t.hoursToClose||'—')+'h</span>')+
+        (sellerAge?'<span style="background:#eaf4fd;color:#1a5276;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">👤 Seller '+sellerAge+'d old</span>':'')+
       '</div>'+
       '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">Client: '+t.clientName+'</div>'+
       '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+t.assignedTo+'</div>'+
@@ -2467,6 +2531,20 @@ function openRaiseTicket(){
         <select class="form-control" id="tk-pri"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
       </div>
     </div>
+    <div class="form-group"><label>🎯 Purpose of Ticket</label>
+      <select class="form-control" id="tk-purpose">
+        <option value="">Select purpose...</option>
+        <option>Issue Resolution</option>
+        <option>Process Query</option>
+        <option>Clarification</option>
+        <option>Complaint</option>
+        <option>Follow-up</option>
+        <option>Feedback</option>
+        <option>Training Request</option>
+        <option>Escalation</option>
+        <option>Other</option>
+      </select>
+    </div>
     <div class="form-group"><label>Description *</label><textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea></div>
     <button class="btn btn-danger btn-full" onclick="submitTicket()">🎫 Raise Ticket</button>`);
 }
@@ -2475,7 +2553,8 @@ async function submitTicket(){
   const sel=document.getElementById('tk-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.dataset?.name||'';
   const desc=document.getElementById('tk-desc').value.trim();
   if(!cc){showToast('Select client','error');return;}if(!desc){showToast('Add description','error');return;}
-  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,description:desc});
+  const purpose = document.getElementById('tk-purpose')?.value || '';
+  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,purpose:purpose,description:desc});
   if(r?.success){showToast(`✅ ${r.ticketId} → ${r.assignedTo}`,'success');closePanel();if(APP.page==='tickets')renderTickets();}
 }
 
@@ -8296,6 +8375,364 @@ async function submitTaskFromCall(clientCode, clientName) {
   });
   if (r?.success) { showToast('✅ Task created!', 'success'); closePanel(); }
   else showToast(r?.error || 'Error', 'error');
+}
+
+// ── AI PRODUCTIVITY REPORT ──────────────────────────────────
+async function renderProductivityReport() {
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 6);
+  const defaultFrom = weekAgo.toISOString().split('T')[0];
+  const defaultTo = today.toISOString().split('T')[0];
+
+  // Read saved date range (if any) or defaults
+  const from = window._prodFrom || defaultFrom;
+  const to   = window._prodTo   || defaultTo;
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap;background:var(--card-bg);padding:12px;border-radius:10px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">FROM</label>
+        <input type="date" id="prod-from" class="form-control" style="width:150px;" value="${from}">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">TO</label>
+        <input type="date" id="prod-to" class="form-control" style="width:150px;" value="${to}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadProductivityReport()">🔄 Load</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(7)">7d</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(14)">14d</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(30)">30d</button>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-sm" style="background:#6c3483;color:#fff;" onclick="regenerateAIInsights()">🤖 Regenerate AI</button>
+        <button class="btn btn-sm btn-outline" onclick="exportProductivityCSV()">📥 Export CSV</button>
+      </div>
+    </div>
+    <div id="prod-content"><div class="loading"><div class="spinner"></div> Loading...</div></div>`;
+
+  loadProductivityReport();
+}
+
+function quickProdRange(days) {
+  const today = new Date();
+  const start = new Date(today); start.setDate(start.getDate() - (days - 1));
+  document.getElementById('prod-from').value = start.toISOString().split('T')[0];
+  document.getElementById('prod-to').value = today.toISOString().split('T')[0];
+  loadProductivityReport();
+}
+
+async function loadProductivityReport() {
+  const from = document.getElementById('prod-from').value;
+  const to = document.getElementById('prod-to').value;
+  window._prodFrom = from; window._prodTo = to;
+  const box = document.getElementById('prod-content');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div> Loading productivity data... (AI insights can take 3-5 seconds)</div>';
+
+  const data = await api('GET', '/reports/productivity?from=' + from + '&to=' + to + '&_=' + Date.now());
+  if (!data) { box.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Failed to load</h3></div>'; return; }
+  window._prodData = data;
+  renderProductivityContent(data);
+}
+
+async function regenerateAIInsights() {
+  const from = document.getElementById('prod-from').value;
+  const to = document.getElementById('prod-to').value;
+  showToast('🤖 AI fresh insights generate kar raha...', 'info');
+  await api('POST', '/reports/productivity/regenerate-ai', { from, to });
+  loadProductivityReport();
+}
+
+function renderProductivityContent(data) {
+  const { period, summary, leaderboard, reportAnalyzerScore, alerts, aiInsights, canViewAll } = data;
+
+  const kpiStrip = `
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">👥 Executives</div><div class="kpi-value">${summary.totalExecutives}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Active</div><div class="kpi-value">${summary.activeExecutives}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">📝 Tasks Done</div><div class="kpi-value">${summary.totalTasksCompleted}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#eafaf1,#d5f5e3);border-left:4px solid var(--green);"><div class="kpi-label">Avg Completion</div><div class="kpi-value" style="color:var(--green);">${summary.avgCompletionRate}%</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fdf2f2,#fbe9e7);border-left:4px solid var(--red);"><div class="kpi-label">🚨 Idle 3d+</div><div class="kpi-value" style="color:var(--red);">${alerts.idle.length}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fff3cd,#fef9e7);border-left:4px solid #d35400;"><div class="kpi-label">⚠️ Aged Tickets</div><div class="kpi-value" style="color:#d35400;">${alerts.agedTickets.length}</div></div>
+    </div>`;
+
+  // Tabs
+  const tabs = `
+    <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;">
+      <button class="prod-tab active" data-tab="leaderboard" onclick="switchProdTab('leaderboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 Leaderboard</button>
+      <button class="prod-tab" data-tab="ai-tasks" onclick="switchProdTab('ai-tasks')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🤖 AI Tasks Execution</button>
+      <button class="prod-tab" data-tab="alerts" onclick="switchProdTab('alerts')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Alerts</button>
+      <button class="prod-tab" data-tab="insights" onclick="switchProdTab('insights')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>
+    </div>`;
+
+  document.getElementById('prod-content').innerHTML = `
+    ${!canViewAll ? '<div style="background:#eaf4fd;border-left:4px solid #2980b9;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">ℹ️ Aap ke role ke hisaab se sirf <strong>apna score</strong> dikh raha hai</div>' : ''}
+    ${kpiStrip}
+    ${tabs}
+    <div id="prod-tab-content">${renderLeaderboardTab(leaderboard)}</div>`;
+}
+
+function switchProdTab(tab) {
+  document.querySelectorAll('.prod-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text)';
+  });
+  const btn = document.querySelector('.prod-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; }
+
+  const data = window._prodData;
+  if (!data) return;
+  const container = document.getElementById('prod-tab-content');
+  if (tab === 'leaderboard')  container.innerHTML = renderLeaderboardTab(data.leaderboard);
+  else if (tab === 'ai-tasks') container.innerHTML = renderAITasksTab(data.reportAnalyzerScore);
+  else if (tab === 'alerts')   container.innerHTML = renderAlertsTab(data.alerts);
+  else if (tab === 'insights') container.innerHTML = renderInsightsTab(data.aiInsights);
+}
+
+function gradeBadge(grade, label) {
+  const colors = {
+    'A+': {bg:'#d4edda', color:'#155724', border:'#28a745'},
+    'A':  {bg:'#d1ecf1', color:'#0c5460', border:'#17a2b8'},
+    'B':  {bg:'#fff3cd', color:'#856404', border:'#ffc107'},
+    'C':  {bg:'#ffe5d0', color:'#994f00', border:'#fd7e14'},
+    'D':  {bg:'#f8d7da', color:'#721c24', border:'#dc3545'},
+    'F':  {bg:'#f5c6cb', color:'#491217', border:'#b71c1c'},
+  };
+  const c = colors[grade] || colors['F'];
+  return '<span style="background:' + c.bg + ';color:' + c.color + ';border:2px solid ' + c.border + ';padding:3px 10px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;">' + grade + ' · ' + (label||'') + '</span>';
+}
+
+function renderLeaderboardTab(leaderboard) {
+  if (!leaderboard.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No activity in this period</h3></div>';
+
+  return `
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:10px;text-align:left;font-size:11px;">#</th>
+            <th style="padding:10px;text-align:left;">Executive</th>
+            <th style="padding:10px;text-align:center;">Grade</th>
+            <th style="padding:10px;text-align:center;">Score</th>
+            <th style="padding:10px;text-align:center;">Tasks</th>
+            <th style="padding:10px;text-align:center;">Completion</th>
+            <th style="padding:10px;text-align:center;">Tickets</th>
+            <th style="padding:10px;text-align:center;">SLA</th>
+            <th style="padding:10px;text-align:center;">CRM</th>
+            <th style="padding:10px;text-align:center;">Consistency</th>
+            <th style="padding:10px;text-align:center;">Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${leaderboard.map((e, i) => {
+            const rowBg = i < 3 ? '#f0fff4' : i >= leaderboard.length - 3 && leaderboard.length > 6 ? '#fdf2f2' : '';
+            const flags = [];
+            if (e.flags.inactive) flags.push('<span style="background:#fdf2f2;color:var(--red);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">💤 ' + e.flags.daysIdle + 'd</span>');
+            if (e.flags.agedTicketCount) flags.push('<span style="background:#fff3cd;color:#d35400;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">🔴 ' + e.flags.agedTicketCount + ' aged</span>');
+            if (e.bonus > 0) flags.push('<span style="background:#eafaf1;color:var(--green);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">⭐ +' + e.bonus + '</span>');
+            return `
+            <tr style="border-top:1px solid var(--border);background:${rowBg};cursor:pointer;" onclick="showProductivityDetail('${e.name.replace(/'/g,"\\'")}')">
+              <td style="padding:10px;font-weight:700;color:var(--text-muted);">${i+1}</td>
+              <td style="padding:10px;">
+                <div style="font-weight:700;">${e.name}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${e.role} · ${e.staffAging}</div>
+              </td>
+              <td style="padding:10px;text-align:center;">${gradeBadge(e.grade, e.gradeLabel)}</td>
+              <td style="padding:10px;text-align:center;font-weight:800;font-size:14px;">${e.score}</td>
+              <td style="padding:10px;text-align:center;">${e.tasksDone}/${e.tasksAssigned}</td>
+              <td style="padding:10px;text-align:center;">
+                <div style="font-weight:700;color:${e.completionPct>=70?'var(--green)':e.completionPct>=40?'var(--amber)':'var(--red)'};">${e.completionPct}%</div>
+              </td>
+              <td style="padding:10px;text-align:center;">${e.ticketsClosed}/${e.ticketsHandled}</td>
+              <td style="padding:10px;text-align:center;">${e.slaPct}%</td>
+              <td style="padding:10px;text-align:center;">${e.crmCallsConnected}/${e.crmCallsTotal}</td>
+              <td style="padding:10px;text-align:center;">${e.daysActive}/${e.workingDays}d</td>
+              <td style="padding:10px;">${flags.join(' ')||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:6px;padding:0 8px;">💡 Row click karo to detailed score breakdown dekhne ke liye</div>`;
+}
+
+function showProductivityDetail(name) {
+  const e = (window._prodData?.leaderboard || []).find(x => x.name === name);
+  if (!e) return;
+
+  const componentBar = (label, pct, score, weight) => {
+    const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red)';
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span>${label}</span>
+        <span><strong>${pct}%</strong> → ${score.toFixed(1)}/${weight}</span>
+      </div>
+      <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden;">
+        <div style="background:${color};height:100%;width:${Math.min(pct,100)}%;"></div>
+      </div>
+    </div>`;
+  };
+
+  openPanel('📈 ' + e.name + ' — Score Breakdown',
+    '<div style="padding:0 4px;">'+
+    '<div style="text-align:center;margin-bottom:16px;padding:14px;background:var(--bg);border-radius:10px;">'+
+      '<div style="font-size:42px;font-weight:900;color:var(--primary);">' + e.score + '</div>'+
+      '<div style="margin-top:4px;">' + gradeBadge(e.grade, e.gradeLabel) + '</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">' + e.role + ' · ' + e.staffAging + ' tenure</div>'+
+    '</div>'+
+    '<div style="font-weight:700;margin-bottom:10px;">Score Components:</div>'+
+    componentBar('📝 Task Completion', e.completionPct, e.completionPct/100*25, 25) +
+    componentBar('⏰ Task Timeliness', e.timelinessPct, e.timelinessPct/100*15, 15) +
+    componentBar('🎯 Domain Excellence', e.domainPct, e.domainPct/100*25, 25) +
+    componentBar('📅 Activity Consistency', e.consistencyPct, Math.min(e.consistencyPct,100)/100*20, 20) +
+    componentBar('⏱ Ticket SLA', e.slaPct, e.slaPct/100*15, 15) +
+    '<div style="border-top:2px solid var(--border);margin-top:12px;padding-top:12px;">'+
+      '<div style="display:flex;justify-content:space-between;font-weight:700;">'+
+        '<span>Base Score</span><span>' + e.baseScore + '/100</span>'+
+      '</div>'+
+      (e.bonus > 0 ? '<div style="color:var(--green);font-size:13px;margin-top:6px;">⭐ Bonus +' + e.bonus + ': ' + e.bonusReasons.join(', ') + '</div>' : '') +
+      (e.penalty > 0 ? '<div style="color:var(--red);font-size:13px;margin-top:6px;">🚨 Penalty -' + e.penalty + ': ' + e.penaltyReasons.join(', ') + '</div>' : '') +
+    '</div>'+
+    '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;">'+
+      '<div style="font-weight:700;margin-bottom:8px;">📊 Raw Numbers:</div>'+
+      '<div>Tasks: ' + e.tasksDone + ' done of ' + e.tasksAssigned + ' assigned (' + e.tasksOverdue + ' overdue)</div>'+
+      '<div>Tickets: ' + e.ticketsClosed + ' closed of ' + e.ticketsHandled + ' handled · avg ' + (e.avgTicketHours||'—') + 'h</div>'+
+      '<div>CRM: ' + e.crmCallsConnected + ' connected / ' + e.crmCallsTotal + ' total</div>'+
+      '<div>DSR: ' + e.dsrEntries + ' entries</div>'+
+      '<div>Work Log: ' + e.workLogCount + ' entries</div>'+
+      '<div>Active Days: ' + e.daysActive + ' of ' + e.workingDays + ' working days</div>'+
+      '<div>Last Active: ' + e.flags.lastActiveDate + '</div>'+
+    '</div>'+
+    '</div>'
+  );
+}
+
+function renderAITasksTab(scores) {
+  if (!scores.length) return '<div class="empty-state"><div class="emoji">🤖</div><h3>Report Analyzer ka koi usage nahi is period mein</h3></div>';
+
+  const totalGen = scores.reduce((s,r) => s + r.tasksGenerated, 0);
+  const totalDone = scores.reduce((s,r) => s + r.tasksDone, 0);
+  const overallPct = totalGen ? Math.round(totalDone/totalGen*100) : 0;
+
+  return `
+  <div style="background:linear-gradient(135deg,#f5eef8,#e8daef);border-radius:12px;padding:16px;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:700;color:#6c3483;margin-bottom:8px;">🤖 COMPANY-WIDE REPORT ANALYZER EFFICIENCY</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+      <div><div style="font-size:11px;color:var(--text-muted);">Reports</div><div style="font-size:22px;font-weight:800;">${scores.reduce((s,r) => s+r.timesUsed, 0)}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Tasks Generated</div><div style="font-size:22px;font-weight:800;color:#6c3483;">${totalGen}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Tasks Done</div><div style="font-size:22px;font-weight:800;color:var(--green);">${totalDone}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Execution %</div><div style="font-size:22px;font-weight:800;color:${overallPct>=60?'var(--green)':overallPct>=30?'var(--amber)':'var(--red)'};">${overallPct}%</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Benchmark: 60%+ achha, 30% se neeche concerning</div>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:10px;text-align:left;">User</th>
+            <th style="padding:10px;text-align:center;">Used</th>
+            <th style="padding:10px;text-align:center;">Sellers</th>
+            <th style="padding:10px;text-align:center;">Tasks Generated</th>
+            <th style="padding:10px;text-align:center;">Done</th>
+            <th style="padding:10px;text-align:center;">Execution</th>
+            <th style="padding:10px;text-align:center;">Last Used</th>
+            <th style="padding:10px;text-align:left;">Flag</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scores.map(r => `
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:10px;"><div style="font-weight:700;">${r.user}</div><div style="font-size:10px;color:var(--text-muted);">${r.role}</div></td>
+            <td style="padding:10px;text-align:center;font-weight:600;">${r.timesUsed}x</td>
+            <td style="padding:10px;text-align:center;">${r.sellersAnalyzed}</td>
+            <td style="padding:10px;text-align:center;color:#6c3483;font-weight:700;">${r.tasksGenerated}</td>
+            <td style="padding:10px;text-align:center;color:var(--green);font-weight:700;">${r.tasksDone}</td>
+            <td style="padding:10px;text-align:center;font-weight:800;color:${r.executionPct>=60?'var(--green)':r.executionPct>=30?'var(--amber)':'var(--red)'};">${r.executionPct}%</td>
+            <td style="padding:10px;text-align:center;font-size:11px;color:var(--text-muted);">${r.lastUsed}</td>
+            <td style="padding:10px;font-size:11px;">${r.flag||'<span style="color:var(--green);">✅ OK</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderAlertsTab(alerts) {
+  const hasAny = alerts.idle.length + alerts.backlogGrowing.length + alerts.agedTickets.length + alerts.lowCompletion.length > 0;
+  if (!hasAny) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No alerts! Team is doing great.</h3></div>';
+
+  const section = (title, color, items, emptyMsg) => `
+    <div class="card" style="margin-bottom:10px;border-left:4px solid ${color};">
+      <div class="card-header" style="background:${color}15;"><span class="card-title">${title} (${items.length})</span></div>
+      <div class="card-body">
+        ${items.length ? items.map(a => `
+          <div style="padding:10px;border-bottom:1px solid var(--border);">
+            <div style="font-weight:700;">${a.name}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+              ${a.role || ''}${a.lastActive ? ' · Last active: '+a.lastActive : ''}${a.daysIdle ? ' · '+a.daysIdle+' days idle' : ''}${a.count ? ' · '+a.count+' aged tickets' : ''}${a.assigned ? ' · '+a.done+'/'+a.assigned+' tasks done ('+a.pendingRatio+'% pending)' : ''}${a.completionPct!==undefined ? ' · '+a.completionPct+'% completion on '+a.tasksAssigned+' tasks' : ''}
+            </div>
+          </div>
+        `).join('') : '<div style="padding:12px;color:var(--text-muted);font-size:13px;">'+emptyMsg+'</div>'}
+      </div>
+    </div>`;
+
+  return `
+    ${section('💤 Inactive 3+ Days', 'var(--red)', alerts.idle, 'Sab active hain')}
+    ${section('📈 Backlog Growing', '#d35400', alerts.backlogGrowing, 'Koi nahi')}
+    ${section('🔴 Aged Tickets Holders', 'var(--red)', alerts.agedTickets, 'No aged tickets')}
+    ${section('⚠️ Low Completion Rate', 'var(--amber)', alerts.lowCompletion, 'Everyone performing')}`;
+}
+
+function renderInsightsTab(insights) {
+  if (!insights) return '<div class="empty-state"><div class="emoji">🤖</div><h3>AI insights available nahi hain</h3><p>Admin/Lead role mein login karo, ya date range change karo.</p></div>';
+  if (insights.error) return '<div class="card"><div class="card-body"><div style="color:var(--red);font-weight:700;">⚠️ AI insights generate nahi ho paaye</div><div style="margin-top:8px;font-size:13px;">' + insights.summary + '</div><div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="regenerateAIInsights()">🔄 Retry</button></div></div></div>';
+
+  const topPerf = (insights.topPerformers || []).map(p =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--green);">' + (p.name||'—') + ':</strong> ' + (p.highlight||'') + '</li>').join('');
+  const concerns = (insights.concerns || []).map(c =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--amber);">' + (c.name||'—') + ':</strong> ' + (c.issue||'') + '</li>').join('');
+  const recs = (insights.recommendations || []).map((r, i) =>
+    '<li style="margin-bottom:8px;"><strong>' + (i+1) + '.</strong> ' + r + '</li>').join('');
+
+  return `
+  <div class="card" style="border-left:4px solid #6c3483;background:linear-gradient(180deg,#f5eef8 0%,#fff 80%);">
+    <div class="card-header" style="background:#f5eef8;">
+      <span class="card-title">💡 AI Insights — by ${insights.aiProvider || 'AI'}</span>
+      <span style="font-size:11px;color:var(--text-muted);">
+        ${insights.fromCache ? '⚡ Cached' : '🆕 Fresh'} · ${insights.generatedAt ? new Date(insights.generatedAt).toLocaleString('en-IN') : ''}
+      </span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:14px;line-height:1.6;padding:10px;background:#fff;border-radius:8px;margin-bottom:14px;">${insights.summary || ''}</div>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--green);">🏆 Top Performers</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${topPerf || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--amber);">⚠️ Concerns</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${concerns || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--primary);">🎯 Action Recommendations</div>
+      <ul style="padding-left:20px;">${recs || '<li>—</li>'}</ul>
+    </div>
+  </div>`;
+}
+
+function exportProductivityCSV() {
+  const data = window._prodData;
+  if (!data) { showToast('Data load karo pehle', 'error'); return; }
+
+  const rows = [['Rank','Name','Role','Grade','Score','Tasks Done','Tasks Assigned','Completion %','Tickets Closed','SLA %','CRM Connected','Days Active/Working','Last Active','Bonus','Penalty']];
+  data.leaderboard.forEach((e, i) => {
+    rows.push([i+1, e.name, e.role, e.grade, e.score, e.tasksDone, e.tasksAssigned, e.completionPct, e.ticketsClosed, e.slaPct, e.crmCallsConnected, e.daysActive + '/' + e.workingDays, e.flags.lastActiveDate, e.bonus, e.penalty]);
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'productivity_' + data.period.from + '_to_' + data.period.to + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV downloaded', 'success');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────

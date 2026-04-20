@@ -2084,8 +2084,27 @@ async function renderTickets(){
   let execSummaryHtml = '';
   if(isLead) {
     const execMap = {};
+    // Build client->AM map
+    const clientAmMap = {};
+    (APP.clients||[]).forEach(c => { clientAmMap[c.clientCode] = c.amName||''; });
+
     tickets.filter(t=>t.status!=='Done').forEach(t=>{
-      const am = t.assignedTo || 'Unassigned';
+      // Try to get actual person name
+      let am = '';
+      // If assignedTo has a real name (not a role), use it
+      const roleKeywords = ['Account Manager','Ads Executive','CRM Executive','Ops Lead','CSI Lead'];
+      const isRole = roleKeywords.some(r => r === (t.assignedTo||'').trim());
+
+      if(!isRole && t.assignedTo) {
+        am = t.assignedTo;
+      } else if(t.clientCode && clientAmMap[t.clientCode]) {
+        am = clientAmMap[t.clientCode];
+      } else if(t.raisedBy) {
+        am = t.raisedBy;
+      } else {
+        am = t.assignedTo || 'Unassigned';
+      }
+
       if(!execMap[am]) execMap[am]={name:am,open:0,inProgress:0,pending:0,total:0};
       execMap[am].total++;
       if(t.status==='Open') execMap[am].open++;
@@ -2099,15 +2118,16 @@ async function renderTickets(){
       <div class="card" style="margin-bottom:12px;border-left:4px solid #8e44ad;">
         <div class="card-header" style="background:#f5eef8;">
           <span class="card-title">👥 Executive-wise Open Tickets</span>
-          <button class="btn btn-sm btn-outline" onclick="filterTicketsByExec('')" id="tkt-exec-all" style="font-weight:700;">All</button>
+          <button class="btn btn-sm btn-outline" onclick="filterTicketsByExec('','name')" id="tkt-exec-all" style="font-weight:700;">All</button>
         </div>
         <div class="card-body" style="padding:10px 14px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;">
             ${execList.map(e=>`
-              <div onclick="filterTicketsByExec('${e.name.replace(/'/g,'')}')" 
+              <div onclick="filterTicketsByExecName('${e.name.replace(/'/g,'')}')" 
                 id="tkt-exec-${e.name.replace(/\s+/g,'_')}"
                 style="border:1.5px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;transition:all 0.15s;background:#fff;"
-                onmouseover="this.style.borderColor='#8e44ad'" onmouseout="this.style.borderColor='var(--border)'">
+                onmouseover="this.style.borderColor='#8e44ad'" onmouseout="this.style.borderColor=this.dataset.sel==='1'?'#8e44ad':'var(--border)'"
+                data-sel="0">
                 <div style="font-size:13px;font-weight:700;margin-bottom:6px;">${e.name}</div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   ${e.open?`<span style="background:#fdf2f2;color:var(--red);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">🔴 ${e.open} Open</span>`:''}
@@ -2147,15 +2167,37 @@ function filterTicketsByExec(name) {
   const all = APP.tickets || [];
   const filtered = name ? all.filter(t=>t.assignedTo===name) : all;
   document.getElementById('tickets-body').innerHTML = ticketCards(filtered);
-  // Highlight selected card
   document.querySelectorAll('[id^="tkt-exec-"]').forEach(el=>{
     el.style.background='#fff';
     el.style.borderColor='var(--border)';
+    el.dataset.sel='0';
   });
   if(name) {
     const card = document.getElementById('tkt-exec-'+name.replace(/\s+/g,'_'));
-    if(card){ card.style.background='#f5eef8'; card.style.borderColor='#8e44ad'; }
+    if(card){ card.style.background='#f5eef8'; card.style.borderColor='#8e44ad'; card.dataset.sel='1'; }
   }
+}
+
+function filterTicketsByExecName(name) {
+  const all = APP.tickets || [];
+  const clientAmMap = {};
+  (APP.clients||[]).forEach(c => { clientAmMap[c.clientCode] = c.amName||''; });
+  const roleKeywords = ['Account Manager','Ads Executive','CRM Executive','Ops Lead','CSI Lead'];
+
+  const filtered = all.filter(t => {
+    const isRole = roleKeywords.some(r => r === (t.assignedTo||'').trim());
+    if(!isRole && t.assignedTo === name) return true;
+    if(t.clientCode && clientAmMap[t.clientCode] === name) return true;
+    if(t.raisedBy === name) return true;
+    return false;
+  });
+
+  document.getElementById('tickets-body').innerHTML = ticketCards(filtered);
+  document.querySelectorAll('[id^="tkt-exec-"]').forEach(el=>{
+    el.style.background='#fff'; el.style.borderColor='var(--border)'; el.dataset.sel='0';
+  });
+  const card = document.getElementById('tkt-exec-'+name.replace(/\s+/g,'_'));
+  if(card){ card.style.background='#f5eef8'; card.style.borderColor='#8e44ad'; card.dataset.sel='1'; }
 }
 
 function ticketCards(tickets){

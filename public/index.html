@@ -7393,7 +7393,11 @@ async function deleteDoc(docId) {
 async function renderApprovals() {
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(u.role);
+  // Named admins — always see/approve all (matches backend hasApprovalAllAccess)
+  const APPROVAL_ALL_ACCESS_NAMES = ['manpreet','gaurav','devendra','piyush','shivendra'];
+  const lowerName = (u.name || '').toLowerCase();
+  const isNamedAdmin = APPROVAL_ALL_ACCESS_NAMES.some(n => lowerName.includes(n));
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(u.role) || isNamedAdmin;
   const requests = await api('GET', '/approvals?_='+Date.now()) || [];
 
   const pending = requests.filter(r=>r.status==='Pending');

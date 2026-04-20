@@ -1095,13 +1095,28 @@ docsRouter.delete('/:docId', authMiddleware, async (req, res) => {
 // ── APPROVAL REQUESTS ─────────────────────────────────────────
 const approvalRouter = require('express').Router();
 
-// GET all — Admin/Lead sees all, others see own
+// Named admins — always see/approve all regardless of role (business rule)
+// Match is case-insensitive substring (e.g., "Gaurav Mourya" matches "gaurav")
+const APPROVAL_ALL_ACCESS_NAMES = ['manpreet','gaurav','devendra','piyush','shivendra'];
+function hasApprovalAllAccess(user) {
+  if(!user) return false;
+  const role = user.role || '';
+  const name = (user.name || '').toLowerCase();
+  // 1. Existing leads (unchanged)
+  if(['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(role)) return true;
+  // 2. Any CRM role (CRM Lead + CRM Executive)
+  if(role.toLowerCase().includes('crm')) return true;
+  // 3. Named admins (hardcoded by business)
+  if(APPROVAL_ALL_ACCESS_NAMES.some(n => name.includes(n))) return true;
+  return false;
+}
+
+// GET all — All-access users see everything, others see only what they raised
 approvalRouter.get('/', authMiddleware, async (req, res) => {
   try {
-    const { role, name } = req.user;
-    const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(role);
+    const seesAll = hasApprovalAllAccess(req.user);
     let query = supabase.from('approval_requests').select('*').order('requested_at', { ascending: false });
-    if(!isLead) query = query.eq('requested_by', name);
+    if(!seesAll) query = query.eq('requested_by', req.user.name);
     const { data, error } = await query;
     if(error) throw error;
     res.json((data||[]).map(r=>({
@@ -1151,11 +1166,15 @@ approvalRouter.post('/', authMiddleware, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH — approve or reject
+// PATCH — approve or reject (existing approver roles + named admins)
 approvalRouter.patch('/:id', authMiddleware, async (req, res) => {
   try {
     const allowedRoles = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
-    if(!allowedRoles.includes(req.user.role)) return res.status(403).json({ error: 'Not authorized' });
+    const lowerName = (req.user.name || '').toLowerCase();
+    const isNamedAdmin = APPROVAL_ALL_ACCESS_NAMES.some(n => lowerName.includes(n));
+    if(!allowedRoles.includes(req.user.role) && !isNamedAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
     const { action, reviewRemarks } = req.body;
     const status = action === 'approve' ? 'Approved' : 'Rejected';
     const { error } = await supabase.from('approval_requests').update({

@@ -4747,6 +4747,12 @@ async function renderWorkLog(){
   const u = APP.user;
   const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
 
+  // Pre-load clients silently (so Log Work dropdown ready rahe)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
+
   // Get users list for leads
   let execList = [];
   if(isLead) {
@@ -4975,9 +4981,19 @@ function filterWorkLog(type) {
   document.getElementById('worklog-table').innerHTML = renderWorkLogTable(logs);
 }
 
-function openQuickWorkLog(){
+async function openQuickWorkLog(){
+  // Ensure clients are loaded (fix for executives who open worklog directly without visiting Clients page)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
+  // If still empty after fetch, show helpful error
+  if(!APP.clients || !APP.clients.length){
+    showToast('⚠️ Aap ke clients list empty hai — Admin se contact karo taaki sellers assign ho', 'error');
+    return;
+  }
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client *</label>
+    <div class="form-group"><label>Client * <span style="color:var(--text-muted);font-size:11px;font-weight:normal;">(${APP.clients.length} clients available)</span></label>
       <div id="qwl-client-wrap"></div>
     </div>
     <div class="form-row">

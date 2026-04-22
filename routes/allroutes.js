@@ -1851,11 +1851,485 @@ productivityRouter.post('/productivity/regenerate-ai', authMiddleware, async (re
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// ── SALES RETENTION REPORT ──────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//
+// Tracks business impact per Account Manager:
+// - Monthly sales per AM (current vs previous month)
+// - MoM growth % (target: 15%+ minimum)
+// - Sellers with 0 sale (no grace period — zero is zero)
+// - Sellers with <15% growth (concern)
+// - Sellers with 15%+ growth (healthy)
+// - ACOS management (current vs prev month)
+// - Ticket burden + resolution speed
+// - Overall "Retention Health Score" per AM
+
+const salesRetentionRouter = require('express').Router();
+
+const SR_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra'];
+const GROWTH_TARGET_PCT = 15; // Minimum expected monthly growth per seller
+
+// Helpers
+function _monthBoundaries(refDate) {
+  // Returns {currFrom, currTo, prevFrom, prevTo} as YYYY-MM-DD strings
+  const d = refDate ? new Date(refDate) : new Date();
+  const y = d.getFullYear(), m = d.getMonth();
+  const currStart = new Date(y, m, 1);
+  const currEnd   = new Date(y, m + 1, 0);
+  const prevStart = new Date(y, m - 1, 1);
+  const prevEnd   = new Date(y, m, 0);
+  const iso = (dt) => dt.toISOString().split('T')[0];
+  return {
+    currFrom: iso(currStart), currTo: iso(currEnd),
+    prevFrom: iso(prevStart), prevTo: iso(prevEnd),
+    currLabel: currStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+    prevLabel: prevStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+  };
+}
+
+function _growthBucket(growthPct, hasCurr, hasPrev) {
+  // Categorize a seller's month-over-month growth
+  if (!hasPrev && !hasCurr) return 'dormant';       // no data either month
+  if (!hasPrev && hasCurr)  return 'new_or_restart';// new sales this month, nothing last month
+  if (hasPrev && !hasCurr)  return 'zero';          // had sales, now zero
+  if (growthPct < 0)         return 'negative';
+  if (growthPct < GROWTH_TARGET_PCT) return 'below_target'; // 0 to <15%
+  return 'healthy';                                  // 15%+
+}
+
+// Aggregate DSR data into client monthly totals
+function _clientMonthlyTotals(dsrRows) {
+  // Returns { client_code: { sales, adSpend, orders } }
+  const map = {};
+  (dsrRows || []).forEach(r => {
+    const cc = r.client_code;
+    if (!cc) return;
+    if (!map[cc]) map[cc] = { sales: 0, adSpend: 0, orders: 0, entries: 0 };
+    map[cc].sales   += parseFloat(r.sales_amount || 0);
+    map[cc].adSpend += parseFloat(r.ad_spend || 0);
+    map[cc].orders  += parseInt(r.orders_count || 0);
+    map[cc].entries += 1;
+  });
+  return map;
+}
+
+function _amRetentionScore(am) {
+  // am object contains aggregated numbers. Returns 0-100.
+  const sellers = am.totalSellers || 1;
+
+  // 1. Growth score (40 pts) — based on avg growth across sellers
+  let growthScore = 0;
+  if (am.avgGrowthPct >= 20) growthScore = 40;
+  else if (am.avgGrowthPct >= 15) growthScore = 35;
+  else if (am.avgGrowthPct >= 10) growthScore = 28;
+  else if (am.avgGrowthPct >= 5)  growthScore = 20;
+  else if (am.avgGrowthPct >= 0)  growthScore = 12;
+  else if (am.avgGrowthPct >= -10) growthScore = 5;
+  else growthScore = 0;
+
+  // 2. Zero sale penalty (up to -30)
+  const zeroPct = (am.zeroSaleCount / sellers) * 100;
+  let zeroPenalty = 0;
+  if (zeroPct >= 40) zeroPenalty = 30;
+  else if (zeroPct >= 25) zeroPenalty = 20;
+  else if (zeroPct >= 15) zeroPenalty = 12;
+  else if (zeroPct >= 5)  zeroPenalty = 5;
+
+  // 3. Ticket health (20 pts) — fewer tickets + fast resolution
+  let ticketScore = 20;
+  const ticketsPerSeller = am.totalTickets / sellers;
+  if (ticketsPerSeller > 3)     ticketScore -= 8;
+  else if (ticketsPerSeller > 2) ticketScore -= 4;
+  if (am.avgResolutionHours > 48) ticketScore -= 8;
+  else if (am.avgResolutionHours > 24) ticketScore -= 4;
+  if (am.agedTickets > 0) ticketScore -= (am.agedTickets * 2);
+  ticketScore = Math.max(0, ticketScore);
+
+  // 4. ACOS management (20 pts) — based on current ACOS + trend
+  let acosScore = 0;
+  const acos = am.avgACOS;
+  if (acos == null || isNaN(acos)) acosScore = 10; // neutral if no data
+  else if (acos < 20) acosScore = 20;
+  else if (acos < 25) acosScore = 17;
+  else if (acos < 30) acosScore = 13;
+  else if (acos < 40) acosScore = 8;
+  else acosScore = 3;
+  // Bonus if improved from last month
+  if (am.acosImproved) acosScore = Math.min(20, acosScore + 3);
+
+  // 5. Tenure bonus (0-10 pts) — based on retention/staying power
+  // Proxy: % of sellers with >90 day seller_aging
+  let tenureBonus = 0;
+  if (am.stableSellerPct >= 70) tenureBonus = 10;
+  else if (am.stableSellerPct >= 50) tenureBonus = 6;
+  else if (am.stableSellerPct >= 30) tenureBonus = 3;
+
+  const base = Math.max(0, growthScore - zeroPenalty + ticketScore + acosScore + tenureBonus);
+  return {
+    total: Math.min(100, Math.round(base)),
+    breakdown: {
+      growthScore, zeroPenalty, ticketScore, acosScore, tenureBonus,
+    },
+  };
+}
+
+function _retentionGrade(score) {
+  if (score >= 85) return { grade: 'A+', label: '🌟 Elite Retainer' };
+  if (score >= 75) return { grade: 'A',  label: '🏆 Strong Retainer' };
+  if (score >= 60) return { grade: 'B',  label: '👍 Solid' };
+  if (score >= 45) return { grade: 'C',  label: '⚠️ Needs Attention' };
+  if (score >= 30) return { grade: 'D',  label: '🔴 Churn Risk' };
+  return            { grade: 'F', label: '🚨 Critical — Intervention' };
+}
+
+// Main endpoint: full retention report for all AMs
+salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const lowerName = (name || '').toLowerCase();
+    const isNamedAdmin = SR_NAMED_ADMINS.some(n => lowerName.includes(n));
+    const FULL_ACCESS = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    const canViewAll = FULL_ACCESS.includes(role) || isNamedAdmin;
+
+    const refDate = req.query.refDate || null;
+    const bounds = _monthBoundaries(refDate);
+
+    // Parallel fetch
+    const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes, ticketsRes, usersRes] = await Promise.all([
+      supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').in('status', ['Active','Hold']),
+      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
+      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      supabase.from('ads_data').select('client_code, acos'),
+      supabase.from('tickets').select('ticket_id, client_code, status, created_at, hours_to_close, resolved_by, assigned_to').gte('created_at', bounds.currFrom + 'T00:00:00'),
+      supabase.from('users').select('name, role, joining_date').eq('is_active', true).eq('role', 'Account Manager'),
+    ]);
+
+    const clients = clientsRes.data || [];
+    const currMonthly = _clientMonthlyTotals(dsrCurrRes.data);
+    const prevMonthly = _clientMonthlyTotals(dsrPrevRes.data);
+    const adsMap = {};
+    (adsRes.data || []).forEach(a => { if (a.client_code) adsMap[a.client_code] = parseFloat(a.acos) || null; });
+    const tickets = ticketsRes.data || [];
+    const today = new Date();
+
+    // Build per-seller records grouped by AM
+    const amMap = {};
+    clients.forEach(c => {
+      const am = (c.am_name || '').trim();
+      if (!am) return;
+      if (!amMap[am]) amMap[am] = {
+        am_name: am,
+        sellers: [],
+        totalSellers: 0,
+        currSales: 0, prevSales: 0,
+        totalAdSpend: 0, totalOrders: 0,
+        zeroSaleCount: 0, negativeGrowthCount: 0,
+        belowTargetCount: 0, healthyCount: 0,
+        newOrRestartCount: 0, dormantCount: 0,
+        growthPcts: [], // for avg calculation
+        acosValues: [],
+        stableSellers: 0, // sellers > 90 days old
+      };
+      const curr = currMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
+      const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
+      const hasCurr = curr.sales > 0;
+      const hasPrev = prev.sales > 0;
+      let growthPct = 0;
+      if (hasPrev) growthPct = Math.round(((curr.sales - prev.sales) / prev.sales) * 100);
+      else if (hasCurr) growthPct = 100;
+      const bucket = _growthBucket(growthPct, hasCurr, hasPrev);
+
+      const entry = amMap[am];
+      entry.totalSellers++;
+      entry.currSales += curr.sales;
+      entry.prevSales += prev.sales;
+      entry.totalAdSpend += curr.adSpend;
+      entry.totalOrders  += curr.orders;
+
+      if (bucket === 'zero') entry.zeroSaleCount++;
+      else if (bucket === 'negative') entry.negativeGrowthCount++;
+      else if (bucket === 'below_target') entry.belowTargetCount++;
+      else if (bucket === 'healthy') entry.healthyCount++;
+      else if (bucket === 'new_or_restart') entry.newOrRestartCount++;
+      else if (bucket === 'dormant') entry.dormantCount++;
+
+      // Only include growth% for sellers that actually had prev sales (stable comparison)
+      if (hasPrev) entry.growthPcts.push(growthPct);
+      if (adsMap[c.client_code] != null) entry.acosValues.push(adsMap[c.client_code]);
+      if ((c.seller_aging || 0) > 90) entry.stableSellers++;
+
+      entry.sellers.push({
+        clientCode: c.client_code, busyName: c.busy_name,
+        marketplace: c.marketplace, servicePlan: c.service_plan,
+        sellerAging: c.seller_aging || 0,
+        currSales: Math.round(curr.sales),
+        prevSales: Math.round(prev.sales),
+        growthPct,
+        bucket,
+        acos: adsMap[c.client_code] || null,
+        renewalDate: c.renewal_date,
+      });
+    });
+
+    // Compute ticket stats per AM (using assigned_to or resolved_by matching am_name)
+    // Since tickets are assigned to generic roles mostly, we use client->AM map
+    const clientAmMap = {};
+    clients.forEach(c => { clientAmMap[c.client_code] = (c.am_name || '').trim(); });
+    tickets.forEach(t => {
+      const am = clientAmMap[t.client_code];
+      if (!am || !amMap[am]) return;
+      if (!amMap[am].tickets) amMap[am].tickets = [];
+      amMap[am].tickets.push(t);
+    });
+
+    // Final AM list
+    const amList = Object.values(amMap).map(am => {
+      const ticketsArr = am.tickets || [];
+      const closed = ticketsArr.filter(t => t.status === 'Done' && t.hours_to_close != null);
+      const resolutionHours = closed.map(t => t.hours_to_close);
+      const avgResolutionHours = resolutionHours.length
+        ? Math.round(resolutionHours.reduce((s,h) => s+h, 0) / resolutionHours.length)
+        : 0;
+      const aged = ticketsArr.filter(t => {
+        if (t.status === 'Done') return false;
+        if (!t.created_at) return false;
+        return Math.floor((today - new Date(t.created_at)) / 86400000) > 10;
+      }).length;
+
+      const mom = am.prevSales > 0
+        ? Math.round(((am.currSales - am.prevSales) / am.prevSales) * 100)
+        : (am.currSales > 0 ? 100 : 0);
+      const avgGrowthPct = am.growthPcts.length
+        ? Math.round(am.growthPcts.reduce((s,g) => s+g, 0) / am.growthPcts.length)
+        : 0;
+      const avgACOS = am.acosValues.length
+        ? Math.round((am.acosValues.reduce((s,a) => s+a, 0) / am.acosValues.length) * 10) / 10
+        : null;
+
+      const stableSellerPct = am.totalSellers ? Math.round((am.stableSellers / am.totalSellers) * 100) : 0;
+      const acosImproved = false; // placeholder — would need historical ACOS data
+
+      const amInput = {
+        totalSellers: am.totalSellers,
+        avgGrowthPct,
+        zeroSaleCount: am.zeroSaleCount,
+        totalTickets: ticketsArr.length,
+        avgResolutionHours,
+        agedTickets: aged,
+        avgACOS,
+        acosImproved,
+        stableSellerPct,
+      };
+      const scoreObj = _amRetentionScore(amInput);
+      const gradeObj = _retentionGrade(scoreObj.total);
+
+      return {
+        amName: am.am_name,
+        totalSellers: am.totalSellers,
+        currMonthSales: Math.round(am.currSales),
+        prevMonthSales: Math.round(am.prevSales),
+        momGrowthPct: mom,
+        avgSellerGrowthPct: avgGrowthPct,
+        totalAdSpend: Math.round(am.totalAdSpend),
+        totalOrders: am.totalOrders,
+        avgACOS,
+        // Bucket counts
+        zeroSale: am.zeroSaleCount,
+        negativeGrowth: am.negativeGrowthCount,
+        belowTarget: am.belowTargetCount,
+        healthy: am.healthyCount,
+        newOrRestart: am.newOrRestartCount,
+        dormant: am.dormantCount,
+        // Ticket
+        totalTickets: ticketsArr.length,
+        avgResolutionHours,
+        agedTickets: aged,
+        ticketsPerSeller: am.totalSellers ? Math.round((ticketsArr.length / am.totalSellers) * 10) / 10 : 0,
+        // Retention
+        stableSellerPct,
+        retentionScore: scoreObj.total,
+        scoreBreakdown: scoreObj.breakdown,
+        grade: gradeObj.grade,
+        gradeLabel: gradeObj.label,
+        sellers: am.sellers,
+      };
+    }).sort((a, b) => b.retentionScore - a.retentionScore);
+
+    // Access filter
+    let finalList = amList;
+    if (!canViewAll) {
+      finalList = amList.filter(am => am.amName.toLowerCase() === name.toLowerCase());
+    }
+
+    // Company-wide summary
+    const totalCurrSales = amList.reduce((s, am) => s + am.currMonthSales, 0);
+    const totalPrevSales = amList.reduce((s, am) => s + am.prevMonthSales, 0);
+    const companyMoM = totalPrevSales > 0 ? Math.round(((totalCurrSales - totalPrevSales) / totalPrevSales) * 100) : 0;
+    const totalZeroSale = amList.reduce((s, am) => s + am.zeroSale, 0);
+    const totalHealthy  = amList.reduce((s, am) => s + am.healthy, 0);
+    const totalSellers  = amList.reduce((s, am) => s + am.totalSellers, 0);
+
+    // AI insights (only for full access)
+    let aiInsights = null;
+    if (canViewAll && finalList.length > 0 && req.query.skipAI !== '1') {
+      aiInsights = await getRetentionAIInsights(finalList, bounds);
+    }
+
+    res.json({
+      period: {
+        currLabel: bounds.currLabel, prevLabel: bounds.prevLabel,
+        currFrom: bounds.currFrom, currTo: bounds.currTo,
+        prevFrom: bounds.prevFrom, prevTo: bounds.prevTo,
+      },
+      companySummary: {
+        totalAMs: amList.length,
+        totalSellers,
+        currMonthSales: totalCurrSales,
+        prevMonthSales: totalPrevSales,
+        momGrowthPct: companyMoM,
+        healthyPct: totalSellers ? Math.round((totalHealthy / totalSellers) * 100) : 0,
+        zeroSalePct: totalSellers ? Math.round((totalZeroSale / totalSellers) * 100) : 0,
+        zeroSaleCount: totalZeroSale,
+      },
+      amList: finalList,
+      aiInsights,
+      canViewAll,
+      growthTarget: GROWTH_TARGET_PCT,
+    });
+  } catch(e) {
+    console.error('Sales retention error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Drilldown: detailed seller list for a specific AM
+salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const lowerName = (name || '').toLowerCase();
+    const isNamedAdmin = SR_NAMED_ADMINS.some(n => lowerName.includes(n));
+    const FULL_ACCESS = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    const canViewAll = FULL_ACCESS.includes(role) || isNamedAdmin;
+    const requestedAM = decodeURIComponent(req.params.amName);
+    if (!canViewAll && requestedAM.toLowerCase() !== name.toLowerCase()) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    const bounds = _monthBoundaries(req.query.refDate);
+    const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes] = await Promise.all([
+      supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').ilike('am_name', requestedAM).in('status', ['Active','Hold']),
+      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
+      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      supabase.from('ads_data').select('client_code, acos'),
+    ]);
+    const clients = clientsRes.data || [];
+    const currMonthly = _clientMonthlyTotals(dsrCurrRes.data);
+    const prevMonthly = _clientMonthlyTotals(dsrPrevRes.data);
+    const adsMap = {};
+    (adsRes.data || []).forEach(a => { if (a.client_code) adsMap[a.client_code] = parseFloat(a.acos) || null; });
+
+    const sellers = clients.map(c => {
+      const curr = currMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
+      const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
+      const hasCurr = curr.sales > 0, hasPrev = prev.sales > 0;
+      let growthPct = 0;
+      if (hasPrev) growthPct = Math.round(((curr.sales - prev.sales) / prev.sales) * 100);
+      else if (hasCurr) growthPct = 100;
+      return {
+        clientCode: c.client_code, busyName: c.busy_name,
+        marketplace: c.marketplace, servicePlan: c.service_plan,
+        sellerAging: c.seller_aging || 0,
+        currSales: Math.round(curr.sales),
+        prevSales: Math.round(prev.sales),
+        growthPct,
+        bucket: _growthBucket(growthPct, hasCurr, hasPrev),
+        currOrders: curr.orders,
+        currAdSpend: Math.round(curr.adSpend),
+        acos: adsMap[c.client_code] || null,
+        renewalDate: c.renewal_date,
+      };
+    }).sort((a, b) => a.growthPct - b.growthPct); // worst first
+
+    res.json({ amName: requestedAM, period: bounds, sellers });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// AI insights cache (separate from productivity cache)
+const _retentionAICache = new Map();
+async function getRetentionAIInsights(amList, bounds) {
+  const key = bounds.currFrom + '|' + bounds.currTo + '|' + amList.map(a => a.amName).sort().join(',');
+  const entry = _retentionAICache.get(key);
+  if (entry && Date.now() - entry.timestamp < AI_CACHE_TTL_MS) {
+    return { ...entry.data, fromCache: true };
+  }
+
+  const top3 = amList.slice(0, 3);
+  const bottom3 = amList.slice(-3).reverse();
+  const zeroSaleChamps = amList.filter(a => a.zeroSale >= 3).slice(0, 3);
+  const growthChamps = amList.filter(a => a.avgSellerGrowthPct >= 15).slice(0, 5);
+
+  const fmt = (a) => `- ${a.amName}: ${a.totalSellers} sellers, Curr ₹${(a.currMonthSales/100000).toFixed(1)}L (${a.momGrowthPct >= 0 ? '+' : ''}${a.momGrowthPct}% MoM), Healthy ${a.healthy}/${a.totalSellers}, ZeroSale ${a.zeroSale}, Avg Growth ${a.avgSellerGrowthPct}%, ACOS ${a.avgACOS != null ? a.avgACOS + '%' : 'N/A'}, ${a.totalTickets} tickets (${a.avgResolutionHours}h avg), Score ${a.retentionScore}/100 [${a.grade}]`;
+
+  const prompt = `You are a retention + sales strategist for eNewcleus (Amazon seller management, Indore). Analyze this Account Manager team performance for ${bounds.currLabel} vs ${bounds.prevLabel}. Target: minimum 15% monthly growth per seller. Zero grace period.
+
+TOP 3 RETAINERS:
+${top3.map(fmt).join('\n')}
+
+BOTTOM 3 (CHURN RISK):
+${bottom3.map(fmt).join('\n')}
+
+GROWTH CHAMPIONS (avg seller growth 15%+):
+${growthChamps.length ? growthChamps.map(fmt).join('\n') : 'Koi nahi — alarming'}
+
+ZERO-SALE CLUSTERS (AMs with 3+ zero-sale sellers):
+${zeroSaleChamps.length ? zeroSaleChamps.map(a => '- ' + a.amName + ': ' + a.zeroSale + ' zero-sale out of ' + a.totalSellers).join('\n') : 'None'}
+
+Return ONLY valid JSON:
+{
+  "summary": "3-4 line Hinglish overview focusing on retention health + concerns",
+  "retentionChampions": [{"name": "...", "highlight": "Hinglish praise with data"}],
+  "churnRisks": [{"name": "...", "issue": "Hinglish concern + possible reason"}],
+  "zeroSaleAlerts": [{"name": "...", "action": "Specific action needed"}],
+  "recommendations": ["specific action 1", "2", "3"]
+}
+
+Rules: 3 champions, 3 risks, 3 zero-sale alerts (if any), 3 recommendations. Tone: warm but direct, like a COO. Reference specific numbers. Keep JSON under 2000 chars.`;
+
+  const raw = await callAI(prompt, { maxTokens: 1400 });
+  if (!raw) {
+    return {
+      summary: 'AI insights abhi generate nahi ho paaye. Data review kar sakte ho directly.',
+      retentionChampions: [], churnRisks: [], zeroSaleAlerts: [], recommendations: [],
+      aiProvider: (process.env.AI_PROVIDER || 'gemini'),
+      error: true,
+    };
+  }
+  let parsed;
+  try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
+  catch(e) { parsed = { summary: raw.slice(0, 600), retentionChampions: [], churnRisks: [], zeroSaleAlerts: [], recommendations: [], parseError: true }; }
+
+  const result = {
+    ...parsed,
+    generatedAt: new Date().toISOString(),
+    aiProvider: (process.env.AI_PROVIDER || 'gemini').toLowerCase() === 'anthropic' ? 'claude-haiku-4-5' : 'gemini-2.5-flash',
+  };
+  _retentionAICache.set(key, { data: result, timestamp: Date.now() });
+  return result;
+}
+
+// Regenerate AI (force refresh)
+salesRetentionRouter.post('/sales-retention/regenerate-ai', authMiddleware, async (req, res) => {
+  try {
+    _retentionAICache.clear();
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
-  productivityRouter,
+  productivityRouter, salesRetentionRouter,
 };

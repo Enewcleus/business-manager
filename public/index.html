@@ -319,6 +319,7 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -340,6 +341,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -356,6 +358,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -382,6 +385,7 @@ const NAV_CONFIG = {
   ],
   'Account Manager': [
     {id:'execperf',icon:'📈',label:'My Performance'},
+    {id:'retention',icon:'💰',label:'My Retention'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
@@ -705,11 +709,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -8746,6 +8750,379 @@ function exportProductivityCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'productivity_' + data.period.from + '_to_' + data.period.to + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV downloaded', 'success');
+}
+
+// ── 💰 SALES RETENTION REPORT ─────────────────────────────────
+async function renderSalesRetention() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap;background:var(--card-bg);padding:12px;border-radius:10px;">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">Month-over-Month Seller Sales Health</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">Target: 15%+ growth per seller · Zero grace period</div>
+      </div>
+      <button class="btn btn-sm" style="background:#6c3483;color:#fff;" onclick="regenerateRetentionAI()">🤖 Regenerate AI</button>
+      <button class="btn btn-sm btn-outline" onclick="exportRetentionCSV()">📥 Export CSV</button>
+    </div>
+    <div id="retention-content"><div class="loading"><div class="spinner"></div> Loading sales retention data... (AI analysis 3-5 sec)</div></div>`;
+  loadSalesRetention();
+}
+
+async function loadSalesRetention() {
+  const data = await api('GET', '/reports/sales-retention?_=' + Date.now());
+  if (!data) {
+    document.getElementById('retention-content').innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Data load failed</h3></div>';
+    return;
+  }
+  window._retentionData = data;
+  renderRetentionContent(data);
+}
+
+async function regenerateRetentionAI() {
+  showToast('🤖 AI fresh insights generate kar raha...', 'info');
+  await api('POST', '/reports/sales-retention/regenerate-ai', {});
+  loadSalesRetention();
+}
+
+function fmtINR(n) {
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + 'Cr';
+  if (n >= 100000)   return '₹' + (n/100000).toFixed(2) + 'L';
+  if (n >= 1000)     return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + Math.round(n);
+}
+
+function retGradeBadge(grade, label) {
+  const colors = {
+    'A+': {bg:'#d4edda', color:'#155724', border:'#28a745'},
+    'A':  {bg:'#d1ecf1', color:'#0c5460', border:'#17a2b8'},
+    'B':  {bg:'#fff3cd', color:'#856404', border:'#ffc107'},
+    'C':  {bg:'#ffe5d0', color:'#994f00', border:'#fd7e14'},
+    'D':  {bg:'#f8d7da', color:'#721c24', border:'#dc3545'},
+    'F':  {bg:'#f5c6cb', color:'#491217', border:'#b71c1c'},
+  };
+  const c = colors[grade] || colors['F'];
+  return '<span style="background:' + c.bg + ';color:' + c.color + ';border:2px solid ' + c.border + ';padding:3px 10px;border-radius:8px;font-weight:800;font-size:12px;display:inline-block;white-space:nowrap;">' + grade + ' · ' + (label||'') + '</span>';
+}
+
+function growthColor(pct) {
+  if (pct >= 20) return 'var(--green)';
+  if (pct >= 15) return '#16a085';
+  if (pct >= 0)  return 'var(--amber)';
+  if (pct >= -10) return '#d35400';
+  return 'var(--red)';
+}
+
+function renderRetentionContent(data) {
+  const { period, companySummary, amList, aiInsights, canViewAll, growthTarget } = data;
+
+  // Company summary strip
+  const growthColr = growthColor(companySummary.momGrowthPct);
+  const companyCard = `
+    <div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;opacity:0.8;">📊 Company Retention Health</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:2px;">${period.currLabel} vs ${period.prevLabel}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;opacity:0.8;">Month-over-Month</div>
+          <div style="font-size:32px;font-weight:900;color:${companySummary.momGrowthPct >= 0 ? '#27ae60' : '#e74c3c'};">${companySummary.momGrowthPct >= 0 ? '+' : ''}${companySummary.momGrowthPct}%</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+        <div><div style="font-size:10px;opacity:0.7;">AMs</div><div style="font-size:20px;font-weight:800;">${companySummary.totalAMs}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Total Sellers</div><div style="font-size:20px;font-weight:800;">${companySummary.totalSellers}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Current Month</div><div style="font-size:18px;font-weight:800;color:#D4A03D;">${fmtINR(companySummary.currMonthSales)}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Previous Month</div><div style="font-size:18px;font-weight:800;opacity:0.7;">${fmtINR(companySummary.prevMonthSales)}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Healthy (15%+)</div><div style="font-size:20px;font-weight:800;color:#27ae60;">${companySummary.healthyPct}%</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Zero-Sale Sellers</div><div style="font-size:20px;font-weight:800;color:#e74c3c;">${companySummary.zeroSaleCount} (${companySummary.zeroSalePct}%)</div></div>
+      </div>
+    </div>`;
+
+  // Tabs
+  const tabsHtml = `
+    <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;">
+      <button class="ret-tab active" data-tab="am-dashboard" onclick="switchRetTab('am-dashboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 AM Dashboard</button>
+      ${canViewAll ? '<button class="ret-tab" data-tab="insights" onclick="switchRetTab(\'insights\')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>' : ''}
+      <button class="ret-tab" data-tab="churn-risk" onclick="switchRetTab('churn-risk')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Churn Risk Sellers</button>
+    </div>`;
+
+  document.getElementById('retention-content').innerHTML = `
+    ${!canViewAll ? '<div style="background:#eaf4fd;border-left:4px solid #2980b9;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">ℹ️ Sirf aap ka own retention data dikh raha hai</div>' : ''}
+    ${companyCard}
+    ${tabsHtml}
+    <div id="ret-tab-content">${renderAMDashboardTab(amList, growthTarget)}</div>`;
+}
+
+function switchRetTab(tab) {
+  document.querySelectorAll('.ret-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text)';
+  });
+  const btn = document.querySelector('.ret-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; }
+  const data = window._retentionData;
+  if (!data) return;
+  const container = document.getElementById('ret-tab-content');
+  if (tab === 'am-dashboard') container.innerHTML = renderAMDashboardTab(data.amList, data.growthTarget);
+  else if (tab === 'insights') container.innerHTML = renderRetentionInsightsTab(data.aiInsights);
+  else if (tab === 'churn-risk') container.innerHTML = renderChurnRiskTab(data.amList);
+}
+
+function renderAMDashboardTab(amList, growthTarget) {
+  if (!amList.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No AM data found</h3></div>';
+
+  return `
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
+    ${amList.map((am, i) => {
+      const growthCol = growthColor(am.momGrowthPct);
+      const avgGrowthCol = growthColor(am.avgSellerGrowthPct);
+      const rank = i + 1;
+      const isTop3 = rank <= 3 && amList.length > 3;
+      const isBottom3 = rank > amList.length - 3 && amList.length > 6;
+      const borderCol = isTop3 ? 'var(--green)' : isBottom3 ? 'var(--red)' : 'var(--border)';
+
+      return `
+      <div style="background:var(--card-bg);border:2px solid ${borderCol};border-radius:12px;padding:14px;cursor:pointer;transition:all 0.15s;" onclick="viewAMRetentionDetail('${am.amName.replace(/'/g,"\\'")}')" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+              <span style="font-size:11px;color:var(--text-muted);font-weight:700;">#${rank}</span>
+              <span style="font-size:15px;font-weight:800;">${am.amName}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);">${am.totalSellers} sellers managed</div>
+          </div>
+          ${retGradeBadge(am.grade, am.gradeLabel)}
+        </div>
+
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+          <div style="font-size:22px;font-weight:900;color:var(--primary);">${am.retentionScore}</div>
+          <div style="font-size:11px;color:var(--text-muted);">/ 100 Retention Score</div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);">Current Month</div>
+              <div style="font-size:15px;font-weight:800;">${fmtINR(am.currMonthSales)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:10px;color:var(--text-muted);">MoM Growth</div>
+              <div style="font-size:15px;font-weight:800;color:${growthCol};">${am.momGrowthPct >= 0 ? '+' : ''}${am.momGrowthPct}%</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);">Prev: ${fmtINR(am.prevMonthSales)} · Avg/seller growth: <span style="color:${avgGrowthCol};font-weight:700;">${am.avgSellerGrowthPct}%</span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px;">
+          <div style="background:#eafaf1;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:var(--green);">${am.healthy}</div>
+            <div style="font-size:9px;color:var(--green);font-weight:700;">🟢 Healthy ${growthTarget}%+</div>
+          </div>
+          <div style="background:#fef9e7;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#d35400;">${am.belowTarget}</div>
+            <div style="font-size:9px;color:#d35400;font-weight:700;">🟡 Below Tgt</div>
+          </div>
+          <div style="background:#fdf2f2;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:var(--red);">${am.negativeGrowth}</div>
+            <div style="font-size:9px;color:var(--red);font-weight:700;">🔻 Declining</div>
+          </div>
+          <div style="background:#f5c6cb;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#7a0000;">${am.zeroSale}</div>
+            <div style="font-size:9px;color:#7a0000;font-weight:700;">🚨 Zero</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;">
+          <span>🎫 ${am.totalTickets} tickets · ${am.avgResolutionHours}h avg</span>
+          ${am.agedTickets ? '<span style="color:var(--red);font-weight:700;">⏰ ' + am.agedTickets + ' aged</span>' : ''}
+          ${am.avgACOS != null ? '<span>📉 ACOS ' + am.avgACOS + '%</span>' : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center;">💡 Card click karo detailed seller breakdown dekhne ke liye</div>`;
+}
+
+async function viewAMRetentionDetail(amName) {
+  openPanel('💰 ' + amName + ' — Seller Breakdown', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const data = await api('GET', '/reports/sales-retention/am/' + encodeURIComponent(amName));
+  if (!data) { document.getElementById('panel-body').innerHTML = '<div>Failed to load</div>'; return; }
+
+  const sellers = data.sellers || [];
+  const bucketColor = {
+    'zero': '#7a0000', 'negative': 'var(--red)', 'below_target': '#d35400',
+    'healthy': 'var(--green)', 'new_or_restart': '#2980b9', 'dormant': 'var(--text-muted)',
+  };
+  const bucketLabel = {
+    'zero': '🚨 Zero Sale', 'negative': '🔻 Declining', 'below_target': '🟡 Below Target',
+    'healthy': '🟢 Healthy', 'new_or_restart': '🆕 New/Restart', 'dormant': '💤 Dormant',
+  };
+
+  // Group counts
+  const groupCounts = {};
+  sellers.forEach(s => groupCounts[s.bucket] = (groupCounts[s.bucket] || 0) + 1);
+
+  const groupBadges = Object.entries(groupCounts).map(([k, v]) =>
+    '<span style="background:' + bucketColor[k] + '22;color:' + bucketColor[k] + ';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-right:4px;">' + bucketLabel[k] + ': ' + v + '</span>'
+  ).join('');
+
+  const sellerRows = sellers.map(s => `
+    <tr style="border-top:1px solid var(--border);">
+      <td style="padding:8px;font-size:12px;">
+        <div style="font-weight:700;">${s.busyName}</div>
+        <div style="font-size:10px;color:var(--text-muted);">${s.clientCode} · ${s.marketplace || ''} · ${s.sellerAging}d old</div>
+      </td>
+      <td style="padding:8px;text-align:right;font-size:12px;font-weight:600;">${fmtINR(s.currSales)}</td>
+      <td style="padding:8px;text-align:right;font-size:12px;color:var(--text-muted);">${fmtINR(s.prevSales)}</td>
+      <td style="padding:8px;text-align:center;">
+        <span style="color:${growthColor(s.growthPct)};font-weight:800;font-size:13px;">${s.growthPct >= 0 ? '+' : ''}${s.growthPct}%</span>
+      </td>
+      <td style="padding:8px;text-align:center;font-size:11px;">
+        <span style="background:${bucketColor[s.bucket]}22;color:${bucketColor[s.bucket]};padding:2px 6px;border-radius:4px;font-weight:700;">${bucketLabel[s.bucket]}</span>
+      </td>
+      <td style="padding:8px;text-align:center;font-size:11px;">${s.acos != null ? s.acos + '%' : '—'}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px;">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">${data.period.currLabel} vs ${data.period.prevLabel}</div>
+      <div>${groupBadges}</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:580px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:8px;text-align:left;">Seller</th>
+            <th style="padding:8px;text-align:right;">Current</th>
+            <th style="padding:8px;text-align:right;">Previous</th>
+            <th style="padding:8px;text-align:center;">Growth</th>
+            <th style="padding:8px;text-align:center;">Status</th>
+            <th style="padding:8px;text-align:center;">ACOS</th>
+          </tr>
+        </thead>
+        <tbody>${sellerRows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderRetentionInsightsTab(insights) {
+  if (!insights) return '<div class="empty-state"><div class="emoji">🤖</div><h3>AI insights unavailable</h3></div>';
+  if (insights.error) return '<div class="card"><div class="card-body"><div style="color:var(--red);font-weight:700;">⚠️ AI generate nahi ho paaya</div><div style="margin-top:8px;font-size:13px;">' + insights.summary + '</div><button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="regenerateRetentionAI()">🔄 Retry</button></div></div>';
+
+  const champs = (insights.retentionChampions || []).map(p =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--green);">' + (p.name||'—') + ':</strong> ' + (p.highlight||'') + '</li>').join('');
+  const risks = (insights.churnRisks || []).map(c =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--red);">' + (c.name||'—') + ':</strong> ' + (c.issue||'') + '</li>').join('');
+  const zeroSale = (insights.zeroSaleAlerts || []).map(z =>
+    '<li style="margin-bottom:8px;"><strong style="color:#7a0000;">' + (z.name||'—') + ':</strong> ' + (z.action||'') + '</li>').join('');
+  const recs = (insights.recommendations || []).map((r, i) =>
+    '<li style="margin-bottom:8px;"><strong>' + (i+1) + '.</strong> ' + r + '</li>').join('');
+
+  return `
+  <div class="card" style="border-left:4px solid #6c3483;background:linear-gradient(180deg,#f5eef8 0%,#fff 80%);">
+    <div class="card-header" style="background:#f5eef8;">
+      <span class="card-title">💡 AI Retention Strategy — by ${insights.aiProvider || 'AI'}</span>
+      <span style="font-size:11px;color:var(--text-muted);">
+        ${insights.fromCache ? '⚡ Cached' : '🆕 Fresh'} · ${insights.generatedAt ? new Date(insights.generatedAt).toLocaleString('en-IN') : ''}
+      </span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:14px;line-height:1.6;padding:10px;background:#fff;border-radius:8px;margin-bottom:14px;">${insights.summary || ''}</div>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--green);">🏆 Retention Champions</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${champs || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--red);">🚨 Churn Risk AMs</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${risks || '<li>—</li>'}</ul>
+
+      ${zeroSale ? '<div style="font-weight:700;margin-bottom:8px;color:#7a0000;">⚠️ Zero-Sale Clusters</div><ul style="padding-left:20px;margin-bottom:16px;">' + zeroSale + '</ul>' : ''}
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--primary);">🎯 Action Recommendations</div>
+      <ul style="padding-left:20px;">${recs || '<li>—</li>'}</ul>
+    </div>
+  </div>`;
+}
+
+function renderChurnRiskTab(amList) {
+  // Flatten all sellers in zero/negative/below_target buckets
+  const riskSellers = [];
+  amList.forEach(am => {
+    (am.sellers || []).forEach(s => {
+      if (['zero','negative','below_target'].includes(s.bucket)) {
+        riskSellers.push({ ...s, amName: am.amName });
+      }
+    });
+  });
+
+  riskSellers.sort((a, b) => {
+    const priority = { 'zero': 0, 'negative': 1, 'below_target': 2 };
+    if (priority[a.bucket] !== priority[b.bucket]) return priority[a.bucket] - priority[b.bucket];
+    return a.growthPct - b.growthPct;
+  });
+
+  if (!riskSellers.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No churn risk sellers!</h3><p>Everyone is growing or new.</p></div>';
+
+  const bucketLabel = { 'zero': '🚨 Zero Sale', 'negative': '🔻 Declining', 'below_target': '🟡 Below 15%' };
+  const bucketColor = { 'zero': '#7a0000', 'negative': 'var(--red)', 'below_target': '#d35400' };
+
+  return `
+  <div style="background:#fdf2f2;border-left:4px solid var(--red);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">
+    <strong>⚠️ ${riskSellers.length} sellers need attention</strong> — these are driving churn risk. Prioritize from top.
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:800px;">
+        <thead style="background:#fdf2f2;">
+          <tr>
+            <th style="padding:10px;text-align:left;">#</th>
+            <th style="padding:10px;text-align:left;">Seller</th>
+            <th style="padding:10px;text-align:left;">AM</th>
+            <th style="padding:10px;text-align:center;">Status</th>
+            <th style="padding:10px;text-align:right;">Current</th>
+            <th style="padding:10px;text-align:right;">Previous</th>
+            <th style="padding:10px;text-align:center;">Growth</th>
+            <th style="padding:10px;text-align:center;">Tenure</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${riskSellers.slice(0, 100).map((s, i) => `
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:8px;font-weight:700;color:var(--text-muted);">${i+1}</td>
+              <td style="padding:8px;">
+                <div style="font-weight:700;">${s.busyName}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${s.clientCode} · ${s.marketplace || ''}</div>
+              </td>
+              <td style="padding:8px;font-size:12px;">${s.amName}</td>
+              <td style="padding:8px;text-align:center;">
+                <span style="background:${bucketColor[s.bucket]}22;color:${bucketColor[s.bucket]};padding:3px 7px;border-radius:5px;font-size:11px;font-weight:700;">${bucketLabel[s.bucket]}</span>
+              </td>
+              <td style="padding:8px;text-align:right;">${fmtINR(s.currSales)}</td>
+              <td style="padding:8px;text-align:right;color:var(--text-muted);">${fmtINR(s.prevSales)}</td>
+              <td style="padding:8px;text-align:center;color:${growthColor(s.growthPct)};font-weight:700;">${s.growthPct >= 0 ? '+' : ''}${s.growthPct}%</td>
+              <td style="padding:8px;text-align:center;font-size:11px;">${s.sellerAging}d</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  ${riskSellers.length > 100 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Showing top 100 of ' + riskSellers.length + '</div>' : ''}`;
+}
+
+function exportRetentionCSV() {
+  const data = window._retentionData;
+  if (!data) { showToast('Data load karo pehle', 'error'); return; }
+  const rows = [['Rank','AM','Sellers','Current Sales','Previous Sales','MoM %','Avg Seller Growth %','Healthy','Below Target','Declining','Zero Sale','Tickets','Avg Resolution (h)','Aged','Avg ACOS','Retention Score','Grade']];
+  data.amList.forEach((a, i) => {
+    rows.push([i+1, a.amName, a.totalSellers, a.currMonthSales, a.prevMonthSales, a.momGrowthPct, a.avgSellerGrowthPct, a.healthy, a.belowTarget, a.negativeGrowth, a.zeroSale, a.totalTickets, a.avgResolutionHours, a.agedTickets, a.avgACOS != null ? a.avgACOS : '', a.retentionScore, a.grade]);
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'sales_retention_' + data.period.currFrom + '.csv';
   a.click();
   URL.revokeObjectURL(url);
   showToast('✅ CSV downloaded', 'success');

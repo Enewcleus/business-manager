@@ -3,7 +3,7 @@ const supabase = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 
 async function getFilteredClients(user) {
-  const { role, name } = user;
+  const { role, name } = user; 
   const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
     ? user.marketplaceAccess : null;
 

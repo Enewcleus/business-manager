@@ -4,8 +4,16 @@ const { authMiddleware } = require('../middleware/auth');
 
 async function getFilteredClients(user) {
   const { role, name } = user;
-  const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
-    ? user.marketplaceAccess : null;
+
+  // Defensive marketplace filter: only apply if access list contains valid Amazon/Flipkart/Meesho values
+  // (legacy bulk imports had junk like ["Other"] which filtered out all real clients)
+  const VALID_MARKETPLACES = ['Amazon.in', 'Amazon.com', 'Flipkart.com', 'Flipkart', 'Meesho', 'Myntra', 'Jiomart', 'Ajio'];
+  let marketplaceFilter = null;
+  if (user.marketplaceAccess && Array.isArray(user.marketplaceAccess) && user.marketplaceAccess.length > 0) {
+    const validOnly = user.marketplaceAccess.filter(mp => VALID_MARKETPLACES.includes(mp));
+    if (validOnly.length > 0) marketplaceFilter = validOnly;
+    // else: treat as "no restriction" (legacy junk ignored)
+  }
 
   // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive, CRM Lead, Viewer — sab clients
   if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive', 'Viewer'].includes(role)) {

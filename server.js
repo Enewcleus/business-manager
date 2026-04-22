@@ -68,6 +68,7 @@ app.use('/api/mis',              require('./routes/allroutes').misRouter);
 app.use('/api/documents',        require('./routes/allroutes').docsRouter);
 app.use('/api/approvals',        require('./routes/allroutes').approvalRouter);
 app.use('/api/reports',          require('./routes/allroutes').productivityRouter);
+app.use('/api/reports',          require('./routes/allroutes').salesRetentionRouter);
 app.use('/api/chat',             require('./routes/chat'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────

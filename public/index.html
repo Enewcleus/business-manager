@@ -5085,9 +5085,15 @@ async function renderRenewals(){
     return html;
   }
   function statusBadge(s){
-    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};
-    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(s||'Pending')+'</span>';
+    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple','Extension':'badge-blue'};
+    var icons={'Extension':'🕐 '};
+    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(icons[s]||'')+(s||'Pending')+'</span>';
   }
+
+  // Extension tracking
+  const extensions = allRenewals.filter(r => r.status === 'Extension');
+  const expiredExt = extensions.filter(r => r.extensionExpired);
+  const expiringExt = extensions.filter(r => r.extensionExpiringSoon);
 
   var html = '<div class="kpi-grid">'+
     '<div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">'+overdue.length+'</div></div>'+
@@ -5095,8 +5101,44 @@ async function renderRenewals(){
     '<div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">'+next30List.length+'</div></div>'+
     '<div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Confirmed').length+'</div></div>'+
     '<div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Hold').length+'</div></div>'+
+    (extensions.length?'<div class="kpi-card" style="background:linear-gradient(135deg,#f5eef8,#e8daef);border-left:4px solid #6c3483;"><div class="kpi-label" style="color:#6c3483;">🕐 Extension</div><div class="kpi-value" style="color:#6c3483;">'+extensions.length+(expiredExt.length?'<span style="font-size:11px;color:var(--red);"> · '+expiredExt.length+' expired</span>':'')+'</div></div>':'')+
     (canSeeAmount&&stats?.totalValue?'<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹'+Number(stats.totalValue).toLocaleString('en-IN')+'</div></div>':'')+
   '</div>';
+
+  // 🚨 Extension Expired/Expiring Alert (top priority)
+  if (expiredExt.length || expiringExt.length) {
+    html += '<div style="background:linear-gradient(135deg,#fdf2f2,#fff3cd);border-left:4px solid var(--red);padding:12px 14px;border-radius:10px;margin-bottom:12px;">'+
+      '<div style="font-weight:800;color:var(--red);font-size:14px;margin-bottom:4px;">🚨 Extension Action Required</div>'+
+      '<div style="font-size:12px;color:var(--text);">'+
+        (expiredExt.length?expiredExt.length+' extension(s) EXPIRED · ':'')+
+        (expiringExt.length?expiringExt.length+' expiring in 2 days':'')+
+      '</div>'+
+    '</div>';
+  }
+
+  // Extension section — always show if any exist
+  if (extensions.length > 0) {
+    extensions.sort((a, b) => (a.extensionDaysLeft || 999) - (b.extensionDaysLeft || 999));
+    html += '<div class="card" style="border-left:4px solid #6c3483;margin-bottom:12px;">'+
+      '<div class="card-header" style="background:#f5eef8;"><span class="card-title" style="color:#6c3483;">🕐 Extensions ('+extensions.length+')</span></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+'<th>Extension Tak</th><th>Days Left</th><th>Granted By</th><th>Reason</th><th>Action</th></tr></thead><tbody>';
+    extensions.forEach(function(r){
+      var daysColor = r.extensionExpired ? 'var(--red)' : r.extensionExpiringSoon ? '#d35400' : 'var(--green)';
+      var daysText = r.extensionExpired ? 'EXPIRED ('+Math.abs(r.extensionDaysLeft)+'d ago)' : r.extensionDaysLeft+'d left';
+      html += '<tr'+(r.extensionExpired?' style="background:#fdf2f2;"':r.extensionExpiringSoon?' style="background:#fff3cd;"':'')+'>'+
+        '<td><strong>'+r.clientName+'</strong></td>'+
+        '<td style="font-size:12px;">'+(r.servicePlan||'—')+'</td>'+
+        (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+        '<td><strong>'+(r.extensionUntil||'—')+'</strong></td>'+
+        '<td><strong style="color:'+daysColor+';">'+daysText+'</strong></td>'+
+        '<td style="font-size:12px;">'+(r.extensionGrantedBy||'—')+'</td>'+
+        '<td style="font-size:11px;max-width:200px;">'+(r.extensionReason||'—')+'</td>'+
+        '<td>'+actionBtns(r)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div></div></div>';
+  }
 
   // Next 30 Days section
   html += '<div class="card" style="border-left:4px solid var(--amber);margin-bottom:12px;">'+
@@ -5299,17 +5341,53 @@ function openEditRenewal(id, name) {
   var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
   var isCRM = ['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(APP.user.role);
   var canSeeAmount = ['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+
+  // Extension history HTML (if any)
+  var histHtml = '';
+  if (renewal.extensionHistory && renewal.extensionHistory.length > 0) {
+    histHtml = '<div style="background:#f5eef8;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;">'+
+      '<div style="font-weight:700;color:#6c3483;margin-bottom:6px;">📜 Extension History ('+renewal.extensionHistory.length+')</div>';
+    renewal.extensionHistory.forEach(function(h, i){
+      histHtml += '<div style="padding:6px 0;border-top:'+(i>0?'1px solid #e0d0e8':'none')+';">'+
+        '<div><strong>'+(h.extensionUntil||'—')+'</strong> — by '+(h.grantedBy||'—')+'</div>'+
+        '<div style="color:var(--text-muted);">'+(h.reason||'No reason')+'</div>'+
+        '<div style="font-size:10px;color:var(--text-muted);">'+(h.grantedAt?new Date(h.grantedAt).toLocaleString('en-IN'):'')+'</div>'+
+      '</div>';
+    });
+    histHtml += '</div>';
+  }
+
+  // Extension expiring alert (if this seller is in expired/expiring state)
+  var expAlert = '';
+  if (renewal.status === 'Extension') {
+    if (renewal.extensionExpired) {
+      expAlert = '<div style="background:#fdf2f2;border-left:4px solid var(--red);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;color:var(--red);font-weight:700;">🚨 Extension EXPIRED ('+Math.abs(renewal.extensionDaysLeft)+'d ago)<br><span style="font-weight:normal;">Ab iska kya karna hai? Confirm / Extend Again / Lost mark karo</span></div>';
+    } else if (renewal.extensionExpiringSoon) {
+      expAlert = '<div style="background:#fff3cd;border-left:4px solid #d35400;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;color:#d35400;font-weight:700;">⏰ Extension expires in '+renewal.extensionDaysLeft+' day(s) — action lo</div>';
+    }
+  }
+
   openPanel('✏️ Renewal — '+name,
+    expAlert + histHtml +
     '<div class="form-group"><label>Renewal Date (Seller ne bataya)</label>'+
     '<input type="date" class="form-control" id="er-date" value="'+(renewal.renewalDate||'')+'"></div>'+
     (canSeeAmount?'<div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>':'<input type="hidden" id="er-amount" value="">')+
     '<div class="form-group"><label>Status</label>'+
-    '<select class="form-control" id="er-status">'+
+    '<select class="form-control" id="er-status" onchange="toggleExtensionFields()">'+
       '<option '+(renewal.status==='Pending'?'selected':'')+'>Pending</option>'+
       '<option '+(renewal.status==='Confirmed'?'selected':'')+'>Confirmed</option>'+
       '<option '+(renewal.status==='Hold'?'selected':'')+'>Hold</option>'+
+      '<option '+(renewal.status==='Extension'?'selected':'')+'>Extension</option>'+
       '<option '+(renewal.status==='Lost'?'selected':'')+'>Lost</option>'+
     '</select></div>'+
+    // Extension fields (shown conditionally)
+    '<div id="er-extension-fields" style="display:'+(renewal.status==='Extension'?'block':'none')+';background:#f5eef8;border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#6c3483;margin-bottom:8px;">🕐 Extension Details</div>'+
+      '<div class="form-group"><label>Extension Tak (date) *</label>'+
+      '<input type="date" class="form-control" id="er-ext-until" value="'+(renewal.extensionUntil||'')+'"></div>'+
+      '<div class="form-group" style="margin-bottom:0;"><label>Reason / Notes *</label>'+
+      '<textarea class="form-control" id="er-ext-reason" rows="2" placeholder="Kyun extension chahiye? Kisne maanga? Kab tak kaam hoga?">'+(renewal.extensionReason||'')+'</textarea></div>'+
+    '</div>'+
     (isCRM?'<div class="form-group"><label>CRM Comment</label>'+
     '<textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha?">'+(renewal.crmComment||'')+'</textarea></div>':'<input type="hidden" id="er-comment" value="">')+
     '<div class="form-group"><label>Notes</label>'+
@@ -5319,14 +5397,30 @@ function openEditRenewal(id, name) {
   );
 }
 
+function toggleExtensionFields() {
+  var status = document.getElementById('er-status').value;
+  var box = document.getElementById('er-extension-fields');
+  if (box) box.style.display = status === 'Extension' ? 'block' : 'none';
+}
+
 async function submitEditRenewal(id) {
-  var r = await api('PATCH', '/renewals/'+id, {
-    status: document.getElementById('er-status').value,
+  var status = document.getElementById('er-status').value;
+  var payload = {
+    status: status,
     amount: document.getElementById('er-amount').value||undefined,
     renewalDate: document.getElementById('er-date').value||undefined,
     notes: document.getElementById('er-notes').value,
     crmComment: document.getElementById('er-comment').value||undefined,
-  });
+  };
+  if (status === 'Extension') {
+    var extUntil = document.getElementById('er-ext-until')?.value;
+    var extReason = document.getElementById('er-ext-reason')?.value?.trim();
+    if (!extUntil) { showToast('⚠️ Extension tak date zaroori hai', 'error'); return; }
+    if (!extReason) { showToast('⚠️ Reason likhna zaroori hai', 'error'); return; }
+    payload.extensionUntil = extUntil;
+    payload.extensionReason = extReason;
+  }
+  var r = await api('PATCH', '/renewals/'+id, payload);
   if(r?.success){showToast('✅ Renewal updated!','success');closePanel();renderRenewals();}
   else showToast('Update failed','error');
 }

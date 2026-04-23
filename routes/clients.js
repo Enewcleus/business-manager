@@ -4,8 +4,16 @@ const { authMiddleware } = require('../middleware/auth');
 
 async function getFilteredClients(user) {
   const { role, name } = user;
-  const marketplaceFilter = (user.marketplaceAccess && user.marketplaceAccess.length > 0)
-    ? user.marketplaceAccess : null;
+
+  // Defensive marketplace filter: only apply if access list contains valid Amazon/Flipkart/Meesho values
+  // (legacy bulk imports had junk like ["Other"] which filtered out all real clients)
+  const VALID_MARKETPLACES = ['Amazon.in', 'Amazon.com', 'Flipkart.com', 'Flipkart', 'Meesho', 'Myntra', 'Jiomart', 'Ajio'];
+  let marketplaceFilter = null;
+  if (user.marketplaceAccess && Array.isArray(user.marketplaceAccess) && user.marketplaceAccess.length > 0) {
+    const validOnly = user.marketplaceAccess.filter(mp => VALID_MARKETPLACES.includes(mp));
+    if (validOnly.length > 0) marketplaceFilter = validOnly;
+    // else: treat as "no restriction" (legacy junk ignored)
+  }
 
   // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive, CRM Lead, Viewer — sab clients
   if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive', 'Viewer'].includes(role)) {
@@ -98,6 +106,51 @@ router.get('/', authMiddleware, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── ORPHAN CLIENTS REPORT ────────────────────────────────────
+// Returns Active clients missing AM, Ads Manager, or CRM Executive assignment.
+// Admin / Ops Lead / Sub Admin only.
+router.get('/orphan/report', authMiddleware, async (req, res) => {
+  try {
+    if (!['Admin', 'Ops Lead', 'Sub Admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+    const { data, error } = await supabase.from('clients')
+      .select('client_code, busy_name, marketplace, status, am_name, ads_manager, crm_executive, service_plan')
+      .eq('status', 'Active')
+      .order('busy_name');
+    if (error) throw error;
+
+    const isEmpty = v => !v || v.trim() === '';
+
+    const orphans = (data || []).filter(c =>
+      isEmpty(c.am_name) || isEmpty(c.ads_manager) || isEmpty(c.crm_executive)
+    ).map(c => ({
+      clientCode: c.client_code,
+      busyName: c.busy_name,
+      marketplace: c.marketplace,
+      status: c.status,
+      servicePlan: c.service_plan,
+      amName: c.am_name || null,
+      adsManager: c.ads_manager || null,
+      crmExecutive: c.crm_executive || null,
+      missingAM:  isEmpty(c.am_name),
+      missingAds: isEmpty(c.ads_manager),
+      missingCRM: isEmpty(c.crm_executive),
+    }));
+
+    res.json({
+      totalActive: (data || []).length,
+      orphanCount: orphans.length,
+      summary: {
+        missingAM:  orphans.filter(o => o.missingAM).length,
+        missingAds: orphans.filter(o => o.missingAds).length,
+        missingCRM: orphans.filter(o => o.missingCRM).length,
+      },
+      orphans,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/', authMiddleware, async (req, res) => {

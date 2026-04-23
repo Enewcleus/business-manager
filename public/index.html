@@ -318,6 +318,8 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -338,6 +340,8 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'worklog',icon:'📓',label:'Work Log'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -353,6 +357,8 @@ const NAV_CONFIG = {
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
+    {id:'retention',icon:'💰',label:'Sales Retention'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -371,6 +377,7 @@ const NAV_CONFIG = {
     {id:'crm',icon:'📞',label:'CRM Log'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
+    {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
@@ -378,6 +385,7 @@ const NAV_CONFIG = {
   ],
   'Account Manager': [
     {id:'execperf',icon:'📈',label:'My Performance'},
+    {id:'retention',icon:'💰',label:'My Retention'},
     {id:'tasks',icon:'📝',label:'My Tasks',badge:'tasks'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
@@ -701,11 +709,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -2107,7 +2115,28 @@ async function submitAddClient(){
 }
 
 // ── TICKETS ──────────────────────────────────────────────────
+// Helper: days since a date string (calendar days). Returns integer ≥ 0.
+function ticketAgingDays(dateStr){
+  if(!dateStr) return 0;
+  const d = new Date(dateStr);
+  if(isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+// Helper: aging badge HTML — color coded
+function ticketAgingBadge(days){
+  if(days <= 0) return '<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🆕 Today</span>';
+  if(days <= 2)  return '<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟢 '+days+'d old</span>';
+  if(days <= 5)  return '<span style="background:#fef9e7;color:var(--amber);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟡 '+days+'d old</span>';
+  if(days <= 10) return '<span style="background:#fff3cd;color:#d35400;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🟠 '+days+'d old</span>';
+  return '<span style="background:#fdf2f2;color:var(--red);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🔴 '+days+'d old</span>';
+}
+
 async function renderTickets(){
+  // Ensure clients are loaded (for seller aging + exec mapping)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
   const tickets=await api('GET','/tickets');if(!tickets) return;
   APP.tickets=tickets;
   const open=tickets.filter(t=>t.status!=='Done').length;
@@ -2115,6 +2144,12 @@ async function renderTickets(){
   const b=document.getElementById('badge-tickets');if(b){b.textContent=open;b.style.display=open?'':'none';}
   const u=APP.user;
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(u.role);
+
+  // Build client-code → seller-aging map (used for seller aging column on ticket cards)
+  const clientSellerAgingMap = {};
+  (APP.clients||[]).forEach(c => { clientSellerAgingMap[c.clientCode] = c.sellerAging || 0; });
+  window._clientSellerAgingMap = clientSellerAgingMap;
+
 
   // Executive-wise summary for leads
   let execSummaryHtml = '';
@@ -2141,14 +2176,20 @@ async function renderTickets(){
         am = t.assignedTo || 'Unassigned';
       }
 
-      if(!execMap[am]) execMap[am]={name:am,open:0,inProgress:0,pending:0,total:0};
+      if(!execMap[am]) execMap[am]={name:am,open:0,inProgress:0,pending:0,total:0,ageSum:0,oldest:0};
       execMap[am].total++;
       if(t.status==='Open') execMap[am].open++;
       else if(t.status==='In Progress') execMap[am].inProgress++;
       else if(t.status==='Pending Approval') execMap[am].pending++;
+      // Track aging
+      const age = ticketAgingDays(t.createdAt);
+      execMap[am].ageSum += age;
+      if(age > execMap[am].oldest) execMap[am].oldest = age;
     });
 
     const execList = Object.values(execMap).sort((a,b)=>b.total-a.total);
+    // Compute avg age per exec
+    execList.forEach(e => { e.avgAge = e.total ? Math.round(e.ageSum / e.total) : 0; });
     if(execList.length) {
       execSummaryHtml = `
       <div class="card" style="margin-bottom:12px;border-left:4px solid #8e44ad;">
@@ -2170,7 +2211,10 @@ async function renderTickets(){
                   ${e.inProgress?`<span style="background:#fef9e7;color:var(--amber);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">🟡 ${e.inProgress} WIP</span>`:''}
                   ${e.pending?`<span style="background:#eaf4fd;color:#2980b9;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">⏳ ${e.pending} Pending</span>`:''}
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Total: ${e.total} open</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;justify-content:space-between;">
+                  <span>Total: ${e.total} open</span>
+                  <span style="color:${e.oldest>10?'var(--red)':e.oldest>5?'#d35400':'var(--text-muted)'};font-weight:600;">⏱ avg ${e.avgAge}d · max ${e.oldest}d</span>
+                </div>
               </div>`).join('')}
           </div>
         </div>
@@ -2178,12 +2222,19 @@ async function renderTickets(){
     }
   }
 
+  // Stale tickets = open and > 10 days old
+  const openTickets = tickets.filter(t=>t.status!=='Done');
+  const staleCount = openTickets.filter(t => ticketAgingDays(t.createdAt) > 10).length;
+  const avgOpenAge = openTickets.length ? Math.round(openTickets.reduce((s,t)=>s+ticketAgingDays(t.createdAt),0) / openTickets.length) : 0;
+
   document.getElementById('page-content').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi-card red"><div class="kpi-label">Open</div><div class="kpi-value">${tickets.filter(t=>t.status==='Open').length}</div></div>
       <div class="kpi-card amber"><div class="kpi-label">In Progress</div><div class="kpi-value">${tickets.filter(t=>t.status==='In Progress').length}</div></div>
       <div class="kpi-card blue"><div class="kpi-label">⏳ Pending Approval</div><div class="kpi-value">${pendingApproval}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Done Today</div><div class="kpi-value">${tickets.filter(t=>t.resolvedAt&&isToday(t.resolvedAt)).length}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fff3cd,#fef9e7);border-left:4px solid #d35400;"><div class="kpi-label">⏱ Avg Age (Open)</div><div class="kpi-value" style="color:#d35400;">${avgOpenAge}d</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fdf2f2,#fbe9e7);border-left:4px solid var(--red);"><div class="kpi-label">🔴 Stale (10+d)</div><div class="kpi-value" style="color:var(--red);">${staleCount}</div></div>
     </div>
     ${execSummaryHtml}
     <div class="card">
@@ -2239,12 +2290,16 @@ function filterTicketsByExecName(name) {
 function ticketCards(tickets){
   if(!tickets.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No tickets!</h3></div>';
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
+  const sellerAgingMap = window._clientSellerAgingMap || {};
   return [...tickets].sort((a,b)=>{
     const order={'Open':0,'In Progress':1,'Pending Approval':2,'Done':3};
     return (order[a.status]||0)-(order[b.status]||0);
   }).map(t=>{
     const statusColor = t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber';
     const pendingApproval = t.status==='Pending Approval';
+    const ageDays = ticketAgingDays(t.createdAt);
+    const sellerAge = sellerAgingMap[t.clientCode] || 0;
+    const purpose = t.purpose || '';
     return `
     <div class="ticket-card ${t.priority==='Critical'?'critical':t.priority==='High'?'high':t.priority==='Medium'?'medium':'low'} ${t.slaBreached?'breached':''}" style="${pendingApproval?'border-left:4px solid #3498db;background:#eaf4fd;':''}">
       <div class="ticket-header">
@@ -2253,6 +2308,11 @@ function ticketCards(tickets){
           <span class="badge ${t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':t.priority==='Medium'?'badge-amber':'badge-green'}">${t.priority}</span>
           <span class="badge ${statusColor}">${t.status}</span>
         </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px 0;">
+        ${t.status!=='Done'?ticketAgingBadge(ageDays):''}
+        ${sellerAge?`<span style="background:#eaf4fd;color:#1a5276;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">👤 Seller ${sellerAge}d</span>`:''}
+        ${purpose?`<span style="background:#f5eef8;color:#6c3483;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">🎯 ${purpose}</span>`:''}
       </div>
       <div class="ticket-desc" style="cursor:pointer;" onclick="viewTicketDetail(this)" data-tid="${t.ticketId}">${t.category} — ${t.description.slice(0,120)}${t.description.length>120?'<span style="color:var(--primary);font-size:11px;"> ...read more</span>':''}</div>
       ${pendingApproval?`<div style="font-size:12px;color:#2980b9;padding:4px 0;"><strong>⏳ Close request by:</strong> ${t.closeRequestedBy||'—'} · ${t.closeRequestedAt||'—'}</div>`:''}
@@ -2279,13 +2339,21 @@ function viewTicketDetail(el){
   if(!t) return;
   const isLead=['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','SME','Team Lead','CRM Executive','Viewer'].includes(APP.user.role);
   const pendingApproval = t.status==='Pending Approval';
+  const ageDays = ticketAgingDays(t.createdAt);
+  const sellerAgingMap = window._clientSellerAgingMap || {};
+  const sellerAge = sellerAgingMap[t.clientCode] || 0;
 
   openPanel('🎫 ' + t.ticketId + ' — ' + t.clientName,
     '<div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:12px;">'+
-      '<div style="display:flex;gap:8px;margin-bottom:8px;">'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'+
         '<span class="badge '+(t.priority==='Critical'?'badge-red':t.priority==='High'?'badge-orange':'badge-amber')+'">'+t.priority+'</span>'+
         '<span class="badge '+(t.status==='Done'?'badge-green':t.status==='Pending Approval'?'badge-blue':t.status==='Open'?'badge-red':'badge-amber')+'">'+t.status+'</span>'+
         '<span class="badge badge-blue">'+t.category+'</span>'+
+        (t.purpose?'<span style="background:#f5eef8;color:#6c3483;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;">🎯 '+t.purpose+'</span>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'+
+        (t.status!=='Done'?ticketAgingBadge(ageDays):'<span style="background:#eafaf1;color:var(--green);border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">✅ Closed in '+(t.hoursToClose||'—')+'h</span>')+
+        (sellerAge?'<span style="background:#eaf4fd;color:#1a5276;border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">👤 Seller '+sellerAge+'d old</span>':'')+
       '</div>'+
       '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">Client: '+t.clientName+'</div>'+
       '<div style="font-size:12px;color:var(--text-muted);">Assigned To: '+t.assignedTo+'</div>'+
@@ -2467,6 +2535,20 @@ function openRaiseTicket(){
         <select class="form-control" id="tk-pri"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
       </div>
     </div>
+    <div class="form-group"><label>🎯 Purpose of Ticket</label>
+      <select class="form-control" id="tk-purpose">
+        <option value="">Select purpose...</option>
+        <option>Issue Resolution</option>
+        <option>Process Query</option>
+        <option>Clarification</option>
+        <option>Complaint</option>
+        <option>Follow-up</option>
+        <option>Feedback</option>
+        <option>Training Request</option>
+        <option>Escalation</option>
+        <option>Other</option>
+      </select>
+    </div>
     <div class="form-group"><label>Description *</label><textarea class="form-control" id="tk-desc" placeholder="Describe the issue..."></textarea></div>
     <button class="btn btn-danger btn-full" onclick="submitTicket()">🎫 Raise Ticket</button>`);
 }
@@ -2475,7 +2557,8 @@ async function submitTicket(){
   const sel=document.getElementById('tk-client'),cc=sel.value,cn=sel.options[sel.selectedIndex]?.dataset?.name||'';
   const desc=document.getElementById('tk-desc').value.trim();
   if(!cc){showToast('Select client','error');return;}if(!desc){showToast('Add description','error');return;}
-  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,description:desc});
+  const purpose = document.getElementById('tk-purpose')?.value || '';
+  const r=await api('POST','/tickets',{clientCode:cc,clientName:cn,category:document.getElementById('tk-cat').value,priority:document.getElementById('tk-pri').value,purpose:purpose,description:desc});
   if(r?.success){showToast(`✅ ${r.ticketId} → ${r.assignedTo}`,'success');closePanel();if(APP.page==='tickets')renderTickets();}
 }
 
@@ -4668,6 +4751,12 @@ async function renderWorkLog(){
   const u = APP.user;
   const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead','Viewer'].includes(u.role);
 
+  // Pre-load clients silently (so Log Work dropdown ready rahe)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
+
   // Get users list for leads
   let execList = [];
   if(isLead) {
@@ -4896,9 +4985,19 @@ function filterWorkLog(type) {
   document.getElementById('worklog-table').innerHTML = renderWorkLogTable(logs);
 }
 
-function openQuickWorkLog(){
+async function openQuickWorkLog(){
+  // Ensure clients are loaded (fix for executives who open worklog directly without visiting Clients page)
+  if(!APP.clients || !APP.clients.length){
+    const c = await getClients();
+    if(c) APP.clients = c;
+  }
+  // If still empty after fetch, show helpful error
+  if(!APP.clients || !APP.clients.length){
+    showToast('⚠️ Aap ke clients list empty hai — Admin se contact karo taaki sellers assign ho', 'error');
+    return;
+  }
   openPanel('📓 Quick Work Log',`
-    <div class="form-group"><label>Client *</label>
+    <div class="form-group"><label>Client * <span style="color:var(--text-muted);font-size:11px;font-weight:normal;">(${APP.clients.length} clients available)</span></label>
       <div id="qwl-client-wrap"></div>
     </div>
     <div class="form-row">
@@ -4986,9 +5085,15 @@ async function renderRenewals(){
     return html;
   }
   function statusBadge(s){
-    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple'};
-    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(s||'Pending')+'</span>';
+    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple','Extension':'badge-blue'};
+    var icons={'Extension':'🕐 '};
+    return '<span class="badge '+(map[s]||'badge-amber')+'">'+(icons[s]||'')+(s||'Pending')+'</span>';
   }
+
+  // Extension tracking
+  const extensions = allRenewals.filter(r => r.status === 'Extension');
+  const expiredExt = extensions.filter(r => r.extensionExpired);
+  const expiringExt = extensions.filter(r => r.extensionExpiringSoon);
 
   var html = '<div class="kpi-grid">'+
     '<div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">'+overdue.length+'</div></div>'+
@@ -4996,8 +5101,44 @@ async function renderRenewals(){
     '<div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">'+next30List.length+'</div></div>'+
     '<div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Confirmed').length+'</div></div>'+
     '<div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Hold').length+'</div></div>'+
+    (extensions.length?'<div class="kpi-card" style="background:linear-gradient(135deg,#f5eef8,#e8daef);border-left:4px solid #6c3483;"><div class="kpi-label" style="color:#6c3483;">🕐 Extension</div><div class="kpi-value" style="color:#6c3483;">'+extensions.length+(expiredExt.length?'<span style="font-size:11px;color:var(--red);"> · '+expiredExt.length+' expired</span>':'')+'</div></div>':'')+
     (canSeeAmount&&stats?.totalValue?'<div class="kpi-card teal"><div class="kpi-label">Confirmed Value</div><div class="kpi-value" style="font-size:18px;">₹'+Number(stats.totalValue).toLocaleString('en-IN')+'</div></div>':'')+
   '</div>';
+
+  // 🚨 Extension Expired/Expiring Alert (top priority)
+  if (expiredExt.length || expiringExt.length) {
+    html += '<div style="background:linear-gradient(135deg,#fdf2f2,#fff3cd);border-left:4px solid var(--red);padding:12px 14px;border-radius:10px;margin-bottom:12px;">'+
+      '<div style="font-weight:800;color:var(--red);font-size:14px;margin-bottom:4px;">🚨 Extension Action Required</div>'+
+      '<div style="font-size:12px;color:var(--text);">'+
+        (expiredExt.length?expiredExt.length+' extension(s) EXPIRED · ':'')+
+        (expiringExt.length?expiringExt.length+' expiring in 2 days':'')+
+      '</div>'+
+    '</div>';
+  }
+
+  // Extension section — always show if any exist
+  if (extensions.length > 0) {
+    extensions.sort((a, b) => (a.extensionDaysLeft || 999) - (b.extensionDaysLeft || 999));
+    html += '<div class="card" style="border-left:4px solid #6c3483;margin-bottom:12px;">'+
+      '<div class="card-header" style="background:#f5eef8;"><span class="card-title" style="color:#6c3483;">🕐 Extensions ('+extensions.length+')</span></div>'+
+      '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'+
+      '<thead><tr><th>Client</th><th>Plan</th>'+(canSeeAmount?'<th>Amount</th>':'')+'<th>Extension Tak</th><th>Days Left</th><th>Granted By</th><th>Reason</th><th>Action</th></tr></thead><tbody>';
+    extensions.forEach(function(r){
+      var daysColor = r.extensionExpired ? 'var(--red)' : r.extensionExpiringSoon ? '#d35400' : 'var(--green)';
+      var daysText = r.extensionExpired ? 'EXPIRED ('+Math.abs(r.extensionDaysLeft)+'d ago)' : r.extensionDaysLeft+'d left';
+      html += '<tr'+(r.extensionExpired?' style="background:#fdf2f2;"':r.extensionExpiringSoon?' style="background:#fff3cd;"':'')+'>'+
+        '<td><strong>'+r.clientName+'</strong></td>'+
+        '<td style="font-size:12px;">'+(r.servicePlan||'—')+'</td>'+
+        (canSeeAmount?'<td>'+amtCell(r)+'</td>':'')+
+        '<td><strong>'+(r.extensionUntil||'—')+'</strong></td>'+
+        '<td><strong style="color:'+daysColor+';">'+daysText+'</strong></td>'+
+        '<td style="font-size:12px;">'+(r.extensionGrantedBy||'—')+'</td>'+
+        '<td style="font-size:11px;max-width:200px;">'+(r.extensionReason||'—')+'</td>'+
+        '<td>'+actionBtns(r)+'</td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div></div></div>';
+  }
 
   // Next 30 Days section
   html += '<div class="card" style="border-left:4px solid var(--amber);margin-bottom:12px;">'+
@@ -5200,17 +5341,53 @@ function openEditRenewal(id, name) {
   var renewal = (window._allRenewals||[]).find(function(r){return r.renewalId===id;})||{};
   var isCRM = ['CRM Executive','Admin','Ops Lead','CRM Lead','CSI Lead','Team Lead'].includes(APP.user.role);
   var canSeeAmount = ['Admin','Ops Lead','CRM Lead','CSI Lead','CRM Executive','Team Lead'].includes(APP.user.role);
+
+  // Extension history HTML (if any)
+  var histHtml = '';
+  if (renewal.extensionHistory && renewal.extensionHistory.length > 0) {
+    histHtml = '<div style="background:#f5eef8;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;">'+
+      '<div style="font-weight:700;color:#6c3483;margin-bottom:6px;">📜 Extension History ('+renewal.extensionHistory.length+')</div>';
+    renewal.extensionHistory.forEach(function(h, i){
+      histHtml += '<div style="padding:6px 0;border-top:'+(i>0?'1px solid #e0d0e8':'none')+';">'+
+        '<div><strong>'+(h.extensionUntil||'—')+'</strong> — by '+(h.grantedBy||'—')+'</div>'+
+        '<div style="color:var(--text-muted);">'+(h.reason||'No reason')+'</div>'+
+        '<div style="font-size:10px;color:var(--text-muted);">'+(h.grantedAt?new Date(h.grantedAt).toLocaleString('en-IN'):'')+'</div>'+
+      '</div>';
+    });
+    histHtml += '</div>';
+  }
+
+  // Extension expiring alert (if this seller is in expired/expiring state)
+  var expAlert = '';
+  if (renewal.status === 'Extension') {
+    if (renewal.extensionExpired) {
+      expAlert = '<div style="background:#fdf2f2;border-left:4px solid var(--red);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;color:var(--red);font-weight:700;">🚨 Extension EXPIRED ('+Math.abs(renewal.extensionDaysLeft)+'d ago)<br><span style="font-weight:normal;">Ab iska kya karna hai? Confirm / Extend Again / Lost mark karo</span></div>';
+    } else if (renewal.extensionExpiringSoon) {
+      expAlert = '<div style="background:#fff3cd;border-left:4px solid #d35400;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;color:#d35400;font-weight:700;">⏰ Extension expires in '+renewal.extensionDaysLeft+' day(s) — action lo</div>';
+    }
+  }
+
   openPanel('✏️ Renewal — '+name,
+    expAlert + histHtml +
     '<div class="form-group"><label>Renewal Date (Seller ne bataya)</label>'+
     '<input type="date" class="form-control" id="er-date" value="'+(renewal.renewalDate||'')+'"></div>'+
     (canSeeAmount?'<div class="form-group"><label>Amount (₹)</label><input type="number" class="form-control" id="er-amount" value="'+(renewal.amount||'')+'" placeholder="0"></div>':'<input type="hidden" id="er-amount" value="">')+
     '<div class="form-group"><label>Status</label>'+
-    '<select class="form-control" id="er-status">'+
+    '<select class="form-control" id="er-status" onchange="toggleExtensionFields()">'+
       '<option '+(renewal.status==='Pending'?'selected':'')+'>Pending</option>'+
       '<option '+(renewal.status==='Confirmed'?'selected':'')+'>Confirmed</option>'+
       '<option '+(renewal.status==='Hold'?'selected':'')+'>Hold</option>'+
+      '<option '+(renewal.status==='Extension'?'selected':'')+'>Extension</option>'+
       '<option '+(renewal.status==='Lost'?'selected':'')+'>Lost</option>'+
     '</select></div>'+
+    // Extension fields (shown conditionally)
+    '<div id="er-extension-fields" style="display:'+(renewal.status==='Extension'?'block':'none')+';background:#f5eef8;border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#6c3483;margin-bottom:8px;">🕐 Extension Details</div>'+
+      '<div class="form-group"><label>Extension Tak (date) *</label>'+
+      '<input type="date" class="form-control" id="er-ext-until" value="'+(renewal.extensionUntil||'')+'"></div>'+
+      '<div class="form-group" style="margin-bottom:0;"><label>Reason / Notes *</label>'+
+      '<textarea class="form-control" id="er-ext-reason" rows="2" placeholder="Kyun extension chahiye? Kisne maanga? Kab tak kaam hoga?">'+(renewal.extensionReason||'')+'</textarea></div>'+
+    '</div>'+
     (isCRM?'<div class="form-group"><label>CRM Comment</label>'+
     '<textarea class="form-control" id="er-comment" rows="3" placeholder="Seller se baat hui? Kya kaha?">'+(renewal.crmComment||'')+'</textarea></div>':'<input type="hidden" id="er-comment" value="">')+
     '<div class="form-group"><label>Notes</label>'+
@@ -5220,14 +5397,30 @@ function openEditRenewal(id, name) {
   );
 }
 
+function toggleExtensionFields() {
+  var status = document.getElementById('er-status').value;
+  var box = document.getElementById('er-extension-fields');
+  if (box) box.style.display = status === 'Extension' ? 'block' : 'none';
+}
+
 async function submitEditRenewal(id) {
-  var r = await api('PATCH', '/renewals/'+id, {
-    status: document.getElementById('er-status').value,
+  var status = document.getElementById('er-status').value;
+  var payload = {
+    status: status,
     amount: document.getElementById('er-amount').value||undefined,
     renewalDate: document.getElementById('er-date').value||undefined,
     notes: document.getElementById('er-notes').value,
     crmComment: document.getElementById('er-comment').value||undefined,
-  });
+  };
+  if (status === 'Extension') {
+    var extUntil = document.getElementById('er-ext-until')?.value;
+    var extReason = document.getElementById('er-ext-reason')?.value?.trim();
+    if (!extUntil) { showToast('⚠️ Extension tak date zaroori hai', 'error'); return; }
+    if (!extReason) { showToast('⚠️ Reason likhna zaroori hai', 'error'); return; }
+    payload.extensionUntil = extUntil;
+    payload.extensionReason = extReason;
+  }
+  var r = await api('PATCH', '/renewals/'+id, payload);
   if(r?.success){showToast('✅ Renewal updated!','success');closePanel();renderRenewals();}
   else showToast('Update failed','error');
 }
@@ -6185,10 +6378,86 @@ function exportExcel(){
 
 // ── ADMIN ────────────────────────────────────────────────────
 async function renderAdmin(){
-  const [users,hierarchy]=await Promise.all([api('GET','/users'),api('GET','/users/hierarchy')]);
+  const [users,hierarchy,orphanData]=await Promise.all([
+    api('GET','/users'),
+    api('GET','/users/hierarchy'),
+    api('GET','/clients/orphan/report').catch(()=>null),
+  ]);
   if(!users) return;
   const depts=[...new Set(users.map(u=>u.department).filter(Boolean))];
+
+  // Orphan clients alert card (shown only if orphans exist)
+  let orphanHtml = '';
+  if (orphanData && orphanData.orphanCount > 0) {
+    orphanHtml = `
+      <div class="card" style="margin-bottom:12px;border-left:4px solid var(--red);background:linear-gradient(180deg,#fdf2f2 0%,#fff 60%);">
+        <div class="card-header" style="background:#fdf2f2;">
+          <span class="card-title" style="color:var(--red);">⚠️ Unassigned Clients — ${orphanData.orphanCount} need attention</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-outline" onclick="exportOrphanCSV()">📥 CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="toggleOrphanDetail()" id="orphan-toggle-btn">👁 Show Details</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px;">
+            <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;border:1px solid var(--border);">
+              <div style="font-size:10px;color:var(--text-muted);font-weight:700;">TOTAL ACTIVE</div>
+              <div style="font-size:22px;font-weight:800;">${orphanData.totalActive}</div>
+            </div>
+            <div style="background:#fff;border-radius:8px;padding:10px;text-align:center;border:1px solid var(--red);">
+              <div style="font-size:10px;color:var(--red);font-weight:700;">ORPHAN</div>
+              <div style="font-size:22px;font-weight:800;color:var(--red);">${orphanData.orphanCount}</div>
+            </div>
+            <div style="background:#fef9e7;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#856404;font-weight:700;">❌ NO AM</div>
+              <div style="font-size:22px;font-weight:800;color:#856404;">${orphanData.summary.missingAM}</div>
+            </div>
+            <div style="background:#fff3cd;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#d35400;font-weight:700;">❌ NO ADS</div>
+              <div style="font-size:22px;font-weight:800;color:#d35400;">${orphanData.summary.missingAds}</div>
+            </div>
+            <div style="background:#fdf2f2;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:var(--red);font-weight:700;">❌ NO CRM</div>
+              <div style="font-size:22px;font-weight:800;color:var(--red);">${orphanData.summary.missingCRM}</div>
+            </div>
+          </div>
+          <div id="orphan-detail" style="display:none;padding:0;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:800px;">
+              <thead style="background:#fdf2f2;">
+                <tr>
+                  <th style="padding:8px;text-align:left;">Client</th>
+                  <th style="padding:8px;text-align:left;">Marketplace</th>
+                  <th style="padding:8px;text-align:center;">AM</th>
+                  <th style="padding:8px;text-align:center;">Ads Manager</th>
+                  <th style="padding:8px;text-align:center;">CRM Exec</th>
+                  <th style="padding:8px;text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${orphanData.orphans.map(o => `
+                  <tr style="border-top:1px solid var(--border);">
+                    <td style="padding:8px;">
+                      <div style="font-weight:700;">${o.busyName}</div>
+                      <div style="font-size:10px;color:var(--text-muted);">${o.clientCode}</div>
+                    </td>
+                    <td style="padding:8px;font-size:11px;">${o.marketplace || '—'}</td>
+                    <td style="padding:8px;text-align:center;">${o.missingAM ? '<span style="background:#fdf2f2;color:var(--red);padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;">❌ MISSING</span>' : '<span style="font-size:11px;">' + o.amName + '</span>'}</td>
+                    <td style="padding:8px;text-align:center;">${o.missingAds ? '<span style="background:#fdf2f2;color:var(--red);padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;">❌ MISSING</span>' : '<span style="font-size:11px;">' + o.adsManager + '</span>'}</td>
+                    <td style="padding:8px;text-align:center;">${o.missingCRM ? '<span style="background:#fdf2f2;color:var(--red);padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;">❌ MISSING</span>' : '<span style="font-size:11px;">' + o.crmExecutive + '</span>'}</td>
+                    <td style="padding:8px;text-align:center;">
+                      <button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 8px;" onclick="openFixOrphan('${o.clientCode}','${o.busyName.replace(/'/g,"\\'")}','${o.missingAM?1:0}','${o.missingAds?1:0}','${o.missingCRM?1:0}')">🔧 Assign</button>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    window._orphanData = orphanData;
+  }
+
   document.getElementById('page-content').innerHTML=`
+    ${orphanHtml}
     <div class="kpi-grid">
       <div class="kpi-card blue"><div class="kpi-label">Total Users</div><div class="kpi-value">${users.length}</div></div>
       <div class="kpi-card green"><div class="kpi-label">Active</div><div class="kpi-value">${users.filter(u=>u.isActive).length}</div></div>
@@ -6307,7 +6576,7 @@ function openAddUser(){
     <div class="form-row"><div class="form-group"><label>Password *</label><input type="password" class="form-control" id="nu-pass"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="nu-designation" placeholder="e.g. Sr. CRM Executive"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="nu-dept"><option value="">-- Select --</option><option>CRM</option><option>Ads</option><option>Account Management</option><option>CSI</option><option>Admin</option></select></div>
-      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="CRM Lead">CRM Lead</option><option value="Ops Lead">Ops Lead</option><option value="Sub Admin">Sub Admin</option><option value="CSI Lead">CSI Lead</option><option value="CSI Executive">CSI Executive</option><option value="Viewer">Viewer</option><option value="Admin">Admin</option></select></div>
+      <div class="form-group"><label>Role (Permission Level)</label><select class="form-control" id="nu-role"><option value="Executive">Executive</option><option value="Senior Executive">Senior Executive</option><option value="CRM Executive">CRM Executive</option><option value="Ads Executive">Ads Executive</option><option value="Account Manager">Account Manager</option><option value="SME">SME</option><option value="Team Lead">Team Lead</option><option value="Ops Lead">Ops Lead</option><option value="Sub Admin">Sub Admin</option><option value="CSI Lead">CSI Lead</option><option value="CSI Executive">CSI Executive</option><option value="Admin">Admin</option></select></div>
     </div>
     <div class="form-group"><label>Reports To (Manager)</label><select class="form-control" id="nu-manager"><option value="">-- Top Level / No Manager --</option>${users.filter(u=>u.isActive).map(u=>`<option value="${u.userId}">${u.name} ${u.designation?'('+u.designation+')':''}</option>`).join('')}</select></div>
     <div class="form-group"><label>📅 Joining Date</label><input type="date" class="form-control" id="nu-joining"></div>
@@ -6330,7 +6599,7 @@ function openEditUser(userId){
     <div class="form-row"><div class="form-group"><label>Name</label><input type="text" class="form-control" id="eu-name" value="${u.name}"></div><div class="form-group"><label>Designation</label><input type="text" class="form-control" id="eu-designation" value="${u.designation||''}" placeholder="e.g. CRM Team Lead"></div></div>
     <div class="form-row">
       <div class="form-group"><label>Department</label><select class="form-control" id="eu-dept"><option value="">-- Select --</option>${['CRM','Ads','Account Management','CSI','Admin'].map(d=>`<option ${u.department===d?'selected':''}>${d}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','CRM Lead','Ops Lead','Sub Admin','CSI Lead','CSI Executive','Viewer','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Role</label><select class="form-control" id="eu-role">${['Executive','Senior Executive','CRM Executive','Ads Executive','Account Manager','SME','Team Lead','Ops Lead','Sub Admin','CSI Lead','CSI Executive','Admin'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>
     <div class="form-group"><label>Reports To</label><select class="form-control" id="eu-manager"><option value="">-- Top Level --</option>${users.filter(x=>x.isActive&&x.userId!==userId).map(x=>`<option value="${x.userId}" ${u.reportingTo===x.id?'selected':''}>${x.name} ${x.designation?'('+x.designation+')':''}</option>`).join('')}</select></div>
     <div class="form-group"><label>Status</label><select class="form-control" id="eu-active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
@@ -7393,7 +7662,11 @@ async function deleteDoc(docId) {
 async function renderApprovals() {
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
   const u = APP.user;
-  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(u.role);
+  // Named admins — always see/approve all (matches backend hasApprovalAllAccess)
+  const APPROVAL_ALL_ACCESS_NAMES = ['manpreet','gaurav','devendra','piyush','shivendra'];
+  const lowerName = (u.name || '').toLowerCase();
+  const isNamedAdmin = APPROVAL_ALL_ACCESS_NAMES.some(n => lowerName.includes(n));
+  const isLead = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin','Team Lead'].includes(u.role) || isNamedAdmin;
   const requests = await api('GET', '/approvals?_='+Date.now()) || [];
 
   const pending = requests.filter(r=>r.status==='Pending');
@@ -8292,6 +8565,815 @@ async function submitTaskFromCall(clientCode, clientName) {
   });
   if (r?.success) { showToast('✅ Task created!', 'success'); closePanel(); }
   else showToast(r?.error || 'Error', 'error');
+}
+
+// ── AI PRODUCTIVITY REPORT ──────────────────────────────────
+async function renderProductivityReport() {
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 6);
+  const defaultFrom = weekAgo.toISOString().split('T')[0];
+  const defaultTo = today.toISOString().split('T')[0];
+
+  // Read saved date range (if any) or defaults
+  const from = window._prodFrom || defaultFrom;
+  const to   = window._prodTo   || defaultTo;
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap;background:var(--card-bg);padding:12px;border-radius:10px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">FROM</label>
+        <input type="date" id="prod-from" class="form-control" style="width:150px;" value="${from}">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">TO</label>
+        <input type="date" id="prod-to" class="form-control" style="width:150px;" value="${to}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadProductivityReport()">🔄 Load</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(7)">7d</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(14)">14d</button>
+      <button class="btn btn-sm btn-outline" onclick="quickProdRange(30)">30d</button>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-sm" style="background:#6c3483;color:#fff;" onclick="regenerateAIInsights()">🤖 Regenerate AI</button>
+        <button class="btn btn-sm btn-outline" onclick="exportProductivityCSV()">📥 Export CSV</button>
+      </div>
+    </div>
+    <div id="prod-content"><div class="loading"><div class="spinner"></div> Loading...</div></div>`;
+
+  loadProductivityReport();
+}
+
+function quickProdRange(days) {
+  const today = new Date();
+  const start = new Date(today); start.setDate(start.getDate() - (days - 1));
+  document.getElementById('prod-from').value = start.toISOString().split('T')[0];
+  document.getElementById('prod-to').value = today.toISOString().split('T')[0];
+  loadProductivityReport();
+}
+
+async function loadProductivityReport() {
+  const from = document.getElementById('prod-from').value;
+  const to = document.getElementById('prod-to').value;
+  window._prodFrom = from; window._prodTo = to;
+  const box = document.getElementById('prod-content');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div> Loading productivity data... (AI insights can take 3-5 seconds)</div>';
+
+  const data = await api('GET', '/reports/productivity?from=' + from + '&to=' + to + '&_=' + Date.now());
+  if (!data) { box.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Failed to load</h3></div>'; return; }
+  window._prodData = data;
+  renderProductivityContent(data);
+}
+
+async function regenerateAIInsights() {
+  const from = document.getElementById('prod-from').value;
+  const to = document.getElementById('prod-to').value;
+  showToast('🤖 AI fresh insights generate kar raha...', 'info');
+  await api('POST', '/reports/productivity/regenerate-ai', { from, to });
+  loadProductivityReport();
+}
+
+function renderProductivityContent(data) {
+  const { period, summary, leaderboard, reportAnalyzerScore, alerts, aiInsights, canViewAll } = data;
+
+  const kpiStrip = `
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">👥 Executives</div><div class="kpi-value">${summary.totalExecutives}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">✅ Active</div><div class="kpi-value">${summary.activeExecutives}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">📝 Tasks Done</div><div class="kpi-value">${summary.totalTasksCompleted}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#eafaf1,#d5f5e3);border-left:4px solid var(--green);"><div class="kpi-label">Avg Completion</div><div class="kpi-value" style="color:var(--green);">${summary.avgCompletionRate}%</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fdf2f2,#fbe9e7);border-left:4px solid var(--red);"><div class="kpi-label">🚨 Idle 3d+</div><div class="kpi-value" style="color:var(--red);">${alerts.idle.length}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,#fff3cd,#fef9e7);border-left:4px solid #d35400;"><div class="kpi-label">⚠️ Aged Tickets</div><div class="kpi-value" style="color:#d35400;">${alerts.agedTickets.length}</div></div>
+    </div>`;
+
+  // Tabs
+  const tabs = `
+    <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;">
+      <button class="prod-tab active" data-tab="leaderboard" onclick="switchProdTab('leaderboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 Leaderboard</button>
+      <button class="prod-tab" data-tab="ai-tasks" onclick="switchProdTab('ai-tasks')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🤖 AI Tasks Execution</button>
+      <button class="prod-tab" data-tab="alerts" onclick="switchProdTab('alerts')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Alerts</button>
+      <button class="prod-tab" data-tab="insights" onclick="switchProdTab('insights')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>
+    </div>`;
+
+  document.getElementById('prod-content').innerHTML = `
+    ${!canViewAll ? '<div style="background:#eaf4fd;border-left:4px solid #2980b9;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">ℹ️ Aap ke role ke hisaab se sirf <strong>apna score</strong> dikh raha hai</div>' : ''}
+    ${kpiStrip}
+    ${tabs}
+    <div id="prod-tab-content">${renderLeaderboardTab(leaderboard)}</div>`;
+}
+
+function switchProdTab(tab) {
+  document.querySelectorAll('.prod-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text)';
+  });
+  const btn = document.querySelector('.prod-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; }
+
+  const data = window._prodData;
+  if (!data) return;
+  const container = document.getElementById('prod-tab-content');
+  if (tab === 'leaderboard')  container.innerHTML = renderLeaderboardTab(data.leaderboard);
+  else if (tab === 'ai-tasks') container.innerHTML = renderAITasksTab(data.reportAnalyzerScore);
+  else if (tab === 'alerts')   container.innerHTML = renderAlertsTab(data.alerts);
+  else if (tab === 'insights') container.innerHTML = renderInsightsTab(data.aiInsights);
+}
+
+function gradeBadge(grade, label) {
+  const colors = {
+    'A+': {bg:'#d4edda', color:'#155724', border:'#28a745'},
+    'A':  {bg:'#d1ecf1', color:'#0c5460', border:'#17a2b8'},
+    'B':  {bg:'#fff3cd', color:'#856404', border:'#ffc107'},
+    'C':  {bg:'#ffe5d0', color:'#994f00', border:'#fd7e14'},
+    'D':  {bg:'#f8d7da', color:'#721c24', border:'#dc3545'},
+    'F':  {bg:'#f5c6cb', color:'#491217', border:'#b71c1c'},
+  };
+  const c = colors[grade] || colors['F'];
+  return '<span style="background:' + c.bg + ';color:' + c.color + ';border:2px solid ' + c.border + ';padding:3px 10px;border-radius:8px;font-weight:800;font-size:13px;display:inline-block;">' + grade + ' · ' + (label||'') + '</span>';
+}
+
+function renderLeaderboardTab(leaderboard) {
+  if (!leaderboard.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No activity in this period</h3></div>';
+
+  return `
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:10px;text-align:left;font-size:11px;">#</th>
+            <th style="padding:10px;text-align:left;">Executive</th>
+            <th style="padding:10px;text-align:center;">Grade</th>
+            <th style="padding:10px;text-align:center;">Score</th>
+            <th style="padding:10px;text-align:center;">Tasks</th>
+            <th style="padding:10px;text-align:center;">Completion</th>
+            <th style="padding:10px;text-align:center;">Tickets</th>
+            <th style="padding:10px;text-align:center;">SLA</th>
+            <th style="padding:10px;text-align:center;">CRM</th>
+            <th style="padding:10px;text-align:center;">Consistency</th>
+            <th style="padding:10px;text-align:center;">Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${leaderboard.map((e, i) => {
+            const rowBg = i < 3 ? '#f0fff4' : i >= leaderboard.length - 3 && leaderboard.length > 6 ? '#fdf2f2' : '';
+            const flags = [];
+            if (e.flags.inactive) flags.push('<span style="background:#fdf2f2;color:var(--red);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">💤 ' + e.flags.daysIdle + 'd</span>');
+            if (e.flags.agedTicketCount) flags.push('<span style="background:#fff3cd;color:#d35400;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">🔴 ' + e.flags.agedTicketCount + ' aged</span>');
+            if (e.bonus > 0) flags.push('<span style="background:#eafaf1;color:var(--green);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">⭐ +' + e.bonus + '</span>');
+            return `
+            <tr style="border-top:1px solid var(--border);background:${rowBg};cursor:pointer;" onclick="showProductivityDetail('${e.name.replace(/'/g,"\\'")}')">
+              <td style="padding:10px;font-weight:700;color:var(--text-muted);">${i+1}</td>
+              <td style="padding:10px;">
+                <div style="font-weight:700;">${e.name}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${e.role} · ${e.staffAging}</div>
+              </td>
+              <td style="padding:10px;text-align:center;">${gradeBadge(e.grade, e.gradeLabel)}</td>
+              <td style="padding:10px;text-align:center;font-weight:800;font-size:14px;">${e.score}</td>
+              <td style="padding:10px;text-align:center;">${e.tasksDone}/${e.tasksAssigned}</td>
+              <td style="padding:10px;text-align:center;">
+                <div style="font-weight:700;color:${e.completionPct>=70?'var(--green)':e.completionPct>=40?'var(--amber)':'var(--red)'};">${e.completionPct}%</div>
+              </td>
+              <td style="padding:10px;text-align:center;">${e.ticketsClosed}/${e.ticketsHandled}</td>
+              <td style="padding:10px;text-align:center;">${e.slaPct}%</td>
+              <td style="padding:10px;text-align:center;">${e.crmCallsConnected}/${e.crmCallsTotal}</td>
+              <td style="padding:10px;text-align:center;">${e.daysActive}/${e.workingDays}d</td>
+              <td style="padding:10px;">${flags.join(' ')||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:6px;padding:0 8px;">💡 Row click karo to detailed score breakdown dekhne ke liye</div>`;
+}
+
+function showProductivityDetail(name) {
+  const e = (window._prodData?.leaderboard || []).find(x => x.name === name);
+  if (!e) return;
+
+  const componentBar = (label, pct, score, weight) => {
+    const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red)';
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span>${label}</span>
+        <span><strong>${pct}%</strong> → ${score.toFixed(1)}/${weight}</span>
+      </div>
+      <div style="background:#eee;border-radius:4px;height:8px;overflow:hidden;">
+        <div style="background:${color};height:100%;width:${Math.min(pct,100)}%;"></div>
+      </div>
+    </div>`;
+  };
+
+  openPanel('📈 ' + e.name + ' — Score Breakdown',
+    '<div style="padding:0 4px;">'+
+    '<div style="text-align:center;margin-bottom:16px;padding:14px;background:var(--bg);border-radius:10px;">'+
+      '<div style="font-size:42px;font-weight:900;color:var(--primary);">' + e.score + '</div>'+
+      '<div style="margin-top:4px;">' + gradeBadge(e.grade, e.gradeLabel) + '</div>'+
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">' + e.role + ' · ' + e.staffAging + ' tenure</div>'+
+    '</div>'+
+    '<div style="font-weight:700;margin-bottom:10px;">Score Components:</div>'+
+    componentBar('📝 Task Completion', e.completionPct, e.completionPct/100*25, 25) +
+    componentBar('⏰ Task Timeliness', e.timelinessPct, e.timelinessPct/100*15, 15) +
+    componentBar('🎯 Domain Excellence', e.domainPct, e.domainPct/100*25, 25) +
+    componentBar('📅 Activity Consistency', e.consistencyPct, Math.min(e.consistencyPct,100)/100*20, 20) +
+    componentBar('⏱ Ticket SLA', e.slaPct, e.slaPct/100*15, 15) +
+    '<div style="border-top:2px solid var(--border);margin-top:12px;padding-top:12px;">'+
+      '<div style="display:flex;justify-content:space-between;font-weight:700;">'+
+        '<span>Base Score</span><span>' + e.baseScore + '/100</span>'+
+      '</div>'+
+      (e.bonus > 0 ? '<div style="color:var(--green);font-size:13px;margin-top:6px;">⭐ Bonus +' + e.bonus + ': ' + e.bonusReasons.join(', ') + '</div>' : '') +
+      (e.penalty > 0 ? '<div style="color:var(--red);font-size:13px;margin-top:6px;">🚨 Penalty -' + e.penalty + ': ' + e.penaltyReasons.join(', ') + '</div>' : '') +
+    '</div>'+
+    '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;">'+
+      '<div style="font-weight:700;margin-bottom:8px;">📊 Raw Numbers:</div>'+
+      '<div>Tasks: ' + e.tasksDone + ' done of ' + e.tasksAssigned + ' assigned (' + e.tasksOverdue + ' overdue)</div>'+
+      '<div>Tickets: ' + e.ticketsClosed + ' closed of ' + e.ticketsHandled + ' handled · avg ' + (e.avgTicketHours||'—') + 'h</div>'+
+      '<div>CRM: ' + e.crmCallsConnected + ' connected / ' + e.crmCallsTotal + ' total</div>'+
+      '<div>DSR: ' + e.dsrEntries + ' entries</div>'+
+      '<div>Work Log: ' + e.workLogCount + ' entries</div>'+
+      '<div>Active Days: ' + e.daysActive + ' of ' + e.workingDays + ' working days</div>'+
+      '<div>Last Active: ' + e.flags.lastActiveDate + '</div>'+
+    '</div>'+
+    '</div>'
+  );
+}
+
+function renderAITasksTab(scores) {
+  if (!scores.length) return '<div class="empty-state"><div class="emoji">🤖</div><h3>Report Analyzer ka koi usage nahi is period mein</h3></div>';
+
+  const totalGen = scores.reduce((s,r) => s + r.tasksGenerated, 0);
+  const totalDone = scores.reduce((s,r) => s + r.tasksDone, 0);
+  const overallPct = totalGen ? Math.round(totalDone/totalGen*100) : 0;
+
+  return `
+  <div style="background:linear-gradient(135deg,#f5eef8,#e8daef);border-radius:12px;padding:16px;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:700;color:#6c3483;margin-bottom:8px;">🤖 COMPANY-WIDE REPORT ANALYZER EFFICIENCY</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+      <div><div style="font-size:11px;color:var(--text-muted);">Reports</div><div style="font-size:22px;font-weight:800;">${scores.reduce((s,r) => s+r.timesUsed, 0)}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Tasks Generated</div><div style="font-size:22px;font-weight:800;color:#6c3483;">${totalGen}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Tasks Done</div><div style="font-size:22px;font-weight:800;color:var(--green);">${totalDone}</div></div>
+      <div><div style="font-size:11px;color:var(--text-muted);">Execution %</div><div style="font-size:22px;font-weight:800;color:${overallPct>=60?'var(--green)':overallPct>=30?'var(--amber)':'var(--red)'};">${overallPct}%</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Benchmark: 60%+ achha, 30% se neeche concerning</div>
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:10px;text-align:left;">User</th>
+            <th style="padding:10px;text-align:center;">Used</th>
+            <th style="padding:10px;text-align:center;">Sellers</th>
+            <th style="padding:10px;text-align:center;">Tasks Generated</th>
+            <th style="padding:10px;text-align:center;">Done</th>
+            <th style="padding:10px;text-align:center;">Execution</th>
+            <th style="padding:10px;text-align:center;">Last Used</th>
+            <th style="padding:10px;text-align:left;">Flag</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scores.map(r => `
+          <tr style="border-top:1px solid var(--border);">
+            <td style="padding:10px;"><div style="font-weight:700;">${r.user}</div><div style="font-size:10px;color:var(--text-muted);">${r.role}</div></td>
+            <td style="padding:10px;text-align:center;font-weight:600;">${r.timesUsed}x</td>
+            <td style="padding:10px;text-align:center;">${r.sellersAnalyzed}</td>
+            <td style="padding:10px;text-align:center;color:#6c3483;font-weight:700;">${r.tasksGenerated}</td>
+            <td style="padding:10px;text-align:center;color:var(--green);font-weight:700;">${r.tasksDone}</td>
+            <td style="padding:10px;text-align:center;font-weight:800;color:${r.executionPct>=60?'var(--green)':r.executionPct>=30?'var(--amber)':'var(--red)'};">${r.executionPct}%</td>
+            <td style="padding:10px;text-align:center;font-size:11px;color:var(--text-muted);">${r.lastUsed}</td>
+            <td style="padding:10px;font-size:11px;">${r.flag||'<span style="color:var(--green);">✅ OK</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderAlertsTab(alerts) {
+  const hasAny = alerts.idle.length + alerts.backlogGrowing.length + alerts.agedTickets.length + alerts.lowCompletion.length > 0;
+  if (!hasAny) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No alerts! Team is doing great.</h3></div>';
+
+  const section = (title, color, items, emptyMsg) => `
+    <div class="card" style="margin-bottom:10px;border-left:4px solid ${color};">
+      <div class="card-header" style="background:${color}15;"><span class="card-title">${title} (${items.length})</span></div>
+      <div class="card-body">
+        ${items.length ? items.map(a => `
+          <div style="padding:10px;border-bottom:1px solid var(--border);">
+            <div style="font-weight:700;">${a.name}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+              ${a.role || ''}${a.lastActive ? ' · Last active: '+a.lastActive : ''}${a.daysIdle ? ' · '+a.daysIdle+' days idle' : ''}${a.count ? ' · '+a.count+' aged tickets' : ''}${a.assigned ? ' · '+a.done+'/'+a.assigned+' tasks done ('+a.pendingRatio+'% pending)' : ''}${a.completionPct!==undefined ? ' · '+a.completionPct+'% completion on '+a.tasksAssigned+' tasks' : ''}
+            </div>
+          </div>
+        `).join('') : '<div style="padding:12px;color:var(--text-muted);font-size:13px;">'+emptyMsg+'</div>'}
+      </div>
+    </div>`;
+
+  return `
+    ${section('💤 Inactive 3+ Days', 'var(--red)', alerts.idle, 'Sab active hain')}
+    ${section('📈 Backlog Growing', '#d35400', alerts.backlogGrowing, 'Koi nahi')}
+    ${section('🔴 Aged Tickets Holders', 'var(--red)', alerts.agedTickets, 'No aged tickets')}
+    ${section('⚠️ Low Completion Rate', 'var(--amber)', alerts.lowCompletion, 'Everyone performing')}`;
+}
+
+function renderInsightsTab(insights) {
+  if (!insights) return '<div class="empty-state"><div class="emoji">🤖</div><h3>AI insights available nahi hain</h3><p>Admin/Lead role mein login karo, ya date range change karo.</p></div>';
+  if (insights.error) return '<div class="card"><div class="card-body"><div style="color:var(--red);font-weight:700;">⚠️ AI insights generate nahi ho paaye</div><div style="margin-top:8px;font-size:13px;">' + insights.summary + '</div><div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="regenerateAIInsights()">🔄 Retry</button></div></div></div>';
+
+  const topPerf = (insights.topPerformers || []).map(p =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--green);">' + (p.name||'—') + ':</strong> ' + (p.highlight||'') + '</li>').join('');
+  const concerns = (insights.concerns || []).map(c =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--amber);">' + (c.name||'—') + ':</strong> ' + (c.issue||'') + '</li>').join('');
+  const recs = (insights.recommendations || []).map((r, i) =>
+    '<li style="margin-bottom:8px;"><strong>' + (i+1) + '.</strong> ' + r + '</li>').join('');
+
+  return `
+  <div class="card" style="border-left:4px solid #6c3483;background:linear-gradient(180deg,#f5eef8 0%,#fff 80%);">
+    <div class="card-header" style="background:#f5eef8;">
+      <span class="card-title">💡 AI Insights — by ${insights.aiProvider || 'AI'}</span>
+      <span style="font-size:11px;color:var(--text-muted);">
+        ${insights.fromCache ? '⚡ Cached' : '🆕 Fresh'} · ${insights.generatedAt ? new Date(insights.generatedAt).toLocaleString('en-IN') : ''}
+      </span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:14px;line-height:1.6;padding:10px;background:#fff;border-radius:8px;margin-bottom:14px;">${insights.summary || ''}</div>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--green);">🏆 Top Performers</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${topPerf || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--amber);">⚠️ Concerns</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${concerns || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--primary);">🎯 Action Recommendations</div>
+      <ul style="padding-left:20px;">${recs || '<li>—</li>'}</ul>
+    </div>
+  </div>`;
+}
+
+function exportProductivityCSV() {
+  const data = window._prodData;
+  if (!data) { showToast('Data load karo pehle', 'error'); return; }
+
+  const rows = [['Rank','Name','Role','Grade','Score','Tasks Done','Tasks Assigned','Completion %','Tickets Closed','SLA %','CRM Connected','Days Active/Working','Last Active','Bonus','Penalty']];
+  data.leaderboard.forEach((e, i) => {
+    rows.push([i+1, e.name, e.role, e.grade, e.score, e.tasksDone, e.tasksAssigned, e.completionPct, e.ticketsClosed, e.slaPct, e.crmCallsConnected, e.daysActive + '/' + e.workingDays, e.flags.lastActiveDate, e.bonus, e.penalty]);
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'productivity_' + data.period.from + '_to_' + data.period.to + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV downloaded', 'success');
+}
+
+// ── 💰 SALES RETENTION REPORT ─────────────────────────────────
+async function renderSalesRetention() {
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap;background:var(--card-bg);padding:12px;border-radius:10px;">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">Month-over-Month Seller Sales Health</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">Target: 15%+ growth per seller · Zero grace period</div>
+      </div>
+      <button class="btn btn-sm" style="background:#6c3483;color:#fff;" onclick="regenerateRetentionAI()">🤖 Regenerate AI</button>
+      <button class="btn btn-sm btn-outline" onclick="exportRetentionCSV()">📥 Export CSV</button>
+    </div>
+    <div id="retention-content"><div class="loading"><div class="spinner"></div> Loading sales retention data... (AI analysis 3-5 sec)</div></div>`;
+  loadSalesRetention();
+}
+
+async function loadSalesRetention() {
+  const data = await api('GET', '/reports/sales-retention?_=' + Date.now());
+  if (!data) {
+    document.getElementById('retention-content').innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Data load failed</h3></div>';
+    return;
+  }
+  window._retentionData = data;
+  renderRetentionContent(data);
+}
+
+async function regenerateRetentionAI() {
+  showToast('🤖 AI fresh insights generate kar raha...', 'info');
+  await api('POST', '/reports/sales-retention/regenerate-ai', {});
+  loadSalesRetention();
+}
+
+function fmtINR(n) {
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + 'Cr';
+  if (n >= 100000)   return '₹' + (n/100000).toFixed(2) + 'L';
+  if (n >= 1000)     return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + Math.round(n);
+}
+
+function retGradeBadge(grade, label) {
+  const colors = {
+    'A+': {bg:'#d4edda', color:'#155724', border:'#28a745'},
+    'A':  {bg:'#d1ecf1', color:'#0c5460', border:'#17a2b8'},
+    'B':  {bg:'#fff3cd', color:'#856404', border:'#ffc107'},
+    'C':  {bg:'#ffe5d0', color:'#994f00', border:'#fd7e14'},
+    'D':  {bg:'#f8d7da', color:'#721c24', border:'#dc3545'},
+    'F':  {bg:'#f5c6cb', color:'#491217', border:'#b71c1c'},
+  };
+  const c = colors[grade] || colors['F'];
+  return '<span style="background:' + c.bg + ';color:' + c.color + ';border:2px solid ' + c.border + ';padding:3px 10px;border-radius:8px;font-weight:800;font-size:12px;display:inline-block;white-space:nowrap;">' + grade + ' · ' + (label||'') + '</span>';
+}
+
+function growthColor(pct) {
+  if (pct >= 20) return 'var(--green)';
+  if (pct >= 15) return '#16a085';
+  if (pct >= 0)  return 'var(--amber)';
+  if (pct >= -10) return '#d35400';
+  return 'var(--red)';
+}
+
+function renderRetentionContent(data) {
+  const { period, companySummary, amList, aiInsights, canViewAll, growthTarget } = data;
+
+  // Company summary strip
+  const growthColr = growthColor(companySummary.momGrowthPct);
+  const companyCard = `
+    <div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;opacity:0.8;">📊 Company Retention Health</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:2px;">${period.currLabel} vs ${period.prevLabel}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;opacity:0.8;">Month-over-Month</div>
+          <div style="font-size:32px;font-weight:900;color:${companySummary.momGrowthPct >= 0 ? '#27ae60' : '#e74c3c'};">${companySummary.momGrowthPct >= 0 ? '+' : ''}${companySummary.momGrowthPct}%</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+        <div><div style="font-size:10px;opacity:0.7;">AMs</div><div style="font-size:20px;font-weight:800;">${companySummary.totalAMs}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Total Sellers</div><div style="font-size:20px;font-weight:800;">${companySummary.totalSellers}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Current Month</div><div style="font-size:18px;font-weight:800;color:#D4A03D;">${fmtINR(companySummary.currMonthSales)}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Previous Month</div><div style="font-size:18px;font-weight:800;opacity:0.7;">${fmtINR(companySummary.prevMonthSales)}</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Healthy (15%+)</div><div style="font-size:20px;font-weight:800;color:#27ae60;">${companySummary.healthyPct}%</div></div>
+        <div><div style="font-size:10px;opacity:0.7;">Zero-Sale Sellers</div><div style="font-size:20px;font-weight:800;color:#e74c3c;">${companySummary.zeroSaleCount} (${companySummary.zeroSalePct}%)</div></div>
+      </div>
+    </div>`;
+
+  // Tabs
+  const tabsHtml = `
+    <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;">
+      <button class="ret-tab active" data-tab="am-dashboard" onclick="switchRetTab('am-dashboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 AM Dashboard</button>
+      ${canViewAll ? '<button class="ret-tab" data-tab="insights" onclick="switchRetTab(\'insights\')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>' : ''}
+      <button class="ret-tab" data-tab="churn-risk" onclick="switchRetTab('churn-risk')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Churn Risk Sellers</button>
+    </div>`;
+
+  document.getElementById('retention-content').innerHTML = `
+    ${!canViewAll ? '<div style="background:#eaf4fd;border-left:4px solid #2980b9;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">ℹ️ Sirf aap ka own retention data dikh raha hai</div>' : ''}
+    ${companyCard}
+    ${tabsHtml}
+    <div id="ret-tab-content">${renderAMDashboardTab(amList, growthTarget)}</div>`;
+}
+
+function switchRetTab(tab) {
+  document.querySelectorAll('.ret-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text)';
+  });
+  const btn = document.querySelector('.ret-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; }
+  const data = window._retentionData;
+  if (!data) return;
+  const container = document.getElementById('ret-tab-content');
+  if (tab === 'am-dashboard') container.innerHTML = renderAMDashboardTab(data.amList, data.growthTarget);
+  else if (tab === 'insights') container.innerHTML = renderRetentionInsightsTab(data.aiInsights);
+  else if (tab === 'churn-risk') container.innerHTML = renderChurnRiskTab(data.amList);
+}
+
+function renderAMDashboardTab(amList, growthTarget) {
+  if (!amList.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No AM data found</h3></div>';
+
+  return `
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
+    ${amList.map((am, i) => {
+      const growthCol = growthColor(am.momGrowthPct);
+      const avgGrowthCol = growthColor(am.avgSellerGrowthPct);
+      const rank = i + 1;
+      const isTop3 = rank <= 3 && amList.length > 3;
+      const isBottom3 = rank > amList.length - 3 && amList.length > 6;
+      const borderCol = isTop3 ? 'var(--green)' : isBottom3 ? 'var(--red)' : 'var(--border)';
+
+      return `
+      <div style="background:var(--card-bg);border:2px solid ${borderCol};border-radius:12px;padding:14px;cursor:pointer;transition:all 0.15s;" onclick="viewAMRetentionDetail('${am.amName.replace(/'/g,"\\'")}')" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+              <span style="font-size:11px;color:var(--text-muted);font-weight:700;">#${rank}</span>
+              <span style="font-size:15px;font-weight:800;">${am.amName}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);">${am.totalSellers} sellers managed</div>
+          </div>
+          ${retGradeBadge(am.grade, am.gradeLabel)}
+        </div>
+
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:10px;">
+          <div style="font-size:22px;font-weight:900;color:var(--primary);">${am.retentionScore}</div>
+          <div style="font-size:11px;color:var(--text-muted);">/ 100 Retention Score</div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <div>
+              <div style="font-size:10px;color:var(--text-muted);">Current Month</div>
+              <div style="font-size:15px;font-weight:800;">${fmtINR(am.currMonthSales)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:10px;color:var(--text-muted);">MoM Growth</div>
+              <div style="font-size:15px;font-weight:800;color:${growthCol};">${am.momGrowthPct >= 0 ? '+' : ''}${am.momGrowthPct}%</div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);">Prev: ${fmtINR(am.prevMonthSales)} · Avg/seller growth: <span style="color:${avgGrowthCol};font-weight:700;">${am.avgSellerGrowthPct}%</span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px;">
+          <div style="background:#eafaf1;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:var(--green);">${am.healthy}</div>
+            <div style="font-size:9px;color:var(--green);font-weight:700;">🟢 Healthy ${growthTarget}%+</div>
+          </div>
+          <div style="background:#fef9e7;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#d35400;">${am.belowTarget}</div>
+            <div style="font-size:9px;color:#d35400;font-weight:700;">🟡 Below Tgt</div>
+          </div>
+          <div style="background:#fdf2f2;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:var(--red);">${am.negativeGrowth}</div>
+            <div style="font-size:9px;color:var(--red);font-weight:700;">🔻 Declining</div>
+          </div>
+          <div style="background:#f5c6cb;border-radius:6px;padding:6px 4px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#7a0000;">${am.zeroSale}</div>
+            <div style="font-size:9px;color:#7a0000;font-weight:700;">🚨 Zero</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;font-size:11px;color:var(--text-muted);flex-wrap:wrap;">
+          <span>🎫 ${am.totalTickets} tickets · ${am.avgResolutionHours}h avg</span>
+          ${am.agedTickets ? '<span style="color:var(--red);font-weight:700;">⏰ ' + am.agedTickets + ' aged</span>' : ''}
+          ${am.avgACOS != null ? '<span>📉 ACOS ' + am.avgACOS + '%</span>' : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center;">💡 Card click karo detailed seller breakdown dekhne ke liye</div>`;
+}
+
+async function viewAMRetentionDetail(amName) {
+  openPanel('💰 ' + amName + ' — Seller Breakdown', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+  const data = await api('GET', '/reports/sales-retention/am/' + encodeURIComponent(amName));
+  if (!data) { document.getElementById('panel-body').innerHTML = '<div>Failed to load</div>'; return; }
+
+  const sellers = data.sellers || [];
+  const bucketColor = {
+    'zero': '#7a0000', 'negative': 'var(--red)', 'below_target': '#d35400',
+    'healthy': 'var(--green)', 'new_or_restart': '#2980b9', 'dormant': 'var(--text-muted)',
+  };
+  const bucketLabel = {
+    'zero': '🚨 Zero Sale', 'negative': '🔻 Declining', 'below_target': '🟡 Below Target',
+    'healthy': '🟢 Healthy', 'new_or_restart': '🆕 New/Restart', 'dormant': '💤 Dormant',
+  };
+
+  // Group counts
+  const groupCounts = {};
+  sellers.forEach(s => groupCounts[s.bucket] = (groupCounts[s.bucket] || 0) + 1);
+
+  const groupBadges = Object.entries(groupCounts).map(([k, v]) =>
+    '<span style="background:' + bucketColor[k] + '22;color:' + bucketColor[k] + ';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-right:4px;">' + bucketLabel[k] + ': ' + v + '</span>'
+  ).join('');
+
+  const sellerRows = sellers.map(s => `
+    <tr style="border-top:1px solid var(--border);">
+      <td style="padding:8px;font-size:12px;">
+        <div style="font-weight:700;">${s.busyName}</div>
+        <div style="font-size:10px;color:var(--text-muted);">${s.clientCode} · ${s.marketplace || ''} · ${s.sellerAging}d old</div>
+      </td>
+      <td style="padding:8px;text-align:right;font-size:12px;font-weight:600;">${fmtINR(s.currSales)}</td>
+      <td style="padding:8px;text-align:right;font-size:12px;color:var(--text-muted);">${fmtINR(s.prevSales)}</td>
+      <td style="padding:8px;text-align:center;">
+        <span style="color:${growthColor(s.growthPct)};font-weight:800;font-size:13px;">${s.growthPct >= 0 ? '+' : ''}${s.growthPct}%</span>
+      </td>
+      <td style="padding:8px;text-align:center;font-size:11px;">
+        <span style="background:${bucketColor[s.bucket]}22;color:${bucketColor[s.bucket]};padding:2px 6px;border-radius:4px;font-weight:700;">${bucketLabel[s.bucket]}</span>
+      </td>
+      <td style="padding:8px;text-align:center;font-size:11px;">${s.acos != null ? s.acos + '%' : '—'}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('panel-body').innerHTML = `
+    <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px;">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">${data.period.currLabel} vs ${data.period.prevLabel}</div>
+      <div>${groupBadges}</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:580px;">
+        <thead style="background:#f5eef8;">
+          <tr>
+            <th style="padding:8px;text-align:left;">Seller</th>
+            <th style="padding:8px;text-align:right;">Current</th>
+            <th style="padding:8px;text-align:right;">Previous</th>
+            <th style="padding:8px;text-align:center;">Growth</th>
+            <th style="padding:8px;text-align:center;">Status</th>
+            <th style="padding:8px;text-align:center;">ACOS</th>
+          </tr>
+        </thead>
+        <tbody>${sellerRows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderRetentionInsightsTab(insights) {
+  if (!insights) return '<div class="empty-state"><div class="emoji">🤖</div><h3>AI insights unavailable</h3></div>';
+  if (insights.error) return '<div class="card"><div class="card-body"><div style="color:var(--red);font-weight:700;">⚠️ AI generate nahi ho paaya</div><div style="margin-top:8px;font-size:13px;">' + insights.summary + '</div><button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="regenerateRetentionAI()">🔄 Retry</button></div></div>';
+
+  const champs = (insights.retentionChampions || []).map(p =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--green);">' + (p.name||'—') + ':</strong> ' + (p.highlight||'') + '</li>').join('');
+  const risks = (insights.churnRisks || []).map(c =>
+    '<li style="margin-bottom:8px;"><strong style="color:var(--red);">' + (c.name||'—') + ':</strong> ' + (c.issue||'') + '</li>').join('');
+  const zeroSale = (insights.zeroSaleAlerts || []).map(z =>
+    '<li style="margin-bottom:8px;"><strong style="color:#7a0000;">' + (z.name||'—') + ':</strong> ' + (z.action||'') + '</li>').join('');
+  const recs = (insights.recommendations || []).map((r, i) =>
+    '<li style="margin-bottom:8px;"><strong>' + (i+1) + '.</strong> ' + r + '</li>').join('');
+
+  return `
+  <div class="card" style="border-left:4px solid #6c3483;background:linear-gradient(180deg,#f5eef8 0%,#fff 80%);">
+    <div class="card-header" style="background:#f5eef8;">
+      <span class="card-title">💡 AI Retention Strategy — by ${insights.aiProvider || 'AI'}</span>
+      <span style="font-size:11px;color:var(--text-muted);">
+        ${insights.fromCache ? '⚡ Cached' : '🆕 Fresh'} · ${insights.generatedAt ? new Date(insights.generatedAt).toLocaleString('en-IN') : ''}
+      </span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:14px;line-height:1.6;padding:10px;background:#fff;border-radius:8px;margin-bottom:14px;">${insights.summary || ''}</div>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--green);">🏆 Retention Champions</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${champs || '<li>—</li>'}</ul>
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--red);">🚨 Churn Risk AMs</div>
+      <ul style="padding-left:20px;margin-bottom:16px;">${risks || '<li>—</li>'}</ul>
+
+      ${zeroSale ? '<div style="font-weight:700;margin-bottom:8px;color:#7a0000;">⚠️ Zero-Sale Clusters</div><ul style="padding-left:20px;margin-bottom:16px;">' + zeroSale + '</ul>' : ''}
+
+      <div style="font-weight:700;margin-bottom:8px;color:var(--primary);">🎯 Action Recommendations</div>
+      <ul style="padding-left:20px;">${recs || '<li>—</li>'}</ul>
+    </div>
+  </div>`;
+}
+
+function renderChurnRiskTab(amList) {
+  // Flatten all sellers in zero/negative/below_target buckets
+  const riskSellers = [];
+  amList.forEach(am => {
+    (am.sellers || []).forEach(s => {
+      if (['zero','negative','below_target'].includes(s.bucket)) {
+        riskSellers.push({ ...s, amName: am.amName });
+      }
+    });
+  });
+
+  riskSellers.sort((a, b) => {
+    const priority = { 'zero': 0, 'negative': 1, 'below_target': 2 };
+    if (priority[a.bucket] !== priority[b.bucket]) return priority[a.bucket] - priority[b.bucket];
+    return a.growthPct - b.growthPct;
+  });
+
+  if (!riskSellers.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>No churn risk sellers!</h3><p>Everyone is growing or new.</p></div>';
+
+  const bucketLabel = { 'zero': '🚨 Zero Sale', 'negative': '🔻 Declining', 'below_target': '🟡 Below 15%' };
+  const bucketColor = { 'zero': '#7a0000', 'negative': 'var(--red)', 'below_target': '#d35400' };
+
+  return `
+  <div style="background:#fdf2f2;border-left:4px solid var(--red);padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;">
+    <strong>⚠️ ${riskSellers.length} sellers need attention</strong> — these are driving churn risk. Prioritize from top.
+  </div>
+  <div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:800px;">
+        <thead style="background:#fdf2f2;">
+          <tr>
+            <th style="padding:10px;text-align:left;">#</th>
+            <th style="padding:10px;text-align:left;">Seller</th>
+            <th style="padding:10px;text-align:left;">AM</th>
+            <th style="padding:10px;text-align:center;">Status</th>
+            <th style="padding:10px;text-align:right;">Current</th>
+            <th style="padding:10px;text-align:right;">Previous</th>
+            <th style="padding:10px;text-align:center;">Growth</th>
+            <th style="padding:10px;text-align:center;">Tenure</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${riskSellers.slice(0, 100).map((s, i) => `
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:8px;font-weight:700;color:var(--text-muted);">${i+1}</td>
+              <td style="padding:8px;">
+                <div style="font-weight:700;">${s.busyName}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${s.clientCode} · ${s.marketplace || ''}</div>
+              </td>
+              <td style="padding:8px;font-size:12px;">${s.amName}</td>
+              <td style="padding:8px;text-align:center;">
+                <span style="background:${bucketColor[s.bucket]}22;color:${bucketColor[s.bucket]};padding:3px 7px;border-radius:5px;font-size:11px;font-weight:700;">${bucketLabel[s.bucket]}</span>
+              </td>
+              <td style="padding:8px;text-align:right;">${fmtINR(s.currSales)}</td>
+              <td style="padding:8px;text-align:right;color:var(--text-muted);">${fmtINR(s.prevSales)}</td>
+              <td style="padding:8px;text-align:center;color:${growthColor(s.growthPct)};font-weight:700;">${s.growthPct >= 0 ? '+' : ''}${s.growthPct}%</td>
+              <td style="padding:8px;text-align:center;font-size:11px;">${s.sellerAging}d</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  ${riskSellers.length > 100 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Showing top 100 of ' + riskSellers.length + '</div>' : ''}`;
+}
+
+function exportRetentionCSV() {
+  const data = window._retentionData;
+  if (!data) { showToast('Data load karo pehle', 'error'); return; }
+  const rows = [['Rank','AM','Sellers','Current Sales','Previous Sales','MoM %','Avg Seller Growth %','Healthy','Below Target','Declining','Zero Sale','Tickets','Avg Resolution (h)','Aged','Avg ACOS','Retention Score','Grade']];
+  data.amList.forEach((a, i) => {
+    rows.push([i+1, a.amName, a.totalSellers, a.currMonthSales, a.prevMonthSales, a.momGrowthPct, a.avgSellerGrowthPct, a.healthy, a.belowTarget, a.negativeGrowth, a.zeroSale, a.totalTickets, a.avgResolutionHours, a.agedTickets, a.avgACOS != null ? a.avgACOS : '', a.retentionScore, a.grade]);
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'sales_retention_' + data.period.currFrom + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV downloaded', 'success');
+}
+
+function toggleOrphanDetail() {
+  const el = document.getElementById('orphan-detail');
+  const btn = document.getElementById('orphan-toggle-btn');
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (btn) btn.textContent = '🙈 Hide Details';
+  } else {
+    el.style.display = 'none';
+    if (btn) btn.textContent = '👁 Show Details';
+  }
+}
+
+function exportOrphanCSV() {
+  const d = window._orphanData;
+  if (!d) return;
+  const rows = [['Client Code','Busy Name','Marketplace','AM','Ads Manager','CRM','Missing AM','Missing Ads','Missing CRM']];
+  d.orphans.forEach(o => {
+    rows.push([o.clientCode, o.busyName, o.marketplace || '', o.amName || '', o.adsManager || '', o.crmExecutive || '', o.missingAM ? 'YES':'', o.missingAds ? 'YES':'', o.missingCRM ? 'YES':'']);
+  });
+  const csv = rows.map(r => r.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'orphan_clients_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV downloaded', 'success');
+}
+
+async function openFixOrphan(clientCode, clientName, missingAM, missingAds, missingCRM) {
+  // Load users list to build dropdowns
+  const users = await api('GET', '/users') || [];
+  const activeUsers = users.filter(u => u.isActive);
+  const ams    = activeUsers.filter(u => u.role === 'Account Manager');
+  const ads    = activeUsers.filter(u => u.role === 'Ads Executive');
+  const crms   = activeUsers.filter(u => u.role === 'CRM Executive' || u.role === 'CRM Lead');
+
+  const mkOptions = (list) => '<option value="">-- Select --</option>' + list.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+
+  openPanel('🔧 Assign — ' + clientName,
+    '<div style="background:var(--bg);padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;">' +
+    '<strong>Client:</strong> ' + clientName + '<br><strong>Code:</strong> ' + clientCode +
+    '</div>' +
+    (missingAM === '1' ? '<div class="form-group"><label>👤 Account Manager *</label><select class="form-control" id="fx-am">' + mkOptions(ams) + '</select></div>' : '') +
+    (missingAds === '1' ? '<div class="form-group"><label>📢 Ads Manager *</label><select class="form-control" id="fx-ads">' + mkOptions(ads) + '</select></div>' : '') +
+    (missingCRM === '1' ? '<div class="form-group"><label>📞 CRM Executive *</label><select class="form-control" id="fx-crm">' + mkOptions(crms) + '</select></div>' : '') +
+    '<button class="btn btn-primary btn-full" onclick="submitFixOrphan(\'' + clientCode + '\',' + missingAM + ',' + missingAds + ',' + missingCRM + ')">✅ Save Assignments</button>'
+  );
+}
+
+async function submitFixOrphan(clientCode, missingAM, missingAds, missingCRM) {
+  const payload = {};
+  if (missingAM) {
+    const v = document.getElementById('fx-am')?.value;
+    if (!v) { showToast('AM select karo', 'error'); return; }
+    payload.amName = v;
+  }
+  if (missingAds) {
+    const v = document.getElementById('fx-ads')?.value;
+    if (!v) { showToast('Ads Manager select karo', 'error'); return; }
+    payload.adsManager = v;
+  }
+  if (missingCRM) {
+    const v = document.getElementById('fx-crm')?.value;
+    if (!v) { showToast('CRM select karo', 'error'); return; }
+    payload.crmExecutive = v;
+  }
+  const r = await api('PATCH', '/clients/' + clientCode, payload);
+  if (r?.success) {
+    showToast('✅ Assigned successfully', 'success');
+    closePanel();
+    renderAdmin(); // refresh
+  } else {
+    showToast('Failed: ' + (r?.error || 'Unknown'), 'error');
+  }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────

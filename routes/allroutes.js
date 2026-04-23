@@ -510,11 +510,25 @@ renewalsRouter.get('/', authMiddleware, async (req, res) => {
     const daysLeft = r.renewal_date ? Math.ceil((new Date(r.renewal_date) - now) / 86400000) : null;
     const isOverdue = daysLeft !== null && daysLeft < 0;
     const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 15;
+    // Extension tracking
+    let extensionDaysLeft = null, extensionExpired = false, extensionExpiringSoon = false;
+    if (r.extension_until) {
+      extensionDaysLeft = Math.ceil((new Date(r.extension_until) - now) / 86400000);
+      extensionExpired = extensionDaysLeft < 0;
+      extensionExpiringSoon = extensionDaysLeft >= 0 && extensionDaysLeft <= 2;
+    }
     return {
       renewalId: r.renewal_id, clientCode: r.client_code, clientName: r.client_name,
       servicePlan: r.service_plan, amount: r.amount, renewalDate: r.renewal_date,
       status: r.status, owner: r.owner, daysLeft, isOverdue, isDueSoon,
       crmComment: r.crm_comment || null,
+      // Extension fields
+      extensionUntil: r.extension_until || null,
+      extensionReason: r.extension_reason || null,
+      extensionGrantedBy: r.extension_granted_by || null,
+      extensionGrantedAt: r.extension_granted_at || null,
+      extensionHistory: r.extension_history || [],
+      extensionDaysLeft, extensionExpired, extensionExpiringSoon,
     };
   }));
 });
@@ -527,7 +541,8 @@ renewalsRouter.get('/stats', authMiddleware, async (req, res) => {
 });
 
 renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
-  const { status, notes, amount, renewalDate, crmComment, paymentDate, paymentMode, utrNumber, paymentBank, paymentRemarks } = req.body;
+  const { status, notes, amount, renewalDate, crmComment, paymentDate, paymentMode, utrNumber, paymentBank, paymentRemarks,
+          extensionUntil, extensionReason } = req.body;
   const updates = { updated_at: new Date() };
   if (status !== undefined) updates.status = status;
   if (notes !== undefined) updates.notes = notes;
@@ -539,9 +554,55 @@ renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
   if (paymentMode !== undefined) updates.payment_mode = paymentMode;
   if (paymentBank !== undefined) updates.payment_bank = paymentBank;
   if (paymentRemarks !== undefined) updates.payment_remarks = paymentRemarks;
+
+  // Extension handling
+  if (status === 'Extension' && extensionUntil) {
+    updates.extension_until = extensionUntil;
+    updates.extension_reason = extensionReason || null;
+    updates.extension_granted_by = req.user.name;
+    updates.extension_granted_at = new Date();
+    // Append to history
+    const { data: existing } = await supabase.from('renewals').select('extension_history').eq('renewal_id', req.params.id).single();
+    const history = (existing?.extension_history) || [];
+    history.push({
+      extensionUntil,
+      reason: extensionReason || '',
+      grantedBy: req.user.name,
+      grantedAt: new Date().toISOString(),
+    });
+    updates.extension_history = history;
+  } else if (status && status !== 'Extension') {
+    // Moving away from Extension — keep history, clear active fields
+    updates.extension_until = null;
+  }
+
   const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
+});
+
+// GET /api/renewals/extensions/expiring — ke check hota hai dashboard se
+renewalsRouter.get('/extensions/expiring', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('renewals')
+      .select('renewal_id, client_code, client_name, extension_until, extension_reason, extension_granted_by, amount, service_plan')
+      .eq('status', 'Extension')
+      .not('extension_until', 'is', null);
+    if (error) throw error;
+    const now = new Date();
+    const result = (data || []).map(r => {
+      const daysLeft = Math.ceil((new Date(r.extension_until) - now) / 86400000);
+      return {
+        renewalId: r.renewal_id, clientCode: r.client_code, clientName: r.client_name,
+        extensionUntil: r.extension_until, extensionReason: r.extension_reason,
+        extensionGrantedBy: r.extension_granted_by,
+        amount: r.amount, servicePlan: r.service_plan,
+        extensionDaysLeft: daysLeft,
+        status: daysLeft < 0 ? 'expired' : daysLeft <= 2 ? 'expiring' : 'ok',
+      };
+    }).sort((a, b) => a.extensionDaysLeft - b.extensionDaysLeft);
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 renewalsRouter.post('/trigger-reminders', authMiddleware, async (req, res) => {

@@ -748,10 +748,10 @@ async function loadDSRPage() {
     api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate)
   ]);
   if (clients) APP.clients = clients;
-
-  // Role-based filtering
-  let myClients = APP.clients || [];
+  // Role-based filtering — exclude Inactive/Closed sellers
+  let myClients = (APP.clients || []).filter(c => !['Inactive','Closed'].includes(c.status));
   if (!isLead) {
+
     const uname = u.name.trim().toLowerCase();
     myClients = myClients.filter(c => {
       const am  = (c.amName||'').trim().toLowerCase();

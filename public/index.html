@@ -320,6 +320,7 @@ const NAV_CONFIG = {
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'retention',icon:'💰',label:'Sales Retention'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -342,6 +343,7 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'retention',icon:'💰',label:'Sales Retention'},
+    {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -748,10 +750,10 @@ async function loadDSRPage() {
     api('GET', '/dsr?x=1&from=' + selDate + '&to=' + selDate)
   ]);
   if (clients) APP.clients = clients;
-  // Role-based filtering — exclude Inactive/Closed sellers
-  let myClients = (APP.clients || []).filter(c => !['Inactive','Closed'].includes(c.status));
-  if (!isLead) {
 
+  // Role-based filtering
+  let myClients = APP.clients || [];
+  if (!isLead) {
     const uname = u.name.trim().toLowerCase();
     myClients = myClients.filter(c => {
       const am  = (c.amName||'').trim().toLowerCase();

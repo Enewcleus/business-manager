@@ -6017,6 +6017,7 @@ async function renderReports(){
           <button class="btn btn-secondary" style="background:#1e8449;color:#fff;" onclick="window._currentReport='monthly_exec';generateReport()">🤖 Executive Performance</button>
           <button class="btn btn-secondary" style="background:#6c3483;color:#fff;" onclick="window._currentReport='seller360_report';generateReport()">🔍 Seller 360 Report</button>
           <button class="btn btn-secondary" style="background:#17202a;color:#fff;" onclick="window._currentReport='staff_aging';generateReport()">👥 Staff Aging Report</button>
+          <button class="btn btn-secondary" style="background:#a93226;color:#fff;" onclick="openDSRMissingReport()">🚨 DSR Missing Report</button>
         </div>
         <div class="form-row">
           <div class="form-group"><label>From Date</label><input type="date" class="form-control" id="rpt-from" value="${monthStart}"></div>
@@ -9376,6 +9377,227 @@ async function submitFixOrphan(clientCode, missingAM, missingAds, missingCRM) {
   } else {
     showToast('Failed: ' + (r?.error || 'Unknown'), 'error');
   }
+}
+
+// ── 🚨 DSR MISSING REPORT ─────────────────────────────────────
+async function openDSRMissingReport() {
+  const today = new Date();
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+  const iso = d => d.toISOString().split('T')[0];
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap;background:var(--card-bg);padding:12px;border-radius:10px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">FROM</label>
+        <input type="date" id="dsrm-from" class="form-control" style="width:150px;" value="${iso(weekAgo)}">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;">TO</label>
+        <input type="date" id="dsrm-to" class="form-control" style="width:150px;" value="${iso(yesterday)}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadDSRMissing()">🔍 Generate</button>
+      <button class="btn btn-sm btn-outline" onclick="dsrmQuickRange(7)">7d</button>
+      <button class="btn btn-sm btn-outline" onclick="dsrmQuickRange(14)">14d</button>
+      <button class="btn btn-sm btn-outline" onclick="dsrmQuickRange(30)">30d</button>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-success btn-sm" onclick="exportDSRMissingExcel()">📥 Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="renderReports()">← Back</button>
+      </div>
+    </div>
+    <div id="dsrm-content"><div class="loading"><div class="spinner"></div> Loading DSR data...</div></div>`;
+  loadDSRMissing();
+}
+
+function dsrmQuickRange(days) {
+  const today = new Date();
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const start = new Date(yesterday); start.setDate(start.getDate() - (days - 1));
+  document.getElementById('dsrm-from').value = start.toISOString().split('T')[0];
+  document.getElementById('dsrm-to').value = yesterday.toISOString().split('T')[0];
+  loadDSRMissing();
+}
+
+async function loadDSRMissing() {
+  const from = document.getElementById('dsrm-from').value;
+  const to = document.getElementById('dsrm-to').value;
+  const box = document.getElementById('dsrm-content');
+  box.innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  const data = await api('GET', '/mis/dsr-missing?from=' + from + '&to=' + to + '&_=' + Date.now());
+  if (!data) { box.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Data load failed</h3></div>'; return; }
+  window._dsrMissingData = data;
+  renderDSRMissingContent(data);
+}
+
+function renderDSRMissingContent(data) {
+  const { period, totalActiveClients, summary, amSummary, missingByClient, dateWiseSummary } = data;
+  const compliancePct = summary.totalExpected ? Math.round((summary.totalFilled / summary.totalExpected) * 100) : 100;
+
+  // KPI strip
+  const kpis = `
+    <div class="kpi-grid" style="margin-bottom:12px;">
+      <div class="kpi-card blue"><div class="kpi-label">Active Clients</div><div class="kpi-value">${totalActiveClients}</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Working Days</div><div class="kpi-value">${period.totalDays}</div></div>
+      <div class="kpi-card green"><div class="kpi-label">DSR Filled</div><div class="kpi-value">${summary.totalFilled}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">🚨 Missing</div><div class="kpi-value">${summary.totalMissing}</div></div>
+      <div class="kpi-card" style="background:linear-gradient(135deg,${compliancePct>=90?'#eafaf1,#d5f5e3':compliancePct>=70?'#fef9e7,#fcf3cf':'#fdf2f2,#fadbd8'});border-left:4px solid ${compliancePct>=90?'var(--green)':compliancePct>=70?'var(--amber)':'var(--red)'};"><div class="kpi-label">Compliance</div><div class="kpi-value" style="color:${compliancePct>=90?'var(--green)':compliancePct>=70?'var(--amber)':'var(--red)'};">${compliancePct}%</div></div>
+    </div>`;
+
+  // Tabs
+  const tabsHtml = `
+    <div style="display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;">
+      <button class="dsrm-tab active" data-tab="am" onclick="switchDSRMTab('am')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">👤 AM-wise (${amSummary.length})</button>
+      <button class="dsrm-tab" data-tab="seller" onclick="switchDSRMTab('seller')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">📦 Seller-wise (${missingByClient.length})</button>
+      <button class="dsrm-tab" data-tab="date" onclick="switchDSRMTab('date')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">📅 Date-wise</button>
+    </div>`;
+
+  document.getElementById('dsrm-content').innerHTML = `
+    ${kpis}
+    ${tabsHtml}
+    <div id="dsrm-tab-content">${renderDSRMAMTab(amSummary)}</div>`;
+}
+
+function switchDSRMTab(tab) {
+  document.querySelectorAll('.dsrm-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = 'var(--text)';
+  });
+  const btn = document.querySelector('.dsrm-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.background = 'var(--primary)'; btn.style.color = '#fff'; }
+  const data = window._dsrMissingData;
+  if (!data) return;
+  const c = document.getElementById('dsrm-tab-content');
+  if (tab === 'am') c.innerHTML = renderDSRMAMTab(data.amSummary);
+  else if (tab === 'seller') c.innerHTML = renderDSRMSellerTab(data.missingByClient, data.missingByClientCount);
+  else if (tab === 'date') c.innerHTML = renderDSRMDateTab(data.dateWiseSummary);
+}
+
+function renderDSRMAMTab(amSummary) {
+  if (!amSummary.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>Sab AMs ne 100% DSR file ki!</h3></div>';
+  return `
+    <div class="card">
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#fdf2f2;">
+            <tr>
+              <th style="padding:10px;text-align:left;">#</th>
+              <th style="padding:10px;text-align:left;">Account Manager</th>
+              <th style="padding:10px;text-align:center;">Sellers Affected</th>
+              <th style="padding:10px;text-align:center;">Total Missing</th>
+              <th style="padding:10px;text-align:center;">Expected</th>
+              <th style="padding:10px;text-align:center;">Compliance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${amSummary.map((a, i) => `
+              <tr style="border-top:1px solid var(--border);${a.compliancePct < 70 ? 'background:#fdf2f2;' : a.compliancePct < 90 ? 'background:#fef9e7;' : ''}">
+                <td style="padding:10px;font-weight:700;color:var(--text-muted);">${i+1}</td>
+                <td style="padding:10px;font-weight:700;">${a.amName}</td>
+                <td style="padding:10px;text-align:center;">${a.sellersAffected}</td>
+                <td style="padding:10px;text-align:center;color:var(--red);font-weight:800;">${a.totalMissing}</td>
+                <td style="padding:10px;text-align:center;color:var(--text-muted);">${a.totalExpected}</td>
+                <td style="padding:10px;text-align:center;font-weight:800;color:${a.compliancePct>=90?'var(--green)':a.compliancePct>=70?'var(--amber)':'var(--red)'};">${a.compliancePct}%</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDSRMSellerTab(missingByClient, total) {
+  if (!missingByClient.length) return '<div class="empty-state"><div class="emoji">🎉</div><h3>Saare sellers ki DSR up-to-date!</h3></div>';
+  return `
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${total > 500 ? 'Showing top 500 of ' + total : 'Total: ' + total + ' sellers'}</div>
+    <div class="card">
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead style="background:#fdf2f2;">
+            <tr>
+              <th style="padding:8px;text-align:left;">Seller</th>
+              <th style="padding:8px;text-align:left;">AM</th>
+              <th style="padding:8px;text-align:center;">Missing Days</th>
+              <th style="padding:8px;text-align:left;">Missing Dates</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${missingByClient.map(c => `
+              <tr style="border-top:1px solid var(--border);">
+                <td style="padding:8px;">
+                  <div style="font-weight:700;">${c.busyName}</div>
+                  <div style="font-size:10px;color:var(--text-muted);">${c.clientCode} · ${c.marketplace || ''}</div>
+                </td>
+                <td style="padding:8px;font-size:12px;">${c.amName}</td>
+                <td style="padding:8px;text-align:center;color:var(--red);font-weight:800;">${c.missingCount}</td>
+                <td style="padding:8px;font-size:11px;">${c.missingDates.join(', ')}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDSRMDateTab(dateWiseSummary) {
+  return `
+    <div class="card">
+      <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#fdf2f2;">
+            <tr>
+              <th style="padding:10px;text-align:left;">Date</th>
+              <th style="padding:10px;text-align:center;">Expected</th>
+              <th style="padding:10px;text-align:center;">Filled</th>
+              <th style="padding:10px;text-align:center;">Missing</th>
+              <th style="padding:10px;text-align:center;">Compliance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dateWiseSummary.map(d => `
+              <tr style="border-top:1px solid var(--border);${d.compliancePct < 70 ? 'background:#fdf2f2;' : d.compliancePct < 90 ? 'background:#fef9e7;' : ''}">
+                <td style="padding:10px;font-weight:700;">${d.date}</td>
+                <td style="padding:10px;text-align:center;">${d.totalExpected}</td>
+                <td style="padding:10px;text-align:center;color:var(--green);font-weight:700;">${d.totalFilled}</td>
+                <td style="padding:10px;text-align:center;color:var(--red);font-weight:700;">${d.totalMissing}</td>
+                <td style="padding:10px;text-align:center;font-weight:800;color:${d.compliancePct>=90?'var(--green)':d.compliancePct>=70?'var(--amber)':'var(--red)'};">${d.compliancePct}%</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function exportDSRMissingExcel() {
+  const data = window._dsrMissingData;
+  if (!data) { showToast('Pehle data generate karo', 'error'); return; }
+
+  // 3 sheets in CSV (combined into one downloadable file with section headers)
+  const rows = [];
+  rows.push(['DSR MISSING REPORT — ' + data.period.from + ' to ' + data.period.to]);
+  rows.push([]);
+  rows.push(['SHEET 1: AM-WISE SUMMARY']);
+  rows.push(['Rank','AM Name','Sellers Affected','Total Missing','Expected','Compliance %']);
+  data.amSummary.forEach((a, i) => {
+    rows.push([i+1, a.amName, a.sellersAffected, a.totalMissing, a.totalExpected, a.compliancePct]);
+  });
+  rows.push([]);
+  rows.push(['SHEET 2: SELLER-WISE DETAILS']);
+  rows.push(['Client Code','Busy Name','Marketplace','AM','Missing Days Count','Missing Dates']);
+  data.missingByClient.forEach(c => {
+    rows.push([c.clientCode, c.busyName, c.marketplace || '', c.amName, c.missingCount, c.missingDates.join('; ')]);
+  });
+  rows.push([]);
+  rows.push(['SHEET 3: DATE-WISE SUMMARY']);
+  rows.push(['Date','Expected','Filled','Missing','Compliance %']);
+  data.dateWiseSummary.forEach(d => {
+    rows.push([d.date, d.totalExpected, d.totalFilled, d.totalMissing, d.compliancePct]);
+  });
+
+  const csv = rows.map(r => r.map(c => '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'dsr_missing_' + data.period.from + '_to_' + data.period.to + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Excel downloaded', 'success');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────

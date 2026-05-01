@@ -355,9 +355,19 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   try {
     let clientQuery = supabase.from('clients').select('health_status, status');
-    if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive'].includes(role)) {
+    if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Viewer'].includes(role)) {
       if (role === 'Account Manager') clientQuery = clientQuery.eq('am_name', name);
       else if (role === 'Ads Executive') clientQuery = clientQuery.eq('ads_manager', name);
+      else if (['SME', 'Team Lead', 'Senior Executive'].includes(role)) {
+        // Team-based: include self + team members
+        const { data: teamMembers } = await supabase.from('users')
+          .select('name').ilike('reporting_to_name', `%${name}%`).eq('is_active', true);
+        const teamNames = [name, ...(teamMembers || []).map(m => m.name)];
+        const orFilter = teamNames.map(n =>
+          `am_name.ilike.%${n}%,ads_manager.ilike.%${n}%,crm_executive.ilike.%${n}%`
+        ).join(',');
+        clientQuery = clientQuery.or(orFilter);
+      }
       else clientQuery = clientQuery.or(`am_name.eq.${name},ads_manager.eq.${name},crm_executive.eq.${name}`);
     }
     const [{ data: clients }, { data: tickets }, { data: renewals }] = await Promise.all([
@@ -1250,6 +1260,143 @@ approvalRouter.patch('/:id', authMiddleware, async (req, res) => {
 
 // ── MIS REPORT ────────────────────────────────────────────────
 const misRouter = require('express').Router();
+
+// ── DSR MISSING REPORT ──────────────────────────────────────
+// Returns date-wise breakdown of which AMs missed DSR for which sellers
+// Query params: from=YYYY-MM-DD, to=YYYY-MM-DD (default: last 7 days)
+misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
+  try {
+    const allowedRoles = ['Admin', 'Ops Lead', 'Sub Admin', 'CRM Lead', 'CSI Lead', 'Team Lead', 'SME', 'Senior Executive'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Default: last 7 days excluding today
+    const today = new Date();
+    const defaultTo = new Date(today); defaultTo.setDate(defaultTo.getDate() - 1);
+    const defaultFrom = new Date(today); defaultFrom.setDate(defaultFrom.getDate() - 7);
+    const iso = d => d.toISOString().split('T')[0];
+    const from = req.query.from || iso(defaultFrom);
+    const to   = req.query.to   || iso(defaultTo);
+
+    // Build date list (skip Sundays)
+    const dateList = [];
+    const start = new Date(from), end = new Date(to);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) dateList.push(iso(d)); // Skip Sundays
+    }
+
+    // Fetch active clients + DSR entries in range
+    const [clientsRes, dsrRes] = await Promise.all([
+      supabase.from('clients')
+        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status')
+        .eq('status', 'Active'),
+      supabase.from('dsr_data')
+        .select('client_code, report_date, entered_by')
+        .gte('report_date', from).lte('report_date', to),
+    ]);
+
+    const clients = (clientsRes.data || []).filter(c =>
+      c.am_name && c.am_name.trim() !== ''  // Only clients with AM assigned
+    );
+    const dsrEntries = dsrRes.data || [];
+
+    // Build set of "filled" combos: clientCode|date
+    const filledSet = new Set();
+    dsrEntries.forEach(d => {
+      filledSet.add(`${d.client_code}|${d.report_date}`);
+    });
+
+    // Build missing matrix: per-AM and per-client
+    const missingByAM = {};   // { amName: { totalMissing, sellersAffected, missingDays: [...], details: [...] } }
+    const missingByClient = []; // { clientCode, busyName, amName, missingDates: [...] }
+
+    clients.forEach(c => {
+      const am = (c.am_name || '').trim();
+      if (!am) return;
+
+      const clientMissingDates = [];
+      dateList.forEach(date => {
+        const key = `${c.client_code}|${date}`;
+        if (!filledSet.has(key)) {
+          clientMissingDates.push(date);
+          if (!missingByAM[am]) missingByAM[am] = {
+            amName: am, totalMissing: 0, sellersAffected: new Set(), missingByDate: {},
+          };
+          missingByAM[am].totalMissing++;
+          missingByAM[am].sellersAffected.add(c.client_code);
+          missingByAM[am].missingByDate[date] = (missingByAM[am].missingByDate[date] || 0) + 1;
+        }
+      });
+      if (clientMissingDates.length > 0) {
+        missingByClient.push({
+          clientCode: c.client_code,
+          busyName: c.busy_name,
+          marketplace: c.marketplace,
+          amName: am,
+          missingDates: clientMissingDates,
+          missingCount: clientMissingDates.length,
+        });
+      }
+    });
+
+    // Convert AM map to array
+    const amSummary = Object.values(missingByAM).map(a => ({
+      amName: a.amName,
+      totalMissing: a.totalMissing,
+      sellersAffected: a.sellersAffected.size,
+      missingByDate: a.missingByDate,
+      // Compliance % for the period
+      totalExpected: 0, // computed below
+    })).sort((a, b) => b.totalMissing - a.totalMissing);
+
+    // Compute compliance per AM
+    const amClientMap = {};
+    clients.forEach(c => {
+      const am = c.am_name.trim();
+      if (!amClientMap[am]) amClientMap[am] = 0;
+      amClientMap[am]++;
+    });
+    amSummary.forEach(a => {
+      const expected = (amClientMap[a.amName] || 0) * dateList.length;
+      a.totalExpected = expected;
+      a.compliancePct = expected > 0 ? Math.round(((expected - a.totalMissing) / expected) * 100) : 100;
+    });
+
+    // Sort missingByClient by missing count desc
+    missingByClient.sort((a, b) => b.missingCount - a.missingCount);
+
+    // Date-wise summary
+    const dateWiseSummary = dateList.map(date => {
+      const totalExpected = clients.length;
+      const totalFilled = clients.filter(c => filledSet.has(`${c.client_code}|${date}`)).length;
+      return {
+        date,
+        totalExpected,
+        totalFilled,
+        totalMissing: totalExpected - totalFilled,
+        compliancePct: totalExpected ? Math.round((totalFilled / totalExpected) * 100) : 100,
+      };
+    });
+
+    res.json({
+      period: { from, to, dateList, totalDays: dateList.length },
+      totalActiveClients: clients.length,
+      summary: {
+        totalExpected: clients.length * dateList.length,
+        totalFilled: dsrEntries.filter(d => clients.find(c => c.client_code === d.client_code)).length,
+        totalMissing: missingByClient.reduce((s, c) => s + c.missingCount, 0),
+      },
+      amSummary,
+      missingByClient: missingByClient.slice(0, 500), // Cap large lists
+      missingByClientCount: missingByClient.length,
+      dateWiseSummary,
+    });
+  } catch(e) {
+    console.error('DSR missing report error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 misRouter.get('/data', authMiddleware, async (req, res) => {
   try {

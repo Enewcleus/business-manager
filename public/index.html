@@ -11262,148 +11262,625 @@ function raRenderResults() {
 
 
 function downloadRAPDF() {
+  // First — ask user about ASIN targeting
+  const totalAsinsAvailable = Object.keys(_ra.asinMap || {}).length;
+  openPanel('📄 Download Report PDF', `
+    <div style="background:linear-gradient(135deg,#eaf4fd,#d6e9f8);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:#1c4e80;margin-bottom:6px;">📊 Report Customization</div>
+      <div style="font-size:12px;color:#1c4e80;">Total ASINs available in this analysis: <strong>${totalAsinsAvailable}</strong></div>
+    </div>
+    <div class="form-group">
+      <label>🎯 Kitne ASINs target karne hain?</label>
+      <select class="form-control" id="ra-pdf-asin-mode" onchange="toggleRAPdfCustom()">
+        <option value="all">Sab ASINs (full report — ${totalAsinsAvailable})</option>
+        <option value="top10">Top 10 (urgent + high priority)</option>
+        <option value="top25">Top 25 ASINs</option>
+        <option value="top50">Top 50 ASINs</option>
+        <option value="custom">Custom number</option>
+      </select>
+      <div id="ra-pdf-custom-wrap" style="display:none;margin-top:8px;">
+        <input type="number" id="ra-pdf-custom-count" class="form-control" min="1" max="${totalAsinsAvailable}" placeholder="Number of ASINs (e.g., 30)" value="20">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>📋 Kya kya include karna hai?</label>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="ra-inc-cover" checked> Cover Page + Summary</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="ra-inc-charts" checked> Visual Charts (priority + category)</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="ra-inc-tasks" checked> Detailed Task List</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="ra-inc-checklist" checked> Action Checklist (last page)</label>
+      </div>
+    </div>
+    <button class="btn btn-success btn-full" onclick="confirmRAPDF()" style="font-weight:700;">📄 Generate PDF</button>
+  `);
+}
+
+function toggleRAPdfCustom() {
+  const mode = document.getElementById('ra-pdf-asin-mode').value;
+  document.getElementById('ra-pdf-custom-wrap').style.display = mode === 'custom' ? 'block' : 'none';
+}
+
+function confirmRAPDF() {
+  const mode = document.getElementById('ra-pdf-asin-mode').value;
+  let limit = null;
+  if (mode === 'top10') limit = 10;
+  else if (mode === 'top25') limit = 25;
+  else if (mode === 'top50') limit = 50;
+  else if (mode === 'custom') {
+    const c = parseInt(document.getElementById('ra-pdf-custom-count').value, 10);
+    if (!c || c < 1) { showToast('Valid number do', 'error'); return; }
+    limit = c;
+  }
+  const opts = {
+    asinLimit: limit,
+    includeCover:    document.getElementById('ra-inc-cover').checked,
+    includeCharts:   document.getElementById('ra-inc-charts').checked,
+    includeTasks:    document.getElementById('ra-inc-tasks').checked,
+    includeChecklist:document.getElementById('ra-inc-checklist').checked,
+  };
+  closePanel();
+  setTimeout(()=>generateRAPDF(opts), 100);
+}
+
+function generateRAPDF(opts) {
   const { jsPDF } = window.jspdf;
   if(!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...','error'); return; }
 
   const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
   const sellerName = client?.busyName || _ra.clientCode || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const tasks = _ra.tasks || [];
+  const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  let allTasks = (_ra.tasks || []).slice();
+
+  // Priority order map
+  const prioOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+  allTasks.sort((a,b) => (prioOrder[a.priority] ?? 99) - (prioOrder[b.priority] ?? 99));
+
+  // Apply ASIN limit if requested
+  let tasks = allTasks;
+  if (opts.asinLimit && allTasks.length > opts.asinLimit) {
+    tasks = allTasks.slice(0, opts.asinLimit);
+  }
+
   const urgent = tasks.filter(t=>t.priority==='urgent');
   const high = tasks.filter(t=>t.priority==='high');
   const medium = tasks.filter(t=>t.priority==='medium');
+  const low = tasks.filter(t=>t.priority==='low');
 
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-  const pageW=210, pageH=297, sideW=12, margin=18;
-  const contentW = pageW - sideW - margin - 8;
-  const BLUE=[28,78,128], LB=[214,228,240], RED=[231,76,60], ORANGE=[211,84,0];
-  const AMBER=[212,160,61], GREEN=[39,174,96], GRAY=[245,245,245];
-  const DG=[100,100,100], WHITE=[255,255,255];
-  let pageNum=1;
+  // Category breakdown
+  const catMap = {};
+  tasks.forEach(t => {
+    const c = t.category || 'General';
+    catMap[c] = (catMap[c] || 0) + 1;
+  });
+  const categories = Object.entries(catMap).sort((a,b) => b[1] - a[1]).slice(0, 6);
 
-  function drawSidebar(){
-    doc.setFillColor(...BLUE);
-    doc.rect(0,0,sideW,pageH,'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(7);
-    doc.setFont('helvetica','bold');
-    'eNewcleus'.split('').forEach(function(l,i){
-      doc.text(l, sideW/2, pageH-15-(i*5), {align:'center'});
-    });
-    doc.setFontSize(7);
-    doc.text(String(pageNum), sideW/2, pageH-5, {align:'center'});
-    doc.setDrawColor(...LB);
-    doc.setLineWidth(0.3);
-    doc.line(sideW,0,sideW,pageH);
-  }
+  // Brand colors (consistent palette)
+  const BRAND      = [28, 78, 128];     // Deep blue
+  const BRAND_LT   = [214, 228, 240];   // Light blue
+  const ACCENT     = [212, 160, 61];    // Gold
+  const RED        = [231, 76, 60];
+  const ORANGE     = [230, 126, 34];
+  const AMBER      = [241, 196, 15];
+  const GREEN      = [39, 174, 96];
+  const TEAL       = [22, 160, 133];
+  const PURPLE     = [142, 68, 173];
+  const GRAY_LT    = [248, 249, 250];
+  const GRAY       = [220, 220, 220];
+  const TEXT_DK    = [33, 37, 41];
+  const TEXT_MD    = [108, 117, 125];
+  const WHITE      = [255, 255, 255];
 
-  function drawHeader(){
-    doc.setFillColor(...BLUE);
-    doc.rect(sideW,0,pageW-sideW,28,'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(13);
-    doc.setFont('helvetica','bold');
-    doc.text('Amazon Report Analyzer', sideW+6, 11);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','normal');
-    doc.text('Seller: '+sellerName, sideW+6, 18);
-    doc.text('Date: '+today, sideW+6, 23);
-    doc.text('Tasks: '+tasks.length+' | Urgent: '+urgent.length+' | High: '+high.length, pageW-8, 18, {align:'right'});
-  }
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4', compress: true });
+  const pageW = 210, pageH = 297;
+  const sideW = 14, marginR = 14, marginT = 32, marginB = 18;
+  const contentX = sideW + 6;
+  const contentW = pageW - sideW - marginR - 6;
+  let pageNum = 0;
 
-  function newPage(){
-    doc.addPage(); pageNum++;
-    drawSidebar();
-    // mini header
-    doc.setFillColor(...BLUE);
-    doc.rect(sideW,0,pageW-sideW,10,'F');
+  // ──────────────────────────────────────────────────────
+  // FRAME — drawn on every page
+  // ──────────────────────────────────────────────────────
+  function drawFrame(showHeader = true) {
+    pageNum++;
+    // Sidebar
+    doc.setFillColor(...BRAND);
+    doc.rect(0, 0, sideW, pageH, 'F');
+    // Accent stripe
+    doc.setFillColor(...ACCENT);
+    doc.rect(sideW, 0, 1.5, pageH, 'F');
+    // Vertical brand text in sidebar
     doc.setTextColor(...WHITE);
     doc.setFontSize(8);
     doc.setFont('helvetica','bold');
-    doc.text('eNewcleus — '+sellerName+' Report', sideW+4, 7);
-    return 16;
-  }
+    'eNewcleus'.split('').forEach((l,i) => {
+      doc.text(l, sideW/2, pageH - 30 - (i*5), {align:'center'});
+    });
+    // Page number at bottom of sidebar
+    doc.setFontSize(8);
+    doc.text(String(pageNum), sideW/2, pageH - 8, {align:'center'});
 
-  function drawSecHeader(y, title, color){
-    if(y>pageH-30){ y=newPage(); }
-    doc.setFillColor(...color);
-    doc.roundedRect(sideW+4,y,contentW+4,8,2,2,'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(10);
-    doc.setFont('helvetica','bold');
-    doc.text(title, sideW+8, y+5.5);
-    return y+12;
-  }
-
-  function drawTask(y, t){
-    const lines = doc.splitTextToSize(t.title||'—', contentW-4);
-    const dlines = doc.splitTextToSize(t.description||'', contentW-4);
-    const h = 7+(lines.length*5)+(dlines.length*4)+4;
-    if(y+h>pageH-15){ y=newPage(); }
-    doc.setFillColor(...GRAY);
-    doc.roundedRect(sideW+4,y,contentW+4,h,2,2,'F');
-    const pc=t.priority==='urgent'?RED:t.priority==='high'?ORANGE:AMBER;
-    doc.setFillColor(...pc);
-    doc.roundedRect(sideW+5,y+1.5,22,4.5,1,1,'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(6.5);
-    doc.setFont('helvetica','bold');
-    doc.text((t.priority||'').toUpperCase(), sideW+16, y+4.5, {align:'center'});
-    doc.setFillColor(...LB);
-    doc.roundedRect(sideW+29,y+1.5,30,4.5,1,1,'F');
-    doc.setTextColor(...BLUE);
-    doc.setFontSize(6.5);
-    doc.text(t.category||'General', sideW+44, y+4.5, {align:'center'});
-    doc.setTextColor(30,30,30);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','bold');
-    doc.text(lines, sideW+6, y+9);
-    if(dlines.length){
+    if (showHeader) {
+      // Top header strip
+      doc.setFillColor(...BRAND);
+      doc.rect(sideW + 1.5, 0, pageW - sideW - 1.5, 22, 'F');
+      doc.setTextColor(...WHITE);
+      doc.setFontSize(11);
+      doc.setFont('helvetica','bold');
+      doc.text('Amazon Report Analysis', contentX, 9);
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
-      doc.setTextColor(...DG);
-      doc.text(dlines, sideW+6, y+9+(lines.length*5));
+      doc.text(sellerName, contentX, 14);
+      doc.setFontSize(7);
+      doc.text(today, pageW - marginR, 9, {align:'right'});
+      doc.setFontSize(7);
+      doc.text(_ra.clientCode || '', pageW - marginR, 14, {align:'right'});
+      // Thin divider under header
+      doc.setDrawColor(...ACCENT);
+      doc.setLineWidth(0.4);
+      doc.line(sideW + 1.5, 22, pageW, 22);
     }
-    return y+h+3;
+
+    // Footer
+    doc.setDrawColor(...GRAY);
+    doc.setLineWidth(0.2);
+    doc.line(contentX, pageH - 12, pageW - marginR, pageH - 12);
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MD);
+    doc.setFont('helvetica','normal');
+    doc.text('eNewcleus Technology — Confidential', contentX, pageH - 7);
+    doc.text('Generated: ' + today, pageW - marginR, pageH - 7, {align:'right'});
   }
 
-  // Page 1
-  drawSidebar();
-  drawHeader();
-  let y=33;
+  function checkPage(y, needed) {
+    if (y + needed > pageH - marginB) {
+      doc.addPage();
+      drawFrame(true);
+      return marginT;
+    }
+    return y;
+  }
 
-  // KPI row
-  const kpis=[['Urgent',urgent.length,RED],['High',high.length,ORANGE],['Medium',medium.length,AMBER],['Total',tasks.length,GREEN]];
-  const kw=contentW/kpis.length;
-  kpis.forEach(function(k,i){
-    const x=sideW+4+i*kw;
-    doc.setFillColor(...k[2]);
-    doc.roundedRect(x,y,kw-3,14,2,2,'F');
+  // ──────────────────────────────────────────────────────
+  // PAGE 1 — COVER PAGE
+  // ──────────────────────────────────────────────────────
+  if (opts.includeCover) {
+    drawFrame(false);
+
+    // Big top brand block
+    doc.setFillColor(...BRAND);
+    doc.rect(sideW + 1.5, 0, pageW - sideW - 1.5, 70, 'F');
+    // Gold accent on brand block
+    doc.setFillColor(...ACCENT);
+    doc.rect(sideW + 1.5, 67, pageW - sideW - 1.5, 1.5, 'F');
+
+    // eNewcleus logo text
     doc.setTextColor(...WHITE);
+    doc.setFontSize(30);
+    doc.setFont('helvetica','bold');
+    doc.text('eNewcleus', contentX, 35);
+    doc.setFontSize(11);
+    doc.setFont('helvetica','normal');
+    doc.text('Sell Easy. Sell More.', contentX, 43);
+    doc.setFontSize(9);
+    doc.setTextColor(...ACCENT);
+    doc.text('Amazon Performance Intelligence Report', contentX, 55);
+
+    // Title block — middle
+    doc.setTextColor(...TEXT_DK);
+    doc.setFontSize(22);
+    doc.setFont('helvetica','bold');
+    const titleLines = doc.splitTextToSize(sellerName, contentW);
+    doc.text(titleLines, contentX, 95);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(...TEXT_MD);
+    doc.text('Comprehensive Performance Analysis', contentX, 95 + (titleLines.length * 8) + 4);
+
+    // Info card
+    let infoY = 125;
+    doc.setFillColor(...GRAY_LT);
+    doc.roundedRect(contentX, infoY, contentW, 38, 3, 3, 'F');
+    doc.setDrawColor(...BRAND_LT);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(contentX, infoY, contentW, 38, 3, 3);
+
+    doc.setTextColor(...TEXT_MD);
+    doc.setFontSize(8);
+    doc.setFont('helvetica','bold');
+    doc.text('CLIENT CODE', contentX + 5, infoY + 7);
+    doc.text('REPORT DATE', contentX + 5 + contentW/2, infoY + 7);
+    doc.text('TOTAL TASKS', contentX + 5, infoY + 22);
+    doc.text('ASINs ANALYZED', contentX + 5 + contentW/2, infoY + 22);
+
+    doc.setTextColor(...TEXT_DK);
+    doc.setFontSize(13);
+    doc.text(_ra.clientCode || '—', contentX + 5, infoY + 14);
+    doc.text(today, contentX + 5 + contentW/2, infoY + 14);
+    doc.text(String(tasks.length), contentX + 5, infoY + 30);
+    doc.text(String(Object.keys(_ra.asinMap || {}).length), contentX + 5 + contentW/2, infoY + 30);
+
+    // Priority KPI grid
+    let kY = 175;
+    doc.setFontSize(10);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Priority Distribution', contentX, kY);
+    kY += 6;
+
+    const kpis = [
+      {label:'Urgent',  count:urgent.length, color:RED},
+      {label:'High',    count:high.length,   color:ORANGE},
+      {label:'Medium',  count:medium.length, color:AMBER},
+      {label:'Low',     count:low.length,    color:GREEN},
+    ];
+    const kpiW = (contentW - 9) / 4;
+    kpis.forEach((k, i) => {
+      const x = contentX + i * (kpiW + 3);
+      // Card bg
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(x, kY, kpiW, 26, 2, 2, 'F');
+      // Top color bar
+      doc.setFillColor(...k.color);
+      doc.roundedRect(x, kY, kpiW, 5, 2, 2, 'F');
+      doc.setFillColor(...k.color);
+      doc.rect(x, kY + 3, kpiW, 2, 'F');
+      // Border
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(x, kY, kpiW, 26, 2, 2);
+      // Number
+      doc.setTextColor(...k.color);
+      doc.setFontSize(20);
+      doc.setFont('helvetica','bold');
+      doc.text(String(k.count), x + kpiW/2, kY + 17, {align:'center'});
+      // Label
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.text(k.label, x + kpiW/2, kY + 23, {align:'center'});
+    });
+
+    // Limit notice if applied
+    if (opts.asinLimit && allTasks.length > opts.asinLimit) {
+      let nY = 215;
+      doc.setFillColor(...BRAND_LT);
+      doc.roundedRect(contentX, nY, contentW, 12, 2, 2, 'F');
+      doc.setTextColor(...BRAND);
+      doc.setFontSize(8);
+      doc.setFont('helvetica','bold');
+      doc.text('NOTE', contentX + 4, nY + 5);
+      doc.setFont('helvetica','normal');
+      doc.text('Showing top ' + opts.asinLimit + ' of ' + allTasks.length + ' tasks (priority sorted)', contentX + 4, nY + 9.5);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────
+  // CHARTS PAGE
+  // ──────────────────────────────────────────────────────
+  if (opts.includeCharts && tasks.length > 0) {
+    doc.addPage();
+    drawFrame(true);
+    let y = marginT;
+
+    // Section title
     doc.setFontSize(14);
     doc.setFont('helvetica','bold');
-    doc.text(String(k[1]), x+kw/2-1.5, y+8, {align:'center'});
-    doc.setFontSize(7);
-    doc.setFont('helvetica','normal');
-    doc.text(k[0], x+kw/2-1.5, y+12.5, {align:'center'});
-  });
-  y+=20;
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Visual Analytics', contentX, y);
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    doc.line(contentX, y + 2, contentX + 30, y + 2);
+    y += 12;
 
-  if(urgent.length){ y=drawSecHeader(y,'URGENT — Abhi Karo',RED); urgent.forEach(function(t){y=drawTask(y,t);}); }
-  if(high.length){ y=drawSecHeader(y,'HIGH PRIORITY — Is Hafte',ORANGE); high.forEach(function(t){y=drawTask(y,t);}); }
-  if(medium.length){ y=drawSecHeader(y,'MEDIUM — Is Mahine',AMBER); medium.forEach(function(t){y=drawTask(y,t);}); }
+    // CHART 1: Priority Breakdown (Bar Chart)
+    doc.setFontSize(11);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Tasks by Priority', contentX, y);
+    y += 8;
 
-  // Footer
-  const tp=doc.getNumberOfPages();
-  for(let i=1;i<=tp;i++){
-    doc.setPage(i);
-    doc.setFontSize(7);
-    doc.setTextColor(...DG);
+    const chartH = 50;
+    const chartY = y;
+    const barAreaX = contentX + 22;
+    const barAreaW = contentW - 25;
+    const maxCount = Math.max(urgent.length, high.length, medium.length, low.length, 1);
+    const barH = 8;
+    const barGap = 4;
+
+    [
+      {label:'Urgent', val:urgent.length, color:RED},
+      {label:'High',   val:high.length,   color:ORANGE},
+      {label:'Medium', val:medium.length, color:AMBER},
+      {label:'Low',    val:low.length,    color:GREEN},
+    ].forEach((b, i) => {
+      const yPos = chartY + i * (barH + barGap);
+      // Label
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...TEXT_DK);
+      doc.text(b.label, contentX, yPos + barH/2 + 1.5);
+      // Background bar
+      doc.setFillColor(...GRAY_LT);
+      doc.roundedRect(barAreaX, yPos, barAreaW, barH, 1.5, 1.5, 'F');
+      // Filled bar
+      const w = (b.val / maxCount) * barAreaW;
+      if (w > 0) {
+        doc.setFillColor(...b.color);
+        doc.roundedRect(barAreaX, yPos, w, barH, 1.5, 1.5, 'F');
+        // Value at end of bar
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(7);
+        doc.setFont('helvetica','bold');
+        if (w > 12) {
+          doc.text(String(b.val), barAreaX + w - 3, yPos + barH/2 + 1.3, {align:'right'});
+        } else {
+          doc.setTextColor(...TEXT_DK);
+          doc.text(String(b.val), barAreaX + w + 2, yPos + barH/2 + 1.3);
+        }
+      } else {
+        doc.setTextColor(...TEXT_MD);
+        doc.setFontSize(7);
+        doc.text('0', barAreaX + 2, yPos + barH/2 + 1.3);
+      }
+    });
+    y = chartY + 4 * (barH + barGap) + 8;
+
+    // CHART 2: Category breakdown (horizontal bars)
+    if (categories.length > 0) {
+      y = checkPage(y, 80);
+      doc.setFontSize(11);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('Tasks by Category (Top ' + categories.length + ')', contentX, y);
+      y += 8;
+
+      const catColors = [BRAND, ACCENT, TEAL, PURPLE, ORANGE, RED];
+      const maxCat = Math.max(...categories.map(c => c[1]));
+      const labelW = 35;
+      const cBarX = contentX + labelW;
+      const cBarW = contentW - labelW - 5;
+      const cBarH = 7;
+      const cGap = 4;
+
+      categories.forEach((c, i) => {
+        const yPos = y + i * (cBarH + cGap);
+        // Category name (truncated)
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(...TEXT_DK);
+        const truncCat = c[0].length > 18 ? c[0].slice(0, 16) + '..' : c[0];
+        doc.text(truncCat, contentX, yPos + cBarH/2 + 1.5);
+        // Bg
+        doc.setFillColor(...GRAY_LT);
+        doc.roundedRect(cBarX, yPos, cBarW, cBarH, 1.5, 1.5, 'F');
+        // Fill
+        const w = (c[1] / maxCat) * cBarW;
+        const color = catColors[i % catColors.length];
+        doc.setFillColor(...color);
+        doc.roundedRect(cBarX, yPos, w, cBarH, 1.5, 1.5, 'F');
+        // Value
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(7);
+        doc.setFont('helvetica','bold');
+        if (w > 10) {
+          doc.text(String(c[1]), cBarX + w - 2, yPos + cBarH/2 + 1.3, {align:'right'});
+        } else {
+          doc.setTextColor(...TEXT_DK);
+          doc.text(String(c[1]), cBarX + w + 2, yPos + cBarH/2 + 1.3);
+        }
+      });
+      y += categories.length * (cBarH + cGap) + 6;
+    }
+
+    // Summary box
+    y = checkPage(y, 30);
+    doc.setFillColor(...BRAND_LT);
+    doc.roundedRect(contentX, y, contentW, 22, 2, 2, 'F');
+    doc.setTextColor(...BRAND);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.text('Summary', contentX + 4, y + 6);
+    doc.setFontSize(8);
     doc.setFont('helvetica','normal');
-    doc.text('eNewcleus Technology — Confidential | '+today, pageW/2+sideW/2, pageH-3, {align:'center'});
+    doc.setTextColor(...TEXT_DK);
+    const totalC = urgent.length + high.length;
+    const summaryText = totalC > 0
+      ? totalC + ' urgent/high priority issues need immediate attention. Review them in next 7 days.'
+      : 'No urgent issues. Continue with monthly optimization tasks.';
+    const sLines = doc.splitTextToSize(summaryText, contentW - 8);
+    doc.text(sLines, contentX + 4, y + 12);
   }
 
-  doc.save('eNewcleus_'+sellerName.replace(/\s+/g,'_')+'_Analysis_'+new Date().toISOString().split('T')[0]+'.pdf');
+  // ──────────────────────────────────────────────────────
+  // TASK DETAIL PAGES
+  // ──────────────────────────────────────────────────────
+  function drawSectionHeader(y, title, count, color) {
+    y = checkPage(y, 16);
+    doc.setFillColor(...color);
+    doc.roundedRect(contentX, y, contentW, 10, 2, 2, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(11);
+    doc.setFont('helvetica','bold');
+    doc.text(title, contentX + 4, y + 6.5);
+    // Count pill on right
+    doc.setFillColor(...WHITE);
+    doc.roundedRect(contentX + contentW - 18, y + 2, 14, 6, 2, 2, 'F');
+    doc.setTextColor(...color);
+    doc.setFontSize(9);
+    doc.text(String(count), contentX + contentW - 11, y + 6, {align:'center'});
+    return y + 14;
+  }
+
+  function drawTaskCard(y, t, idx) {
+    const titleLines = doc.splitTextToSize(t.title || '—', contentW - 12);
+    const descLines = t.description ? doc.splitTextToSize(t.description, contentW - 12) : [];
+    const cardH = 14 + (titleLines.length * 4.5) + (descLines.length * 3.8) + 5;
+    y = checkPage(y, cardH + 3);
+
+    // Card background
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(contentX, y, contentW, cardH, 2, 2, 'F');
+    doc.setDrawColor(...GRAY);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(contentX, y, contentW, cardH, 2, 2);
+
+    // Priority left strip
+    const pColor = t.priority === 'urgent' ? RED : t.priority === 'high' ? ORANGE : t.priority === 'medium' ? AMBER : GREEN;
+    doc.setFillColor(...pColor);
+    doc.roundedRect(contentX, y, 2.5, cardH, 1, 1, 'F');
+    doc.rect(contentX + 1.5, y, 1, cardH, 'F');
+
+    // Index bubble
+    doc.setFillColor(...BRAND);
+    doc.circle(contentX + 8, y + 6, 3.2, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(7);
+    doc.setFont('helvetica','bold');
+    doc.text(String(idx), contentX + 8, y + 7.3, {align:'center'});
+
+    // Priority badge
+    doc.setFillColor(...pColor);
+    doc.roundedRect(contentX + 14, y + 3.5, 18, 5, 1.2, 1.2, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica','bold');
+    doc.text((t.priority || '').toUpperCase(), contentX + 23, y + 6.8, {align:'center'});
+
+    // Category badge
+    doc.setFillColor(...BRAND_LT);
+    doc.roundedRect(contentX + 34, y + 3.5, Math.min(40, doc.getTextWidth(t.category || 'General') + 6), 5, 1.2, 1.2, 'F');
+    doc.setTextColor(...BRAND);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica','bold');
+    doc.text(t.category || 'General', contentX + 36, y + 6.8);
+
+    // ASIN if present
+    if (t.asin) {
+      doc.setFillColor(...GRAY_LT);
+      const asinW = doc.getTextWidth(t.asin) + 6;
+      doc.roundedRect(contentX + contentW - asinW - 2, y + 3.5, asinW, 5, 1.2, 1.2, 'F');
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(6.5);
+      doc.setFont('courier','bold');
+      doc.text(t.asin, contentX + contentW - asinW/2 - 2, y + 6.8, {align:'center'});
+    }
+
+    // Title
+    doc.setTextColor(...TEXT_DK);
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica','bold');
+    doc.text(titleLines, contentX + 6, y + 13);
+    let descY = y + 13 + (titleLines.length * 4.5);
+
+    // Description
+    if (descLines.length) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...TEXT_MD);
+      doc.text(descLines, contentX + 6, descY);
+    }
+
+    return y + cardH + 3;
+  }
+
+  if (opts.includeTasks && tasks.length > 0) {
+    doc.addPage();
+    drawFrame(true);
+    let y = marginT;
+
+    // Section main title
+    doc.setFontSize(14);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Action Items', contentX, y);
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    doc.line(contentX, y + 2, contentX + 26, y + 2);
+    y += 10;
+
+    let idx = 1;
+    if (urgent.length) {
+      y = drawSectionHeader(y, 'URGENT — Abhi Karo (24-48 hrs)', urgent.length, RED);
+      urgent.forEach(t => { y = drawTaskCard(y, t, idx++); });
+      y += 4;
+    }
+    if (high.length) {
+      y = drawSectionHeader(y, 'HIGH PRIORITY — This Week', high.length, ORANGE);
+      high.forEach(t => { y = drawTaskCard(y, t, idx++); });
+      y += 4;
+    }
+    if (medium.length) {
+      y = drawSectionHeader(y, 'MEDIUM — This Month', medium.length, AMBER);
+      medium.forEach(t => { y = drawTaskCard(y, t, idx++); });
+      y += 4;
+    }
+    if (low.length) {
+      y = drawSectionHeader(y, 'LOW — Ongoing', low.length, GREEN);
+      low.forEach(t => { y = drawTaskCard(y, t, idx++); });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────
+  // CHECKLIST PAGE (last)
+  // ──────────────────────────────────────────────────────
+  if (opts.includeChecklist && tasks.length > 0) {
+    doc.addPage();
+    drawFrame(true);
+    let y = marginT;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Action Checklist', contentX, y);
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    doc.line(contentX, y + 2, contentX + 28, y + 2);
+    y += 8;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica','italic');
+    doc.setTextColor(...TEXT_MD);
+    doc.text('Print kar lo aur tasks complete hote hi tick karo. Track your progress.', contentX, y);
+    y += 8;
+
+    const checkTasks = [...urgent, ...high, ...medium, ...low].slice(0, 30);
+    checkTasks.forEach((t, i) => {
+      const lines = doc.splitTextToSize(t.title || '—', contentW - 12);
+      const itemH = 4 + (lines.length * 4);
+      y = checkPage(y, itemH + 2);
+      // Checkbox
+      doc.setDrawColor(...TEXT_DK);
+      doc.setLineWidth(0.3);
+      doc.rect(contentX, y, 4, 4);
+      // Priority dot
+      const pc = t.priority === 'urgent' ? RED : t.priority === 'high' ? ORANGE : t.priority === 'medium' ? AMBER : GREEN;
+      doc.setFillColor(...pc);
+      doc.circle(contentX + 7, y + 2, 1.2, 'F');
+      // Title
+      doc.setTextColor(...TEXT_DK);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica','normal');
+      doc.text(lines, contentX + 10, y + 3);
+      y += itemH + 2;
+      // Light divider
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.1);
+      doc.line(contentX, y, pageW - marginR, y);
+      y += 1;
+    });
+
+    if (checkTasks.length < tasks.length) {
+      y += 4;
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica','italic');
+      doc.setTextColor(...TEXT_MD);
+      doc.text('+ ' + (tasks.length - checkTasks.length) + ' more tasks in detailed section', contentX, y);
+    }
+  }
+
+  doc.save('eNewcleus_' + sellerName.replace(/\s+/g,'_') + '_Report_' + new Date().toISOString().split('T')[0] + '.pdf');
   showToast('PDF download ho raha hai!','success');
 }
 

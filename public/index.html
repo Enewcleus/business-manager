@@ -117,6 +117,7 @@
   .badge-red { background:#fadbd8; color:#922b21; }
   .badge-blue { background:#d6eaf8; color:#1a5276; }
   .badge-orange { background:#fdebd0; color:#a04000; }
+  .badge-teal { background:#d1ecf1; color:#0c5460; }
   .badge-gray { background:#f2f3f4; color:#566573; }
   .badge-purple { background:#e8daef; color:#6c3483; }
 
@@ -2084,22 +2085,30 @@ async function openAddClient(){
   const users = await api('GET','/users');
   const ams = (users||[]).filter(u=>u.role==='Account Manager'&&u.isActive).map(u=>u.name);
   const ads = (users||[]).filter(u=>u.role==='Ads Executive'&&u.isActive).map(u=>u.name);
-  const crms = (users||[]).filter(u=>u.role==='CRM Executive'&&u.isActive).map(u=>u.name);
+  // CRM dropdown ab sirf "CRM Lead" role users dikhata hai (CRM Executive removed)
+  const crms = (users||[]).filter(u=>u.role==='CRM Lead'&&u.isActive).map(u=>u.name);
   const allExecs = (users||[]).filter(u=>u.isActive).map(u=>u.name);
   openPanel('➕ Add Client',`
+    <div class="form-group"><label>🎯 Service Type *</label>
+      <select class="form-control" id="nc-stype" onchange="toggleNCServiceType()">
+        <option value="Full Service">Full Service (AM + Ads + CRM)</option>
+        <option value="Ads Only">Ads Only (sirf Ads Manager)</option>
+      </select>
+      <div id="nc-stype-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Default: Full Service</div>
+    </div>
     <div class="form-group"><label>Busy Name *</label><input type="text" class="form-control" id="nc-name" placeholder="Company Name"></div>
     <div class="form-group"><label>Marketplace</label><select class="form-control" id="nc-market"><option>Amazon.in</option><option>Amazon.com</option><option>Amazon.uk</option><option>Amazon.ae</option><option>Amazon.ca</option><option>Flipkart</option><option>Meesho</option><option>Myntra</option><option>Snapdeal</option><option>Other</option></select></div>
     <div class="form-row">
-      <div class="form-group"><label>Account Manager</label>
+      <div class="form-group" id="nc-am-wrap"><label id="nc-am-label">Account Manager *</label>
         <select class="form-control" id="nc-am"><option value="">-- Select AM --</option>${ams.map(n=>`<option>${n}</option>`).join('')}</select>
       </div>
-      <div class="form-group"><label>Ads Manager</label>
+      <div class="form-group"><label>Ads Manager *</label>
         <select class="form-control" id="nc-ads"><option value="">-- Select Ads --</option>${ads.map(n=>`<option>${n}</option>`).join('')}</select>
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>CRM Executive</label>
-        <select class="form-control" id="nc-crm"><option value="">-- Select CRM --</option>${crms.map(n=>`<option>${n}</option>`).join('')}</select>
+      <div class="form-group" id="nc-crm-wrap"><label id="nc-crm-label">CRM Lead *</label>
+        <select class="form-control" id="nc-crm"><option value="">-- Select CRM Lead --</option>${crms.map(n=>`<option>${n}</option>`).join('')}</select>
       </div>
       <div class="form-group"><label>Plan</label><select class="form-control" id="nc-plan"><option>Basic</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
     </div>
@@ -2110,9 +2119,37 @@ async function openAddClient(){
     <div class="form-group"><label>📞 Phone Number</label><input type="tel" class="form-control" id="nc-phone" placeholder="e.g. 9876543210"></div>
     <button class="btn btn-primary btn-full" onclick="submitAddClient()">Add Client</button>`);
 }
+
+// Toggle Add Client form fields based on Service Type
+function toggleNCServiceType(){
+  const stype = document.getElementById('nc-stype').value;
+  const amLabel = document.getElementById('nc-am-label');
+  const crmLabel = document.getElementById('nc-crm-label');
+  const hint = document.getElementById('nc-stype-hint');
+  if (stype === 'Ads Only') {
+    if (amLabel) amLabel.innerHTML = 'Account Manager <span style="color:var(--text-muted);font-size:11px;">(optional)</span>';
+    if (crmLabel) crmLabel.innerHTML = 'CRM Lead <span style="color:var(--text-muted);font-size:11px;">(optional)</span>';
+    if (hint) hint.innerHTML = '<span style="color:#2980b9;">📢 Ads Only mein sirf Ads Manager mandatory — AM/CRM blank chal jayenge</span>';
+  } else {
+    if (amLabel) amLabel.innerHTML = 'Account Manager *';
+    if (crmLabel) crmLabel.innerHTML = 'CRM Lead *';
+    if (hint) hint.innerHTML = '🎯 Full Service: AM + Ads + CRM mandatory';
+  }
+}
+
 async function submitAddClient(){
   const name=document.getElementById('nc-name').value.trim();if(!name){showToast('Name required','error');return;}
-  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:document.getElementById('nc-am').value,adsManager:document.getElementById('nc-ads').value,crmExecutive:document.getElementById('nc-crm').value,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null,phone:document.getElementById('nc-phone')?.value||null});
+  const stype = document.getElementById('nc-stype').value;
+  const amVal = document.getElementById('nc-am').value;
+  const adsVal = document.getElementById('nc-ads').value;
+  const crmVal = document.getElementById('nc-crm').value;
+  // Validation based on service type
+  if (!adsVal) { showToast('Ads Manager required', 'error'); return; }
+  if (stype === 'Full Service') {
+    if (!amVal) { showToast('Full Service mein AM required', 'error'); return; }
+    if (!crmVal) { showToast('Full Service mein CRM Lead required', 'error'); return; }
+  }
+  const r=await api('POST','/clients',{busyName:name,marketplace:document.getElementById('nc-market').value,amName:amVal,adsManager:adsVal,crmExecutive:crmVal,servicePlan:document.getElementById('nc-plan').value,renewalDate:document.getElementById('nc-renewal').value||null,phone:document.getElementById('nc-phone')?.value||null,serviceType:stype});
   if(r?.success){showToast('✅ '+r.clientCode+' added!','success');closePanel();renderClients();}
 }
 
@@ -5087,8 +5124,15 @@ async function renderRenewals(){
     return html;
   }
   function statusBadge(s){
-    var map={'Confirmed':'badge-green','Lost':'badge-red','Hold':'badge-purple','Extension':'badge-blue'};
-    var icons={'Extension':'🕐 '};
+    var map={
+      'Confirmed':'badge-green',
+      'Lost':'badge-red',
+      'Hold':'badge-purple',
+      'Extension':'badge-blue',
+      'Ready to Pay':'badge-orange',
+      'Renewal Received':'badge-teal',
+    };
+    var icons={'Extension':'🕐 ','Ready to Pay':'💳 ','Renewal Received':'✨ '};
     return '<span class="badge '+(map[s]||'badge-amber')+'">'+(icons[s]||'')+(s||'Pending')+'</span>';
   }
 
@@ -5096,11 +5140,15 @@ async function renderRenewals(){
   const extensions = allRenewals.filter(r => r.status === 'Extension');
   const expiredExt = extensions.filter(r => r.extensionExpired);
   const expiringExt = extensions.filter(r => r.extensionExpiringSoon);
+  const readyToPay = allRenewals.filter(r => r.status === 'Ready to Pay');
+  const received = allRenewals.filter(r => r.status === 'Renewal Received');
 
   var html = '<div class="kpi-grid">'+
     '<div class="kpi-card red"><div class="kpi-label">🚨 Overdue</div><div class="kpi-value">'+overdue.length+'</div></div>'+
     '<div class="kpi-card red"><div class="kpi-label">⚠️ Due ≤7 Days</div><div class="kpi-value">'+urgent.length+'</div></div>'+
     '<div class="kpi-card amber"><div class="kpi-label">📅 Next 30 Days</div><div class="kpi-value">'+next30List.length+'</div></div>'+
+    (readyToPay.length?'<div class="kpi-card" style="background:linear-gradient(135deg,#fff3cd,#ffeaa7);border-left:4px solid #d35400;"><div class="kpi-label" style="color:#d35400;">💳 Ready to Pay</div><div class="kpi-value" style="color:#d35400;">'+readyToPay.length+'</div></div>':'')+
+    (received.length?'<div class="kpi-card" style="background:linear-gradient(135deg,#d1ecf1,#a8dadc);border-left:4px solid #16a085;"><div class="kpi-label" style="color:#16a085;">✨ Received</div><div class="kpi-value" style="color:#16a085;">'+received.length+'</div></div>':'')+
     '<div class="kpi-card green"><div class="kpi-label">✅ Confirmed</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Confirmed').length+'</div></div>'+
     '<div class="kpi-card purple"><div class="kpi-label">⏸ On Hold</div><div class="kpi-value">'+allRenewals.filter(r=>r.status==='Hold').length+'</div></div>'+
     (extensions.length?'<div class="kpi-card" style="background:linear-gradient(135deg,#f5eef8,#e8daef);border-left:4px solid #6c3483;"><div class="kpi-label" style="color:#6c3483;">🕐 Extension</div><div class="kpi-value" style="color:#6c3483;">'+extensions.length+(expiredExt.length?'<span style="font-size:11px;color:var(--red);"> · '+expiredExt.length+' expired</span>':'')+'</div></div>':'')+
@@ -5377,6 +5425,8 @@ function openEditRenewal(id, name) {
     '<div class="form-group"><label>Status</label>'+
     '<select class="form-control" id="er-status" onchange="toggleExtensionFields()">'+
       '<option '+(renewal.status==='Pending'?'selected':'')+'>Pending</option>'+
+      '<option '+(renewal.status==='Ready to Pay'?'selected':'')+'>Ready to Pay</option>'+
+      '<option '+(renewal.status==='Renewal Received'?'selected':'')+'>Renewal Received</option>'+
       '<option '+(renewal.status==='Confirmed'?'selected':'')+'>Confirmed</option>'+
       '<option '+(renewal.status==='Hold'?'selected':'')+'>Hold</option>'+
       '<option '+(renewal.status==='Extension'?'selected':'')+'>Extension</option>'+

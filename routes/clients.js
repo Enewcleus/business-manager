@@ -77,6 +77,7 @@ function formatClient(c) {
     adsManager: c.ads_manager,
     crmExecutive: c.crm_executive,
     status: c.status,
+    serviceType: c.service_type || 'Full Service',
     servicePlan: c.service_plan,
     renewalDate: c.renewal_date,
     healthStatus: c.health_status,
@@ -109,7 +110,9 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // ─── ORPHAN CLIENTS REPORT ────────────────────────────────────
-// Returns Active clients missing AM, Ads Manager, or CRM Executive assignment.
+// Returns Active clients missing required executive assignments (service-type aware).
+// Full Service clients: AM + Ads + CRM all required
+// Ads Only clients: only Ads Manager required
 // Admin / Ops Lead / Sub Admin only.
 router.get('/orphan/report', authMiddleware, async (req, res) => {
   try {
@@ -117,28 +120,43 @@ router.get('/orphan/report', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin only' });
     }
     const { data, error } = await supabase.from('clients')
-      .select('client_code, busy_name, marketplace, status, am_name, ads_manager, crm_executive, service_plan')
+      .select('client_code, busy_name, marketplace, status, am_name, ads_manager, crm_executive, service_plan, service_type')
       .eq('status', 'Active')
       .order('busy_name');
     if (error) throw error;
 
     const isEmpty = v => !v || v.trim() === '';
 
-    const orphans = (data || []).filter(c =>
-      isEmpty(c.am_name) || isEmpty(c.ads_manager) || isEmpty(c.crm_executive)
-    ).map(c => ({
-      clientCode: c.client_code,
-      busyName: c.busy_name,
-      marketplace: c.marketplace,
-      status: c.status,
-      servicePlan: c.service_plan,
-      amName: c.am_name || null,
-      adsManager: c.ads_manager || null,
-      crmExecutive: c.crm_executive || null,
-      missingAM:  isEmpty(c.am_name),
-      missingAds: isEmpty(c.ads_manager),
-      missingCRM: isEmpty(c.crm_executive),
-    }));
+    const orphans = (data || []).filter(c => {
+      const stype = c.service_type || 'Full Service';
+      const adsMissing = isEmpty(c.ads_manager);
+      const amMissing = isEmpty(c.am_name);
+      const crmMissing = isEmpty(c.crm_executive);
+      // Ads Only: only ads is required
+      if (stype === 'Ads Only') return adsMissing;
+      // Full Service: all three required
+      return amMissing || adsMissing || crmMissing;
+    }).map(c => {
+      const stype = c.service_type || 'Full Service';
+      const adsMissing = isEmpty(c.ads_manager);
+      const amMissing = isEmpty(c.am_name);
+      const crmMissing = isEmpty(c.crm_executive);
+      return {
+        clientCode: c.client_code,
+        busyName: c.busy_name,
+        marketplace: c.marketplace,
+        status: c.status,
+        servicePlan: c.service_plan,
+        serviceType: stype,
+        amName: c.am_name || null,
+        adsManager: c.ads_manager || null,
+        crmExecutive: c.crm_executive || null,
+        // For Ads Only, AM/CRM missing is OK (intentional) — flag only Ads
+        missingAM:  stype === 'Ads Only' ? false : amMissing,
+        missingAds: adsMissing,
+        missingCRM: stype === 'Ads Only' ? false : crmMissing,
+      };
+    });
 
     res.json({
       totalActive: (data || []).length,
@@ -160,6 +178,7 @@ router.post('/', authMiddleware, async (req, res) => {
     client_code: clientCode, busy_name: d.busyName, marketplace: d.marketplace,
     am_name: d.amName, ads_manager: d.adsManager, crm_executive: d.crmExecutive,
     status: 'Active', service_plan: d.servicePlan,
+    service_type: d.serviceType || 'Full Service',
     renewal_date: d.renewalDate || null, health_status: 'Healthy',
     phone: d.phone || null, added_by: req.user.name,
   });

@@ -11327,7 +11327,7 @@ function generateRAPDF(opts) {
   if(!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...','error'); return; }
 
   const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
-  const sellerName = client?.busyName || _ra.clientCode || 'Report';
+  const sellerName = client?.busyName || _ra.clientName || _ra.clientCode || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   let allTasks = (_ra.tasks || []).slice();
@@ -11347,10 +11347,10 @@ function generateRAPDF(opts) {
   const medium = tasks.filter(t=>t.priority==='medium');
   const low = tasks.filter(t=>t.priority==='low');
 
-  // Category breakdown
+  // Category breakdown — use issue/dept/category with smart fallback
   const catMap = {};
   tasks.forEach(t => {
-    const c = t.category || 'General';
+    const c = t.issue || t.dept || t.category || 'General';
     catMap[c] = (catMap[c] || 0) + 1;
   });
   const categories = Object.entries(catMap).sort((a,b) => b[1] - a[1]).slice(0, 6);
@@ -12089,8 +12089,28 @@ function generateRAPDF(opts) {
   }
 
   function drawTaskCard(y, t, idx) {
-    const titleLines = doc.splitTextToSize(t.title || '—', contentW - 12);
-    const descLines = t.description ? doc.splitTextToSize(t.description, contentW - 12) : [];
+    // Smart field mapping for Report Analyzer tasks:
+    //   t.issue → category-like label (e.g. "🚨 OUT OF STOCK", "📉 Low Conversion")
+    //   t.task → main instruction (the actual to-do)
+    //   t.reason → background context
+    //   t.metric → key data point
+    //   t.title → ASIN product title (long, used as identifier)
+    //   t.dept → Ops/Ads/Listing
+    //   t.deadline → days
+    const taskCategory = t.issue || t.dept || t.category || 'Action Item';
+    const taskTitle = t.task || t.title || '—';
+    const taskDescParts = [];
+    if (t.reason) taskDescParts.push(t.reason);
+    if (t.metric) taskDescParts.push('📊 ' + t.metric);
+    if (t.title && t.task && t.title !== t.task) {
+      // Show product name if separate from instruction
+      const titleShort = t.title.length > 80 ? t.title.slice(0, 78) + '...' : t.title;
+      taskDescParts.push('Product: ' + titleShort);
+    }
+    const taskDesc = taskDescParts.join(' · ');
+
+    const titleLines = doc.splitTextToSize(taskTitle, contentW - 12);
+    const descLines = taskDesc ? doc.splitTextToSize(taskDesc, contentW - 12) : [];
     const cardH = 14 + (titleLines.length * 4.5) + (descLines.length * 3.8) + 5;
     y = checkPage(y, cardH + 3);
 
@@ -12123,15 +12143,18 @@ function generateRAPDF(opts) {
     doc.setFont('helvetica','bold');
     doc.text((t.priority || '').toUpperCase(), contentX + 23, y + 6.8, {align:'center'});
 
-    // Category badge
+    // Category/Issue badge (truncate if too long for emoji+text)
+    const catText = (taskCategory || '').replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim() || taskCategory;
+    const catShort = catText.length > 28 ? catText.slice(0, 26) + '..' : catText;
+    const catBadgeW = Math.min(60, doc.getTextWidth(catShort) + 6);
     doc.setFillColor(...BRAND_LT);
-    doc.roundedRect(contentX + 34, y + 3.5, Math.min(40, doc.getTextWidth(t.category || 'General') + 6), 5, 1.2, 1.2, 'F');
+    doc.roundedRect(contentX + 34, y + 3.5, catBadgeW, 5, 1.2, 1.2, 'F');
     doc.setTextColor(...BRAND);
     doc.setFontSize(6.5);
     doc.setFont('helvetica','bold');
-    doc.text(t.category || 'General', contentX + 36, y + 6.8);
+    doc.text(catShort, contentX + 36, y + 6.8);
 
-    // ASIN if present
+    // ASIN if present (right side)
     if (t.asin) {
       doc.setFillColor(...GRAY_LT);
       const asinW = doc.getTextWidth(t.asin) + 6;
@@ -12142,14 +12165,14 @@ function generateRAPDF(opts) {
       doc.text(t.asin, contentX + contentW - asinW/2 - 2, y + 6.8, {align:'center'});
     }
 
-    // Title
+    // Title (the actual task instruction)
     doc.setTextColor(...TEXT_DK);
     doc.setFontSize(9.5);
     doc.setFont('helvetica','bold');
     doc.text(titleLines, contentX + 6, y + 13);
     let descY = y + 13 + (titleLines.length * 4.5);
 
-    // Description
+    // Description (reason + metric + product name)
     if (descLines.length) {
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
@@ -12222,7 +12245,8 @@ function generateRAPDF(opts) {
 
     const checkTasks = [...urgent, ...high, ...medium, ...low].slice(0, 30);
     checkTasks.forEach((t, i) => {
-      const lines = doc.splitTextToSize(t.title || '—', contentW - 12);
+      const taskText = t.task || t.title || '—';
+      const lines = doc.splitTextToSize(taskText, contentW - 12);
       const itemH = 4 + (lines.length * 4);
       y = checkPage(y, itemH + 2);
       // Checkbox

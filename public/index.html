@@ -10928,16 +10928,44 @@ function raGenerateTasks() {
     const asinKeywords = _ra.keywordMap[a.asin] || [];
 
     // === OPS TASKS ===
-    // 1. Out of Stock
-    if (a.stock === 0 && (a.sessions > 0 || a.units > 0)) {
+    // 1. Out of Stock — Smart MFN/FBA detection
+    // If FBA stock = 0 BUT units sold > 0, likely seller is fulfilling via MFN
+    // (selling but no FBA inventory = MFN seller fulfillment)
+    const isMFNSelling = (a.stock === 0 && a.units > 0);
+    const isTrueOOS = (a.stock === 0 && a.units === 0 && a.sessions > 0);
+
+    if (isTrueOOS) {
+      // True OOS: 0 stock, 0 units sold, but sessions coming in — definitely lose sales
       _ra.tasks.push({
         asin: a.asin, title: a.title, sku: a.sku,
         priority: 'urgent', dept: 'Ops',
         issue: '🚨 OUT OF STOCK',
-        task: 'FBA mein stock bhejo — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
-        reason: 'Stock = 0, sessions aa rahe hain. Sales loss ho raha hai!',
+        task: 'FBA stock check karo (ya MFN inventory available?) — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
+        reason: 'FBA stock = 0, koi sales nahi hua, but ' + a.sessions + ' sessions aa rahe hain. Either FBA shipment bhejo, ya MFN listing live check karo.',
         deadline: 1,
-        metric: 'Stock: 0 units',
+        metric: 'FBA Stock: 0 | Sessions: ' + a.sessions + ' | Units: 0',
+      });
+    } else if (isMFNSelling && a.units >= 5) {
+      // MFN selling well: 0 FBA stock, but selling units → migrate to FBA for better visibility
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: a.units >= 20 ? 'urgent' : 'high', dept: 'Ops',
+        issue: '📦 MFN to FBA Migration',
+        task: 'MFN par sale ho raha hai — ' + asinLabel + '. FBA mein bhejo for Prime badge + 2x conversion boost.',
+        reason: 'FBA stock 0 hai but ' + a.units + ' units sale hue (MFN se). FBA migrate karne se Prime badge milega, ranking bhi badhegi, ACOS bhi reduce hoga.',
+        deadline: 7,
+        metric: 'MFN Sales: ' + a.units + ' units | Recommended FBA: ' + Math.max(50, a.units * 3) + ' units',
+      });
+    } else if (a.stock > 0 && a.stock < 10 && a.units > 0) {
+      // Low stock warning
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '⚠️ LOW STOCK',
+        task: 'FBA shipment plan karo — ' + asinLabel + '. Sirf ' + a.stock + ' units bachi hain.',
+        reason: 'Daily ' + (a.units > 0 ? Math.round(a.units / 30) : '?') + ' units sale ho rahi hain. ' + (a.stock < 5 ? '5 din mein khatam ho jayegi.' : 'Replenish jaldi karo.'),
+        deadline: 3,
+        metric: 'Current Stock: ' + a.stock + ' | Recommended: ' + Math.max(50, a.units * 3),
       });
     }
 
@@ -11319,7 +11347,17 @@ function confirmRAPDF() {
     includeChecklist:document.getElementById('ra-inc-checklist').checked,
   };
   closePanel();
-  setTimeout(()=>generateRAPDF(opts), 100);
+  showToast('PDF generate ho rahi hai... 5-10 sec lag sakte hain', 'info');
+  setTimeout(() => {
+    try {
+      generateRAPDF(opts);
+    } catch(err) {
+      console.error('[PDF GENERATION ERROR]', err);
+      console.error('[PDF GENERATION ERROR STACK]', err.stack);
+      showToast('❌ PDF generate karne mein error: ' + (err.message || 'Unknown'), 'error');
+      alert('PDF generation failed:\n\n' + err.message + '\n\nKripya browser console (F12) check karo aur screenshot bhejo error ka.');
+    }
+  }, 100);
 }
 
 function generateRAPDF(opts) {
@@ -12062,6 +12100,193 @@ function generateRAPDF(opts) {
         y += rowH;
       });
       y += 4;
+    }
+
+    // ────── TOP 5 GOOD & BAD CAMPAIGNS (Ads Performance) ──────
+    const allKwData = _ra.keywordMap['_all'] || [];
+    if (allKwData.length > 0) {
+      // Aggregate by campaign
+      const campaignAgg = {};
+      allKwData.forEach(k => {
+        const c = k.campaignName || 'Unknown';
+        if (!campaignAgg[c]) campaignAgg[c] = { name: c, spend: 0, sales: 0, kwCount: 0 };
+        campaignAgg[c].spend += parseFloat(k.spend || 0);
+        campaignAgg[c].sales += parseFloat(k.sales || 0);
+        campaignAgg[c].kwCount++;
+      });
+      const campaigns = Object.values(campaignAgg)
+        .filter(c => c.spend > 50 || c.sales > 0)
+        .map(c => ({ ...c, acos: c.sales > 0 ? Math.round((c.spend / c.sales) * 100 * 10) / 10 : null }));
+
+      // Top 5 GOOD: profitable (low ACOS, high sales)
+      const goodCampaigns = campaigns
+        .filter(c => c.sales > 0 && c.acos != null && c.acos <= 30)
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5);
+
+      // Top 5 BAD: high spend with little/no sales (or ACOS > 50%)
+      const badCampaigns = campaigns
+        .filter(c => c.spend >= 100 && (c.sales === 0 || (c.acos != null && c.acos > 50)))
+        .sort((a, b) => b.spend - a.spend)
+        .slice(0, 5);
+
+      if (goodCampaigns.length > 0 || badCampaigns.length > 0) {
+        y = checkPage(y, 80);
+        doc.setFontSize(11);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(...TEXT_DK);
+        doc.text('Campaign Analysis — Good vs Bad', contentX, y);
+        doc.setDrawColor(...ACCENT);
+        doc.setLineWidth(0.4);
+        doc.line(contentX, y + 1.5, contentX + 60, y + 1.5);
+        y += 7;
+      }
+
+      // GOOD CAMPAIGNS section
+      if (goodCampaigns.length > 0) {
+        y = checkPage(y, 35);
+        // Section header
+        doc.setFillColor(...GREEN);
+        doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.text('TOP ' + goodCampaigns.length + ' GOOD CAMPAIGNS — Scale Karo (Budget Badhao)', contentX + 3, y + 4);
+        y += 8;
+
+        goodCampaigns.forEach((c, i) => {
+          y = checkPage(y, 8);
+          const cleanName = stripUnsupported(c.name);
+          const truncName = cleanName.length > 60 ? cleanName.slice(0, 58) + '..' : cleanName;
+          // Number bubble
+          doc.setFillColor(...GREEN);
+          doc.circle(contentX + 3, y + 2.5, 2, 'F');
+          doc.setTextColor(...WHITE);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','bold');
+          doc.text(String(i + 1), contentX + 3, y + 3.4, {align:'center'});
+          // Campaign name
+          doc.setTextColor(...TEXT_DK);
+          doc.setFontSize(8);
+          doc.setFont('helvetica','bold');
+          doc.text(truncName, contentX + 7, y + 3);
+          // Stats line
+          doc.setFontSize(7);
+          doc.setFont('helvetica','normal');
+          doc.setTextColor(85, 85, 85);
+          const stats = 'Sales: ' + fmtMoney(c.sales) + '  |  Spend: ' + fmtMoney(c.spend) + '  |  ACOS: ' + c.acos + '%  |  Keywords: ' + c.kwCount;
+          doc.text(stats, contentX + 7, y + 6.5);
+          y += 9;
+        });
+        y += 3;
+      }
+
+      // BAD CAMPAIGNS section
+      if (badCampaigns.length > 0) {
+        y = checkPage(y, 35);
+        doc.setFillColor(...RED);
+        doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.text('TOP ' + badCampaigns.length + ' BAD CAMPAIGNS — Pause / Optimize Karo', contentX + 3, y + 4);
+        y += 8;
+
+        badCampaigns.forEach((c, i) => {
+          y = checkPage(y, 8);
+          const cleanName = stripUnsupported(c.name);
+          const truncName = cleanName.length > 60 ? cleanName.slice(0, 58) + '..' : cleanName;
+          doc.setFillColor(...RED);
+          doc.circle(contentX + 3, y + 2.5, 2, 'F');
+          doc.setTextColor(...WHITE);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','bold');
+          doc.text(String(i + 1), contentX + 3, y + 3.4, {align:'center'});
+          doc.setTextColor(...TEXT_DK);
+          doc.setFontSize(8);
+          doc.setFont('helvetica','bold');
+          doc.text(truncName, contentX + 7, y + 3);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','normal');
+          doc.setTextColor(85, 85, 85);
+          const acosStr = c.acos != null ? c.acos + '%' : 'No Sales';
+          const stats = 'Spend: ' + fmtMoney(c.spend) + '  |  Sales: ' + fmtMoney(c.sales) + '  |  ACOS: ' + acosStr + '  |  ' + (c.sales === 0 ? 'WASTED SPEND' : 'HIGH ACOS');
+          doc.text(stats, contentX + 7, y + 6.5);
+          y += 9;
+        });
+        y += 3;
+      }
+    }
+
+    // ────── NEGATIVE KEYWORDS — High Spend, No Sales ──────
+    const wastedKw = _ra.keywordMap['_wasted'] || [];
+    if (wastedKw.length > 0) {
+      const topWasted = [...wastedKw].sort((a, b) => b.spend - a.spend).slice(0, 10);
+      y = checkPage(y, 50);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('Negative Keywords — Add Karo (Wasted Spend)', contentX, y);
+      doc.setDrawColor(...ACCENT);
+      doc.setLineWidth(0.4);
+      doc.line(contentX, y + 1.5, contentX + 60, y + 1.5);
+      y += 7;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica','italic');
+      doc.setTextColor(85, 85, 85);
+      doc.text('Yeh search terms pe spend ho raha hai par 0 sales — campaign mein NEGATIVE keyword add karo:', contentX, y);
+      y += 5;
+
+      // Header row
+      doc.setFillColor(...GRAY_LT);
+      doc.rect(contentX, y, contentW, 5, 'F');
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','bold');
+      doc.text('#', contentX + 2, y + 3.5);
+      doc.text('Search Term', contentX + 8, y + 3.5);
+      doc.text('Wasted Spend', contentX + contentW - 30, y + 3.5);
+      doc.text('Action', contentX + contentW - 16, y + 3.5);
+      y += 5;
+
+      let totalWasted = 0;
+      topWasted.forEach((w, i) => {
+        y = checkPage(y, 6);
+        const cleanTerm = stripUnsupported(w.term);
+        const truncTerm = cleanTerm.length > 50 ? cleanTerm.slice(0, 48) + '..' : cleanTerm;
+        doc.setDrawColor(...GRAY);
+        doc.setLineWidth(0.1);
+        doc.line(contentX, y, contentX + contentW, y);
+        doc.setTextColor(...TEXT_DK);
+        doc.setFontSize(8);
+        doc.setFont('helvetica','normal');
+        doc.text(String(i + 1), contentX + 2, y + 4);
+        doc.setFont('helvetica','bold');
+        doc.text(truncTerm, contentX + 8, y + 4);
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(...RED);
+        doc.text(fmtMoney(w.spend), contentX + contentW - 30, y + 4);
+        // Action badge
+        doc.setFillColor(...RED);
+        doc.roundedRect(contentX + contentW - 16, y + 1, 14, 4, 1, 1, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica','bold');
+        doc.text('NEGATE', contentX + contentW - 9, y + 3.8, {align:'center'});
+        y += 6;
+        totalWasted += w.spend;
+      });
+      // Total
+      y += 2;
+      doc.setFillColor(...BRAND_LT);
+      doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+      doc.setTextColor(...BRAND);
+      doc.setFontSize(8);
+      doc.setFont('helvetica','bold');
+      doc.text('Total Wasted Spend (Top ' + topWasted.length + '): ' + fmtMoney(totalWasted) + ' — Negate karne se yeh save hoga!', contentX + 3, y + 4);
+      y += 8;
     }
 
     // ────── Key Insight Box ──────

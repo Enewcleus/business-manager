@@ -11327,7 +11327,17 @@ function generateRAPDF(opts) {
   if(!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...','error'); return; }
 
   const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
-  const sellerName = client?.busyName || _ra.clientName || _ra.clientCode || 'Report';
+  const sellerNameRaw = client?.busyName || _ra.clientName || _ra.clientCode || 'Report';
+  // Strip emojis + non-Latin1 chars (jsPDF default fonts can't render them)
+  const stripUnsupported = (s) => String(s || '')
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+    .replace(/[\u{1F000}-\u{1F2FF}]/gu, '')
+    .replace(/[^\x00-\xFF]/g, '')
+    .replace(/\s+/g, ' ').trim();
+  const sellerName = stripUnsupported(sellerNameRaw) || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   let allTasks = (_ra.tasks || []).slice();
@@ -11646,11 +11656,12 @@ function generateRAPDF(opts) {
 
       categories.forEach((c, i) => {
         const yPos = y + i * (cBarH + cGap);
-        // Category name (truncated)
+        // Category name (cleaned of emojis + truncated)
         doc.setFontSize(7.5);
         doc.setFont('helvetica','normal');
         doc.setTextColor(...TEXT_DK);
-        const truncCat = c[0].length > 18 ? c[0].slice(0, 16) + '..' : c[0];
+        const cleanCat = cleanForPDF(c[0]) || c[0];
+        const truncCat = cleanCat.length > 18 ? cleanCat.slice(0, 16) + '..' : cleanCat;
         doc.text(truncCat, contentX, yPos + cBarH/2 + 1.5);
         // Bg
         doc.setFillColor(...GRAY_LT);
@@ -12088,6 +12099,10 @@ function generateRAPDF(opts) {
     return y + 14;
   }
 
+  // Helper: Strip emojis and non-Latin1 characters that PDF font can't render
+  // (jsPDF default fonts only support Latin1 — emojis show as garbage like Ø=Þ¨)
+  const cleanForPDF = stripUnsupported;
+
   function drawTaskCard(y, t, idx) {
     // Smart field mapping for Report Analyzer tasks:
     //   t.issue → category-like label (e.g. "🚨 OUT OF STOCK", "📉 Low Conversion")
@@ -12097,21 +12112,36 @@ function generateRAPDF(opts) {
     //   t.title → ASIN product title (long, used as identifier)
     //   t.dept → Ops/Ads/Listing
     //   t.deadline → days
-    const taskCategory = t.issue || t.dept || t.category || 'Action Item';
-    const taskTitle = t.task || t.title || '—';
+    const taskCategory = cleanForPDF(t.issue || t.dept || t.category || 'Action Item');
+    const taskTitle = cleanForPDF(t.task || t.title || '—');
     const taskDescParts = [];
-    if (t.reason) taskDescParts.push(t.reason);
-    if (t.metric) taskDescParts.push('📊 ' + t.metric);
+    if (t.reason) taskDescParts.push(cleanForPDF(t.reason));
+    if (t.metric) taskDescParts.push(cleanForPDF(t.metric));
     if (t.title && t.task && t.title !== t.task) {
       // Show product name if separate from instruction
-      const titleShort = t.title.length > 80 ? t.title.slice(0, 78) + '...' : t.title;
+      const cleanProductName = cleanForPDF(t.title);
+      const titleShort = cleanProductName.length > 80 ? cleanProductName.slice(0, 78) + '...' : cleanProductName;
       taskDescParts.push('Product: ' + titleShort);
     }
-    const taskDesc = taskDescParts.join(' · ');
+    const taskDesc = taskDescParts.join(' | ');
 
+    // Set font BEFORE measuring — splitTextToSize uses current font metrics
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9.5);
     const titleLines = doc.splitTextToSize(taskTitle, contentW - 12);
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
     const descLines = taskDesc ? doc.splitTextToSize(taskDesc, contentW - 12) : [];
-    const cardH = 14 + (titleLines.length * 4.5) + (descLines.length * 3.8) + 5;
+
+    // Better height calculation — accurate line heights
+    const titleLineH = 4.2;
+    const descLineH = 3.6;
+    const headerH = 11; // Space for badges row
+    const titleBlockH = titleLines.length * titleLineH;
+    const descBlockH = descLines.length > 0 ? (descLines.length * descLineH) + 1.5 : 0;
+    const cardH = headerH + titleBlockH + descBlockH + 4; // 4 = bottom padding
+
     y = checkPage(y, cardH + 3);
 
     // Card background
@@ -12143,9 +12173,8 @@ function generateRAPDF(opts) {
     doc.setFont('helvetica','bold');
     doc.text((t.priority || '').toUpperCase(), contentX + 23, y + 6.8, {align:'center'});
 
-    // Category/Issue badge (truncate if too long for emoji+text)
-    const catText = (taskCategory || '').replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim() || taskCategory;
-    const catShort = catText.length > 28 ? catText.slice(0, 26) + '..' : catText;
+    // Category/Issue badge
+    const catShort = taskCategory.length > 28 ? taskCategory.slice(0, 26) + '..' : taskCategory;
     const catBadgeW = Math.min(60, doc.getTextWidth(catShort) + 6);
     doc.setFillColor(...BRAND_LT);
     doc.roundedRect(contentX + 34, y + 3.5, catBadgeW, 5, 1.2, 1.2, 'F');
@@ -12165,18 +12194,18 @@ function generateRAPDF(opts) {
       doc.text(t.asin, contentX + contentW - asinW/2 - 2, y + 6.8, {align:'center'});
     }
 
-    // Title (the actual task instruction)
+    // Title (the actual task instruction) — DARK text, BOLD
     doc.setTextColor(...TEXT_DK);
     doc.setFontSize(9.5);
     doc.setFont('helvetica','bold');
-    doc.text(titleLines, contentX + 6, y + 13);
-    let descY = y + 13 + (titleLines.length * 4.5);
+    doc.text(titleLines, contentX + 6, y + headerH + 2.5);
+    let descY = y + headerH + 2.5 + titleBlockH + 1;
 
-    // Description (reason + metric + product name)
+    // Description (reason + metric + product name) — DARKER medium-grey, readable
     if (descLines.length) {
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
-      doc.setTextColor(...TEXT_MD);
+      doc.setTextColor(85, 85, 85);  // Darker than TEXT_MD for readability
       doc.text(descLines, contentX + 6, descY);
     }
 
@@ -12245,7 +12274,7 @@ function generateRAPDF(opts) {
 
     const checkTasks = [...urgent, ...high, ...medium, ...low].slice(0, 30);
     checkTasks.forEach((t, i) => {
-      const taskText = t.task || t.title || '—';
+      const taskText = cleanForPDF(t.task || t.title || '—');
       const lines = doc.splitTextToSize(taskText, contentW - 12);
       const itemH = 4 + (lines.length * 4);
       y = checkPage(y, itemH + 2);

@@ -11408,6 +11408,8 @@ function generateRAPDF(opts) {
       return String(s).replace(/[^\x20-\x7E]/g, '').trim();
     }
   };
+  // Alias for backward compatibility — cleanForPDF and stripUnsupported are same
+  const cleanForPDF = stripUnsupported;
   const sellerName = stripUnsupported(sellerNameRaw) || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -12369,10 +12371,6 @@ function generateRAPDF(opts) {
     doc.text(String(count), contentX + contentW - 11, y + 6, {align:'center'});
     return y + 14;
   }
-
-  // Helper: Strip emojis and non-Latin1 characters that PDF font can't render
-  // (jsPDF default fonts only support Latin1 — emojis show as garbage like Ø=Þ¨)
-  const cleanForPDF = stripUnsupported;
 
   function drawTaskCard(y, t, idx) {
     // Smart field mapping for Report Analyzer tasks:

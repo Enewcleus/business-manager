@@ -10928,16 +10928,44 @@ function raGenerateTasks() {
     const asinKeywords = _ra.keywordMap[a.asin] || [];
 
     // === OPS TASKS ===
-    // 1. Out of Stock
-    if (a.stock === 0 && (a.sessions > 0 || a.units > 0)) {
+    // 1. Out of Stock — Smart MFN/FBA detection
+    // If FBA stock = 0 BUT units sold > 0, likely seller is fulfilling via MFN
+    // (selling but no FBA inventory = MFN seller fulfillment)
+    const isMFNSelling = (a.stock === 0 && a.units > 0);
+    const isTrueOOS = (a.stock === 0 && a.units === 0 && a.sessions > 0);
+
+    if (isTrueOOS) {
+      // True OOS: 0 stock, 0 units sold, but sessions coming in — definitely lose sales
       _ra.tasks.push({
         asin: a.asin, title: a.title, sku: a.sku,
         priority: 'urgent', dept: 'Ops',
         issue: '🚨 OUT OF STOCK',
-        task: 'FBA mein stock bhejo — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
-        reason: 'Stock = 0, sessions aa rahe hain. Sales loss ho raha hai!',
+        task: 'FBA stock check karo (ya MFN inventory available?) — ' + asinLabel + '. Replenish: ' + a.needReplenish + ' units.',
+        reason: 'FBA stock = 0, koi sales nahi hua, but ' + a.sessions + ' sessions aa rahe hain. Either FBA shipment bhejo, ya MFN listing live check karo.',
         deadline: 1,
-        metric: 'Stock: 0 units',
+        metric: 'FBA Stock: 0 | Sessions: ' + a.sessions + ' | Units: 0',
+      });
+    } else if (isMFNSelling && a.units >= 5) {
+      // MFN selling well: 0 FBA stock, but selling units → migrate to FBA for better visibility
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: a.units >= 20 ? 'urgent' : 'high', dept: 'Ops',
+        issue: '📦 MFN to FBA Migration',
+        task: 'MFN par sale ho raha hai — ' + asinLabel + '. FBA mein bhejo for Prime badge + 2x conversion boost.',
+        reason: 'FBA stock 0 hai but ' + a.units + ' units sale hue (MFN se). FBA migrate karne se Prime badge milega, ranking bhi badhegi, ACOS bhi reduce hoga.',
+        deadline: 7,
+        metric: 'MFN Sales: ' + a.units + ' units | Recommended FBA: ' + Math.max(50, a.units * 3) + ' units',
+      });
+    } else if (a.stock > 0 && a.stock < 10 && a.units > 0) {
+      // Low stock warning
+      _ra.tasks.push({
+        asin: a.asin, title: a.title, sku: a.sku,
+        priority: 'high', dept: 'Ops',
+        issue: '⚠️ LOW STOCK',
+        task: 'FBA shipment plan karo — ' + asinLabel + '. Sirf ' + a.stock + ' units bachi hain.',
+        reason: 'Daily ' + (a.units > 0 ? Math.round(a.units / 30) : '?') + ' units sale ho rahi hain. ' + (a.stock < 5 ? '5 din mein khatam ho jayegi.' : 'Replenish jaldi karo.'),
+        deadline: 3,
+        metric: 'Current Stock: ' + a.stock + ' | Recommended: ' + Math.max(50, a.units * 3),
       });
     }
 
@@ -11134,17 +11162,42 @@ function raGenerateTasks() {
 
 // ─── SALES PROJECTION ────────────────────────────────────────────
 function raCalcProjection() {
-  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
-  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+  // Safe number coercion — handles undefined, null, strings like "₹5,200", NaN
+  const safeNum = (v) => {
+    if (v == null) return 0;
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    const cleaned = String(v).replace(/[^\d.\-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
 
-  // Also use DSR data if available
+  const asins = Object.values(_ra.asinMap).filter(a => a && a.asin && a.asin !== '_returns');
+
+  // Sum sales — try multiple field sources (sales OR adSales OR units * avg price fallback)
+  let totalSales = 0;
+  asins.forEach(a => {
+    const directSales = safeNum(a.sales);
+    const adSales = safeNum(a.adSales);
+    // Use whichever is bigger (sometimes ads_data has total sales, sometimes business report)
+    const best = Math.max(directSales, adSales);
+    totalSales += best;
+  });
+
+  // Also use DSR data if available — this captures BOTH MFN + FBA sales
   let baseSales = totalSales;
   if (_ra.dsrHistory && _ra.dsrHistory.length > 0) {
-    const recentMonth = _ra.dsrHistory.slice(0,30).reduce((s,d)=>s+(raNum(d.sales_amount)||0),0);
+    // Last 30 days DSR sales total
+    const recentMonth = _ra.dsrHistory.slice(0, 30).reduce((s, d) => {
+      return s + safeNum(d.sales_amount);
+    }, 0);
     if (recentMonth > 0) baseSales = Math.max(baseSales, recentMonth);
   }
 
-  if (baseSales === 0) return null;
+  // Final safety check — if everything is 0/NaN, return null gracefully
+  if (!baseSales || isNaN(baseSales) || baseSales <= 0) {
+    console.log('[Projection] No valid sales data found. asinSales=' + totalSales + ', dsrFound=' + (_ra.dsrHistory?.length || 0));
+    return null;
+  }
 
   const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
   const now = new Date();
@@ -11319,7 +11372,17 @@ function confirmRAPDF() {
     includeChecklist:document.getElementById('ra-inc-checklist').checked,
   };
   closePanel();
-  setTimeout(()=>generateRAPDF(opts), 100);
+  showToast('PDF generate ho rahi hai... 5-10 sec lag sakte hain', 'info');
+  setTimeout(() => {
+    try {
+      generateRAPDF(opts);
+    } catch(err) {
+      console.error('[PDF GENERATION ERROR]', err);
+      console.error('[PDF GENERATION ERROR STACK]', err.stack);
+      showToast('❌ PDF generate karne mein error: ' + (err.message || 'Unknown'), 'error');
+      alert('PDF generation failed:\n\n' + err.message + '\n\nKripya browser console (F12) check karo aur screenshot bhejo error ka.');
+    }
+  }, 100);
 }
 
 function generateRAPDF(opts) {
@@ -11327,7 +11390,27 @@ function generateRAPDF(opts) {
   if(!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...','error'); return; }
 
   const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
-  const sellerName = client?.busyName || _ra.clientCode || 'Report';
+  const sellerNameRaw = client?.busyName || _ra.clientName || _ra.clientCode || 'Report';
+  // Strip emojis + non-Latin1 chars (jsPDF default fonts can't render them)
+  const stripUnsupported = (s) => {
+    if (s === null || s === undefined) return '';
+    try {
+      return String(s)
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+        .replace(/[\u{1F000}-\u{1F2FF}]/gu, '')
+        .replace(/[^\x00-\xFF]/g, '')
+        .replace(/\s+/g, ' ').trim();
+    } catch(e) {
+      // If regex fails (very old browser), fallback to basic ASCII filter
+      return String(s).replace(/[^\x20-\x7E]/g, '').trim();
+    }
+  };
+  // Alias for backward compatibility — cleanForPDF and stripUnsupported are same
+  const cleanForPDF = stripUnsupported;
+  const sellerName = stripUnsupported(sellerNameRaw) || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   let allTasks = (_ra.tasks || []).slice();
@@ -11342,15 +11425,28 @@ function generateRAPDF(opts) {
     tasks = allTasks.slice(0, opts.asinLimit);
   }
 
+  // DEBUG: Log first 15 tasks to console for inspection
+  console.log('[PDF DEBUG] Total tasks:', tasks.length);
+  console.log('[PDF DEBUG] First 15 tasks:', tasks.slice(0, 15).map((t, i) => ({
+    idx: i+1,
+    priority: t.priority,
+    issue: t.issue,
+    dept: t.dept,
+    task: (t.task || '').slice(0, 60),
+    title: (t.title || '').slice(0, 40),
+    reason: (t.reason || '').slice(0, 40),
+    asin: t.asin,
+  })));
+
   const urgent = tasks.filter(t=>t.priority==='urgent');
   const high = tasks.filter(t=>t.priority==='high');
   const medium = tasks.filter(t=>t.priority==='medium');
   const low = tasks.filter(t=>t.priority==='low');
 
-  // Category breakdown
+  // Category breakdown — use issue/dept/category with smart fallback
   const catMap = {};
   tasks.forEach(t => {
-    const c = t.category || 'General';
+    const c = t.issue || t.dept || t.category || 'General';
     catMap[c] = (catMap[c] || 0) + 1;
   });
   const categories = Object.entries(catMap).sort((a,b) => b[1] - a[1]).slice(0, 6);
@@ -11646,11 +11742,12 @@ function generateRAPDF(opts) {
 
       categories.forEach((c, i) => {
         const yPos = y + i * (cBarH + cGap);
-        // Category name (truncated)
+        // Category name (cleaned of emojis + truncated)
         doc.setFontSize(7.5);
         doc.setFont('helvetica','normal');
         doc.setTextColor(...TEXT_DK);
-        const truncCat = c[0].length > 18 ? c[0].slice(0, 16) + '..' : c[0];
+        const cleanCat = cleanForPDF(c[0]) || c[0];
+        const truncCat = cleanCat.length > 18 ? cleanCat.slice(0, 16) + '..' : cleanCat;
         doc.text(truncCat, contentX, yPos + cBarH/2 + 1.5);
         // Bg
         doc.setFillColor(...GRAY_LT);
@@ -12032,6 +12129,193 @@ function generateRAPDF(opts) {
       y += 4;
     }
 
+    // ────── TOP 5 GOOD & BAD CAMPAIGNS (Ads Performance) ──────
+    const allKwData = _ra.keywordMap['_all'] || [];
+    if (allKwData.length > 0) {
+      // Aggregate by campaign
+      const campaignAgg = {};
+      allKwData.forEach(k => {
+        const c = k.campaignName || 'Unknown';
+        if (!campaignAgg[c]) campaignAgg[c] = { name: c, spend: 0, sales: 0, kwCount: 0 };
+        campaignAgg[c].spend += parseFloat(k.spend || 0);
+        campaignAgg[c].sales += parseFloat(k.sales || 0);
+        campaignAgg[c].kwCount++;
+      });
+      const campaigns = Object.values(campaignAgg)
+        .filter(c => c.spend > 50 || c.sales > 0)
+        .map(c => ({ ...c, acos: c.sales > 0 ? Math.round((c.spend / c.sales) * 100 * 10) / 10 : null }));
+
+      // Top 5 GOOD: profitable (low ACOS, high sales)
+      const goodCampaigns = campaigns
+        .filter(c => c.sales > 0 && c.acos != null && c.acos <= 30)
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5);
+
+      // Top 5 BAD: high spend with little/no sales (or ACOS > 50%)
+      const badCampaigns = campaigns
+        .filter(c => c.spend >= 100 && (c.sales === 0 || (c.acos != null && c.acos > 50)))
+        .sort((a, b) => b.spend - a.spend)
+        .slice(0, 5);
+
+      if (goodCampaigns.length > 0 || badCampaigns.length > 0) {
+        y = checkPage(y, 80);
+        doc.setFontSize(11);
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(...TEXT_DK);
+        doc.text('Campaign Analysis — Good vs Bad', contentX, y);
+        doc.setDrawColor(...ACCENT);
+        doc.setLineWidth(0.4);
+        doc.line(contentX, y + 1.5, contentX + 60, y + 1.5);
+        y += 7;
+      }
+
+      // GOOD CAMPAIGNS section
+      if (goodCampaigns.length > 0) {
+        y = checkPage(y, 35);
+        // Section header
+        doc.setFillColor(...GREEN);
+        doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.text('TOP ' + goodCampaigns.length + ' GOOD CAMPAIGNS — Scale Karo (Budget Badhao)', contentX + 3, y + 4);
+        y += 8;
+
+        goodCampaigns.forEach((c, i) => {
+          y = checkPage(y, 8);
+          const cleanName = stripUnsupported(c.name);
+          const truncName = cleanName.length > 60 ? cleanName.slice(0, 58) + '..' : cleanName;
+          // Number bubble
+          doc.setFillColor(...GREEN);
+          doc.circle(contentX + 3, y + 2.5, 2, 'F');
+          doc.setTextColor(...WHITE);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','bold');
+          doc.text(String(i + 1), contentX + 3, y + 3.4, {align:'center'});
+          // Campaign name
+          doc.setTextColor(...TEXT_DK);
+          doc.setFontSize(8);
+          doc.setFont('helvetica','bold');
+          doc.text(truncName, contentX + 7, y + 3);
+          // Stats line
+          doc.setFontSize(7);
+          doc.setFont('helvetica','normal');
+          doc.setTextColor(85, 85, 85);
+          const stats = 'Sales: ' + fmtMoney(c.sales) + '  |  Spend: ' + fmtMoney(c.spend) + '  |  ACOS: ' + c.acos + '%  |  Keywords: ' + c.kwCount;
+          doc.text(stats, contentX + 7, y + 6.5);
+          y += 9;
+        });
+        y += 3;
+      }
+
+      // BAD CAMPAIGNS section
+      if (badCampaigns.length > 0) {
+        y = checkPage(y, 35);
+        doc.setFillColor(...RED);
+        doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(9);
+        doc.setFont('helvetica','bold');
+        doc.text('TOP ' + badCampaigns.length + ' BAD CAMPAIGNS — Pause / Optimize Karo', contentX + 3, y + 4);
+        y += 8;
+
+        badCampaigns.forEach((c, i) => {
+          y = checkPage(y, 8);
+          const cleanName = stripUnsupported(c.name);
+          const truncName = cleanName.length > 60 ? cleanName.slice(0, 58) + '..' : cleanName;
+          doc.setFillColor(...RED);
+          doc.circle(contentX + 3, y + 2.5, 2, 'F');
+          doc.setTextColor(...WHITE);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','bold');
+          doc.text(String(i + 1), contentX + 3, y + 3.4, {align:'center'});
+          doc.setTextColor(...TEXT_DK);
+          doc.setFontSize(8);
+          doc.setFont('helvetica','bold');
+          doc.text(truncName, contentX + 7, y + 3);
+          doc.setFontSize(7);
+          doc.setFont('helvetica','normal');
+          doc.setTextColor(85, 85, 85);
+          const acosStr = c.acos != null ? c.acos + '%' : 'No Sales';
+          const stats = 'Spend: ' + fmtMoney(c.spend) + '  |  Sales: ' + fmtMoney(c.sales) + '  |  ACOS: ' + acosStr + '  |  ' + (c.sales === 0 ? 'WASTED SPEND' : 'HIGH ACOS');
+          doc.text(stats, contentX + 7, y + 6.5);
+          y += 9;
+        });
+        y += 3;
+      }
+    }
+
+    // ────── NEGATIVE KEYWORDS — High Spend, No Sales ──────
+    const wastedKw = _ra.keywordMap['_wasted'] || [];
+    if (wastedKw.length > 0) {
+      const topWasted = [...wastedKw].sort((a, b) => b.spend - a.spend).slice(0, 10);
+      y = checkPage(y, 50);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('Negative Keywords — Add Karo (Wasted Spend)', contentX, y);
+      doc.setDrawColor(...ACCENT);
+      doc.setLineWidth(0.4);
+      doc.line(contentX, y + 1.5, contentX + 60, y + 1.5);
+      y += 7;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica','italic');
+      doc.setTextColor(85, 85, 85);
+      doc.text('Yeh search terms pe spend ho raha hai par 0 sales — campaign mein NEGATIVE keyword add karo:', contentX, y);
+      y += 5;
+
+      // Header row
+      doc.setFillColor(...GRAY_LT);
+      doc.rect(contentX, y, contentW, 5, 'F');
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','bold');
+      doc.text('#', contentX + 2, y + 3.5);
+      doc.text('Search Term', contentX + 8, y + 3.5);
+      doc.text('Wasted Spend', contentX + contentW - 30, y + 3.5);
+      doc.text('Action', contentX + contentW - 16, y + 3.5);
+      y += 5;
+
+      let totalWasted = 0;
+      topWasted.forEach((w, i) => {
+        y = checkPage(y, 6);
+        const cleanTerm = stripUnsupported(w.term);
+        const truncTerm = cleanTerm.length > 50 ? cleanTerm.slice(0, 48) + '..' : cleanTerm;
+        doc.setDrawColor(...GRAY);
+        doc.setLineWidth(0.1);
+        doc.line(contentX, y, contentX + contentW, y);
+        doc.setTextColor(...TEXT_DK);
+        doc.setFontSize(8);
+        doc.setFont('helvetica','normal');
+        doc.text(String(i + 1), contentX + 2, y + 4);
+        doc.setFont('helvetica','bold');
+        doc.text(truncTerm, contentX + 8, y + 4);
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(...RED);
+        doc.text(fmtMoney(w.spend), contentX + contentW - 30, y + 4);
+        // Action badge
+        doc.setFillColor(...RED);
+        doc.roundedRect(contentX + contentW - 16, y + 1, 14, 4, 1, 1, 'F');
+        doc.setTextColor(...WHITE);
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica','bold');
+        doc.text('NEGATE', contentX + contentW - 9, y + 3.8, {align:'center'});
+        y += 6;
+        totalWasted += w.spend;
+      });
+      // Total
+      y += 2;
+      doc.setFillColor(...BRAND_LT);
+      doc.roundedRect(contentX, y, contentW, 6, 1.5, 1.5, 'F');
+      doc.setTextColor(...BRAND);
+      doc.setFontSize(8);
+      doc.setFont('helvetica','bold');
+      doc.text('Total Wasted Spend (Top ' + topWasted.length + '): ' + fmtMoney(totalWasted) + ' — Negate karne se yeh save hoga!', contentX + 3, y + 4);
+      y += 8;
+    }
+
     // ────── Key Insight Box ──────
     y = checkPage(y, 28);
     doc.setFillColor(...BRAND_LT);
@@ -12089,9 +12373,55 @@ function generateRAPDF(opts) {
   }
 
   function drawTaskCard(y, t, idx) {
-    const titleLines = doc.splitTextToSize(t.title || '—', contentW - 12);
-    const descLines = t.description ? doc.splitTextToSize(t.description, contentW - 12) : [];
-    const cardH = 14 + (titleLines.length * 4.5) + (descLines.length * 3.8) + 5;
+    // Smart field mapping for Report Analyzer tasks:
+    //   t.issue → category-like label (e.g. "🚨 OUT OF STOCK", "📉 Low Conversion")
+    //   t.task → main instruction (the actual to-do)
+    //   t.reason → background context
+    //   t.metric → key data point
+    //   t.title → ASIN product title (long, used as identifier)
+    //   t.dept → Ops/Ads/Listing
+    //   t.deadline → days
+    //
+    // Defensive fallback: if cleaning returns empty, use raw t.dept then 'Action Item'
+    const cleanedIssue = cleanForPDF(t.issue);
+    const cleanedDept = cleanForPDF(t.dept);
+    const taskCategory = cleanedIssue || cleanedDept || cleanForPDF(t.category) || 'Action Item';
+    const cleanedTask = cleanForPDF(t.task);
+    const cleanedTitle = cleanForPDF(t.title);
+    const taskTitle = cleanedTask || cleanedTitle || '—';
+    const taskDescParts = [];
+    if (t.reason) {
+      const r = cleanForPDF(t.reason);
+      if (r) taskDescParts.push(r);
+    }
+    if (t.metric) {
+      const m = cleanForPDF(t.metric);
+      if (m) taskDescParts.push(m);
+    }
+    if (cleanedTitle && cleanedTask && cleanedTitle !== cleanedTask) {
+      // Show product name if separate from instruction
+      const titleShort = cleanedTitle.length > 80 ? cleanedTitle.slice(0, 78) + '...' : cleanedTitle;
+      taskDescParts.push('Product: ' + titleShort);
+    }
+    const taskDesc = taskDescParts.join(' | ');
+
+    // Set font BEFORE measuring — splitTextToSize uses current font metrics
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9.5);
+    const titleLines = doc.splitTextToSize(taskTitle, contentW - 12);
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    const descLines = taskDesc ? doc.splitTextToSize(taskDesc, contentW - 12) : [];
+
+    // Better height calculation — accurate line heights
+    const titleLineH = 4.2;
+    const descLineH = 3.6;
+    const headerH = 11; // Space for badges row
+    const titleBlockH = titleLines.length * titleLineH;
+    const descBlockH = descLines.length > 0 ? (descLines.length * descLineH) + 1.5 : 0;
+    const cardH = headerH + titleBlockH + descBlockH + 4; // 4 = bottom padding
+
     y = checkPage(y, cardH + 3);
 
     // Card background
@@ -12123,15 +12453,17 @@ function generateRAPDF(opts) {
     doc.setFont('helvetica','bold');
     doc.text((t.priority || '').toUpperCase(), contentX + 23, y + 6.8, {align:'center'});
 
-    // Category badge
+    // Category/Issue badge
+    const catShort = taskCategory.length > 28 ? taskCategory.slice(0, 26) + '..' : taskCategory;
+    const catBadgeW = Math.min(60, doc.getTextWidth(catShort) + 6);
     doc.setFillColor(...BRAND_LT);
-    doc.roundedRect(contentX + 34, y + 3.5, Math.min(40, doc.getTextWidth(t.category || 'General') + 6), 5, 1.2, 1.2, 'F');
+    doc.roundedRect(contentX + 34, y + 3.5, catBadgeW, 5, 1.2, 1.2, 'F');
     doc.setTextColor(...BRAND);
     doc.setFontSize(6.5);
     doc.setFont('helvetica','bold');
-    doc.text(t.category || 'General', contentX + 36, y + 6.8);
+    doc.text(catShort, contentX + 36, y + 6.8);
 
-    // ASIN if present
+    // ASIN if present (right side)
     if (t.asin) {
       doc.setFillColor(...GRAY_LT);
       const asinW = doc.getTextWidth(t.asin) + 6;
@@ -12142,18 +12474,18 @@ function generateRAPDF(opts) {
       doc.text(t.asin, contentX + contentW - asinW/2 - 2, y + 6.8, {align:'center'});
     }
 
-    // Title
+    // Title (the actual task instruction) — DARK text, BOLD
     doc.setTextColor(...TEXT_DK);
     doc.setFontSize(9.5);
     doc.setFont('helvetica','bold');
-    doc.text(titleLines, contentX + 6, y + 13);
-    let descY = y + 13 + (titleLines.length * 4.5);
+    doc.text(titleLines, contentX + 6, y + headerH + 2.5);
+    let descY = y + headerH + 2.5 + titleBlockH + 1;
 
-    // Description
+    // Description (reason + metric + product name) — DARKER medium-grey, readable
     if (descLines.length) {
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
-      doc.setTextColor(...TEXT_MD);
+      doc.setTextColor(85, 85, 85);  // Darker than TEXT_MD for readability
       doc.text(descLines, contentX + 6, descY);
     }
 
@@ -12222,7 +12554,8 @@ function generateRAPDF(opts) {
 
     const checkTasks = [...urgent, ...high, ...medium, ...low].slice(0, 30);
     checkTasks.forEach((t, i) => {
-      const lines = doc.splitTextToSize(t.title || '—', contentW - 12);
+      const taskText = cleanForPDF(t.task || t.title || '—');
+      const lines = doc.splitTextToSize(taskText, contentW - 12);
       const itemH = 4 + (lines.length * 4);
       y = checkPage(y, itemH + 2);
       // Checkbox

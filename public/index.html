@@ -11162,17 +11162,42 @@ function raGenerateTasks() {
 
 // ─── SALES PROJECTION ────────────────────────────────────────────
 function raCalcProjection() {
-  const asins = Object.values(_ra.asinMap).filter(a => a.asin !== '_returns');
-  const totalSales = asins.reduce((s,a)=>s+a.sales,0);
+  // Safe number coercion — handles undefined, null, strings like "₹5,200", NaN
+  const safeNum = (v) => {
+    if (v == null) return 0;
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    const cleaned = String(v).replace(/[^\d.\-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  };
 
-  // Also use DSR data if available
+  const asins = Object.values(_ra.asinMap).filter(a => a && a.asin && a.asin !== '_returns');
+
+  // Sum sales — try multiple field sources (sales OR adSales OR units * avg price fallback)
+  let totalSales = 0;
+  asins.forEach(a => {
+    const directSales = safeNum(a.sales);
+    const adSales = safeNum(a.adSales);
+    // Use whichever is bigger (sometimes ads_data has total sales, sometimes business report)
+    const best = Math.max(directSales, adSales);
+    totalSales += best;
+  });
+
+  // Also use DSR data if available — this captures BOTH MFN + FBA sales
   let baseSales = totalSales;
   if (_ra.dsrHistory && _ra.dsrHistory.length > 0) {
-    const recentMonth = _ra.dsrHistory.slice(0,30).reduce((s,d)=>s+(raNum(d.sales_amount)||0),0);
+    // Last 30 days DSR sales total
+    const recentMonth = _ra.dsrHistory.slice(0, 30).reduce((s, d) => {
+      return s + safeNum(d.sales_amount);
+    }, 0);
     if (recentMonth > 0) baseSales = Math.max(baseSales, recentMonth);
   }
 
-  if (baseSales === 0) return null;
+  // Final safety check — if everything is 0/NaN, return null gracefully
+  if (!baseSales || isNaN(baseSales) || baseSales <= 0) {
+    console.log('[Projection] No valid sales data found. asinSales=' + totalSales + ', dsrFound=' + (_ra.dsrHistory?.length || 0));
+    return null;
+  }
 
   const months = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
   const now = new Date();

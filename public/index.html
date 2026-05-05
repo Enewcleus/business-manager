@@ -11329,14 +11329,22 @@ function generateRAPDF(opts) {
   const client = APP.clients?.find(c=>c.clientCode===_ra.clientCode);
   const sellerNameRaw = client?.busyName || _ra.clientName || _ra.clientCode || 'Report';
   // Strip emojis + non-Latin1 chars (jsPDF default fonts can't render them)
-  const stripUnsupported = (s) => String(s || '')
-    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
-    .replace(/[\u{2600}-\u{27BF}]/gu, '')
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-    .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
-    .replace(/[\u{1F000}-\u{1F2FF}]/gu, '')
-    .replace(/[^\x00-\xFF]/g, '')
-    .replace(/\s+/g, ' ').trim();
+  const stripUnsupported = (s) => {
+    if (s === null || s === undefined) return '';
+    try {
+      return String(s)
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+        .replace(/[\u{1F900}-\u{1F9FF}]/gu, '')
+        .replace(/[\u{1F000}-\u{1F2FF}]/gu, '')
+        .replace(/[^\x00-\xFF]/g, '')
+        .replace(/\s+/g, ' ').trim();
+    } catch(e) {
+      // If regex fails (very old browser), fallback to basic ASCII filter
+      return String(s).replace(/[^\x20-\x7E]/g, '').trim();
+    }
+  };
   const sellerName = stripUnsupported(sellerNameRaw) || 'Report';
   const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   const todayFull = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -11351,6 +11359,19 @@ function generateRAPDF(opts) {
   if (opts.asinLimit && allTasks.length > opts.asinLimit) {
     tasks = allTasks.slice(0, opts.asinLimit);
   }
+
+  // DEBUG: Log first 15 tasks to console for inspection
+  console.log('[PDF DEBUG] Total tasks:', tasks.length);
+  console.log('[PDF DEBUG] First 15 tasks:', tasks.slice(0, 15).map((t, i) => ({
+    idx: i+1,
+    priority: t.priority,
+    issue: t.issue,
+    dept: t.dept,
+    task: (t.task || '').slice(0, 60),
+    title: (t.title || '').slice(0, 40),
+    reason: (t.reason || '').slice(0, 40),
+    asin: t.asin,
+  })));
 
   const urgent = tasks.filter(t=>t.priority==='urgent');
   const high = tasks.filter(t=>t.priority==='high');
@@ -12112,15 +12133,26 @@ function generateRAPDF(opts) {
     //   t.title → ASIN product title (long, used as identifier)
     //   t.dept → Ops/Ads/Listing
     //   t.deadline → days
-    const taskCategory = cleanForPDF(t.issue || t.dept || t.category || 'Action Item');
-    const taskTitle = cleanForPDF(t.task || t.title || '—');
+    //
+    // Defensive fallback: if cleaning returns empty, use raw t.dept then 'Action Item'
+    const cleanedIssue = cleanForPDF(t.issue);
+    const cleanedDept = cleanForPDF(t.dept);
+    const taskCategory = cleanedIssue || cleanedDept || cleanForPDF(t.category) || 'Action Item';
+    const cleanedTask = cleanForPDF(t.task);
+    const cleanedTitle = cleanForPDF(t.title);
+    const taskTitle = cleanedTask || cleanedTitle || '—';
     const taskDescParts = [];
-    if (t.reason) taskDescParts.push(cleanForPDF(t.reason));
-    if (t.metric) taskDescParts.push(cleanForPDF(t.metric));
-    if (t.title && t.task && t.title !== t.task) {
+    if (t.reason) {
+      const r = cleanForPDF(t.reason);
+      if (r) taskDescParts.push(r);
+    }
+    if (t.metric) {
+      const m = cleanForPDF(t.metric);
+      if (m) taskDescParts.push(m);
+    }
+    if (cleanedTitle && cleanedTask && cleanedTitle !== cleanedTask) {
       // Show product name if separate from instruction
-      const cleanProductName = cleanForPDF(t.title);
-      const titleShort = cleanProductName.length > 80 ? cleanProductName.slice(0, 78) + '...' : cleanProductName;
+      const titleShort = cleanedTitle.length > 80 ? cleanedTitle.slice(0, 78) + '...' : cleanedTitle;
       taskDescParts.push('Product: ' + titleShort);
     }
     const taskDesc = taskDescParts.join(' | ');

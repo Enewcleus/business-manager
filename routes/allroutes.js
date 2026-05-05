@@ -1301,11 +1301,35 @@ misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
     );
     const dsrEntries = dsrRes.data || [];
 
-    // Build set of "filled" combos: clientCode|date
+    // Helper: normalize any date input to YYYY-MM-DD string (handles timestamps, Date objects, ISO strings)
+    function normalizeDate(d) {
+      if (!d) return null;
+      if (typeof d === 'string') {
+        // If already YYYY-MM-DD, return as-is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        // Otherwise extract date part from ISO timestamp like "2026-04-22T00:00:00..."
+        const m = d.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (m) return m[1];
+      }
+      // Fallback: convert to Date and ISO
+      try { return new Date(d).toISOString().split('T')[0]; }
+      catch(e) { return null; }
+    }
+
+    // Build set of "filled" combos: clientCode|YYYY-MM-DD
     const filledSet = new Set();
+    let normalizationFailures = 0;
     dsrEntries.forEach(d => {
-      filledSet.add(`${d.client_code}|${d.report_date}`);
+      const normalizedDate = normalizeDate(d.report_date);
+      if (!normalizedDate) { normalizationFailures++; return; }
+      filledSet.add(`${d.client_code}|${normalizedDate}`);
     });
+
+    // Debug log (will show in Railway logs if issues)
+    if (normalizationFailures > 0) {
+      console.log(`DSR Missing Report: ${normalizationFailures} entries had unparseable dates`);
+    }
+    console.log(`DSR Missing Report: ${dsrEntries.length} DSR entries → ${filledSet.size} unique (clientCode|date) keys for ${clients.length} clients across ${dateList.length} working days`);
 
     // Build missing matrix: per-AM and per-client
     const missingByAM = {};   // { amName: { totalMissing, sellersAffected, missingDays: [...], details: [...] } }
@@ -1396,6 +1420,69 @@ misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
     console.error('DSR missing report error:', e);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── DSR MISSING DEBUG ────────────────────────────────────────
+// For a specific client_code, returns the exact DSR entries + which dates are flagged missing.
+// Use this to verify why a seller is showing as missing when DSR is filled.
+misRouter.get('/dsr-missing/debug/:clientCode', authMiddleware, async (req, res) => {
+  try {
+    const allowedRoles = ['Admin', 'Ops Lead', 'Sub Admin', 'CRM Lead', 'CSI Lead'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const cc = req.params.clientCode;
+    const today = new Date();
+    const defaultTo = new Date(today); defaultTo.setDate(defaultTo.getDate() - 1);
+    const defaultFrom = new Date(today); defaultFrom.setDate(defaultFrom.getDate() - 7);
+    const iso = d => d.toISOString().split('T')[0];
+    const from = req.query.from || iso(defaultFrom);
+    const to   = req.query.to   || iso(defaultTo);
+
+    const [clientRes, dsrRes] = await Promise.all([
+      supabase.from('clients').select('client_code, busy_name, am_name, status').eq('client_code', cc).single(),
+      supabase.from('dsr_data').select('client_code, report_date, sales_amount, ad_spend, entered_by, created_at')
+        .eq('client_code', cc).gte('report_date', from).lte('report_date', to)
+        .order('report_date', { ascending: true }),
+    ]);
+
+    // Build expected dates (skip Sundays)
+    const expectedDates = [];
+    const start = new Date(from), end = new Date(to);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) expectedDates.push(iso(d));
+    }
+
+    const dsrEntries = dsrRes.data || [];
+    const dsrDateMap = {};
+    dsrEntries.forEach(d => {
+      // Normalize the date — same logic as missing report
+      let nd = d.report_date;
+      if (typeof nd === 'string') {
+        const m = nd.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (m) nd = m[1];
+      } else { try { nd = new Date(nd).toISOString().split('T')[0]; } catch(e){} }
+      dsrDateMap[nd] = d;
+    });
+
+    const dateBreakdown = expectedDates.map(date => ({
+      date,
+      filled: !!dsrDateMap[date],
+      rawEntry: dsrDateMap[date] || null,
+    }));
+
+    res.json({
+      client: clientRes.data || { error: 'Client not found' },
+      period: { from, to, expectedDays: expectedDates.length },
+      summary: {
+        expectedDays: expectedDates.length,
+        filledDays: dateBreakdown.filter(d => d.filled).length,
+        missingDays: dateBreakdown.filter(d => !d.filled).length,
+      },
+      rawDSREntries: dsrEntries,  // Show RAW DB data with original date format
+      dateBreakdown,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 misRouter.get('/data', authMiddleware, async (req, res) => {

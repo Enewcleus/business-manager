@@ -11694,6 +11694,381 @@ function generateRAPDF(opts) {
   }
 
   // ──────────────────────────────────────────────────────
+  // SALES vs AD SPEND ANALYSIS PAGE
+  // ──────────────────────────────────────────────────────
+  const dsrHistory = _ra.dsrHistory || [];
+  const asinList = Object.values(_ra.asinMap || {}).filter(a => a && a.asin && a.asin !== '_returns');
+  const hasFinancialData = dsrHistory.length > 0 || asinList.some(a => a.sales > 0 || a.adSpend > 0);
+
+  if (opts.includeCharts && hasFinancialData) {
+    doc.addPage();
+    drawFrame(true);
+    let y = marginT;
+
+    // Section title
+    doc.setFontSize(14);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...TEXT_DK);
+    doc.text('Sales vs Ad Spend Analysis', contentX, y);
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    doc.line(contentX, y + 2, contentX + 50, y + 2);
+    y += 10;
+
+    // KPI Strip
+    let totalSales = 0, totalAdSpend = 0, profitableDays = 0, daysWithData = 0;
+    dsrHistory.forEach(d => {
+      const s = parseFloat(d.sales_amount || 0);
+      const a = parseFloat(d.ad_spend || 0);
+      totalSales += s;
+      totalAdSpend += a;
+      if (s > 0 || a > 0) {
+        daysWithData++;
+        if (s > a * 4) profitableDays++; // ACOS < 25% = profitable
+      }
+    });
+    // Fallback: if no DSR data, use asinMap totals
+    if (dsrHistory.length === 0) {
+      asinList.forEach(a => {
+        totalSales += parseFloat(a.sales || 0);
+        totalAdSpend += parseFloat(a.adSpend || 0);
+      });
+    }
+    const overallACOS = totalSales > 0 ? Math.round((totalAdSpend / totalSales) * 100 * 10) / 10 : 0;
+
+    function fmtMoney(n) {
+      if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + 'Cr';
+      if (n >= 100000) return '₹' + (n/100000).toFixed(2) + 'L';
+      if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K';
+      return '₹' + Math.round(n);
+    }
+
+    const kpiW = (contentW - 9) / 4;
+    const kpiData = [
+      { label: 'TOTAL SALES', value: fmtMoney(totalSales), color: GREEN },
+      { label: 'AD SPEND', value: fmtMoney(totalAdSpend), color: ORANGE },
+      { label: 'ACOS AVG', value: overallACOS + '%', color: overallACOS <= 25 ? GREEN : overallACOS <= 40 ? ORANGE : RED },
+      { label: dsrHistory.length > 0 ? 'PROFITABLE DAYS' : 'ASINs WITH DATA',
+        value: dsrHistory.length > 0 ? (profitableDays + '/' + daysWithData) : String(asinList.length),
+        color: BRAND },
+    ];
+    kpiData.forEach((k, i) => {
+      const x = contentX + i * (kpiW + 3);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(x, y, kpiW, 14, 2, 2, 'F');
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, kpiW, 14, 2, 2);
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','bold');
+      doc.text(k.label, x + 2, y + 4.5);
+      doc.setTextColor(...k.color);
+      doc.setFontSize(11);
+      doc.setFont('helvetica','bold');
+      doc.text(k.value, x + 2, y + 11);
+    });
+    y += 19;
+
+    // ────── CHART 1: Daily Trend Line Chart ──────
+    if (dsrHistory.length > 1) {
+      // Sort by date ascending
+      const sortedDSR = [...dsrHistory].sort((a, b) =>
+        new Date(a.report_date) - new Date(b.report_date)
+      ).slice(-30); // Last 30 days
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('Daily Trend — Last ' + sortedDSR.length + ' Days', contentX, y);
+      y += 5;
+
+      // Legend
+      doc.setFillColor(...GREEN);
+      doc.circle(contentX + 2, y - 1, 1.2, 'F');
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','normal');
+      doc.text('Sales', contentX + 5, y);
+      doc.setFillColor(...ORANGE);
+      doc.circle(contentX + 22, y - 1, 1.2, 'F');
+      doc.text('Ad Spend', contentX + 25, y);
+      y += 4;
+
+      // Chart area
+      const chartX = contentX + 12;
+      const chartY = y;
+      const chartW = contentW - 14;
+      const chartH = 38;
+
+      // Background
+      doc.setFillColor(252, 252, 252);
+      doc.rect(chartX, chartY, chartW, chartH, 'F');
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.2);
+      doc.rect(chartX, chartY, chartW, chartH);
+
+      // Find max value
+      const maxVal = Math.max(
+        ...sortedDSR.map(d => parseFloat(d.sales_amount || 0)),
+        ...sortedDSR.map(d => parseFloat(d.ad_spend || 0))
+      );
+      const niceMax = maxVal * 1.1 || 1;
+
+      // Y-axis grid + labels (4 levels)
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.15);
+      doc.setFontSize(6);
+      doc.setTextColor(...TEXT_MD);
+      doc.setFont('helvetica','normal');
+      for (let i = 0; i <= 3; i++) {
+        const yL = chartY + (chartH * i / 3);
+        doc.line(chartX, yL, chartX + chartW, yL);
+        const val = niceMax * (3 - i) / 3;
+        doc.text(fmtMoney(val).replace('₹',''), chartX - 1, yL + 1.5, {align:'right'});
+      }
+
+      // Plot lines
+      const xStep = chartW / Math.max(1, sortedDSR.length - 1);
+      const salesPoints = [];
+      const spendPoints = [];
+      sortedDSR.forEach((d, i) => {
+        const x = chartX + i * xStep;
+        const sY = chartY + chartH - (parseFloat(d.sales_amount || 0) / niceMax) * chartH;
+        const aY = chartY + chartH - (parseFloat(d.ad_spend || 0) / niceMax) * chartH;
+        salesPoints.push([x, sY]);
+        spendPoints.push([x, aY]);
+      });
+
+      // Sales line (green)
+      doc.setDrawColor(...GREEN);
+      doc.setLineWidth(0.7);
+      for (let i = 1; i < salesPoints.length; i++) {
+        doc.line(salesPoints[i-1][0], salesPoints[i-1][1], salesPoints[i][0], salesPoints[i][1]);
+      }
+      // Ad spend line (orange)
+      doc.setDrawColor(...ORANGE);
+      doc.setLineWidth(0.7);
+      for (let i = 1; i < spendPoints.length; i++) {
+        doc.line(spendPoints[i-1][0], spendPoints[i-1][1], spendPoints[i][0], spendPoints[i][1]);
+      }
+
+      // Last point dots (highlight today)
+      if (salesPoints.length > 0) {
+        const last = salesPoints[salesPoints.length - 1];
+        doc.setFillColor(...GREEN);
+        doc.circle(last[0], last[1], 1, 'F');
+      }
+      if (spendPoints.length > 0) {
+        const last = spendPoints[spendPoints.length - 1];
+        doc.setFillColor(...ORANGE);
+        doc.circle(last[0], last[1], 1, 'F');
+      }
+
+      // X-axis labels (first, mid, last date)
+      doc.setFontSize(6);
+      doc.setTextColor(...TEXT_MD);
+      const fmtDate = (s) => {
+        const d = new Date(s);
+        return d.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+      };
+      if (sortedDSR.length > 0) {
+        doc.text(fmtDate(sortedDSR[0].report_date), chartX, chartY + chartH + 4);
+        if (sortedDSR.length > 2) {
+          const mid = Math.floor(sortedDSR.length / 2);
+          doc.text(fmtDate(sortedDSR[mid].report_date), chartX + chartW/2, chartY + chartH + 4, {align:'center'});
+        }
+        doc.text(fmtDate(sortedDSR[sortedDSR.length - 1].report_date), chartX + chartW, chartY + chartH + 4, {align:'right'});
+      }
+      y += chartH + 8;
+
+      // ────── CHART 2: ACOS Trend ──────
+      y = checkPage(y, 50);
+      doc.setFontSize(10);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('ACOS Trend (Ad Cost / Sales %)', contentX, y);
+      y += 4;
+
+      doc.setFontSize(7);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(...TEXT_MD);
+      doc.text('Target: <= 25%', contentX, y);
+      doc.setTextColor(...RED);
+      doc.text('Red zone > 40%', contentX + 22, y);
+      y += 3;
+
+      const acosY = y;
+      const acosH = 28;
+      doc.setFillColor(252, 252, 252);
+      doc.rect(chartX, acosY, chartW, acosH, 'F');
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.2);
+      doc.rect(chartX, acosY, chartW, acosH);
+
+      // Calc per-day ACOS
+      const acosData = sortedDSR.map(d => {
+        const s = parseFloat(d.sales_amount || 0);
+        const a = parseFloat(d.ad_spend || 0);
+        return s > 0 ? (a / s) * 100 : 0;
+      });
+      const maxACOS = Math.max(60, ...acosData) * 1.1;
+
+      // Target line at 25%
+      const targetY = acosY + acosH - (25 / maxACOS) * acosH;
+      doc.setDrawColor(...GREEN);
+      doc.setLineWidth(0.3);
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(chartX, targetY, chartX + chartW, targetY);
+      doc.setLineDashPattern([], 0);
+      doc.setTextColor(...GREEN);
+      doc.setFontSize(6);
+      doc.text('25%', chartX + chartW + 1, targetY + 1.5);
+
+      // Red zone line at 40%
+      const redY = acosY + acosH - (40 / maxACOS) * acosH;
+      doc.setDrawColor(...RED);
+      doc.setLineWidth(0.3);
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(chartX, redY, chartX + chartW, redY);
+      doc.setLineDashPattern([], 0);
+      doc.setTextColor(...RED);
+      doc.text('40%', chartX + chartW + 1, redY + 1.5);
+
+      // Bars
+      const barW = chartW / acosData.length * 0.7;
+      const barGap = chartW / acosData.length * 0.3;
+      acosData.forEach((acos, i) => {
+        const bx = chartX + i * (barW + barGap) + barGap/2;
+        const bh = (Math.min(acos, maxACOS) / maxACOS) * acosH;
+        const by = acosY + acosH - bh;
+        const color = acos <= 25 ? GREEN : acos <= 40 ? AMBER : RED;
+        doc.setFillColor(...color);
+        doc.rect(bx, by, barW, bh, 'F');
+      });
+      y += acosH + 6;
+    }
+
+    // ────── TOP 5 ASINs Table ──────
+    const topASINs = asinList
+      .filter(a => parseFloat(a.sales || 0) > 0 || parseFloat(a.adSpend || 0) > 0)
+      .sort((a, b) => parseFloat(b.sales || 0) - parseFloat(a.sales || 0))
+      .slice(0, 5);
+
+    if (topASINs.length > 0) {
+      y = checkPage(y, 60);
+      doc.setFontSize(10);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(...TEXT_DK);
+      doc.text('Top 5 ASINs — Sales vs Ad Spend', contentX, y);
+      y += 5;
+
+      // Table header
+      const colX = [contentX, contentX + 38, contentX + 70, contentX + 100, contentX + 122];
+      const tblW = contentW;
+      doc.setFillColor(...GRAY_LT);
+      doc.rect(contentX, y, tblW, 6, 'F');
+      doc.setTextColor(...TEXT_MD);
+      doc.setFontSize(7);
+      doc.setFont('helvetica','bold');
+      doc.text('ASIN', colX[0] + 1, y + 4);
+      doc.text('Sales', colX[1] + 26, y + 4, {align:'right'});
+      doc.text('Ad Spend', colX[2] + 26, y + 4, {align:'right'});
+      doc.text('ACOS', colX[3] + 18, y + 4, {align:'right'});
+      doc.text('Visual', colX[4] + 4, y + 4);
+      y += 6;
+
+      topASINs.forEach((a, i) => {
+        const sales = parseFloat(a.sales || 0);
+        const adSpend = parseFloat(a.adSpend || 0);
+        const acos = sales > 0 ? Math.round((adSpend / sales) * 100 * 10) / 10 : 0;
+
+        // Row
+        doc.setDrawColor(...GRAY);
+        doc.setLineWidth(0.15);
+        doc.line(contentX, y, contentX + tblW, y);
+        const rowH = 7;
+
+        // ASIN code
+        doc.setTextColor(...TEXT_DK);
+        doc.setFontSize(7);
+        doc.setFont('courier','normal');
+        doc.text(a.asin || '—', colX[0] + 1, y + 5);
+
+        // Sales
+        doc.setFont('helvetica','bold');
+        doc.setTextColor(...GREEN);
+        doc.text(fmtMoney(sales), colX[1] + 26, y + 5, {align:'right'});
+
+        // Ad spend
+        doc.setTextColor(...ORANGE);
+        doc.setFont('helvetica','normal');
+        doc.text(fmtMoney(adSpend), colX[2] + 26, y + 5, {align:'right'});
+
+        // ACOS badge
+        const badgeColor = acos <= 25 ? GREEN : acos <= 40 ? AMBER : RED;
+        const badgeBg = acos <= 25 ? [212,245,227] : acos <= 40 ? [253,246,221] : [250,219,216];
+        doc.setFillColor(...badgeBg);
+        doc.roundedRect(colX[3] + 4, y + 1.5, 16, 4.5, 1, 1, 'F');
+        doc.setTextColor(...badgeColor);
+        doc.setFontSize(7);
+        doc.setFont('helvetica','bold');
+        doc.text(acos + '%', colX[3] + 12, y + 4.8, {align:'center'});
+
+        // Visual proportion bar
+        const visBarX = colX[4] + 1;
+        const visBarW = contentX + tblW - visBarX - 2;
+        const totalVal = sales + adSpend;
+        if (totalVal > 0) {
+          const salesW = (sales / totalVal) * visBarW;
+          doc.setFillColor(...GREEN);
+          doc.rect(visBarX, y + 2, salesW, 3, 'F');
+          doc.setFillColor(...ORANGE);
+          doc.rect(visBarX + salesW, y + 2, visBarW - salesW, 3, 'F');
+        }
+
+        y += rowH;
+      });
+      y += 4;
+    }
+
+    // ────── Key Insight Box ──────
+    y = checkPage(y, 28);
+    doc.setFillColor(...BRAND_LT);
+    doc.roundedRect(contentX, y, contentW, 22, 2, 2, 'F');
+    doc.setTextColor(...BRAND);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','bold');
+    doc.text('Key Insight', contentX + 4, y + 6);
+    doc.setFontSize(8);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(...TEXT_DK);
+
+    let insight = '';
+    if (topASINs.length > 0) {
+      const worst = topASINs.reduce((w, a) => {
+        const acA = parseFloat(a.sales) > 0 ? (parseFloat(a.adSpend) / parseFloat(a.sales)) * 100 : 0;
+        const acW = parseFloat(w.sales) > 0 ? (parseFloat(w.adSpend) / parseFloat(w.sales)) * 100 : 0;
+        return acA > acW ? a : w;
+      });
+      const best = topASINs.reduce((b, a) => {
+        const acA = parseFloat(a.sales) > 0 ? (parseFloat(a.adSpend) / parseFloat(a.sales)) * 100 : 999;
+        const acB = parseFloat(b.sales) > 0 ? (parseFloat(b.adSpend) / parseFloat(b.sales)) * 100 : 999;
+        return acA < acB ? a : b;
+      });
+      const worstACOS = parseFloat(worst.sales) > 0 ? Math.round((parseFloat(worst.adSpend) / parseFloat(worst.sales)) * 100) : 0;
+      const bestACOS = parseFloat(best.sales) > 0 ? Math.round((parseFloat(best.adSpend) / parseFloat(best.sales)) * 100) : 0;
+      insight = worst.asin + ' ka ACOS ' + worstACOS + '% — campaign optimize karo. ' + best.asin + ' sabse profitable (' + bestACOS + '% ACOS) — yahan budget badhao.';
+    } else if (overallACOS > 0) {
+      insight = 'Overall ACOS ' + overallACOS + '%. ' + (overallACOS <= 25 ? 'Healthy zone — continue current strategy.' : overallACOS <= 40 ? 'Optimize karne ki zaroorat hai — high ACOS campaigns review karo.' : 'Critical zone — immediate action lo, ad spend control karo.');
+    } else {
+      insight = 'DSR data missing — daily sales aur ad spend regularly enter karo.';
+    }
+    const iLines = doc.splitTextToSize(insight, contentW - 8);
+    doc.text(iLines, contentX + 4, y + 12);
+  }
+
+  // ──────────────────────────────────────────────────────
   // TASK DETAIL PAGES
   // ──────────────────────────────────────────────────────
   function drawSectionHeader(y, title, count, color) {

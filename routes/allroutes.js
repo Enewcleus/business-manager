@@ -553,6 +553,47 @@ renewalsRouter.get('/stats', authMiddleware, async (req, res) => {
 renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
   const { status, notes, amount, renewalDate, crmComment, paymentDate, paymentMode, utrNumber, paymentBank, paymentRemarks,
           extensionUntil, extensionReason } = req.body;
+
+  let renewalId = req.params.id;
+
+  // VIRTUAL RENEWAL HANDLING:
+  // Frontend creates "virtual" renewal IDs like "CLT_CLT443279" for clients that have
+  // renewal_date set but no entry in renewals table yet. On first update (e.g. Save Payment),
+  // we need to auto-create the actual renewal row before applying updates.
+  if (renewalId.startsWith('CLT_')) {
+    const clientCode = renewalId.substring(4); // Strip "CLT_" prefix
+    // Fetch client details to seed the renewal
+    const { data: client, error: cErr } = await supabase
+      .from('clients')
+      .select('client_code, busy_name, am_name, service_plan, renewal_date, marketplace')
+      .eq('client_code', clientCode)
+      .single();
+    if (cErr || !client) {
+      return res.status(404).json({ error: 'Client not found for virtual renewal ID: ' + clientCode });
+    }
+    // Generate a proper renewal_id
+    const newRenewalId = 'REN' + Date.now() + Math.floor(Math.random() * 1000);
+    // Insert new renewal row
+    const { error: insErr } = await supabase.from('renewals').insert({
+      renewal_id: newRenewalId,
+      client_code: client.client_code,
+      client_name: client.busy_name,
+      owner: client.am_name || null,
+      service_plan: client.service_plan || null,
+      marketplace: client.marketplace || null,
+      renewal_date: client.renewal_date,
+      status: 'Pending',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    if (insErr) {
+      console.error('Failed to auto-create renewal:', insErr);
+      return res.status(500).json({ error: 'Failed to create renewal entry: ' + insErr.message });
+    }
+    renewalId = newRenewalId; // Now use the real ID for update below
+    console.log(`Auto-created renewal ${newRenewalId} for client ${clientCode} on first update`);
+  }
+
   const updates = { updated_at: new Date() };
   if (status !== undefined) updates.status = status;
   if (notes !== undefined) updates.notes = notes;
@@ -572,7 +613,7 @@ renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
     updates.extension_granted_by = req.user.name;
     updates.extension_granted_at = new Date();
     // Append to history
-    const { data: existing } = await supabase.from('renewals').select('extension_history').eq('renewal_id', req.params.id).single();
+    const { data: existing } = await supabase.from('renewals').select('extension_history').eq('renewal_id', renewalId).single();
     const history = (existing?.extension_history) || [];
     history.push({
       extensionUntil,
@@ -586,9 +627,9 @@ renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
     updates.extension_until = null;
   }
 
-  const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', req.params.id);
+  const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', renewalId);
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+  res.json({ success: true, renewalId });
 });
 
 // GET /api/renewals/extensions/expiring — ke check hota hai dashboard se
@@ -1287,18 +1328,32 @@ misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
     }
 
     // Fetch active clients + DSR entries in range
+    // DEFENSIVE: Use case-insensitive ILIKE with trim to handle "Active " with whitespace,
+    // "active" lowercase, etc. Also explicitly exclude Inactive/Closed/Hold even if accidentally
+    // marked as 'Active' with weird casing
     const [clientsRes, dsrRes] = await Promise.all([
       supabase.from('clients')
-        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status')
-        .eq('status', 'Active'),
+        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status'),
       supabase.from('dsr_data')
         .select('client_code, report_date, entered_by')
         .gte('report_date', from).lte('report_date', to),
     ]);
 
-    const clients = (clientsRes.data || []).filter(c =>
-      c.am_name && c.am_name.trim() !== ''  // Only clients with AM assigned
-    );
+    // Frontend filter: ONLY truly active clients with valid AM
+    // (defensive — handles trim, casing, and excludes hold/inactive/closed)
+    const allClients = clientsRes.data || [];
+    const clients = allClients.filter(c => {
+      const status = (c.status || '').trim().toLowerCase();
+      const am = (c.am_name || '').trim();
+      return status === 'active' && am !== '';
+    });
+
+    // Debug log for verification
+    const inactiveCount = allClients.filter(c => {
+      const s = (c.status || '').trim().toLowerCase();
+      return s !== 'active';
+    }).length;
+    console.log(`DSR Missing Report: filtered ${clients.length} active clients (excluded ${inactiveCount} inactive/hold/closed) from ${allClients.length} total`);
     const dsrEntries = dsrRes.data || [];
 
     // Helper: normalize any date input to YYYY-MM-DD string (handles timestamps, Date objects, ISO strings)
@@ -1440,11 +1495,20 @@ misRouter.get('/dsr-missing/debug/:clientCode', authMiddleware, async (req, res)
     const to   = req.query.to   || iso(defaultTo);
 
     const [clientRes, dsrRes] = await Promise.all([
-      supabase.from('clients').select('client_code, busy_name, am_name, status').eq('client_code', cc).single(),
+      supabase.from('clients').select('client_code, busy_name, am_name, status, last_updated').eq('client_code', cc).single(),
       supabase.from('dsr_data').select('client_code, report_date, sales_amount, ad_spend, entered_by, created_at')
         .eq('client_code', cc).gte('report_date', from).lte('report_date', to)
         .order('report_date', { ascending: true }),
     ]);
+
+    // Status check
+    const cd = clientRes.data;
+    const statusCheck = cd ? {
+      raw_status: cd.status,
+      trimmed_lower: (cd.status || '').trim().toLowerCase(),
+      is_active: ((cd.status || '').trim().toLowerCase() === 'active'),
+      should_appear_in_report: ((cd.status || '').trim().toLowerCase() === 'active') && !!(cd.am_name && cd.am_name.trim()),
+    } : null;
 
     // Build expected dates (skip Sundays)
     const expectedDates = [];
@@ -1473,13 +1537,14 @@ misRouter.get('/dsr-missing/debug/:clientCode', authMiddleware, async (req, res)
 
     res.json({
       client: clientRes.data || { error: 'Client not found' },
+      statusCheck,
       period: { from, to, expectedDays: expectedDates.length },
       summary: {
         expectedDays: expectedDates.length,
         filledDays: dateBreakdown.filter(d => d.filled).length,
         missingDays: dateBreakdown.filter(d => !d.filled).length,
       },
-      rawDSREntries: dsrEntries,  // Show RAW DB data with original date format
+      rawDSREntries: dsrEntries,
       dateBreakdown,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }

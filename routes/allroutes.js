@@ -553,6 +553,47 @@ renewalsRouter.get('/stats', authMiddleware, async (req, res) => {
 renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
   const { status, notes, amount, renewalDate, crmComment, paymentDate, paymentMode, utrNumber, paymentBank, paymentRemarks,
           extensionUntil, extensionReason } = req.body;
+
+  let renewalId = req.params.id;
+
+  // VIRTUAL RENEWAL HANDLING:
+  // Frontend creates "virtual" renewal IDs like "CLT_CLT443279" for clients that have
+  // renewal_date set but no entry in renewals table yet. On first update (e.g. Save Payment),
+  // we need to auto-create the actual renewal row before applying updates.
+  if (renewalId.startsWith('CLT_')) {
+    const clientCode = renewalId.substring(4); // Strip "CLT_" prefix
+    // Fetch client details to seed the renewal
+    const { data: client, error: cErr } = await supabase
+      .from('clients')
+      .select('client_code, busy_name, am_name, service_plan, renewal_date, marketplace')
+      .eq('client_code', clientCode)
+      .single();
+    if (cErr || !client) {
+      return res.status(404).json({ error: 'Client not found for virtual renewal ID: ' + clientCode });
+    }
+    // Generate a proper renewal_id
+    const newRenewalId = 'REN' + Date.now() + Math.floor(Math.random() * 1000);
+    // Insert new renewal row
+    const { error: insErr } = await supabase.from('renewals').insert({
+      renewal_id: newRenewalId,
+      client_code: client.client_code,
+      client_name: client.busy_name,
+      owner: client.am_name || null,
+      service_plan: client.service_plan || null,
+      marketplace: client.marketplace || null,
+      renewal_date: client.renewal_date,
+      status: 'Pending',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    if (insErr) {
+      console.error('Failed to auto-create renewal:', insErr);
+      return res.status(500).json({ error: 'Failed to create renewal entry: ' + insErr.message });
+    }
+    renewalId = newRenewalId; // Now use the real ID for update below
+    console.log(`Auto-created renewal ${newRenewalId} for client ${clientCode} on first update`);
+  }
+
   const updates = { updated_at: new Date() };
   if (status !== undefined) updates.status = status;
   if (notes !== undefined) updates.notes = notes;
@@ -572,7 +613,7 @@ renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
     updates.extension_granted_by = req.user.name;
     updates.extension_granted_at = new Date();
     // Append to history
-    const { data: existing } = await supabase.from('renewals').select('extension_history').eq('renewal_id', req.params.id).single();
+    const { data: existing } = await supabase.from('renewals').select('extension_history').eq('renewal_id', renewalId).single();
     const history = (existing?.extension_history) || [];
     history.push({
       extensionUntil,
@@ -586,9 +627,9 @@ renewalsRouter.patch('/:id', authMiddleware, async (req, res) => {
     updates.extension_until = null;
   }
 
-  const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', req.params.id);
+  const { error } = await supabase.from('renewals').update(updates).eq('renewal_id', renewalId);
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+  res.json({ success: true, renewalId });
 });
 
 // GET /api/renewals/extensions/expiring — ke check hota hai dashboard se

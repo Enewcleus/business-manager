@@ -1,4 +1,4 @@
-// routes/dsr.js — FIXED: .catch() replaced with try/catch for Supabase v2
+// routes/dsr.js — FIXED: defensive Active filter + AM check for today-status
 
 const express = require('express');
 const router = express.Router();
@@ -61,23 +61,39 @@ router.get('/', auth, async (req, res) => {
 });
 
 // GET /api/dsr/today-status
+// FIXED: Defensive filter — only truly Active clients with valid AM, case-insensitive,
+// whitespace-trimmed. Inactive/Closed/Hold/blank-AM clients excluded from "pending" list.
 router.get('/today-status', auth, async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const codes = await getSellerCodes(req.user);
+
+    // Fetch ALL clients (without DB-level status filter), then filter in JS for robustness
+    // — handles "Active " with whitespace, "active" lowercase, etc.
     let clientQuery = supabase.from('clients')
-      .select('client_code, busy_name, marketplace, ads_manager').eq('status', 'Active');
+      .select('client_code, busy_name, marketplace, ads_manager, am_name, status');
     if (codes !== null) {
       if (!codes.length) return res.json({ total: 0, done: 0, pending: [] });
       clientQuery = clientQuery.in('client_code', codes);
     }
-    const { data: allClients } = await clientQuery;
+    const { data: allClientsRaw } = await clientQuery;
+    const allClients = (allClientsRaw || []).filter(c => {
+      const status = (c.status || '').trim().toLowerCase();
+      const am = (c.am_name || '').trim();
+      // Only truly active clients with a real AM should be counted for DSR compliance
+      return status === 'active' && am !== '';
+    });
+
+    // Debug log (will appear in Railway logs)
+    const excludedCount = (allClientsRaw || []).length - allClients.length;
+    console.log(`[DSR today-status] ${allClients.length} active clients (excluded ${excludedCount} inactive/closed/no-AM) from ${(allClientsRaw || []).length} total`);
+
     const { data: todayDSR } = await supabase.from('dsr_data')
       .select('client_code').eq('report_date', today);
     const doneCodes = new Set((todayDSR || []).map(d => d.client_code));
-    const pending = (allClients || []).filter(c => !doneCodes.has(c.client_code));
+    const pending = allClients.filter(c => !doneCodes.has(c.client_code));
     res.json({
-      total: (allClients || []).length, done: doneCodes.size,
+      total: allClients.length, done: doneCodes.size,
       pending: pending.map(c => ({
         client_code: c.client_code, busy_name: c.busy_name,
         marketplace: c.marketplace, ads_manager: c.ads_manager

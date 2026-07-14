@@ -69,6 +69,7 @@ app.use('/api/documents',        require('./routes/allroutes').docsRouter);
 app.use('/api/approvals',        require('./routes/allroutes').approvalRouter);
 app.use('/api/reports',          require('./routes/allroutes').productivityRouter);
 app.use('/api/reports',          require('./routes/allroutes').salesRetentionRouter);
+app.use('/api/flipkart-analyzer', require('./routes/allroutes').flipkartAnalyzerRouter);
 app.use('/api/chat',             require('./routes/chat'));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────

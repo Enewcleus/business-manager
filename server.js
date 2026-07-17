@@ -70,6 +70,7 @@ app.use('/api/approvals',        require('./routes/allroutes').approvalRouter);
 app.use('/api/reports',          require('./routes/allroutes').productivityRouter);
 app.use('/api/reports',          require('./routes/allroutes').salesRetentionRouter);
 app.use('/api/chat',             require('./routes/chat'));
+app.use('/api/ads-analyzer', require('./routes/allroutes').adsAnalyzerRouter);
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

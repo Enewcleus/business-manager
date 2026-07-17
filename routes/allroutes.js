@@ -936,85 +936,81 @@ reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) 
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── FLIPKART REPORT ANALYZER ──────────────────────────────────────────────
-const flipkartAnalyzerRouter = require('express').Router();
+// ══════════════════════════════════════════════════════════════
+// AMAZON ADS ANALYZER  —  add to routes/allroutes.js
+// Place after reportAnalyzerRouter block
+// ══════════════════════════════════════════════════════════════
+const adsAnalyzerRouter = require('express').Router();
 
-// Flipkart team lead roles — poore team ke logs dekh sakte hain
-const FK_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+// Amazon team roles — poore team ke logs dekh sakte hain
+const ADS_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
 
-// POST /api/flipkart-analyzer/log — analysis log save karo
-flipkartAnalyzerRouter.post('/log', authMiddleware, async (req, res) => {
+// POST /api/ads-analyzer/log — analysis log save karo
+adsAnalyzerRouter.post('/log', authMiddleware, async (req, res) => {
   try {
-    const { clientCode, clientName, reportsUploaded, tasksGenerated, period, healthScore, summary } = req.body;
+    const {
+      clientCode, clientName, reportsUploaded,
+      recommendations, period, summary,
+    } = req.body;
+
     if (!clientCode) return res.status(400).json({ error: 'clientCode required' });
 
-    const logId = 'FKL' + Date.now().toString();
+    const logId = 'ADL' + Date.now().toString();
     const { error } = await supabase.from('report_analyzer_logs').insert({
       log_id: logId,
       client_code: clientCode,
       client_name: clientName || clientCode,
-      marketplace: 'Flipkart',
+      marketplace: 'Amazon-Ads',                     // <-- Flipkart/Amazon-RA se alag
       analyzed_by: req.user.name,
       analyzed_by_role: req.user.role,
       reports_uploaded: reportsUploaded || [],
-      tasks_generated: tasksGenerated || [],
+      tasks_generated: recommendations || [],        // ads recommendations
       period: period || null,
-      health_score: healthScore ?? null,
-      summary: summary || null,
+      health_score: null,
+      summary: summary || null,                      // ACOS/ROAS/spend/wasted etc.
     });
     if (error) throw error;
     res.json({ success: true, logId });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET /api/flipkart-analyzer/logs — last 30 analyses
-flipkartAnalyzerRouter.get('/logs', authMiddleware, async (req, res) => {
+// GET /api/ads-analyzer/logs — last 30 analyses
+adsAnalyzerRouter.get('/logs', authMiddleware, async (req, res) => {
   try {
-    const isLead = FK_LEAD_ROLES.includes(req.user.role);
+    const isLead = ADS_LEAD_ROLES.includes(req.user.role);
+
     let q = supabase.from('report_analyzer_logs')
-      .select('log_id, client_code, client_name, analyzed_by, analyzed_by_role, reports_uploaded, tasks_generated, period, health_score, analyzed_at')
-      .eq('marketplace', 'Flipkart')
+      .select('log_id, client_code, client_name, analyzed_by, analyzed_by_role, ' +
+              'reports_uploaded, tasks_generated, period, summary, analyzed_at')
+      .eq('marketplace', 'Amazon-Ads')
       .order('analyzed_at', { ascending: false })
       .limit(30);
 
+    // Non-leads: sirf apne banaye hue logs
     if (!isLead) q = q.eq('analyzed_by', req.user.name);
 
     const { data, error } = await q;
     if (error) throw error;
     res.json(data || []);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET /api/flipkart-analyzer/log/:logId — full log
-flipkartAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
+// GET /api/ads-analyzer/log/:logId — full log
+adsAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase.from('report_analyzer_logs')
-      .select('*').eq('log_id', req.params.logId).single();
+      .select('*')
+      .eq('log_id', req.params.logId)
+      .single();
     if (error) throw error;
     res.json(data);
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// PATCH /api/flipkart-analyzer/log/:logId/task — task status toggle
-flipkartAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) => {
-  try {
-    const { taskIndex, status } = req.body;
-    const { data, error } = await supabase.from('report_analyzer_logs')
-      .select('tasks_generated').eq('log_id', req.params.logId).single();
-    if (error) throw error;
-
-    const tasks = data.tasks_generated || [];
-    if (tasks[taskIndex] !== undefined) {
-      tasks[taskIndex].status = status;
-      tasks[taskIndex].updatedBy = req.user.name;
-      tasks[taskIndex].updatedAt = new Date().toISOString();
-    }
-
-    const { error: upErr } = await supabase.from('report_analyzer_logs')
-      .update({ tasks_generated: tasks }).eq('log_id', req.params.logId);
-    if (upErr) throw upErr;
-    res.json({ success: true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── MONTHLY REPORTS ──────────────────────────────────────────
@@ -2771,7 +2767,7 @@ module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  flipkartAnalyzerRouter,
+  adsAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
 };

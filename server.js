@@ -71,6 +71,7 @@ app.use('/api/reports',          require('./routes/allroutes').productivityRoute
 app.use('/api/reports',          require('./routes/allroutes').salesRetentionRouter);
 app.use('/api/flipkart-analyzer', require('./routes/allroutes').flipkartAnalyzerRouter);
 app.use('/api/chat',             require('./routes/chat'));
+app.use('/api/ads-analyzer', require('./routes/allroutes').adsAnalyzerRouter);
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

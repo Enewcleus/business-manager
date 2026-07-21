@@ -73,6 +73,7 @@ crmRouter.post('/', authMiddleware, async (req, res) => {
     call_id: callId, client_code: d.clientCode, client_name: d.clientName,
     crm_executive: req.user.name, call_outcome: d.callOutcome || d.outcome || 'Connected',
     seller_comment: d.sellerComment || d.notes || d.subject || '',
+    contact_channel: d.contactChannel || null,
     severity: d.severity || 'Low',
     next_follow_up: d.nextFollowUp || d.followupDate || null,
     ticket_raised: d.ticketRaised || false,
@@ -99,6 +100,7 @@ crmRouter.post('/log', authMiddleware, async (req, res) => {
     crm_executive: req.user.name,
     call_outcome: d.outcome || 'Connected',
     seller_comment: (d.subject ? d.subject + (d.description ? ' | ' + d.description : '') : d.description || ''),
+    contact_channel: d.contactChannel || null,
     severity: 'Low',
     next_follow_up: d.followupDate || null,
     ticket_raised: false,
@@ -934,6 +936,251 @@ reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) 
     if (upErr) throw upErr;
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// GET /api/crm/channel-report — channel-wise performance
+crmRouter.get('/channel-report', authMiddleware, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '30', 10);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    let q = supabase.from('crm_calls')
+      .select('contact_channel, call_outcome, client_code, client_name, crm_executive, created_at')
+      .gte('created_at', since);
+    const LEADS = ['Admin', 'Ops Lead', 'Sub Admin', 'CRM Lead', 'Team Lead'];
+    if (!LEADS.includes(req.user.role)) q = q.eq('crm_executive', req.user.name);
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = data || [];
+    const isConnected = o => /connect/i.test(String(o || '')) && !/no response/i.test(String(o || ''));
+    const chMap = {};
+    for (const r of rows) {
+      const ch = r.contact_channel || 'Not Recorded';
+      const c = chMap[ch] || (chMap[ch] = { channel: ch, total: 0, connected: 0, clients: new Set() });
+      c.total++;
+      if (isConnected(r.call_outcome)) c.connected++;
+      if (r.client_code) c.clients.add(r.client_code);
+    }
+    const channels = Object.values(chMap).map(c => ({
+      channel: c.channel, total: c.total, connected: c.connected,
+      connectRate: c.total ? Math.round(c.connected / c.total * 1000) / 10 : 0,
+      uniqueClients: c.clients.size,
+    })).sort((a, b) => b.total - a.total);
+    const clMap = {};
+    for (const r of rows) {
+      const cc = r.client_code;
+      if (!cc) continue;
+      const ch = r.contact_channel || 'Not Recorded';
+      const c = clMap[cc] || (clMap[cc] = { clientCode: cc, clientName: r.client_name, total: 0, byChannel: {} });
+      c.clientName = c.clientName || r.client_name;
+      c.total++;
+      const b = c.byChannel[ch] || (c.byChannel[ch] = { total: 0, connected: 0 });
+      b.total++;
+      if (isConnected(r.call_outcome)) b.connected++;
+    }
+    const clients = Object.values(clMap).map(c => {
+      let best = null;
+      for (const [ch, v] of Object.entries(c.byChannel)) {
+        if (ch === 'Not Recorded') continue;
+        const rate = v.total ? v.connected / v.total : 0;
+        if (!best || v.connected > best.connected || (v.connected === best.connected && rate > best.rate))
+          best = { channel: ch, connected: v.connected, total: v.total, rate };
+      }
+      return {
+        clientCode: c.clientCode, clientName: c.clientName, total: c.total,
+        bestChannel: best ? best.channel : '-',
+        bestConnected: best ? best.connected : 0,
+        bestRate: best && best.total ? Math.round(best.connected / best.total * 1000) / 10 : 0,
+        byChannel: c.byChannel,
+      };
+    }).sort((a, b) => b.total - a.total);
+    res.json({ days, totalCalls: rows.length, channels, clients });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// FLIPKART REPORT ANALYZER  —  add to routes/allroutes.js
+// Place after reportAnalyzerRouter block (~line 940)
+// ══════════════════════════════════════════════════════════════
+const flipkartAnalyzerRouter = require('express').Router();
+
+// Flipkart team roles — page + logs visibility
+const FK_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+
+// POST /api/flipkart-analyzer/log — save analysis log
+flipkartAnalyzerRouter.post('/log', authMiddleware, async (req, res) => {
+  try {
+    const {
+      clientCode, clientName, reportsUploaded,
+      tasksGenerated, period, healthScore, summary,
+    } = req.body;
+
+    if (!clientCode) return res.status(400).json({ error: 'clientCode required' });
+
+    const logId = 'FKL' + Date.now().toString();
+    const { error } = await supabase.from('report_analyzer_logs').insert({
+      log_id: logId,
+      client_code: clientCode,
+      client_name: clientName || clientCode,
+      marketplace: 'Flipkart',                       // <-- separates from Amazon logs
+      analyzed_by: req.user.name,
+      analyzed_by_role: req.user.role,
+      reports_uploaded: reportsUploaded || [],
+      tasks_generated: tasksGenerated || [],
+      period: period || null,
+      health_score: healthScore ?? null,
+      summary: summary || null,
+    });
+    if (error) throw error;
+    res.json({ success: true, logId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/flipkart-analyzer/logs — last 30 analyses
+flipkartAnalyzerRouter.get('/logs', authMiddleware, async (req, res) => {
+  try {
+    const isLead = FK_LEAD_ROLES.includes(req.user.role);
+
+    let q = supabase.from('report_analyzer_logs')
+      .select('log_id, client_code, client_name, analyzed_by, analyzed_by_role, ' +
+              'reports_uploaded, tasks_generated, period, health_score, analyzed_at')
+      .eq('marketplace', 'Flipkart')
+      .order('analyzed_at', { ascending: false })
+      .limit(30);                                    // <-- 30 logs
+
+    // Non-leads: sirf apne banaye hue logs
+    if (!isLead) q = q.eq('analyzed_by', req.user.name);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/flipkart-analyzer/log/:logId — full log with tasks
+flipkartAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('report_analyzer_logs')
+      .select('*')
+      .eq('log_id', req.params.logId)
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/flipkart-analyzer/log/:logId/task — toggle task status
+flipkartAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) => {
+  try {
+    const { taskIndex, status } = req.body;
+
+    const { data, error } = await supabase.from('report_analyzer_logs')
+      .select('tasks_generated')
+      .eq('log_id', req.params.logId)
+      .single();
+    if (error) throw error;
+
+    const tasks = data.tasks_generated || [];
+    if (tasks[taskIndex] !== undefined) {
+      tasks[taskIndex].status    = status;           // 'pending' | 'done'
+      tasks[taskIndex].updatedBy = req.user.name;
+      tasks[taskIndex].updatedAt = new Date().toISOString();
+    }
+
+    const { error: upErr } = await supabase.from('report_analyzer_logs')
+      .update({ tasks_generated: tasks })
+      .eq('log_id', req.params.logId);
+    if (upErr) throw upErr;
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// AMAZON ADS ANALYZER  —  add to routes/allroutes.js
+// Place after flipkartAnalyzerRouter block
+// ══════════════════════════════════════════════════════════════
+const adsAnalyzerRouter = require('express').Router();
+
+// Amazon team roles — poore team ke logs dekh sakte hain
+const ADS_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+
+// POST /api/ads-analyzer/log — analysis log save karo
+adsAnalyzerRouter.post('/log', authMiddleware, async (req, res) => {
+  try {
+    const {
+      clientCode, clientName, reportsUploaded,
+      recommendations, period, summary,
+    } = req.body;
+
+    if (!clientCode) return res.status(400).json({ error: 'clientCode required' });
+
+    const logId = 'ADL' + Date.now().toString();
+    const { error } = await supabase.from('report_analyzer_logs').insert({
+      log_id: logId,
+      client_code: clientCode,
+      client_name: clientName || clientCode,
+      marketplace: 'Amazon-Ads',                     // <-- Flipkart/Amazon-RA se alag
+      analyzed_by: req.user.name,
+      analyzed_by_role: req.user.role,
+      reports_uploaded: reportsUploaded || [],
+      tasks_generated: recommendations || [],        // ads recommendations
+      period: period || null,
+      health_score: null,
+      summary: summary || null,                      // ACOS/ROAS/spend/wasted etc.
+    });
+    if (error) throw error;
+    res.json({ success: true, logId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/ads-analyzer/logs — last 30 analyses
+adsAnalyzerRouter.get('/logs', authMiddleware, async (req, res) => {
+  try {
+    const isLead = ADS_LEAD_ROLES.includes(req.user.role);
+
+    let q = supabase.from('report_analyzer_logs')
+      .select('log_id, client_code, client_name, analyzed_by, analyzed_by_role, ' +
+              'reports_uploaded, tasks_generated, period, summary, analyzed_at')
+      .eq('marketplace', 'Amazon-Ads')
+      .order('analyzed_at', { ascending: false })
+      .limit(30);
+
+    // Non-leads: sirf apne banaye hue logs
+    if (!isLead) q = q.eq('analyzed_by', req.user.name);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/ads-analyzer/log/:logId — full log
+adsAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('report_analyzer_logs')
+      .select('*')
+      .eq('log_id', req.params.logId)
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── MONTHLY REPORTS ──────────────────────────────────────────
@@ -2245,7 +2492,6 @@ function _monthBoundaries(refDate) {
     prevFrom: iso(prevStart), prevTo: iso(prevEnd),
     currLabel: currStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
     prevLabel: prevStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
-    // DRR ke liye: current month me kitne din beet chuke, aur dono months me kitne din total
     daysElapsed: Math.max(1, Math.min(d.getDate(), currEnd.getDate())),
     daysInCurrMonth: currEnd.getDate(),
     daysInPrevMonth: prevEnd.getDate(),
@@ -2253,12 +2499,11 @@ function _monthBoundaries(refDate) {
   };
 }
 
-// DRR (Daily Run Rate) based growth — mid-month me full-month se compare karna galat hai.
-// Isliye current month ki DRR ko previous month ki DRR se compare karte hain.
+// DRR (Daily Run Rate) growth — mid-month me partial vs full month compare karna galat hai
 function _drrGrowth(currSales, prevSales, mb) {
-  const currDrr = currSales / mb.daysElapsed;            // abhi tak ka daily average
-  const prevDrr = prevSales / mb.daysInPrevMonth;        // pichhle month ka daily average
-  const projected = Math.round(currDrr * mb.daysInCurrMonth);  // is speed se month-end kitna hoga
+  const currDrr = currSales / mb.daysElapsed;
+  const prevDrr = prevSales / mb.daysInPrevMonth;
+  const projected = Math.round(currDrr * mb.daysInCurrMonth);
   const growthPct = prevDrr > 0 ? Math.round(((currDrr - prevDrr) / prevDrr) * 100) : (currSales > 0 ? 100 : 0);
   return { currDrr, prevDrr, projected, growthPct };
 }
@@ -2410,7 +2655,6 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
       const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
       const hasCurr = curr.sales > 0;
       const hasPrev = prev.sales > 0;
-      // DRR-based: mid-month me partial sales ko full-month se compare nahi karte
       const dg = _drrGrowth(curr.sales, prev.sales, bounds);
       const growthPct = hasPrev ? dg.growthPct : (hasCurr ? 100 : 0);
       const bucket = _growthBucket(growthPct, hasCurr, hasPrev);
@@ -2626,8 +2870,6 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
         currSales: Math.round(curr.sales),
         prevSales: Math.round(prev.sales),
         projectedSales: dg.projected,
-        currDrr: Math.round(dg.currDrr),
-        prevDrr: Math.round(dg.prevDrr),
         growthPct,
         bucket: _growthBucket(growthPct, hasCurr, hasPrev),
         currOrders: curr.orders,
@@ -2717,6 +2959,7 @@ module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
+  flipkartAnalyzerRouter, adsAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
 };

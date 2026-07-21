@@ -2625,6 +2625,126 @@ async function submitTicket(){
 }
 
 // ── CRM ──────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════
+// CRM DIAL PANEL — client select karte hi number + dial options
+// ══════════════════════════════════════════════════════════════════
+
+// Number ko clean karo: sirf digits, aur India default (+91)
+function crmCleanPhone(raw) {
+  let d = String(raw || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = '+' + d.slice(1).replace(/\+/g, '');
+  const digits = d.replace(/\D/g, '');
+  if (!digits) return { tel:'', wa:'', display:'' };
+
+  let wa;                                  // WhatsApp ko country code chahiye (bina +)
+  if (d.startsWith('+')) wa = digits;
+  else if (digits.startsWith('0')) wa = '91' + digits.replace(/^0+/, '');  // 0 hata ke 91
+  else if (digits.length === 10) wa = '91' + digits;
+  else if (digits.length === 12 && digits.startsWith('91')) wa = digits;
+  else wa = digits;
+
+  return { tel: d.startsWith('+') ? d : digits, wa, display: String(raw).trim() };
+}
+
+// Client object se saare numbers nikaalo (multiple ho sakte hain)
+function crmGetNumbers(client) {
+  if (!client) return [];
+  const seen = new Set(), out = [];
+  const push = (val, label) => {
+    if (!val) return;
+    // ek field me comma/slash se do number ho sakte hain
+    String(val).split(/[,;/|]/).forEach(part => {
+      const p = crmCleanPhone(part);
+      if (!p.tel || p.tel.replace(/\D/g,'').length < 7) return;
+      if (seen.has(p.wa)) return;
+      seen.add(p.wa);
+      out.push({ ...p, label });
+    });
+  };
+  push(client.phone,          'Primary');
+  push(client.mobile,         'Mobile');
+  push(client.contactNumber,  'Contact');
+  push(client.whatsapp,       'WhatsApp');
+  push(client.altPhone,       'Alternate');
+  push(client.ownerPhone,     'Owner');
+  return out;
+}
+
+// Panel render — client select hone par
+function crmUpdateDial(clientCode) {
+  const panel = document.getElementById('crm-dial-panel');
+  if (!panel) return;
+
+  if (!clientCode) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+
+  const client = (APP.clients || []).find(c => c.clientCode === clientCode);
+  const nums = crmGetNumbers(client);
+
+  if (!nums.length) {
+    panel.style.display = '';
+    panel.innerHTML =
+      '<div style="font-size:12px;color:var(--text-muted);">'
+      + '⚠️ <strong>' + crmEsc(client?.busyName || clientCode) + '</strong> ka koi phone number Client Manager me save nahi hai. '
+      + 'Number add karne ke liye Client Manager me jaake update karo.</div>';
+    return;
+  }
+
+  panel.style.display = '';
+  panel.innerHTML =
+    '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:8px;">📱 DIAL OPTIONS</div>'
+    + nums.map(n =>
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-weight:700;font-size:13px;min-width:120px;">' + crmEsc(n.display) + '</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);min-width:56px;">' + n.label + '</span>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm btn-success" style="text-decoration:none;padding:5px 12px;" '
+        +   'onclick="crmMarkDialed(\'phone\')">📞 Call</a>'
+        + '<a href="https://wa.me/' + n.wa + '" target="_blank" rel="noopener" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:#25D366;color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'whatsapp\')">💬 WhatsApp</a>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:var(--secondary);color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'superphone\')">⚡ Superphone</a>'
+        + '<button class="btn btn-sm btn-outline" style="padding:5px 10px;" '
+        +   'onclick="crmCopyNumber(\'' + n.tel + '\')">📋 Copy</button>'
+        + '</div>'
+      ).join('')
+    + '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">'
+    + 'Call ke baad neeche feedback bhar ke Save Call karo.</div>';
+}
+
+function crmEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Dial click par outcome auto-select (user badal sakta hai)
+function crmMarkDialed(kind) {
+  const sel = document.getElementById('crm-outcome');
+  if (!sel) return;
+  if (kind === 'whatsapp') {
+    for (const o of sel.options) {
+      if (o.text.toLowerCase().includes('whatsapp')) { sel.value = o.value; break; }
+    }
+  }
+}
+
+function crmCopyNumber(num) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(num)
+      .then(() => showToast('Number copy ho gaya: ' + num, 'success'))
+      .catch(() => showToast('Copy nahi hua', 'error'));
+  } else {
+    const t = document.createElement('textarea');
+    t.value = num; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); showToast('Number copy ho gaya: ' + num, 'success'); }
+    catch (e) { showToast('Copy nahi hua', 'error'); }
+    document.body.removeChild(t);
+  }
+}
+
+
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
   const [clients,todayCalls,recentCalls]=await Promise.all([
@@ -2771,7 +2891,7 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label>Client *</label>
-            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value)">
+            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value);crmUpdateDial(this.value)">
               <option value="">Select...</option>
               ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName}${c.crmExecutive?' (CRM: '+c.crmExecutive.split(' ')[0]+')':''}</option>`).join('')}
             </select>
@@ -2780,6 +2900,7 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
             <select class="form-control" id="crm-outcome"><option>Called — Connected</option><option>Called — No Response</option><option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option></select>
           </div>
         </div>
+        <div id="crm-dial-panel" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;"></div>
         <div class="form-row">
           <div class="form-group"><label>Seller Feedback</label><textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea></div>
           <div class="form-group"><label>Severity</label><select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>

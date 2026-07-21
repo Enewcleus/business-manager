@@ -73,6 +73,7 @@ crmRouter.post('/', authMiddleware, async (req, res) => {
     call_id: callId, client_code: d.clientCode, client_name: d.clientName,
     crm_executive: req.user.name, call_outcome: d.callOutcome || d.outcome || 'Connected',
     seller_comment: d.sellerComment || d.notes || d.subject || '',
+    contact_channel: d.contactChannel || null,
     severity: d.severity || 'Low',
     next_follow_up: d.nextFollowUp || d.followupDate || null,
     ticket_raised: d.ticketRaised || false,
@@ -99,6 +100,7 @@ crmRouter.post('/log', authMiddleware, async (req, res) => {
     crm_executive: req.user.name,
     call_outcome: d.outcome || 'Connected',
     seller_comment: (d.subject ? d.subject + (d.description ? ' | ' + d.description : '') : d.description || ''),
+    contact_channel: d.contactChannel || null,
     severity: 'Low',
     next_follow_up: d.followupDate || null,
     ticket_raised: false,
@@ -934,6 +936,75 @@ reportAnalyzerRouter.patch('/log/:logId/task', authMiddleware, async (req, res) 
     if (upErr) throw upErr;
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// GET /api/crm/channel-report — channel-wise performance
+crmRouter.get('/channel-report', authMiddleware, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '30', 10);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+
+    let q = supabase.from('crm_calls')
+      .select('contact_channel, call_outcome, client_code, client_name, crm_executive, created_at')
+      .gte('created_at', since);
+
+    const LEADS = ['Admin', 'Ops Lead', 'Sub Admin', 'CRM Lead', 'Team Lead'];
+    if (!LEADS.includes(req.user.role)) q = q.eq('crm_executive', req.user.name);
+
+    const { data, error } = await q;
+    if (error) throw error;
+
+    const rows = data || [];
+    const isConnected = o => /connect/i.test(String(o || '')) && !/no response/i.test(String(o || ''));
+
+    const chMap = {};
+    for (const r of rows) {
+      const ch = r.contact_channel || 'Not Recorded';
+      const c = chMap[ch] || (chMap[ch] = { channel: ch, total: 0, connected: 0, clients: new Set() });
+      c.total++;
+      if (isConnected(r.call_outcome)) c.connected++;
+      if (r.client_code) c.clients.add(r.client_code);
+    }
+    const channels = Object.values(chMap).map(c => ({
+      channel: c.channel, total: c.total, connected: c.connected,
+      connectRate: c.total ? Math.round(c.connected / c.total * 1000) / 10 : 0,
+      uniqueClients: c.clients.size,
+    })).sort((a, b) => b.total - a.total);
+
+    const clMap = {};
+    for (const r of rows) {
+      const cc = r.client_code;
+      if (!cc) continue;
+      const ch = r.contact_channel || 'Not Recorded';
+      const c = clMap[cc] || (clMap[cc] = { clientCode: cc, clientName: r.client_name, total: 0, byChannel: {} });
+      c.clientName = c.clientName || r.client_name;
+      c.total++;
+      const b = c.byChannel[ch] || (c.byChannel[ch] = { total: 0, connected: 0 });
+      b.total++;
+      if (isConnected(r.call_outcome)) b.connected++;
+    }
+    const clients = Object.values(clMap).map(c => {
+      let best = null;
+      for (const [ch, v] of Object.entries(c.byChannel)) {
+        if (ch === 'Not Recorded') continue;
+        const rate = v.total ? v.connected / v.total : 0;
+        if (!best || v.connected > best.connected || (v.connected === best.connected && rate > best.rate))
+          best = { channel: ch, connected: v.connected, total: v.total, rate };
+      }
+      return {
+        clientCode: c.clientCode, clientName: c.clientName, total: c.total,
+        bestChannel: best ? best.channel : '-',
+        bestConnected: best ? best.connected : 0,
+        bestRate: best && best.total ? Math.round(best.connected / best.total * 1000) / 10 : 0,
+        byChannel: c.byChannel,
+      };
+    }).sort((a, b) => b.total - a.total);
+
+    res.json({ days, totalCalls: rows.length, channels, clients });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════════

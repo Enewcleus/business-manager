@@ -319,6 +319,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
@@ -345,6 +346,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'retention',icon:'💰',label:'Sales Retention'},
@@ -365,6 +367,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
     {id:'retention',icon:'💰',label:'Sales Retention'},
@@ -386,6 +389,7 @@ const NAV_CONFIG = {
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'productivity',icon:'📈',label:'AI Productivity'},
@@ -434,6 +438,7 @@ const NAV_CONFIG = {
     {id:'approvals',icon:'✅',label:'Approvals'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'csi',icon:'📊',label:'CSI Health'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
@@ -450,6 +455,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
@@ -464,6 +470,7 @@ const NAV_CONFIG = {
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
@@ -478,6 +485,7 @@ const NAV_CONFIG = {
     {id:'tasks',icon:'📝',label:'Task Manager',badge:'tasks'},
     {id:'tickets',icon:'🎫',label:'Tickets',badge:'tickets'},
     {id:'crm',icon:'📞',label:'CRM Log'},
+    {id:'channelreport',icon:'📊',label:'Channel Report'},
     {id:'worklog',icon:'📓',label:'Work Log'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
@@ -739,7 +747,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -2625,6 +2633,271 @@ async function submitTicket(){
 }
 
 // ── CRM ──────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════
+// CRM DIAL PANEL — client select karte hi number + dial options
+// ══════════════════════════════════════════════════════════════════
+
+// Number ko clean karo: sirf digits, aur India default (+91)
+function crmCleanPhone(raw) {
+  let d = String(raw || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = '+' + d.slice(1).replace(/\+/g, '');
+  const digits = d.replace(/\D/g, '');
+  if (!digits) return { tel:'', wa:'', display:'' };
+
+  let wa;                                  // WhatsApp ko country code chahiye (bina +)
+  if (d.startsWith('+')) wa = digits;
+  else if (digits.startsWith('0')) wa = '91' + digits.replace(/^0+/, '');  // 0 hata ke 91
+  else if (digits.length === 10) wa = '91' + digits;
+  else if (digits.length === 12 && digits.startsWith('91')) wa = digits;
+  else wa = digits;
+
+  return { tel: d.startsWith('+') ? d : digits, wa, display: String(raw).trim() };
+}
+
+// Client object se saare numbers nikaalo (multiple ho sakte hain)
+function crmGetNumbers(client) {
+  if (!client) return [];
+  const seen = new Set(), out = [];
+  const push = (val, label) => {
+    if (!val) return;
+    // ek field me comma/slash se do number ho sakte hain
+    String(val).split(/[,;/|]/).forEach(part => {
+      const p = crmCleanPhone(part);
+      if (!p.tel || p.tel.replace(/\D/g,'').length < 7) return;
+      if (seen.has(p.wa)) return;
+      seen.add(p.wa);
+      out.push({ ...p, label });
+    });
+  };
+  push(client.phone,          'Primary');
+  push(client.mobile,         'Mobile');
+  push(client.contactNumber,  'Contact');
+  push(client.whatsapp,       'WhatsApp');
+  push(client.altPhone,       'Alternate');
+  push(client.ownerPhone,     'Owner');
+  return out;
+}
+
+// Panel render — client select hone par
+function crmUpdateDial(clientCode) {
+  const panel = document.getElementById('crm-dial-panel');
+  if (!panel) return;
+
+  if (!clientCode) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+
+  const client = (APP.clients || []).find(c => c.clientCode === clientCode);
+  const nums = crmGetNumbers(client);
+
+  if (!nums.length) {
+    panel.style.display = '';
+    panel.innerHTML =
+      '<div style="font-size:12px;color:var(--text-muted);">'
+      + '⚠️ <strong>' + crmEsc(client?.busyName || clientCode) + '</strong> ka koi phone number Client Manager me save nahi hai. '
+      + 'Number add karne ke liye Client Manager me jaake update karo.</div>';
+    return;
+  }
+
+  panel.style.display = '';
+  panel.innerHTML =
+    '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:8px;">📱 DIAL OPTIONS <span style="font-weight:400;">— click karo, channel apne aap select ho jayega</span></div>'
+    + nums.map(n =>
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-weight:700;font-size:13px;min-width:120px;">' + crmEsc(n.display) + '</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);min-width:56px;">' + n.label + '</span>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm btn-success" style="text-decoration:none;padding:5px 12px;" '
+        +   'onclick="crmMarkDialed(\'Phone\')">📞 Call</a>'
+        + '<a href="https://wa.me/' + n.wa + '" target="_blank" rel="noopener" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:#25D366;color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'WhatsApp\')">💬 WhatsApp</a>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:var(--secondary);color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'Superphone\')">⚡ Superphone</a>'
+        + '<button class="btn btn-sm btn-outline" style="padding:5px 10px;" '
+        +   'onclick="crmCopyNumber(\'' + n.tel + '\')">📋 Copy</button>'
+        + '</div>'
+      ).join('')
+    + '<div id="crm-channel-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;">'
+    + 'Call ke baad neeche feedback bhar ke Save Call karo.</div>';
+}
+
+function crmEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Dial click par channel + outcome auto-select (user manually badal sakta hai)
+function crmMarkDialed(channel) {
+  const chSel = document.getElementById('crm-channel');
+  if (chSel) chSel.value = channel;
+
+  // WhatsApp pe outcome bhi set kar do
+  if (channel === 'WhatsApp') {
+    const out = document.getElementById('crm-outcome');
+    if (out) {
+      for (const o of out.options) {
+        if (o.text.toLowerCase().includes('whatsapp')) { out.value = o.value; break; }
+      }
+    }
+  }
+
+  const note = document.getElementById('crm-channel-note');
+  if (note) {
+    note.innerHTML = '<span style="color:var(--green);font-weight:600;">✓ Channel set: ' + channel
+      + '</span> — ab feedback bhar ke Save Call karo.';
+  }
+}
+
+function crmCopyNumber(num) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(num)
+      .then(() => showToast('Number copy ho gaya: ' + num, 'success'))
+      .catch(() => showToast('Copy nahi hua', 'error'));
+  } else {
+    const t = document.createElement('textarea');
+    t.value = num; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); showToast('Number copy ho gaya: ' + num, 'success'); }
+    catch (e) { showToast('Copy nahi hua', 'error'); }
+    document.body.removeChild(t);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// CHANNEL REPORT — kaunse channel pe seller sabse zyada connect hota hai
+// ══════════════════════════════════════════════════════════════════
+let _chRep = { days: 30, data: null, search: '' };
+
+async function renderChannelReport() {
+  document.getElementById('page-content').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Channel report load ho rahi hai...</div>';
+
+  const d = await api('GET', '/crm/channel-report?days=' + _chRep.days + '&_=' + Date.now());
+  _chRep.data = d;
+
+  if (!d || d.error) {
+    document.getElementById('page-content').innerHTML =
+      '<div class="card"><div class="card-body" style="color:var(--red);">Report load nahi hui: '
+      + crmEsc(d?.error || 'unknown error') + '</div></div>';
+    return;
+  }
+  chRenderReport();
+}
+
+function chSetDays(v) { _chRep.days = parseInt(v, 10) || 30; renderChannelReport(); }
+function chSetSearch(v) { _chRep.search = String(v || '').toLowerCase(); chRenderReport(); }
+
+function chRenderReport() {
+  const d = _chRep.data;
+  if (!d) return;
+
+  const channels = d.channels || [];
+  const CH_ICON = { Phone:'📞', WhatsApp:'💬', Superphone:'⚡', Email:'✉️', Other:'🔹', 'Not Recorded':'❔' };
+  const CH_COLOR = { Phone:'var(--green)', WhatsApp:'#25D366', Superphone:'var(--secondary)',
+                     Email:'var(--teal)', Other:'var(--text-muted)', 'Not Recorded':'var(--border)' };
+
+  const recorded = channels.filter(c => c.channel !== 'Not Recorded');
+  const best = recorded.slice().sort((a,b) => b.connectRate - a.connectRate)[0];
+  const most = recorded.slice().sort((a,b) => b.connected - a.connected)[0];
+  const maxTotal = Math.max(...channels.map(c => c.total), 1);
+
+  // ── clients table (search filter) ──
+  let clients = d.clients || [];
+  if (_chRep.search) {
+    clients = clients.filter(c =>
+      String(c.clientName || '').toLowerCase().includes(_chRep.search) ||
+      String(c.clientCode || '').toLowerCase().includes(_chRep.search));
+  }
+
+  const chOrder = ['Phone','WhatsApp','Superphone','Email','Other'];
+
+  document.getElementById('page-content').innerHTML =
+    // ── header + period filter ──
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Channel Performance Report</span>'
+    + '<select class="form-control" style="max-width:170px;font-size:13px;" onchange="chSetDays(this.value)">'
+    + [7,15,30,60,90].map(n => '<option value="'+n+'"'+(n===_chRep.days?' selected':'')+'>Last '+n+' days</option>').join('')
+    + '</select></div>'
+    + '<div class="card-body">'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">'
+    + 'Total <strong>' + (d.totalCalls || 0) + '</strong> contacts in last ' + d.days + ' days. '
+    + 'Connect rate = kitne percent contacts me seller actually connect hua.</div>'
+
+    // ── KPI cards ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
+    + chKpi('🏆 Best Connect Rate', best ? (CH_ICON[best.channel]||'') + ' ' + best.channel : '—',
+            best ? best.connectRate + '% connect' : 'data nahi')
+    + chKpi('📈 Most Connections', most ? (CH_ICON[most.channel]||'') + ' ' + most.channel : '—',
+            most ? most.connected + ' connected' : 'data nahi')
+    + chKpi('📞 Total Contacts', String(d.totalCalls || 0), 'last ' + d.days + ' days')
+    + chKpi('👥 Clients Touched', String((d.clients || []).length), 'unique sellers')
+    + '</div>'
+
+    // ── channel bars ──
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">Channel-wise Breakdown</div>'
+    + (channels.length
+        ? channels.map(c => {
+            const w = Math.round(c.total / maxTotal * 100);
+            const cw = c.total ? Math.round(c.connected / c.total * 100) : 0;
+            return '<div style="margin-bottom:12px;">'
+              + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
+              + '<span style="font-weight:600;">' + (CH_ICON[c.channel]||'') + ' ' + crmEsc(c.channel) + '</span>'
+              + '<span style="color:var(--text-muted);">' + c.connected + '/' + c.total
+              + ' connected · <strong style="color:' + (c.connectRate >= 60 ? 'var(--green)' : c.connectRate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
+              + c.connectRate + '%</strong> · ' + c.uniqueClients + ' clients</span></div>'
+              + '<div style="height:14px;background:var(--border);border-radius:7px;overflow:hidden;position:relative;">'
+              + '<div style="height:100%;width:' + w + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';opacity:0.25;"></div>'
+              + '<div style="height:100%;width:' + Math.round(w * cw / 100) + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';position:absolute;top:0;left:0;"></div>'
+              + '</div></div>';
+          }).join('')
+        : '<div style="color:var(--text-muted);font-size:13px;">Abhi koi data nahi. Calls log karo channel select karke.</div>')
+    + '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;">'
+    + 'Solid bar = connected · Light bar = total attempts</div>'
+    + '</div></div>'
+
+    // ── per-client table ──
+    + '<div class="card">'
+    + '<div class="card-header"><span class="card-title">👥 Client-wise Best Channel</span>'
+    + '<input type="text" class="form-control" placeholder="Seller search..." style="max-width:200px;font-size:13px;" '
+    +   'value="' + crmEsc(_chRep.search) + '" oninput="chSetSearch(this.value)"></div>'
+    + '<div class="card-body" style="padding:0;">'
+    + (clients.length
+        ? '<div class="table-wrap"><table><thead><tr><th>Seller</th><th>Total</th>'
+          + chOrder.map(ch => '<th>' + (CH_ICON[ch]||'') + ' ' + ch + '</th>').join('')
+          + '<th>Best Channel</th></tr></thead><tbody>'
+          + clients.slice(0, 100).map(c =>
+              '<tr>'
+              + '<td><strong>' + crmEsc(c.clientName || c.clientCode) + '</strong><br>'
+              + '<span style="font-size:10px;color:var(--text-muted);">' + crmEsc(c.clientCode) + '</span></td>'
+              + '<td>' + c.total + '</td>'
+              + chOrder.map(ch => {
+                  const b = c.byChannel?.[ch];
+                  if (!b) return '<td style="color:var(--border);">—</td>';
+                  const rate = b.total ? Math.round(b.connected / b.total * 100) : 0;
+                  return '<td style="font-size:12px;">' + b.connected + '/' + b.total
+                    + '<br><span style="font-size:10px;color:' + (rate >= 60 ? 'var(--green)' : rate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
+                    + rate + '%</span></td>';
+                }).join('')
+              + '<td>' + (c.bestChannel !== '-'
+                  ? '<span class="badge badge-green">' + (CH_ICON[c.bestChannel]||'') + ' ' + crmEsc(c.bestChannel) + '</span>'
+                    + '<br><span style="font-size:10px;color:var(--text-muted);">' + c.bestRate + '% rate</span>'
+                  : '<span style="color:var(--text-muted);">—</span>') + '</td>'
+              + '</tr>').join('')
+          + '</tbody></table></div>'
+          + (clients.length > 100 ? '<div style="padding:8px;font-size:11px;color:var(--text-muted);text-align:center;">Showing first 100 of ' + clients.length + '</div>' : '')
+        : '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Koi client data nahi mila.</div>')
+    + '</div></div>';
+}
+
+function chKpi(label, value, sub) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:15px;font-weight:700;">' + value + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
+}
+
+
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
   const [clients,todayCalls,recentCalls]=await Promise.all([
@@ -2771,7 +3044,7 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
       <div class="card-body">
         <div class="form-row">
           <div class="form-group"><label>Client *</label>
-            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value)">
+            <select class="form-control" id="crm-client" onchange="loadCRMHistory(this.value);crmUpdateDial(this.value)">
               <option value="">Select...</option>
               ${clients.map(c=>`<option value="${c.clientCode}">${c.busyName}${c.crmExecutive?' (CRM: '+c.crmExecutive.split(' ')[0]+')':''}</option>`).join('')}
             </select>
@@ -2780,9 +3053,25 @@ function renderCRMPage(clients, todayCalls, crmExecs, showFilter){
             <select class="form-control" id="crm-outcome"><option>Called — Connected</option><option>Called — No Response</option><option>Callback Requested</option><option>WhatsApp Message Sent</option><option>Email Sent</option></select>
           </div>
         </div>
+        <div id="crm-dial-panel" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;"></div>
         <div class="form-row">
           <div class="form-group"><label>Seller Feedback</label><textarea class="form-control" id="crm-comment" placeholder="Seller ne kya kaha?"></textarea></div>
           <div class="form-group"><label>Severity</label><select class="form-control" id="crm-sev"><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Contact Channel *</label>
+            <select class="form-control" id="crm-channel">
+              <option value="">-- Kis channel se contact kiya? --</option>
+              <option value="Phone">Phone</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Superphone">Superphone</option>
+              <option value="Email">Email</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label>&nbsp;</label>
+            <div style="font-size:11px;color:var(--text-muted);padding-top:8px;">Dial button click karoge to ye apne aap select ho jayega.</div>
+          </div>
         </div>
         <div class="form-group"><label>Next Follow-up</label><input type="date" class="form-control" id="crm-followup"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -2913,11 +3202,14 @@ async function saveCRMCall(andTicket){
   const cc = getSearchableVal('crm-client-wrap') || document.getElementById('crm-client')?.value || '';
   const cn = document.getElementById('crm-client-wrap_search')?.value?.split(' (')[0] || document.getElementById('crm-client')?.options[document.getElementById('crm-client')?.selectedIndex]?.text?.split(' (')[0] || '';
   if(!cc){showToast('Select a client','error');return;}
-  const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
+  const ch=document.getElementById('crm-channel')?.value||'';
+  if(!ch){showToast('Contact channel select karo','error');return;}
+  const r=await api('POST','/crm',{clientCode:cc,clientName:cn,callOutcome:document.getElementById('crm-outcome').value,contactChannel:ch,sellerComment:document.getElementById('crm-comment').value,severity:document.getElementById('crm-sev').value,nextFollowUp:document.getElementById('crm-followup').value||null,ticketRaised:!!andTicket});
   if(r?.success){
     showToast('✅ Call logged!','success');
     document.getElementById('crm-comment').value='';
     document.getElementById('crm-followup').value='';
+    const chEl=document.getElementById('crm-channel'); if(chEl) chEl.value='';
     loadCRMHistory(cc);
     if(andTicket) openRaiseTicketFor(cc,cn);
 

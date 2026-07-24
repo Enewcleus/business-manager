@@ -1183,178 +1183,6 @@ adsAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
   }
 });
 
-// ── FEEDBACK (96-day unique check) ────────────────────────────
-const feedbackRouter = require('express').Router();
-
-// Lead roles — poore team ka data dekh sakte hain
-const FB_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
-const FB_MONTHLY_TARGET = 5;
-
-// GET /api/feedback/progress — monthly target progress
-feedbackRouter.get('/progress', authMiddleware, async (req, res) => {
-  try {
-    const { data, error } = await supabase.rpc('feedback_progress', { p_user: req.user.name });
-    if (error) throw error;
-    res.json(data || { target: FB_MONTHLY_TARGET, mine: 0, team_total: 0, flagged_dup: 0 });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/feedback/upload — screenshot upload + 96-day check
-feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (req, res) => {
-  let uploadedPath = null;
-  try {
-    const { clientCode, clientName, fbType, note } = req.body;
-    const file = req.file;
-
-    if (!clientCode) return res.status(400).json({ error: 'Seller select karo.' });
-    if (!file) return res.status(400).json({ error: 'Screenshot choose karo.' });
-    if (!String(file.mimetype || '').startsWith('image/'))
-      return res.status(400).json({ error: 'Sirf image file chalegi.' });
-    if (file.size > 10 * 1024 * 1024)
-      return res.status(400).json({ error: 'Image 10MB se choti honi chahiye.' });
-
-    // Seller registered hai? (manual entry allowed nahi)
-    const { data: client } = await supabase.from('clients')
-      .select('client_code, busy_name').eq('client_code', clientCode).maybeSingle();
-    if (!client) return res.status(400).json({ error: 'Yeh seller software me registered nahi hai.' });
-
-    // ── 96-day check (DB source of truth) ──
-    const { data: check, error: checkErr } =
-      await supabase.rpc('feedback_check', { p_client_code: clientCode });
-    if (checkErr) throw checkErr;
-
-    const isUnique  = Boolean(check.is_unique);
-    const daysSince = check.days_since ?? null;
-
-    // ── upload: <user>/<clientCode>-<timestamp>.<ext> ──
-    const ext  = (String(file.originalname || 'shot.jpg').split('.').pop() || 'jpg').toLowerCase();
-    const safeUser = String(req.user.name).replace(/[^a-zA-Z0-9]/g, '_');
-    const path = `${safeUser}/${clientCode}-${Date.now()}.${ext}`;
-
-    const { error: upErr } = await supabase.storage
-      .from('feedback-shots')
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-    if (upErr) return res.status(500).json({ error: 'Upload fail: ' + upErr.message });
-    uploadedPath = path;
-
-    // ── record (duplicate bhi save hota hai — audit ke liye) ──
-    const feedbackId = 'FBK' + Date.now().toString();
-    const { error: insErr } = await supabase.from('feedback_records').insert({
-      feedback_id: feedbackId,
-      client_code: clientCode,
-      client_name: clientName || client.busy_name,
-      image_path: path,
-      fb_type: fbType || null,
-      note: note || null,
-      is_unique: isUnique,
-      dup_of_id: check.dup_of_id ?? null,
-      days_since: daysSince,
-      uploaded_by: req.user.name,
-      uploaded_by_role: req.user.role,
-    });
-
-    if (insErr) {
-      // record fail hua to image bhi hata do (orphan na rahe)
-      await supabase.storage.from('feedback-shots').remove([path]);
-      uploadedPath = null;
-      throw insErr;
-    }
-
-    res.json({
-      success: true,
-      unique: isUnique,
-      daysSince,
-      sellerName: clientName || client.busy_name,
-      feedbackId,
-    });
-  } catch (e) {
-    if (uploadedPath) {
-      try { await supabase.storage.from('feedback-shots').remove([uploadedPath]); } catch (_) {}
-    }
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/feedback/recent — recent uploads with signed URLs
-feedbackRouter.get('/recent', authMiddleware, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit || '30', 10), 100);
-    const isLead = FB_LEAD_ROLES.includes(req.user.role);
-
-    let q = supabase.from('feedback_records')
-      .select('id, feedback_id, client_code, client_name, image_path, fb_type, note, ' +
-              'is_unique, days_since, uploaded_by, uploaded_by_role, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    // Non-lead: sirf apne uploads
-    if (!isLead) q = q.eq('uploaded_by', req.user.name);
-
-    const { data, error } = await q;
-    if (error) throw error;
-
-    // Private bucket — signed URL (1 hour)
-    const rows = await Promise.all((data || []).map(async r => {
-      let url = null;
-      try {
-        const { data: s } = await supabase.storage
-          .from('feedback-shots').createSignedUrl(r.image_path, 3600);
-        url = s?.signedUrl || null;
-      } catch (_) {}
-      return {
-        id: r.id, feedbackId: r.feedback_id,
-        clientCode: r.client_code, clientName: r.client_name,
-        fbType: r.fb_type, note: r.note,
-        isUnique: r.is_unique, daysSince: r.days_since,
-        uploadedBy: r.uploaded_by, uploadedByRole: r.uploaded_by_role,
-        createdAt: r.created_at,
-        url,
-      };
-    }));
-
-    res.json(rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/feedback/leaderboard — executive-wise monthly count (leads only)
-feedbackRouter.get('/leaderboard', authMiddleware, async (req, res) => {
-  try {
-    if (!FB_LEAD_ROLES.includes(req.user.role))
-      return res.status(403).json({ error: 'Not allowed' });
-
-    const monthStart = new Date();
-    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-
-    const { data, error } = await supabase.from('feedback_records')
-      .select('uploaded_by, uploaded_by_role, is_unique')
-      .gte('created_at', monthStart.toISOString());
-    if (error) throw error;
-
-    const map = {};
-    for (const r of (data || [])) {
-      const k = r.uploaded_by || 'Unknown';
-      const e = map[k] || (map[k] = { name: k, role: r.uploaded_by_role || '', unique: 0, duplicate: 0 });
-      if (r.is_unique) e.unique++; else e.duplicate++;
-    }
-
-    const rows = Object.values(map).map(e => ({
-      ...e,
-      total: e.unique + e.duplicate,
-      target: FB_MONTHLY_TARGET,
-      pct: Math.round(e.unique / FB_MONTHLY_TARGET * 100),
-      achieved: e.unique >= FB_MONTHLY_TARGET,
-    })).sort((a, b) => b.unique - a.unique);
-
-    res.json({ target: FB_MONTHLY_TARGET, executives: rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ── MONTHLY REPORTS ──────────────────────────────────────────
 const monthlyReportsRouter = require('express').Router();
 
@@ -1621,6 +1449,178 @@ docsRouter.delete('/:docId', authMiddleware, async (req, res) => {
     await supabase.from('seller_documents').delete().eq('doc_id', req.params.docId);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── FEEDBACK (96-day unique check) ────────────────────────────
+const feedbackRouter = require('express').Router();
+
+// Lead roles — poore team ka data dekh sakte hain
+const FB_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+const FB_MONTHLY_TARGET = 5;
+
+// GET /api/feedback/progress — monthly target progress
+feedbackRouter.get('/progress', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('feedback_progress', { p_user: req.user.name });
+    if (error) throw error;
+    res.json(data || { target: FB_MONTHLY_TARGET, mine: 0, team_total: 0, flagged_dup: 0 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/feedback/upload — screenshot upload + 96-day check
+feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  let uploadedPath = null;
+  try {
+    const { clientCode, clientName, fbType, note } = req.body;
+    const file = req.file;
+
+    if (!clientCode) return res.status(400).json({ error: 'Seller select karo.' });
+    if (!file) return res.status(400).json({ error: 'Screenshot choose karo.' });
+    if (!String(file.mimetype || '').startsWith('image/'))
+      return res.status(400).json({ error: 'Sirf image file chalegi.' });
+    if (file.size > 10 * 1024 * 1024)
+      return res.status(400).json({ error: 'Image 10MB se choti honi chahiye.' });
+
+    // Seller registered hai? (manual entry allowed nahi)
+    const { data: client } = await supabase.from('clients')
+      .select('client_code, busy_name').eq('client_code', clientCode).maybeSingle();
+    if (!client) return res.status(400).json({ error: 'Yeh seller software me registered nahi hai.' });
+
+    // ── 96-day check (DB source of truth) ──
+    const { data: check, error: checkErr } =
+      await supabase.rpc('feedback_check', { p_client_code: clientCode });
+    if (checkErr) throw checkErr;
+
+    const isUnique  = Boolean(check.is_unique);
+    const daysSince = check.days_since ?? null;
+
+    // ── upload: <user>/<clientCode>-<timestamp>.<ext> ──
+    const ext  = (String(file.originalname || 'shot.jpg').split('.').pop() || 'jpg').toLowerCase();
+    const safeUser = String(req.user.name).replace(/[^a-zA-Z0-9]/g, '_');
+    const path = `${safeUser}/${clientCode}-${Date.now()}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from('feedback-shots')
+      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (upErr) return res.status(500).json({ error: 'Upload fail: ' + upErr.message });
+    uploadedPath = path;
+
+    // ── record (duplicate bhi save hota hai — audit ke liye) ──
+    const feedbackId = 'FBK' + Date.now().toString();
+    const { error: insErr } = await supabase.from('feedback_records').insert({
+      feedback_id: feedbackId,
+      client_code: clientCode,
+      client_name: clientName || client.busy_name,
+      image_path: path,
+      fb_type: fbType || null,
+      note: note || null,
+      is_unique: isUnique,
+      dup_of_id: check.dup_of_id ?? null,
+      days_since: daysSince,
+      uploaded_by: req.user.name,
+      uploaded_by_role: req.user.role,
+    });
+
+    if (insErr) {
+      // record fail hua to image bhi hata do (orphan na rahe)
+      await supabase.storage.from('feedback-shots').remove([path]);
+      uploadedPath = null;
+      throw insErr;
+    }
+
+    res.json({
+      success: true,
+      unique: isUnique,
+      daysSince,
+      sellerName: clientName || client.busy_name,
+      feedbackId,
+    });
+  } catch (e) {
+    if (uploadedPath) {
+      try { await supabase.storage.from('feedback-shots').remove([uploadedPath]); } catch (_) {}
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/feedback/recent — recent uploads with signed URLs
+feedbackRouter.get('/recent', authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '30', 10), 100);
+    const isLead = FB_LEAD_ROLES.includes(req.user.role);
+
+    let q = supabase.from('feedback_records')
+      .select('id, feedback_id, client_code, client_name, image_path, fb_type, note, ' +
+              'is_unique, days_since, uploaded_by, uploaded_by_role, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    // Non-lead: sirf apne uploads
+    if (!isLead) q = q.eq('uploaded_by', req.user.name);
+
+    const { data, error } = await q;
+    if (error) throw error;
+
+    // Private bucket — signed URL (1 hour)
+    const rows = await Promise.all((data || []).map(async r => {
+      let url = null;
+      try {
+        const { data: s } = await supabase.storage
+          .from('feedback-shots').createSignedUrl(r.image_path, 3600);
+        url = s?.signedUrl || null;
+      } catch (_) {}
+      return {
+        id: r.id, feedbackId: r.feedback_id,
+        clientCode: r.client_code, clientName: r.client_name,
+        fbType: r.fb_type, note: r.note,
+        isUnique: r.is_unique, daysSince: r.days_since,
+        uploadedBy: r.uploaded_by, uploadedByRole: r.uploaded_by_role,
+        createdAt: r.created_at,
+        url,
+      };
+    }));
+
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/feedback/leaderboard — executive-wise monthly count (leads only)
+feedbackRouter.get('/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    if (!FB_LEAD_ROLES.includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase.from('feedback_records')
+      .select('uploaded_by, uploaded_by_role, is_unique')
+      .gte('created_at', monthStart.toISOString());
+    if (error) throw error;
+
+    const map = {};
+    for (const r of (data || [])) {
+      const k = r.uploaded_by || 'Unknown';
+      const e = map[k] || (map[k] = { name: k, role: r.uploaded_by_role || '', unique: 0, duplicate: 0 });
+      if (r.is_unique) e.unique++; else e.duplicate++;
+    }
+
+    const rows = Object.values(map).map(e => ({
+      ...e,
+      total: e.unique + e.duplicate,
+      target: FB_MONTHLY_TARGET,
+      pct: Math.round(e.unique / FB_MONTHLY_TARGET * 100),
+      achieved: e.unique >= FB_MONTHLY_TARGET,
+    })).sort((a, b) => b.unique - a.unique);
+
+    res.json({ target: FB_MONTHLY_TARGET, executives: rows });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── APPROVAL REQUESTS ─────────────────────────────────────────

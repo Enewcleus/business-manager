@@ -944,20 +944,15 @@ crmRouter.get('/channel-report', authMiddleware, async (req, res) => {
   try {
     const days = parseInt(req.query.days || '30', 10);
     const since = new Date(Date.now() - days * 86400000).toISOString();
-
     let q = supabase.from('crm_calls')
       .select('contact_channel, call_outcome, client_code, client_name, crm_executive, created_at')
       .gte('created_at', since);
-
     const LEADS = ['Admin', 'Ops Lead', 'Sub Admin', 'CRM Lead', 'Team Lead'];
     if (!LEADS.includes(req.user.role)) q = q.eq('crm_executive', req.user.name);
-
     const { data, error } = await q;
     if (error) throw error;
-
     const rows = data || [];
     const isConnected = o => /connect/i.test(String(o || '')) && !/no response/i.test(String(o || ''));
-
     const chMap = {};
     for (const r of rows) {
       const ch = r.contact_channel || 'Not Recorded';
@@ -971,7 +966,6 @@ crmRouter.get('/channel-report', authMiddleware, async (req, res) => {
       connectRate: c.total ? Math.round(c.connected / c.total * 1000) / 10 : 0,
       uniqueClients: c.clients.size,
     })).sort((a, b) => b.total - a.total);
-
     const clMap = {};
     for (const r of rows) {
       const cc = r.client_code;
@@ -1000,7 +994,6 @@ crmRouter.get('/channel-report', authMiddleware, async (req, res) => {
         byChannel: c.byChannel,
       };
     }).sort((a, b) => b.total - a.total);
-
     res.json({ days, totalCalls: rows.length, channels, clients });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1185,6 +1178,178 @@ adsAnalyzerRouter.get('/log/:logId', authMiddleware, async (req, res) => {
       .single();
     if (error) throw error;
     res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── FEEDBACK (96-day unique check) ────────────────────────────
+const feedbackRouter = require('express').Router();
+
+// Lead roles — poore team ka data dekh sakte hain
+const FB_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+const FB_MONTHLY_TARGET = 5;
+
+// GET /api/feedback/progress — monthly target progress
+feedbackRouter.get('/progress', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('feedback_progress', { p_user: req.user.name });
+    if (error) throw error;
+    res.json(data || { target: FB_MONTHLY_TARGET, mine: 0, team_total: 0, flagged_dup: 0 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/feedback/upload — screenshot upload + 96-day check
+feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  let uploadedPath = null;
+  try {
+    const { clientCode, clientName, fbType, note } = req.body;
+    const file = req.file;
+
+    if (!clientCode) return res.status(400).json({ error: 'Seller select karo.' });
+    if (!file) return res.status(400).json({ error: 'Screenshot choose karo.' });
+    if (!String(file.mimetype || '').startsWith('image/'))
+      return res.status(400).json({ error: 'Sirf image file chalegi.' });
+    if (file.size > 10 * 1024 * 1024)
+      return res.status(400).json({ error: 'Image 10MB se choti honi chahiye.' });
+
+    // Seller registered hai? (manual entry allowed nahi)
+    const { data: client } = await supabase.from('clients')
+      .select('client_code, busy_name').eq('client_code', clientCode).maybeSingle();
+    if (!client) return res.status(400).json({ error: 'Yeh seller software me registered nahi hai.' });
+
+    // ── 96-day check (DB source of truth) ──
+    const { data: check, error: checkErr } =
+      await supabase.rpc('feedback_check', { p_client_code: clientCode });
+    if (checkErr) throw checkErr;
+
+    const isUnique  = Boolean(check.is_unique);
+    const daysSince = check.days_since ?? null;
+
+    // ── upload: <user>/<clientCode>-<timestamp>.<ext> ──
+    const ext  = (String(file.originalname || 'shot.jpg').split('.').pop() || 'jpg').toLowerCase();
+    const safeUser = String(req.user.name).replace(/[^a-zA-Z0-9]/g, '_');
+    const path = `${safeUser}/${clientCode}-${Date.now()}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from('feedback-shots')
+      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (upErr) return res.status(500).json({ error: 'Upload fail: ' + upErr.message });
+    uploadedPath = path;
+
+    // ── record (duplicate bhi save hota hai — audit ke liye) ──
+    const feedbackId = 'FBK' + Date.now().toString();
+    const { error: insErr } = await supabase.from('feedback_records').insert({
+      feedback_id: feedbackId,
+      client_code: clientCode,
+      client_name: clientName || client.busy_name,
+      image_path: path,
+      fb_type: fbType || null,
+      note: note || null,
+      is_unique: isUnique,
+      dup_of_id: check.dup_of_id ?? null,
+      days_since: daysSince,
+      uploaded_by: req.user.name,
+      uploaded_by_role: req.user.role,
+    });
+
+    if (insErr) {
+      // record fail hua to image bhi hata do (orphan na rahe)
+      await supabase.storage.from('feedback-shots').remove([path]);
+      uploadedPath = null;
+      throw insErr;
+    }
+
+    res.json({
+      success: true,
+      unique: isUnique,
+      daysSince,
+      sellerName: clientName || client.busy_name,
+      feedbackId,
+    });
+  } catch (e) {
+    if (uploadedPath) {
+      try { await supabase.storage.from('feedback-shots').remove([uploadedPath]); } catch (_) {}
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/feedback/recent — recent uploads with signed URLs
+feedbackRouter.get('/recent', authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '30', 10), 100);
+    const isLead = FB_LEAD_ROLES.includes(req.user.role);
+
+    let q = supabase.from('feedback_records')
+      .select('id, feedback_id, client_code, client_name, image_path, fb_type, note, ' +
+              'is_unique, days_since, uploaded_by, uploaded_by_role, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    // Non-lead: sirf apne uploads
+    if (!isLead) q = q.eq('uploaded_by', req.user.name);
+
+    const { data, error } = await q;
+    if (error) throw error;
+
+    // Private bucket — signed URL (1 hour)
+    const rows = await Promise.all((data || []).map(async r => {
+      let url = null;
+      try {
+        const { data: s } = await supabase.storage
+          .from('feedback-shots').createSignedUrl(r.image_path, 3600);
+        url = s?.signedUrl || null;
+      } catch (_) {}
+      return {
+        id: r.id, feedbackId: r.feedback_id,
+        clientCode: r.client_code, clientName: r.client_name,
+        fbType: r.fb_type, note: r.note,
+        isUnique: r.is_unique, daysSince: r.days_since,
+        uploadedBy: r.uploaded_by, uploadedByRole: r.uploaded_by_role,
+        createdAt: r.created_at,
+        url,
+      };
+    }));
+
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/feedback/leaderboard — executive-wise monthly count (leads only)
+feedbackRouter.get('/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    if (!FB_LEAD_ROLES.includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase.from('feedback_records')
+      .select('uploaded_by, uploaded_by_role, is_unique')
+      .gte('created_at', monthStart.toISOString());
+    if (error) throw error;
+
+    const map = {};
+    for (const r of (data || [])) {
+      const k = r.uploaded_by || 'Unknown';
+      const e = map[k] || (map[k] = { name: k, role: r.uploaded_by_role || '', unique: 0, duplicate: 0 });
+      if (r.is_unique) e.unique++; else e.duplicate++;
+    }
+
+    const rows = Object.values(map).map(e => ({
+      ...e,
+      total: e.unique + e.duplicate,
+      target: FB_MONTHLY_TARGET,
+      pct: Math.round(e.unique / FB_MONTHLY_TARGET * 100),
+      achieved: e.unique >= FB_MONTHLY_TARGET,
+    })).sort((a, b) => b.unique - a.unique);
+
+    res.json({ target: FB_MONTHLY_TARGET, executives: rows });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -2499,7 +2664,20 @@ function _monthBoundaries(refDate) {
     prevFrom: iso(prevStart), prevTo: iso(prevEnd),
     currLabel: currStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
     prevLabel: prevStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+    daysElapsed: Math.max(1, Math.min(d.getDate(), currEnd.getDate())),
+    daysInCurrMonth: currEnd.getDate(),
+    daysInPrevMonth: prevEnd.getDate(),
+    isPartialMonth: d.getDate() < currEnd.getDate(),
   };
+}
+
+// DRR (Daily Run Rate) growth — mid-month me partial vs full month compare karna galat hai
+function _drrGrowth(currSales, prevSales, mb) {
+  const currDrr = currSales / mb.daysElapsed;
+  const prevDrr = prevSales / mb.daysInPrevMonth;
+  const projected = Math.round(currDrr * mb.daysInCurrMonth);
+  const growthPct = prevDrr > 0 ? Math.round(((currDrr - prevDrr) / prevDrr) * 100) : (currSales > 0 ? 100 : 0);
+  return { currDrr, prevDrr, projected, growthPct };
 }
 
 function _growthBucket(growthPct, hasCurr, hasPrev) {
@@ -2649,9 +2827,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
       const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
       const hasCurr = curr.sales > 0;
       const hasPrev = prev.sales > 0;
-      let growthPct = 0;
-      if (hasPrev) growthPct = Math.round(((curr.sales - prev.sales) / prev.sales) * 100);
-      else if (hasCurr) growthPct = 100;
+      const dg = _drrGrowth(curr.sales, prev.sales, bounds);
+      const growthPct = hasPrev ? dg.growthPct : (hasCurr ? 100 : 0);
       const bucket = _growthBucket(growthPct, hasCurr, hasPrev);
 
       const entry = amMap[am];
@@ -2679,6 +2856,9 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         sellerAging: c.seller_aging || 0,
         currSales: Math.round(curr.sales),
         prevSales: Math.round(prev.sales),
+        projectedSales: dg.projected,
+        currDrr: Math.round(dg.currDrr),
+        prevDrr: Math.round(dg.prevDrr),
         growthPct,
         bucket,
         acos: adsMap[c.client_code] || null,
@@ -2711,9 +2891,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         return Math.floor((today - new Date(t.created_at)) / 86400000) > 10;
       }).length;
 
-      const mom = am.prevSales > 0
-        ? Math.round(((am.currSales - am.prevSales) / am.prevSales) * 100)
-        : (am.currSales > 0 ? 100 : 0);
+      const amDrr = _drrGrowth(am.currSales, am.prevSales, bounds);
+      const mom = am.prevSales > 0 ? amDrr.growthPct : (am.currSales > 0 ? 100 : 0);
       const avgGrowthPct = am.growthPcts.length
         ? Math.round(am.growthPcts.reduce((s,g) => s+g, 0) / am.growthPcts.length)
         : 0;
@@ -2744,6 +2923,7 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         currMonthSales: Math.round(am.currSales),
         prevMonthSales: Math.round(am.prevSales),
         momGrowthPct: mom,
+        projectedMonthSales: amDrr.projected,
         avgSellerGrowthPct: avgGrowthPct,
         totalAdSpend: Math.round(am.totalAdSpend),
         totalOrders: am.totalOrders,
@@ -2779,7 +2959,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
     // Company-wide summary
     const totalCurrSales = amList.reduce((s, am) => s + am.currMonthSales, 0);
     const totalPrevSales = amList.reduce((s, am) => s + am.prevMonthSales, 0);
-    const companyMoM = totalPrevSales > 0 ? Math.round(((totalCurrSales - totalPrevSales) / totalPrevSales) * 100) : 0;
+    const companyDrr = _drrGrowth(totalCurrSales, totalPrevSales, bounds);
+    const companyMoM = totalPrevSales > 0 ? companyDrr.growthPct : 0;
     const totalZeroSale = amList.reduce((s, am) => s + am.zeroSale, 0);
     const totalHealthy  = amList.reduce((s, am) => s + am.healthy, 0);
     const totalSellers  = amList.reduce((s, am) => s + am.totalSellers, 0);
@@ -2795,6 +2976,11 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         currLabel: bounds.currLabel, prevLabel: bounds.prevLabel,
         currFrom: bounds.currFrom, currTo: bounds.currTo,
         prevFrom: bounds.prevFrom, prevTo: bounds.prevTo,
+        daysElapsed: bounds.daysElapsed,
+        daysInCurrMonth: bounds.daysInCurrMonth,
+        daysInPrevMonth: bounds.daysInPrevMonth,
+        isPartialMonth: bounds.isPartialMonth,
+        basis: 'DRR',
       },
       companySummary: {
         totalAMs: amList.length,
@@ -2802,6 +2988,7 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         currMonthSales: totalCurrSales,
         prevMonthSales: totalPrevSales,
         momGrowthPct: companyMoM,
+        projectedMonthSales: companyDrr.projected,
         healthyPct: totalSellers ? Math.round((totalHealthy / totalSellers) * 100) : 0,
         zeroSalePct: totalSellers ? Math.round((totalZeroSale / totalSellers) * 100) : 0,
         zeroSaleCount: totalZeroSale,
@@ -2846,15 +3033,15 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
       const curr = currMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
       const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0, orders: 0 };
       const hasCurr = curr.sales > 0, hasPrev = prev.sales > 0;
-      let growthPct = 0;
-      if (hasPrev) growthPct = Math.round(((curr.sales - prev.sales) / prev.sales) * 100);
-      else if (hasCurr) growthPct = 100;
+      const dg = _drrGrowth(curr.sales, prev.sales, bounds);
+      const growthPct = hasPrev ? dg.growthPct : (hasCurr ? 100 : 0);
       return {
         clientCode: c.client_code, busyName: c.busy_name,
         marketplace: c.marketplace, servicePlan: c.service_plan,
         sellerAging: c.seller_aging || 0,
         currSales: Math.round(curr.sales),
         prevSales: Math.round(prev.sales),
+        projectedSales: dg.projected,
         growthPct,
         bucket: _growthBucket(growthPct, hasCurr, hasPrev),
         currOrders: curr.orders,
@@ -2944,7 +3131,7 @@ module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
   usersRouter, renewalsRouter, adsRouter, clientsRouter,
   hurdleRouter, renewalHistoryRouter, reportAnalyzerRouter,
-  flipkartAnalyzerRouter, adsAnalyzerRouter,
+  flipkartAnalyzerRouter, adsAnalyzerRouter, feedbackRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
 };

@@ -338,6 +338,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ops Lead': [
@@ -359,6 +360,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Lead': [
@@ -381,6 +383,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Lead': [
@@ -397,6 +400,7 @@ const NAV_CONFIG = {
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Account Manager': [
@@ -413,6 +417,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ads Executive': [
@@ -428,6 +433,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Executive': [
@@ -447,6 +453,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'SME': [
@@ -463,6 +470,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Senior Executive': [
@@ -477,6 +485,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Team Lead': [
@@ -494,6 +503,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Executive': [
@@ -506,6 +516,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Sub Admin': [
@@ -747,7 +758,7 @@ function navigate(page) {
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,feedback:renderFeedback,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -2633,271 +2644,6 @@ async function submitTicket(){
 }
 
 // ── CRM ──────────────────────────────────────────────────────
-
-// ══════════════════════════════════════════════════════════════════
-// CRM DIAL PANEL — client select karte hi number + dial options
-// ══════════════════════════════════════════════════════════════════
-
-// Number ko clean karo: sirf digits, aur India default (+91)
-function crmCleanPhone(raw) {
-  let d = String(raw || '').replace(/[^\d+]/g, '');
-  if (d.startsWith('+')) d = '+' + d.slice(1).replace(/\+/g, '');
-  const digits = d.replace(/\D/g, '');
-  if (!digits) return { tel:'', wa:'', display:'' };
-
-  let wa;                                  // WhatsApp ko country code chahiye (bina +)
-  if (d.startsWith('+')) wa = digits;
-  else if (digits.startsWith('0')) wa = '91' + digits.replace(/^0+/, '');  // 0 hata ke 91
-  else if (digits.length === 10) wa = '91' + digits;
-  else if (digits.length === 12 && digits.startsWith('91')) wa = digits;
-  else wa = digits;
-
-  return { tel: d.startsWith('+') ? d : digits, wa, display: String(raw).trim() };
-}
-
-// Client object se saare numbers nikaalo (multiple ho sakte hain)
-function crmGetNumbers(client) {
-  if (!client) return [];
-  const seen = new Set(), out = [];
-  const push = (val, label) => {
-    if (!val) return;
-    // ek field me comma/slash se do number ho sakte hain
-    String(val).split(/[,;/|]/).forEach(part => {
-      const p = crmCleanPhone(part);
-      if (!p.tel || p.tel.replace(/\D/g,'').length < 7) return;
-      if (seen.has(p.wa)) return;
-      seen.add(p.wa);
-      out.push({ ...p, label });
-    });
-  };
-  push(client.phone,          'Primary');
-  push(client.mobile,         'Mobile');
-  push(client.contactNumber,  'Contact');
-  push(client.whatsapp,       'WhatsApp');
-  push(client.altPhone,       'Alternate');
-  push(client.ownerPhone,     'Owner');
-  return out;
-}
-
-// Panel render — client select hone par
-function crmUpdateDial(clientCode) {
-  const panel = document.getElementById('crm-dial-panel');
-  if (!panel) return;
-
-  if (!clientCode) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
-
-  const client = (APP.clients || []).find(c => c.clientCode === clientCode);
-  const nums = crmGetNumbers(client);
-
-  if (!nums.length) {
-    panel.style.display = '';
-    panel.innerHTML =
-      '<div style="font-size:12px;color:var(--text-muted);">'
-      + '⚠️ <strong>' + crmEsc(client?.busyName || clientCode) + '</strong> ka koi phone number Client Manager me save nahi hai. '
-      + 'Number add karne ke liye Client Manager me jaake update karo.</div>';
-    return;
-  }
-
-  panel.style.display = '';
-  panel.innerHTML =
-    '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:8px;">📱 DIAL OPTIONS <span style="font-weight:400;">— click karo, channel apne aap select ho jayega</span></div>'
-    + nums.map(n =>
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
-        + '<span style="font-weight:700;font-size:13px;min-width:120px;">' + crmEsc(n.display) + '</span>'
-        + '<span style="font-size:10px;color:var(--text-muted);min-width:56px;">' + n.label + '</span>'
-        + '<a href="tel:' + n.tel + '" class="btn btn-sm btn-success" style="text-decoration:none;padding:5px 12px;" '
-        +   'onclick="crmMarkDialed(\'Phone\')">📞 Call</a>'
-        + '<a href="https://wa.me/' + n.wa + '" target="_blank" rel="noopener" class="btn btn-sm" '
-        +   'style="text-decoration:none;padding:5px 12px;background:#25D366;color:#fff;border:none;" '
-        +   'onclick="crmMarkDialed(\'WhatsApp\')">💬 WhatsApp</a>'
-        + '<a href="tel:' + n.tel + '" class="btn btn-sm" '
-        +   'style="text-decoration:none;padding:5px 12px;background:var(--secondary);color:#fff;border:none;" '
-        +   'onclick="crmMarkDialed(\'Superphone\')">⚡ Superphone</a>'
-        + '<button class="btn btn-sm btn-outline" style="padding:5px 10px;" '
-        +   'onclick="crmCopyNumber(\'' + n.tel + '\')">📋 Copy</button>'
-        + '</div>'
-      ).join('')
-    + '<div id="crm-channel-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;">'
-    + 'Call ke baad neeche feedback bhar ke Save Call karo.</div>';
-}
-
-function crmEsc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-// Dial click par channel + outcome auto-select (user manually badal sakta hai)
-function crmMarkDialed(channel) {
-  const chSel = document.getElementById('crm-channel');
-  if (chSel) chSel.value = channel;
-
-  // WhatsApp pe outcome bhi set kar do
-  if (channel === 'WhatsApp') {
-    const out = document.getElementById('crm-outcome');
-    if (out) {
-      for (const o of out.options) {
-        if (o.text.toLowerCase().includes('whatsapp')) { out.value = o.value; break; }
-      }
-    }
-  }
-
-  const note = document.getElementById('crm-channel-note');
-  if (note) {
-    note.innerHTML = '<span style="color:var(--green);font-weight:600;">✓ Channel set: ' + channel
-      + '</span> — ab feedback bhar ke Save Call karo.';
-  }
-}
-
-function crmCopyNumber(num) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(num)
-      .then(() => showToast('Number copy ho gaya: ' + num, 'success'))
-      .catch(() => showToast('Copy nahi hua', 'error'));
-  } else {
-    const t = document.createElement('textarea');
-    t.value = num; document.body.appendChild(t); t.select();
-    try { document.execCommand('copy'); showToast('Number copy ho gaya: ' + num, 'success'); }
-    catch (e) { showToast('Copy nahi hua', 'error'); }
-    document.body.removeChild(t);
-  }
-}
-
-
-// ══════════════════════════════════════════════════════════════════
-// CHANNEL REPORT — kaunse channel pe seller sabse zyada connect hota hai
-// ══════════════════════════════════════════════════════════════════
-let _chRep = { days: 30, data: null, search: '' };
-
-async function renderChannelReport() {
-  document.getElementById('page-content').innerHTML =
-    '<div class="loading"><div class="spinner"></div> Channel report load ho rahi hai...</div>';
-
-  const d = await api('GET', '/crm/channel-report?days=' + _chRep.days + '&_=' + Date.now());
-  _chRep.data = d;
-
-  if (!d || d.error) {
-    document.getElementById('page-content').innerHTML =
-      '<div class="card"><div class="card-body" style="color:var(--red);">Report load nahi hui: '
-      + crmEsc(d?.error || 'unknown error') + '</div></div>';
-    return;
-  }
-  chRenderReport();
-}
-
-function chSetDays(v) { _chRep.days = parseInt(v, 10) || 30; renderChannelReport(); }
-function chSetSearch(v) { _chRep.search = String(v || '').toLowerCase(); chRenderReport(); }
-
-function chRenderReport() {
-  const d = _chRep.data;
-  if (!d) return;
-
-  const channels = d.channels || [];
-  const CH_ICON = { Phone:'📞', WhatsApp:'💬', Superphone:'⚡', Email:'✉️', Other:'🔹', 'Not Recorded':'❔' };
-  const CH_COLOR = { Phone:'var(--green)', WhatsApp:'#25D366', Superphone:'var(--secondary)',
-                     Email:'var(--teal)', Other:'var(--text-muted)', 'Not Recorded':'var(--border)' };
-
-  const recorded = channels.filter(c => c.channel !== 'Not Recorded');
-  const best = recorded.slice().sort((a,b) => b.connectRate - a.connectRate)[0];
-  const most = recorded.slice().sort((a,b) => b.connected - a.connected)[0];
-  const maxTotal = Math.max(...channels.map(c => c.total), 1);
-
-  // ── clients table (search filter) ──
-  let clients = d.clients || [];
-  if (_chRep.search) {
-    clients = clients.filter(c =>
-      String(c.clientName || '').toLowerCase().includes(_chRep.search) ||
-      String(c.clientCode || '').toLowerCase().includes(_chRep.search));
-  }
-
-  const chOrder = ['Phone','WhatsApp','Superphone','Email','Other'];
-
-  document.getElementById('page-content').innerHTML =
-    // ── header + period filter ──
-    '<div class="card" style="margin-bottom:16px;">'
-    + '<div class="card-header"><span class="card-title">📊 Channel Performance Report</span>'
-    + '<select class="form-control" style="max-width:170px;font-size:13px;" onchange="chSetDays(this.value)">'
-    + [7,15,30,60,90].map(n => '<option value="'+n+'"'+(n===_chRep.days?' selected':'')+'>Last '+n+' days</option>').join('')
-    + '</select></div>'
-    + '<div class="card-body">'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">'
-    + 'Total <strong>' + (d.totalCalls || 0) + '</strong> contacts in last ' + d.days + ' days. '
-    + 'Connect rate = kitne percent contacts me seller actually connect hua.</div>'
-
-    // ── KPI cards ──
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
-    + chKpi('🏆 Best Connect Rate', best ? (CH_ICON[best.channel]||'') + ' ' + best.channel : '—',
-            best ? best.connectRate + '% connect' : 'data nahi')
-    + chKpi('📈 Most Connections', most ? (CH_ICON[most.channel]||'') + ' ' + most.channel : '—',
-            most ? most.connected + ' connected' : 'data nahi')
-    + chKpi('📞 Total Contacts', String(d.totalCalls || 0), 'last ' + d.days + ' days')
-    + chKpi('👥 Clients Touched', String((d.clients || []).length), 'unique sellers')
-    + '</div>'
-
-    // ── channel bars ──
-    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">Channel-wise Breakdown</div>'
-    + (channels.length
-        ? channels.map(c => {
-            const w = Math.round(c.total / maxTotal * 100);
-            const cw = c.total ? Math.round(c.connected / c.total * 100) : 0;
-            return '<div style="margin-bottom:12px;">'
-              + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
-              + '<span style="font-weight:600;">' + (CH_ICON[c.channel]||'') + ' ' + crmEsc(c.channel) + '</span>'
-              + '<span style="color:var(--text-muted);">' + c.connected + '/' + c.total
-              + ' connected · <strong style="color:' + (c.connectRate >= 60 ? 'var(--green)' : c.connectRate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
-              + c.connectRate + '%</strong> · ' + c.uniqueClients + ' clients</span></div>'
-              + '<div style="height:14px;background:var(--border);border-radius:7px;overflow:hidden;position:relative;">'
-              + '<div style="height:100%;width:' + w + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';opacity:0.25;"></div>'
-              + '<div style="height:100%;width:' + Math.round(w * cw / 100) + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';position:absolute;top:0;left:0;"></div>'
-              + '</div></div>';
-          }).join('')
-        : '<div style="color:var(--text-muted);font-size:13px;">Abhi koi data nahi. Calls log karo channel select karke.</div>')
-    + '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;">'
-    + 'Solid bar = connected · Light bar = total attempts</div>'
-    + '</div></div>'
-
-    // ── per-client table ──
-    + '<div class="card">'
-    + '<div class="card-header"><span class="card-title">👥 Client-wise Best Channel</span>'
-    + '<input type="text" class="form-control" placeholder="Seller search..." style="max-width:200px;font-size:13px;" '
-    +   'value="' + crmEsc(_chRep.search) + '" oninput="chSetSearch(this.value)"></div>'
-    + '<div class="card-body" style="padding:0;">'
-    + (clients.length
-        ? '<div class="table-wrap"><table><thead><tr><th>Seller</th><th>Total</th>'
-          + chOrder.map(ch => '<th>' + (CH_ICON[ch]||'') + ' ' + ch + '</th>').join('')
-          + '<th>Best Channel</th></tr></thead><tbody>'
-          + clients.slice(0, 100).map(c =>
-              '<tr>'
-              + '<td><strong>' + crmEsc(c.clientName || c.clientCode) + '</strong><br>'
-              + '<span style="font-size:10px;color:var(--text-muted);">' + crmEsc(c.clientCode) + '</span></td>'
-              + '<td>' + c.total + '</td>'
-              + chOrder.map(ch => {
-                  const b = c.byChannel?.[ch];
-                  if (!b) return '<td style="color:var(--border);">—</td>';
-                  const rate = b.total ? Math.round(b.connected / b.total * 100) : 0;
-                  return '<td style="font-size:12px;">' + b.connected + '/' + b.total
-                    + '<br><span style="font-size:10px;color:' + (rate >= 60 ? 'var(--green)' : rate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
-                    + rate + '%</span></td>';
-                }).join('')
-              + '<td>' + (c.bestChannel !== '-'
-                  ? '<span class="badge badge-green">' + (CH_ICON[c.bestChannel]||'') + ' ' + crmEsc(c.bestChannel) + '</span>'
-                    + '<br><span style="font-size:10px;color:var(--text-muted);">' + c.bestRate + '% rate</span>'
-                  : '<span style="color:var(--text-muted);">—</span>') + '</td>'
-              + '</tr>').join('')
-          + '</tbody></table></div>'
-          + (clients.length > 100 ? '<div style="padding:8px;font-size:11px;color:var(--text-muted);text-align:center;">Showing first 100 of ' + clients.length + '</div>' : '')
-        : '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Koi client data nahi mila.</div>')
-    + '</div></div>';
-}
-
-function chKpi(label, value, sub) {
-  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">'
-    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
-    + '<div style="font-size:15px;font-weight:700;">' + value + '</div>'
-    + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
-}
-
-
 async function renderCRM(){
   document.getElementById('page-content').innerHTML='<div class="loading"><div class="spinner"></div> Loading CRM...</div>';
   const [clients,todayCalls,recentCalls]=await Promise.all([
@@ -9300,6 +9046,7 @@ async function renderSalesRetention() {
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:700;">Month-over-Month Seller Sales Health</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">Target: 15%+ growth per seller · Zero grace period</div>
+        <div id="retention-basis-note" style="font-size:10px;color:var(--text-muted);margin-top:4px;"></div>
       </div>
       <button class="btn btn-sm" style="background:#6c3483;color:#fff;" onclick="regenerateRetentionAI()">🤖 Regenerate AI</button>
       <button class="btn btn-sm btn-outline" onclick="exportRetentionCSV()">📥 Export CSV</button>
@@ -9355,6 +9102,17 @@ function growthColor(pct) {
 function renderRetentionContent(data) {
   const { period, companySummary, amList, aiInsights, canViewAll, growthTarget } = data;
 
+  const noteEl = document.getElementById('retention-basis-note');
+  if (noteEl && period) {
+    if (period.isPartialMonth) {
+      noteEl.innerHTML = '<span style="background:#eef6ff;border:1px solid #cfe2ff;color:#1c4e80;padding:2px 6px;border-radius:4px;">'
+        + 'Growth <strong>DRR basis</strong> pe hai - ' + period.daysElapsed + '/' + period.daysInCurrMonth
+        + ' din ka daily average pichhle month ke daily average se compare ho raha hai (poora month vs aadha month nahi).</span>';
+    } else {
+      noteEl.innerHTML = '<span style="color:var(--text-muted);">Month complete - full month comparison.</span>';
+    }
+  }
+
   // Company summary strip
   const growthColr = growthColor(companySummary.momGrowthPct);
   const companyCard = `
@@ -9362,7 +9120,8 @@ function renderRetentionContent(data) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
         <div>
           <div style="font-size:14px;opacity:0.8;">📊 Company Retention Health</div>
-          <div style="font-size:11px;opacity:0.6;margin-top:2px;">${period.currLabel} vs ${period.prevLabel}</div>
+          <div style="font-size:11px;opacity:0.6;margin-top:2px;">${period.currLabel} vs ${period.prevLabel}${period.isPartialMonth ? ` · ${period.daysElapsed}/${period.daysInCurrMonth} days · DRR basis` : ''}</div>
+          ${companySummary.projectedMonthSales ? `<div style="font-size:11px;opacity:0.75;margin-top:2px;">Is pace pe month-end: <strong>${fmtINR(companySummary.projectedMonthSales)}</strong></div>` : ''}
         </div>
         <div style="text-align:right;">
           <div style="font-size:11px;opacity:0.8;">Month-over-Month</div>
@@ -9446,10 +9205,11 @@ function renderAMDashboardTab(amList, growthTarget) {
               <div style="font-size:15px;font-weight:800;">${fmtINR(am.currMonthSales)}</div>
             </div>
             <div style="text-align:right;">
-              <div style="font-size:10px;color:var(--text-muted);">MoM Growth</div>
+              <div style="font-size:10px;color:var(--text-muted);">MoM Growth <span style="font-size:8px;background:var(--secondary);color:#fff;padding:1px 4px;border-radius:3px;">DRR</span></div>
               <div style="font-size:15px;font-weight:800;color:${growthCol};">${am.momGrowthPct >= 0 ? '+' : ''}${am.momGrowthPct}%</div>
             </div>
           </div>
+          ${am.projectedMonthSales ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">Is pace pe month-end: <strong style="color:var(--primary);">${fmtINR(am.projectedMonthSales)}</strong></div>` : ''}
           <div style="font-size:10px;color:var(--text-muted);">Prev: ${fmtINR(am.prevMonthSales)} · Avg/seller growth: <span style="color:${avgGrowthCol};font-weight:700;">${am.avgSellerGrowthPct}%</span></div>
         </div>
 
@@ -10924,6 +10684,568 @@ var _ra = {
 };
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════
+// CRM DIAL PANEL — client select karte hi number + dial options
+// ══════════════════════════════════════════════════════════════════
+
+// Number ko clean karo: sirf digits, aur India default (+91)
+function crmCleanPhone(raw) {
+  let d = String(raw || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = '+' + d.slice(1).replace(/\+/g, '');
+  const digits = d.replace(/\D/g, '');
+  if (!digits) return { tel:'', wa:'', display:'' };
+
+  let wa;                                  // WhatsApp ko country code chahiye (bina +)
+  if (d.startsWith('+')) wa = digits;
+  else if (digits.startsWith('0')) wa = '91' + digits.replace(/^0+/, '');  // 0 hata ke 91
+  else if (digits.length === 10) wa = '91' + digits;
+  else if (digits.length === 12 && digits.startsWith('91')) wa = digits;
+  else wa = digits;
+
+  return { tel: d.startsWith('+') ? d : digits, wa, display: String(raw).trim() };
+}
+
+// Client object se saare numbers nikaalo (multiple ho sakte hain)
+function crmGetNumbers(client) {
+  if (!client) return [];
+  const seen = new Set(), out = [];
+  const push = (val, label) => {
+    if (!val) return;
+    // ek field me comma/slash se do number ho sakte hain
+    String(val).split(/[,;/|]/).forEach(part => {
+      const p = crmCleanPhone(part);
+      if (!p.tel || p.tel.replace(/\D/g,'').length < 7) return;
+      if (seen.has(p.wa)) return;
+      seen.add(p.wa);
+      out.push({ ...p, label });
+    });
+  };
+  push(client.phone,          'Primary');
+  push(client.mobile,         'Mobile');
+  push(client.contactNumber,  'Contact');
+  push(client.whatsapp,       'WhatsApp');
+  push(client.altPhone,       'Alternate');
+  push(client.ownerPhone,     'Owner');
+  return out;
+}
+
+// Panel render — client select hone par
+function crmUpdateDial(clientCode) {
+  const panel = document.getElementById('crm-dial-panel');
+  if (!panel) return;
+
+  if (!clientCode) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+
+  const client = (APP.clients || []).find(c => c.clientCode === clientCode);
+  const nums = crmGetNumbers(client);
+
+  if (!nums.length) {
+    panel.style.display = '';
+    panel.innerHTML =
+      '<div style="font-size:12px;color:var(--text-muted);">'
+      + '⚠️ <strong>' + crmEsc(client?.busyName || clientCode) + '</strong> ka koi phone number Client Manager me save nahi hai. '
+      + 'Number add karne ke liye Client Manager me jaake update karo.</div>';
+    return;
+  }
+
+  panel.style.display = '';
+  panel.innerHTML =
+    '<div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:8px;">📱 DIAL OPTIONS <span style="font-weight:400;">— click karo, channel apne aap select ho jayega</span></div>'
+    + nums.map(n =>
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+        + '<span style="font-weight:700;font-size:13px;min-width:120px;">' + crmEsc(n.display) + '</span>'
+        + '<span style="font-size:10px;color:var(--text-muted);min-width:56px;">' + n.label + '</span>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm btn-success" style="text-decoration:none;padding:5px 12px;" '
+        +   'onclick="crmMarkDialed(\'Phone\')">📞 Call</a>'
+        + '<a href="https://wa.me/' + n.wa + '" target="_blank" rel="noopener" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:#25D366;color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'WhatsApp\')">💬 WhatsApp</a>'
+        + '<a href="tel:' + n.tel + '" class="btn btn-sm" '
+        +   'style="text-decoration:none;padding:5px 12px;background:var(--secondary);color:#fff;border:none;" '
+        +   'onclick="crmMarkDialed(\'Superphone\')">⚡ Superphone</a>'
+        + '<button class="btn btn-sm btn-outline" style="padding:5px 10px;" '
+        +   'onclick="crmCopyNumber(\'' + n.tel + '\')">📋 Copy</button>'
+        + '</div>'
+      ).join('')
+    + '<div id="crm-channel-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;">'
+    + 'Call ke baad neeche feedback bhar ke Save Call karo.</div>';
+}
+
+function crmEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Dial click par channel + outcome auto-select (user manually badal sakta hai)
+function crmMarkDialed(channel) {
+  const chSel = document.getElementById('crm-channel');
+  if (chSel) chSel.value = channel;
+
+  // WhatsApp pe outcome bhi set kar do
+  if (channel === 'WhatsApp') {
+    const out = document.getElementById('crm-outcome');
+    if (out) {
+      for (const o of out.options) {
+        if (o.text.toLowerCase().includes('whatsapp')) { out.value = o.value; break; }
+      }
+    }
+  }
+
+  const note = document.getElementById('crm-channel-note');
+  if (note) {
+    note.innerHTML = '<span style="color:var(--green);font-weight:600;">✓ Channel set: ' + channel
+      + '</span> — ab feedback bhar ke Save Call karo.';
+  }
+}
+
+function crmCopyNumber(num) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(num)
+      .then(() => showToast('Number copy ho gaya: ' + num, 'success'))
+      .catch(() => showToast('Copy nahi hua', 'error'));
+  } else {
+    const t = document.createElement('textarea');
+    t.value = num; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); showToast('Number copy ho gaya: ' + num, 'success'); }
+    catch (e) { showToast('Copy nahi hua', 'error'); }
+    document.body.removeChild(t);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// CHANNEL REPORT — kaunse channel pe seller sabse zyada connect hota hai
+// ══════════════════════════════════════════════════════════════════
+let _chRep = { days: 30, data: null, search: '' };
+
+async function renderChannelReport() {
+  document.getElementById('page-content').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Channel report load ho rahi hai...</div>';
+
+  const d = await api('GET', '/crm/channel-report?days=' + _chRep.days + '&_=' + Date.now());
+  _chRep.data = d;
+
+  if (!d || d.error) {
+    document.getElementById('page-content').innerHTML =
+      '<div class="card"><div class="card-body" style="color:var(--red);">Report load nahi hui: '
+      + crmEsc(d?.error || 'unknown error') + '</div></div>';
+    return;
+  }
+  chRenderReport();
+}
+
+function chSetDays(v) { _chRep.days = parseInt(v, 10) || 30; renderChannelReport(); }
+function chSetSearch(v) { _chRep.search = String(v || '').toLowerCase(); chRenderReport(); }
+
+function chRenderReport() {
+  const d = _chRep.data;
+  if (!d) return;
+
+  const channels = d.channels || [];
+  const CH_ICON = { Phone:'📞', WhatsApp:'💬', Superphone:'⚡', Email:'✉️', Other:'🔹', 'Not Recorded':'❔' };
+  const CH_COLOR = { Phone:'var(--green)', WhatsApp:'#25D366', Superphone:'var(--secondary)',
+                     Email:'var(--teal)', Other:'var(--text-muted)', 'Not Recorded':'var(--border)' };
+
+  const recorded = channels.filter(c => c.channel !== 'Not Recorded');
+  const best = recorded.slice().sort((a,b) => b.connectRate - a.connectRate)[0];
+  const most = recorded.slice().sort((a,b) => b.connected - a.connected)[0];
+  const maxTotal = Math.max(...channels.map(c => c.total), 1);
+
+  // ── clients table (search filter) ──
+  let clients = d.clients || [];
+  if (_chRep.search) {
+    clients = clients.filter(c =>
+      String(c.clientName || '').toLowerCase().includes(_chRep.search) ||
+      String(c.clientCode || '').toLowerCase().includes(_chRep.search));
+  }
+
+  const chOrder = ['Phone','WhatsApp','Superphone','Email','Other'];
+
+  document.getElementById('page-content').innerHTML =
+    // ── header + period filter ──
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Channel Performance Report</span>'
+    + '<select class="form-control" style="max-width:170px;font-size:13px;" onchange="chSetDays(this.value)">'
+    + [7,15,30,60,90].map(n => '<option value="'+n+'"'+(n===_chRep.days?' selected':'')+'>Last '+n+' days</option>').join('')
+    + '</select></div>'
+    + '<div class="card-body">'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">'
+    + 'Total <strong>' + (d.totalCalls || 0) + '</strong> contacts in last ' + d.days + ' days. '
+    + 'Connect rate = kitne percent contacts me seller actually connect hua.</div>'
+
+    // ── KPI cards ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
+    + chKpi('🏆 Best Connect Rate', best ? (CH_ICON[best.channel]||'') + ' ' + best.channel : '—',
+            best ? best.connectRate + '% connect' : 'data nahi')
+    + chKpi('📈 Most Connections', most ? (CH_ICON[most.channel]||'') + ' ' + most.channel : '—',
+            most ? most.connected + ' connected' : 'data nahi')
+    + chKpi('📞 Total Contacts', String(d.totalCalls || 0), 'last ' + d.days + ' days')
+    + chKpi('👥 Clients Touched', String((d.clients || []).length), 'unique sellers')
+    + '</div>'
+
+    // ── channel bars ──
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">Channel-wise Breakdown</div>'
+    + (channels.length
+        ? channels.map(c => {
+            const w = Math.round(c.total / maxTotal * 100);
+            const cw = c.total ? Math.round(c.connected / c.total * 100) : 0;
+            return '<div style="margin-bottom:12px;">'
+              + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'
+              + '<span style="font-weight:600;">' + (CH_ICON[c.channel]||'') + ' ' + crmEsc(c.channel) + '</span>'
+              + '<span style="color:var(--text-muted);">' + c.connected + '/' + c.total
+              + ' connected · <strong style="color:' + (c.connectRate >= 60 ? 'var(--green)' : c.connectRate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
+              + c.connectRate + '%</strong> · ' + c.uniqueClients + ' clients</span></div>'
+              + '<div style="height:14px;background:var(--border);border-radius:7px;overflow:hidden;position:relative;">'
+              + '<div style="height:100%;width:' + w + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';opacity:0.25;"></div>'
+              + '<div style="height:100%;width:' + Math.round(w * cw / 100) + '%;background:' + (CH_COLOR[c.channel]||'var(--secondary)') + ';position:absolute;top:0;left:0;"></div>'
+              + '</div></div>';
+          }).join('')
+        : '<div style="color:var(--text-muted);font-size:13px;">Abhi koi data nahi. Calls log karo channel select karke.</div>')
+    + '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;">'
+    + 'Solid bar = connected · Light bar = total attempts</div>'
+    + '</div></div>'
+
+    // ── per-client table ──
+    + '<div class="card">'
+    + '<div class="card-header"><span class="card-title">👥 Client-wise Best Channel</span>'
+    + '<input type="text" class="form-control" placeholder="Seller search..." style="max-width:200px;font-size:13px;" '
+    +   'value="' + crmEsc(_chRep.search) + '" oninput="chSetSearch(this.value)"></div>'
+    + '<div class="card-body" style="padding:0;">'
+    + (clients.length
+        ? '<div class="table-wrap"><table><thead><tr><th>Seller</th><th>Total</th>'
+          + chOrder.map(ch => '<th>' + (CH_ICON[ch]||'') + ' ' + ch + '</th>').join('')
+          + '<th>Best Channel</th></tr></thead><tbody>'
+          + clients.slice(0, 100).map(c =>
+              '<tr>'
+              + '<td><strong>' + crmEsc(c.clientName || c.clientCode) + '</strong><br>'
+              + '<span style="font-size:10px;color:var(--text-muted);">' + crmEsc(c.clientCode) + '</span></td>'
+              + '<td>' + c.total + '</td>'
+              + chOrder.map(ch => {
+                  const b = c.byChannel?.[ch];
+                  if (!b) return '<td style="color:var(--border);">—</td>';
+                  const rate = b.total ? Math.round(b.connected / b.total * 100) : 0;
+                  return '<td style="font-size:12px;">' + b.connected + '/' + b.total
+                    + '<br><span style="font-size:10px;color:' + (rate >= 60 ? 'var(--green)' : rate >= 35 ? 'var(--amber)' : 'var(--red)') + ';">'
+                    + rate + '%</span></td>';
+                }).join('')
+              + '<td>' + (c.bestChannel !== '-'
+                  ? '<span class="badge badge-green">' + (CH_ICON[c.bestChannel]||'') + ' ' + crmEsc(c.bestChannel) + '</span>'
+                    + '<br><span style="font-size:10px;color:var(--text-muted);">' + c.bestRate + '% rate</span>'
+                  : '<span style="color:var(--text-muted);">—</span>') + '</td>'
+              + '</tr>').join('')
+          + '</tbody></table></div>'
+          + (clients.length > 100 ? '<div style="padding:8px;font-size:11px;color:var(--text-muted);text-align:center;">Showing first 100 of ' + clients.length + '</div>' : '')
+        : '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Koi client data nahi mila.</div>')
+    + '</div></div>';
+}
+
+function chKpi(label, value, sub) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:15px;font-weight:700;">' + value + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// FEEDBACK — screenshot upload with 96-day unique check
+// Target: 5 unique feedback per month per executive
+// ══════════════════════════════════════════════════════════════════
+let _fb = { file: null, preview: null, result: null, busy: false };
+
+const FB_LEAD_ROLES_UI = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+
+async function renderFeedback() {
+  const isLead = FB_LEAD_ROLES_UI.includes(APP.user?.role);
+
+  const [clients, progress, recent, board] = await Promise.all([
+    getClients(),
+    api('GET', '/feedback/progress?_=' + Date.now()),
+    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+    isLead ? api('GET', '/feedback/leaderboard?_=' + Date.now()) : Promise.resolve(null),
+  ]);
+  if (clients) APP.clients = clients;
+
+  // Sirf registered + active sellers (manual entry nahi)
+  const list = (APP.clients || []).filter(c => {
+    const st = String(c.status || '').toLowerCase();
+    return !st.includes('inactive') && !st.includes('closed') && !st.includes('churn');
+  });
+
+  _fb = { file: null, preview: null, result: null, busy: false };
+
+  const p = progress || { target: 5, mine: 0, team_total: 0, flagged_dup: 0 };
+  const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
+  const doneCol = (p.mine || 0) >= (p.target || 5) ? 'var(--green)' : 'var(--amber)';
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">⭐ Feedback Upload</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + (p.target || 5)
+    + ' unique/month · 96-day unique check</span></div>'
+    + '<div class="card-body">'
+
+    // ── KPI ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">'
+    + fbKpi('Aapke unique (is month)', (p.mine || 0) + ' / ' + (p.target || 5), pct + '% complete', doneCol)
+    + fbKpi('Team total', String(p.team_total || 0), 'unique this month')
+    + fbKpi('Duplicate flagged', String(p.flagged_dup || 0), 'count nahi hue', 'var(--red)')
+    + fbKpi('Sellers available', String(list.length), 'registered')
+    + '</div>'
+
+    // progress bar
+    + '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:16px;">'
+    + '<div style="height:100%;width:' + pct + '%;background:' + doneCol + ';transition:width .3s;"></div></div>'
+
+    // ── upload form ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">'
+
+    // left: dropzone
+    + '<div>'
+    + '<label style="font-weight:700;font-size:12px;display:block;margin-bottom:6px;">Feedback screenshot (Amazon panel se)</label>'
+    + '<div id="fb-drop" style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;" '
+    +   'onclick="document.getElementById(\'fb-file\').click()" '
+    +   'ondragover="event.preventDefault()" ondrop="fbDrop(event)">'
+    + '<div id="fb-drop-inner">'
+    + '<div style="font-size:34px;margin-bottom:6px;">🖼️</div>'
+    + '<div style="font-weight:700;font-size:13px;">Click karo ya image drag karo</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">JPG / PNG · max 10MB</div>'
+    + '</div></div>'
+    + '<input type="file" id="fb-file" accept="image/*" style="display:none;" onchange="fbPick(this.files[0])">'
+    + '<div id="fb-result" style="margin-top:10px;"></div>'
+    + '</div>'
+
+    // right: fields
+    + '<div>'
+    + '<div class="form-group"><label style="font-weight:700;">Seller * <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(registered only)</span></label>'
+    + '<select class="form-control" id="fb-client">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + list.map(c => '<option value="' + fbEsc(c.clientCode) + '">' + fbEsc(c.busyName)
+        + ' (' + fbEsc(c.clientCode) + ')</option>').join('')
+    + '</select></div>'
+    + '<div class="form-group"><label style="font-weight:700;">Feedback type</label>'
+    + '<select class="form-control" id="fb-type">'
+    + '<option>Product feedback</option><option>Seller rating</option><option>Service feedback</option>'
+    + '</select></div>'
+    + '<div class="form-group"><label style="font-weight:700;">Note (optional)</label>'
+    + '<input type="text" class="form-control" id="fb-note" placeholder="e.g. 5★ on packaging"></div>'
+    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;" onclick="fbSubmit()">Upload &amp; Check</button>'
+    + '</div>'
+
+    + '</div></div></div>'
+
+    + (board ? fbLeaderboardHtml(board) : '')
+    + '<div id="fb-recent">' + fbRecentHtml(recent || []) + '</div>';
+}
+
+function fbEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fbKpi(label, value, sub, color) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:20px;font-weight:800;' + (color ? 'color:' + color + ';' : '') + '">' + value + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
+}
+
+// ─── FILE PICK ────────────────────────────────────────────────────
+function fbDrop(e) {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0];
+  if (f) fbPick(f);
+}
+
+function fbPick(f) {
+  if (!f) return;
+  if (!String(f.type || '').startsWith('image/')) { showToast('Sirf image file chalegi', 'error'); return; }
+  if (f.size > 10 * 1024 * 1024) { showToast('Image 10MB se choti honi chahiye', 'error'); return; }
+
+  _fb.file = f;
+  _fb.result = null;
+  document.getElementById('fb-result').innerHTML = '';
+
+  const drop = document.getElementById('fb-drop');
+  const inner = document.getElementById('fb-drop-inner');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    inner.innerHTML =
+      '<img src="' + ev.target.result + '" style="max-height:200px;max-width:100%;border-radius:8px;object-fit:contain;">'
+      + '<div style="margin-top:6px;font-size:12px;color:var(--green);font-weight:600;">✓ ' + fbEsc(f.name) + '</div>';
+  };
+  reader.readAsDataURL(f);
+  drop.style.borderColor = 'var(--green)';
+  drop.style.background = '#f0fff4';
+}
+
+// ─── SUBMIT ───────────────────────────────────────────────────────
+async function fbSubmit() {
+  if (_fb.busy) return;
+
+  const clientSel = document.getElementById('fb-client');
+  const clientCode = clientSel.value;
+  if (!clientCode) { showToast('Pehle seller select karo!', 'error'); return; }
+  if (!_fb.file) { showToast('Screenshot choose karo!', 'error'); return; }
+
+  const clientName = clientSel.options[clientSel.selectedIndex]?.text?.split(' (')[0] || '';
+  const btn = document.getElementById('fb-submit');
+  _fb.busy = true;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+
+  try {
+    const fd = new FormData();
+    fd.append('image', _fb.file);
+    fd.append('clientCode', clientCode);
+    fd.append('clientName', clientName);
+    fd.append('fbType', document.getElementById('fb-type').value);
+    fd.append('note', document.getElementById('fb-note').value || '');
+
+    const resp = await fetch('/api/feedback/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (typeof TOKEN !== 'undefined' && TOKEN
+        ? TOKEN
+        : (localStorage.getItem('en_token') || localStorage.getItem('enewcleus_token') || '')) },
+      body: fd,
+    });
+    const r = await resp.json();
+
+    const box = document.getElementById('fb-result');
+    if (!resp.ok || r.error) {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--red);">⚠️ ' + fbEsc(r.error || 'Upload fail') + '</div></div>';
+    } else if (r.unique) {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--green);background:#f0fff4;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--green);">✅ Unique — counted!</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">'
+        + fbEsc(r.sellerName) + ' — last feedback: '
+        + (r.daysSince == null ? 'kabhi nahi' : r.daysSince + ' din pehle')
+        + '. 96-day window ke bahar, isliye target me add ho gaya.</div></div>';
+      fbResetForm();
+      fbRefresh();
+    } else {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--red);">⛔ Duplicate — count nahi hoga</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">'
+        + fbEsc(r.sellerName) + ' ka feedback <strong>' + r.daysSince + ' din pehle</strong> aa chuka hai '
+        + '(96-day window ke andar). Record ho gaya par target me count nahi hoga.</div></div>';
+      fbRefresh();
+    }
+  } catch (e) {
+    document.getElementById('fb-result').innerHTML =
+      '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;color:var(--red);font-size:13px;">'
+      + '⚠️ ' + fbEsc(e.message) + '</div>';
+  } finally {
+    _fb.busy = false;
+    btn.disabled = false;
+    btn.textContent = 'Upload & Check';
+  }
+}
+
+function fbResetForm() {
+  _fb.file = null;
+  document.getElementById('fb-file').value = '';
+  document.getElementById('fb-note').value = '';
+  const drop = document.getElementById('fb-drop');
+  drop.style.borderColor = 'var(--border)';
+  drop.style.background = '#fff';
+  document.getElementById('fb-drop-inner').innerHTML =
+    '<div style="font-size:34px;margin-bottom:6px;">🖼️</div>'
+    + '<div style="font-weight:700;font-size:13px;">Click karo ya image drag karo</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">JPG / PNG · max 10MB</div>';
+}
+
+async function fbRefresh() {
+  const [progress, recent] = await Promise.all([
+    api('GET', '/feedback/progress?_=' + Date.now()),
+    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+  ]);
+  if (recent) {
+    const el = document.getElementById('fb-recent');
+    if (el) el.innerHTML = fbRecentHtml(recent);
+  }
+  // KPI update — simplest: page reload without full re-render
+  if (progress) {
+    const p = progress;
+    const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
+    const kpis = document.querySelectorAll('#page-content .card-body > div:first-child > div');
+    if (kpis[0]) {
+      const v = kpis[0].querySelector('div:nth-child(2)');
+      const s = kpis[0].querySelector('div:nth-child(3)');
+      if (v) v.textContent = (p.mine || 0) + ' / ' + (p.target || 5);
+      if (s) s.textContent = pct + '% complete';
+    }
+    if (kpis[1]) { const v = kpis[1].querySelector('div:nth-child(2)'); if (v) v.textContent = String(p.team_total || 0); }
+    if (kpis[2]) { const v = kpis[2].querySelector('div:nth-child(2)'); if (v) v.textContent = String(p.flagged_dup || 0); }
+    const bar = document.querySelector('#page-content .card-body > div[style*="height:10px"] > div');
+    if (bar) bar.style.width = pct + '%';
+  }
+}
+
+// ─── RECENT UPLOADS ───────────────────────────────────────────────
+function fbRecentHtml(rows) {
+  if (!rows.length) {
+    return '<div class="card"><div class="card-header"><span class="card-title">🕐 Recent Uploads</span></div>'
+      + '<div class="card-body"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">'
+      + 'Abhi koi upload nahi.</div></div></div>';
+  }
+  return '<div class="card">'
+    + '<div class="card-header"><span class="card-title">🕐 Recent Uploads</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Last ' + rows.length + '</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+    + '<thead><tr><th>#</th><th>Seller</th><th>Type</th><th>Uploaded By</th><th>Status</th><th>Date</th><th>Shot</th></tr></thead><tbody>'
+    + rows.map((r, i) => {
+        const d = new Date(r.createdAt);
+        return '<tr>'
+          + '<td>' + (i + 1) + '</td>'
+          + '<td><strong>' + fbEsc(r.clientName || r.clientCode) + '</strong><br>'
+          + '<span style="font-size:10px;color:var(--text-muted);">' + fbEsc(r.clientCode) + '</span></td>'
+          + '<td style="font-size:12px;">' + fbEsc(r.fbType || '—') + '</td>'
+          + '<td><span style="font-size:12px;">' + fbEsc(r.uploadedBy) + '</span><br>'
+          + '<span style="font-size:10px;color:var(--text-muted);">' + fbEsc(r.uploadedByRole || '') + '</span></td>'
+          + '<td>' + (r.isUnique
+              ? '<span class="badge badge-green">Unique</span>'
+              : '<span class="badge badge-red">Duplicate (' + r.daysSince + 'd)</span>') + '</td>'
+          + '<td style="font-size:12px;">' + d.toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})
+          + '<br><span style="color:var(--text-muted);">' + d.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) + '</span></td>'
+          + '<td>' + (r.url
+              ? '<a href="' + fbEsc(r.url) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="text-decoration:none;padding:4px 10px;">👁 View</a>'
+              : '<span style="color:var(--text-muted);font-size:11px;">—</span>') + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div></div></div>';
+}
+
+// ─── LEADERBOARD (leads only) ─────────────────────────────────────
+function fbLeaderboardHtml(board) {
+  const rows = board.executives || [];
+  if (!rows.length) return '';
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🏆 Monthly Leaderboard</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + board.target + ' unique/executive</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+    + '<thead><tr><th>#</th><th>Executive</th><th>Role</th><th>Unique</th><th>Duplicate</th><th>Progress</th></tr></thead><tbody>'
+    + rows.map((e, i) =>
+        '<tr>'
+        + '<td>' + (i + 1) + '</td>'
+        + '<td><strong>' + fbEsc(e.name) + '</strong></td>'
+        + '<td style="font-size:12px;color:var(--text-muted);">' + fbEsc(e.role) + '</td>'
+        + '<td><span class="badge badge-' + (e.achieved ? 'green' : 'amber') + '">' + e.unique + '</span></td>'
+        + '<td style="color:var(--text-muted);">' + e.duplicate + '</td>'
+        + '<td style="min-width:120px;">'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+        + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + Math.min(100, e.pct) + '%;background:' + (e.achieved ? 'var(--green)' : 'var(--amber)') + ';"></div></div>'
+        + '<span style="font-size:11px;font-weight:700;">' + e.unique + '/' + e.target + '</span>'
+        + '</div></td>'
+        + '</tr>').join('')
+    + '</tbody></table></div></div></div>';
+}
+
 
 // ══════════════════════════════════════════════════════════════════
 // FLIPKART SELLER ANALYZER  —  Business + Ads (ek page)
@@ -13069,7 +13391,6 @@ function fkPdfTable(doc, y, headers, rows, widths, M, W, accent) {
   });
   return y;
 }
-
 
 
 // ══════════════════════════════════════════════════════════════════

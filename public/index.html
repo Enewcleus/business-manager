@@ -11629,6 +11629,244 @@ function gcVerdictFlipkart(M, returns, wf, N) {
   return L;
 }
 
+// ─── PRECISE FORMATTING (rates/ratios ko round mat karo) ──────────
+function gcMoney(v) {
+  const a = Math.abs(v || 0);
+  if (a >= 1e5) return gcFmt(v);                       // 1L+ pe short form
+  return (v < 0 ? '-' : '') + Math.round(a).toLocaleString('en-IN');
+}
+function gcFmtBy(kind, v) {
+  if (v == null || !isFinite(v)) return '—';
+  switch (kind) {
+    case 'money':  return '₹' + gcMoney(v);
+    case 'money2': return '₹' + (Math.round(v * 100) / 100).toFixed(2);
+    case 'rate':   return (Math.round(v * 100) / 100).toFixed(2) + '%';
+    case 'ratio':  return (Math.round(v * 100) / 100).toFixed(2) + 'x';
+    default:       return gcMoney(v);
+  }
+}
+function gcChgStr(d) {
+  if (d.flat) return '0';
+  return (d.diff > 0 ? '+' : '') + (d.isPct ? d.diff.toFixed(2) + ' pts' : d.pct + '%');
+}
+
+// ─── SINGLE SOURCE OF TRUTH for metric tables (screen/PDF/Excel) ──
+function gcMetricSpec(R) {
+  const M = R.M, isAmz = R.mp === 'amazon';
+  // DRR on ho to sirf count/money metrics per-day hote hain; rates/ratios nahi
+  const perDay = !!(R.N && R.N.on);
+  const S = (label, d, kind, goodUp) => {
+    kind = kind || 'int';
+    const scaled = perDay && (kind === 'int' || kind === 'money');
+    return { label: label + (scaled ? ' (per day)' : ''), d, kind,
+             goodUp: goodUp !== false, perDay: scaled };
+  };
+  return {
+    vis: isAmz
+      ? [S('Sessions', M.sessions), S('Page Views', M.views), S('Impressions', M.impr),
+         S('Clicks', M.clicks), S('CTR', M.ctr, 'rate')]
+      : [S('Ad Views', M.views), S('Clicks', M.clicks), S('CTR', M.ctr, 'rate'),
+         S('CPC', M.cpc, 'money2', false)],
+    sales: isAmz
+      ? [S('Total Sales', M.sales, 'money'), S('Units', M.units), S('Conversion Rate', M.cvr, 'rate'),
+         S('AOV', M.aov, 'money2'), S('Organic Sales', M.organic, 'money')]
+      : [S('Gross Sales', M.gross, 'money'), S('Net Earnings', M.net, 'money'), S('Margin', M.margin, 'rate'),
+         S('Units', M.units), S('AOV', M.aov, 'money2'), S('Organic Sales', M.organic, 'money')],
+    ads: isAmz
+      ? [S('Ad Spend', M.spend, 'money', false), S('Ad Sales', M.adSales, 'money'),
+         S('ACOS', M.acos, 'rate', false), S('ROAS', M.roas, 'ratio'),
+         S('TACOS', M.tacos, 'rate', false), S('CPC', M.cpc, 'money2', false)]
+      : [S('Ad Spend', M.spend, 'money', false), S('Ad Revenue', M.adRev, 'money'),
+         S('Direct Revenue', M.dRev, 'money'), S('Total ROI', M.roi, 'ratio'),
+         S('Direct ROI', M.dRoi, 'ratio'), S('TACOS', M.tacos, 'rate', false)],
+    opt: [].concat(
+      R.wasted  ? [S('Wasted Ad Spend', R.wasted, 'money', false)] : [],
+      R.returns ? [S('Returns', R.returns, R.returns.isPct ? 'rate' : 'int', false)] : [],
+      R.orders  ? [S('Orders', R.orders)] : []),
+  };
+}
+
+// ─── ACTION PLAN — top 20 items, week vs month ────────────────────
+function gcActionPlan(R) {
+  const N = R.N, isAmz = R.mp === 'amazon';
+  const sc = (v, side) => N.on ? v * (side === 'A' ? N.fA : N.fB) : v;
+
+  const items = (R.asins.all || []).filter(x => (x.aSalesN + x.bSalesN) > 0);
+  // business impact ke hisaab se rank — jitna bada change, utna upar
+  items.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const top = items.slice(0, 20);
+
+  const out = [];
+  for (const x of top) {
+    const sA = sc(x.aSess, 'A'), sB = sc(x.bSess, 'B');
+    const uA = sc(x.aUnits, 'A'), uB = sc(x.bUnits, 'B');
+    const cvrA = x.aSess ? x.aUnits / x.aSess : 0;
+    const cvrB = x.bSess ? x.bUnits / x.bSess : 0;
+    const sessDrop = sA > 0 && sB < sA * 0.9;
+    const sessRise = sA > 0 && sB > sA * 1.1;
+    const cvrDrop  = cvrA > 0 && cvrB < cvrA * 0.9;
+    const cvrRise  = cvrA > 0 && cvrB > cvrA * 1.1;
+    const pct = x.pct;
+
+    let when = 'month', tag = '', why = '', act = '';
+
+    if (x.bSalesN === 0 && x.aSalesN > 0) {
+      when = 'week'; tag = '🚨 Sale band';
+      why = 'Pichhle period me ' + gcFmtBy('money', x.aSalesN) + ' ki sale thi, ab zero.';
+      act = 'Turant check karo — stock out hai, listing suppress hui, ya Buy Box gaya. Listing status aur inventory dekho.';
+    } else if (isAmz && sB > 0 && uB === 0 && uA > 0) {
+      when = 'week'; tag = '🚨 Traffic hai, sale nahi';
+      why = 'Sessions ' + Math.round(sB) + ' aa rahe hain par ek bhi unit nahi bika.';
+      act = 'Buy Box, price aur stock check karo. Competitor ne price gira diya ho sakta hai.';
+    } else if (pct <= -25 && sessDrop && (!isAmz || cvrB >= cvrA * 0.9)) {
+      when = 'week'; tag = '📉 Visibility gir gayi';
+      why = 'Sale ' + pct + '%' + (isAmz ? ', sessions ' + Math.round(sA) + ' → ' + Math.round(sB) : '')
+          + '. Conversion theek hai — sirf traffic kam hua.';
+      act = 'Keyword ranking check karo. Is ASIN ko alag campaign do, top keywords pe bid badhao, aur backend search terms refresh karo.';
+    } else if (pct <= -25 && cvrDrop) {
+      when = 'week'; tag = '📉 Convert nahi ho raha';
+      why = 'Sale ' + pct + '%, conversion ' + (cvrA * 100).toFixed(2) + '% → ' + (cvrB * 100).toFixed(2) + '%'
+          + '. Traffic theek hai par khareed nahi rahe.';
+      act = 'Listing audit karo — main image, A+ content, title, bullet points, price aur recent reviews. Competitor se price compare karo.';
+    } else if (pct <= -10) {
+      when = 'month'; tag = '⚠️ Halki girawat';
+      why = 'Sale ' + pct + '% gir gayi (' + gcFmtBy('money', x.aSalesN) + ' → ' + gcFmtBy('money', x.bSalesN) + ').';
+      act = 'Nazar rakho. Agle 2 hafte me ' + (sessDrop ? 'keywords aur bids' : 'listing content') + ' pe kaam karo.';
+    } else if (x.aSalesN === 0 && x.bSalesN > 0) {
+      when = 'month'; tag = '🆕 Naya launch';
+      why = 'Naya ASIN, pehle period me sale nahi thi, ab ' + gcFmtBy('money', x.bSalesN) + '.';
+      act = 'Launch phase me hai — review generation aur keyword indexing pe focus karo.';
+    } else if (pct >= 25 && (cvrRise || sessRise)) {
+      when = 'month'; tag = '🚀 Winner — scale karo';
+      why = 'Sale +' + pct + '% badhi' + (sessRise ? ', traffic bhi badha' : ', conversion improve hui') + '.';
+      act = 'Budget badhao. Related keywords expand karo, aur is ASIN ke variations/bundles pe bhi push do.';
+    } else if (pct >= 10) {
+      when = 'month'; tag = '📈 Achha chal raha';
+      why = 'Sale +' + pct + '% (' + gcFmtBy('money', x.aSalesN) + ' → ' + gcFmtBy('money', x.bSalesN) + ').';
+      act = 'Momentum banaye rakho — stock kaafi rakho aur bid stable rakho.';
+    } else {
+      when = 'month'; tag = '➖ Stable';
+      why = 'Sale lagbhag same (' + (pct > 0 ? '+' : '') + pct + '%).';
+      act = 'Koi urgent kaam nahi. Monthly review me dobara dekho.';
+    }
+
+    out.push({ id: x.id, title: x.title, when, tag, why, act,
+               aSales: x.aSalesN, bSales: x.bSalesN, pct, sA, sB, cvrA, cvrB });
+  }
+  return { week: out.filter(o => o.when === 'week'), month: out.filter(o => o.when === 'month'), all: out };
+}
+
+// ─── PDF ke liye offscreen high-res charts ────────────────────────
+async function gcChartImages() {
+  const R = _gc.result;
+  if (!R || typeof Chart === 'undefined') return null;
+
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1100px;background:#fff;';
+  document.body.appendChild(host);
+
+  const made = [];
+  const mk = (w, h) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'width:' + w + 'px;height:' + h + 'px;background:#fff;';
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    wrap.appendChild(c); host.appendChild(wrap);
+    return c;
+  };
+  const base = { responsive:false, animation:false, devicePixelRatio:2 };
+  const GOLD='#C9A25A', DARK='#2D3440', GREEN='#46A05A', RED='#C84646', BLUE='#2980b9', GREY='#B9C2CC';
+  const M = R.M, isAmz = R.mp === 'amazon';
+
+  try {
+    // 1. grouped bar
+    const barM = isAmz
+      ? [['Sessions',M.sessions],['Sales',M.sales],['Units',M.units],['Ad Spend',M.spend],['Ad Sales',M.adSales],['Clicks',M.clicks]]
+      : [['Gross Sales',M.gross],['Net Earn',M.net],['Units',M.units],['Ad Spend',M.spend],['Ad Revenue',M.adRev],['Clicks',M.clicks]];
+    made.push(new Chart(mk(1000, 480), {
+      type:'bar',
+      data:{ labels: barM.map(m=>m[0]), datasets:[
+        { label:'Period A', data: barM.map(m=>Math.round(m[1].a)), backgroundColor:GREY, borderRadius:4 },
+        { label:'Period B', data: barM.map(m=>Math.round(m[1].b)), backgroundColor:GOLD, borderRadius:4 }]},
+      options:{ ...base, plugins:{ legend:{position:'bottom',labels:{font:{size:15}}} },
+        scales:{ y:{ beginAtZero:true, ticks:{ font:{size:13}, callback:v=>gcFmt(v) } },
+                 x:{ ticks:{ font:{size:13} } } } },
+    }));
+
+    // 2. waterfall
+    const wf = R.wf;
+    const wLbl = isAmz ? ['Traffic','Conversion','AOV','Net Change'] : ['Units','—','AOV','Net Change'];
+    const wVal = isAmz ? [wf.trafficEff, wf.cvrEff, wf.aovEff, wf.total] : [wf.trafficEff, 0, wf.aovEff, wf.total];
+    made.push(new Chart(mk(1000, 480), {
+      type:'bar',
+      data:{ labels:wLbl, datasets:[{ data: wVal.map(v=>Math.round(v)),
+        backgroundColor: wVal.map((v,i)=> i===3 ? (v>=0?DARK:RED) : (v>=0?GREEN:RED)), borderRadius:4 }]},
+      options:{ ...base, plugins:{ legend:{display:false} },
+        scales:{ y:{ ticks:{ font:{size:13}, callback:v=>gcFmt(v) } }, x:{ ticks:{ font:{size:14} } } } },
+    }));
+
+    // 3+4. pies
+    ['A','B'].forEach(side => {
+      const s = R.split[side];
+      made.push(new Chart(mk(480, 420), {
+        type:'doughnut',
+        data:{ labels:['Ad-driven','Organic'], datasets:[{ data:[Math.round(s.ad),Math.round(s.organic)],
+          backgroundColor:[GOLD,BLUE], borderWidth:0 }]},
+        options:{ ...base, plugins:{ legend:{position:'bottom',labels:{font:{size:14}}} } },
+      }));
+    });
+
+    await new Promise(r => setTimeout(r, 300));
+    const imgs = {
+      bar:  made[0].canvas.toDataURL('image/png'),
+      wf:   made[1].canvas.toDataURL('image/png'),
+      pieA: made[2].canvas.toDataURL('image/png'),
+      pieB: made[3].canvas.toDataURL('image/png'),
+    };
+    return imgs;
+  } catch (e) {
+    console.error('chart image error', e);
+    return null;
+  } finally {
+    made.forEach(c => { try { c.destroy(); } catch (e) {} });
+    host.remove();
+  }
+}
+
+// ─── ACTION PLAN — screen HTML ────────────────────────────────────
+function gcActionHtml(plan, isAmz) {
+  if (!plan.all.length) return '';
+  const lbl = isAmz ? 'ASIN' : 'SKU';
+  const group = (list, title, colour, sub) =>
+    '<div style="margin-bottom:16px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+    + '<span style="font-weight:800;font-size:13px;color:' + colour + ';">' + title + '</span>'
+    + '<span class="badge" style="background:' + colour + ';color:#fff;">' + list.length + ' ' + lbl + '</span>'
+    + '<span style="font-size:11px;color:var(--text-muted);">' + sub + '</span></div>'
+    + (list.length
+        ? list.map(o =>
+            '<div style="border-left:3px solid ' + colour + ';background:var(--bg);border-radius:0 7px 7px 0;padding:9px 11px;margin-bottom:7px;">'
+            + '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:3px;">'
+            + '<strong style="font-size:12px;">' + gcEsc(o.id) + '</strong>'
+            + '<span style="font-size:11px;font-weight:700;color:' + (o.pct >= 0 ? 'var(--green)' : 'var(--red)') + ';">'
+            + (o.pct >= 0 ? '+' : '') + o.pct + '%</span>'
+            + '<span style="font-size:10px;color:var(--text-muted);">' + o.tag + '</span></div>'
+            + (o.title ? '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + gcEsc(o.title.slice(0,60)) + '</div>' : '')
+            + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">' + gcEsc(o.why) + '</div>'
+            + '<div style="font-size:11.5px;font-weight:600;">👉 ' + gcEsc(o.act) + '</div>'
+            + '</div>').join('')
+        : '<div style="font-size:12px;color:var(--text-muted);padding:8px;">Is bucket me kuch nahi — achhi baat hai.</div>')
+    + '</div>';
+
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🗓️ Kaam Ki List — Top 20 ' + lbl + '</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">business impact ke hisaab se sorted</span></div>'
+    + '<div class="card-body">'
+    + group(plan.week, '🔥 IS HAFTE', 'var(--red)', 'urgent — abhi dekho')
+    + group(plan.month, '📅 IS MAHINE', 'var(--secondary)', 'plan karke karo')
+    + '</div></div>';
+}
+
 // ─── RESULTS RENDER ───────────────────────────────────────────────
 function gcDestroyCharts() {
   Object.values(_gc.charts || {}).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -11649,7 +11887,7 @@ function gcDeltaCard(label, d, opts) {
     + '<span style="font-size:11px;color:var(--text-muted);">se pehle ' + fmt(d.a) + '</span>'
     + '</div>'
     + '<div style="font-size:12px;font-weight:700;color:' + col + ';margin-top:3px;">'
-    + (d.flat ? '→ koi change nahi' : (d.up?'▲':'▼') + ' ' + sign + (d.isPct ? (d.diff).toFixed(1) + ' pts' : d.pct + '%'))
+    + (d.flat ? '→ koi change nahi' : (d.up?'▲':'▼') + ' ' + gcChgStr(d).replace(/^\+/, '+'))
     + '</div></div>';
 }
 
@@ -11668,7 +11906,8 @@ function gcRenderResults() {
 
   if (R.N.on) {
     html += '<div style="padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:12px;">'
-      + '⚠️ Period alag the (A: ' + R.N.dA + ' din, B: ' + R.N.dB + ' din) — saare numbers <strong>per-day average</strong> pe compare kiye gaye hain.</div>';
+      + '⚠️ Period alag lambai ke the (A: ' + R.N.dA + ' din, B: ' + R.N.dB + ' din) — Sessions, Sales, Spend jaise numbers '
+      + '<strong>per-day average</strong> hain, poore period ka total nahi. ACOS, CTR, conversion jaise rates waise ke waise hain.</div>';
   }
 
   // ── KPI blocks ──
@@ -11678,31 +11917,31 @@ function gcRenderResults() {
     + (isAmz
         ? gcDeltaCard('SESSIONS', M.sessions) + gcDeltaCard('PAGE VIEWS', M.views)
           + gcDeltaCard('IMPRESSIONS', M.impr) + gcDeltaCard('CLICKS', M.clicks)
-          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'})
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>gcFmtBy('rate',v)})
         : gcDeltaCard('AD VIEWS', M.views) + gcDeltaCard('CLICKS', M.clicks)
-          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v}))
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>gcFmtBy('money2',v)}))
     + '</div>';
 
   html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">💰 Sales</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
     + (isAmz
         ? gcDeltaCard('TOTAL SALES', M.sales, {fmt:gcR}) + gcDeltaCard('UNITS', M.units)
-          + gcDeltaCard('CONVERSION', M.cvr, {fmt:v=>v+'%'}) + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v})
+          + gcDeltaCard('CONVERSION', M.cvr, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('AOV', M.aov, {fmt:v=>gcFmtBy('money2',v)})
           + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR})
         : gcDeltaCard('GROSS SALES', M.gross, {fmt:gcR}) + gcDeltaCard('NET EARNINGS', M.net, {fmt:gcR})
-          + gcDeltaCard('MARGIN', M.margin, {fmt:v=>v+'%'}) + gcDeltaCard('UNITS', M.units)
-          + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v}) + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR}))
+          + gcDeltaCard('MARGIN', M.margin, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('UNITS', M.units)
+          + gcDeltaCard('AOV', M.aov, {fmt:v=>gcFmtBy('money2',v)}) + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR}))
     + '</div>';
 
   html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">📢 Ads Performance</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
     + (isAmz
         ? gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD SALES', M.adSales, {fmt:gcR})
-          + gcDeltaCard('ACOS', M.acos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('ROAS', M.roas, {fmt:v=>v+'x'})
-          + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v})
+          + gcDeltaCard('ACOS', M.acos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('ROAS', M.roas, {fmt:v=>gcFmtBy('ratio',v)})
+          + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>gcFmtBy('money2',v)})
         : gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD REVENUE', M.adRev, {fmt:gcR})
-          + gcDeltaCard('DIRECT REVENUE', M.dRev, {fmt:gcR}) + gcDeltaCard('TOTAL ROI', M.roi, {fmt:v=>v+'x'})
-          + gcDeltaCard('DIRECT ROI', M.dRoi, {fmt:v=>v+'x'}) + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}))
+          + gcDeltaCard('DIRECT REVENUE', M.dRev, {fmt:gcR}) + gcDeltaCard('TOTAL ROI', M.roi, {fmt:v=>gcFmtBy('ratio',v)})
+          + gcDeltaCard('DIRECT ROI', M.dRoi, {fmt:v=>gcFmtBy('ratio',v)}) + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}))
     + '</div>';
 
   // optimization block
@@ -11753,6 +11992,8 @@ function gcRenderResults() {
     }
     html += '</div>';
   }
+
+  html += gcActionHtml(gcActionPlan(R), isAmz);
 
   document.getElementById('gc-results').innerHTML = html;
   setTimeout(gcDrawCharts, 60);
@@ -11857,48 +12098,36 @@ function gcDrawCharts() {
 }
 
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────
+// ─── EXCEL EXPORT ─────────────────────────────────────────────────
 function gcExportExcel() {
   const R = _gc.result;
   if (!R) { showToast('Pehle compare karo!', 'error'); return; }
-  const M = R.M, isAmz = R.mp === 'amazon';
+  const isAmz = R.mp === 'amazon';
+  const spec = gcMetricSpec(R);
+  const plan = gcActionPlan(R);
   const wb = XLSX.utils.book_new();
-  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0,31));
+  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0, 31));
 
-  const row = (label, d, unit) => [label, Math.round(d.a*100)/100, Math.round(d.b*100)/100,
-    Math.round(d.diff*100)/100, (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%'), unit || ''];
-
-  const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %', 'Unit'];
-  const metricRows = isAmz ? [
-    row('Sessions', M.sessions), row('Page Views', M.views), row('Impressions', M.impr),
-    row('Clicks', M.clicks), row('CTR', M.ctr, '%'), row('Conversion Rate', M.cvr, '%'),
-    row('Units Ordered', M.units), row('Total Sales', M.sales, 'Rs'), row('AOV', M.aov, 'Rs'),
-    row('Organic Sales', M.organic, 'Rs'), row('Ad Spend', M.spend, 'Rs'), row('Ad Sales', M.adSales, 'Rs'),
-    row('ACOS', M.acos, '%'), row('ROAS', M.roas, 'x'), row('TACOS', M.tacos, '%'), row('CPC', M.cpc, 'Rs'),
-  ] : [
-    row('Gross Sales', M.gross, 'Rs'), row('Net Earnings', M.net, 'Rs'), row('Margin', M.margin, '%'),
-    row('Units', M.units), row('AOV', M.aov, 'Rs'), row('Organic Sales', M.organic, 'Rs'),
-    row('Ad Spend', M.spend, 'Rs'), row('Ad Revenue', M.adRev, 'Rs'), row('Direct Revenue', M.dRev, 'Rs'),
-    row('Indirect Revenue', M.iRev, 'Rs'), row('Total ROI', M.roi, 'x'), row('Direct ROI', M.dRoi, 'x'),
-    row('TACOS', M.tacos, '%'), row('Ad Views', M.views), row('Clicks', M.clicks),
-    row('CTR', M.ctr, '%'), row('CPC', M.cpc, 'Rs'),
-  ];
-  if (R.wasted)  metricRows.push(row('Wasted Ad Spend', R.wasted, 'Rs'));
-  if (R.returns) metricRows.push(row('Returns', R.returns, R.returns.isPct ? '%' : 'count'));
-  if (R.orders)  metricRows.push(row('Orders', R.orders));
+  const mrow = s => [s.label, Math.round(s.d.a * 100) / 100, Math.round(s.d.b * 100) / 100,
+                     Math.round(s.d.diff * 100) / 100, gcChgStr(s.d)];
+  const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %'];
 
   add('1. Summary', [
     ['GROWTH COMPARISON — ' + _gc.clientName],
-    [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A')
-      + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B')],
-    [R.N.on ? 'NOTE: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) — daily-average basis pe compare kiya gaya' : 'Dono period same length ke the'],
+    [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from || 'Period A') + ' to ' + (_gc.A.to || '')
+      + '   vs   ' + (_gc.B.from || 'Period B') + ' to ' + (_gc.B.to || '')],
+    [R.N.on ? 'NOTE: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) — "(per day)" wale numbers DAILY AVERAGE hain, total nahi'
+            : 'Dono period ' + (R.N.dA || '?') + ' din ke the — direct comparison'],
     [],
-    head, ...metricRows,
+    ['VISIBILITY & TRAFFIC'], head, ...spec.vis.map(mrow), [],
+    ['SALES'],                head, ...spec.sales.map(mrow), [],
+    ['ADS PERFORMANCE'],      head, ...spec.ads.map(mrow),
+    ...(spec.opt.length ? [[], ['OPTIMIZATION'], head, ...spec.opt.map(mrow)] : []),
   ]);
 
   add('2. Revenue Bridge', [
-    ['REVENUE CHANGE DECOMPOSITION'],
-    ['Kaunsi cheez ne revenue kitna badla'],
-    [],
+    ['REVENUE CHANGE — KAHAN SE AAYA'],
+    ['Kaunsi cheez ne revenue kitna badla'], [],
     ['Driver', 'Impact (Rs)'],
     [isAmz ? 'Traffic (sessions)' : 'Units', Math.round(R.wf.trafficEff)],
     ['Conversion rate', Math.round(R.wf.cvrEff)],
@@ -11907,8 +12136,7 @@ function gcExportExcel() {
   ]);
 
   add('3. Ad vs Organic', [
-    ['AD-DRIVEN vs ORGANIC REVENUE'],
-    [],
+    ['AD-DRIVEN vs ORGANIC REVENUE'], [],
     ['Period', 'Ad-driven (Rs)', 'Organic (Rs)', 'Total (Rs)', 'Ad share %'],
     ['Period A', Math.round(R.split.A.ad), Math.round(R.split.A.organic),
       Math.round(R.split.A.ad + R.split.A.organic), gcPct(R.split.A.ad, R.split.A.ad + R.split.A.organic)],
@@ -11916,230 +12144,323 @@ function gcExportExcel() {
       Math.round(R.split.B.ad + R.split.B.organic), gcPct(R.split.B.ad, R.split.B.ad + R.split.B.organic)],
   ]);
 
-  const itemLbl = isAmz ? 'ASIN' : 'SKU';
-  add('4. Item Movers', [
-    ['TOP GAINERS & LOSERS'],
-    [],
-    ['TOP GAINERS'],
-    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
-    ...R.asins.gainers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
-    [],
-    ['TOP LOSERS'],
-    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
-    ...R.asins.losers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+  const lbl = isAmz ? 'ASIN' : 'SKU';
+  add('4. Action Plan', [
+    ['KAAM KI LIST — TOP 20 ' + lbl],
+    ['Business impact ke hisaab se sorted'], [],
+    ['Kab', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change %', 'Kya hua', 'Kya karna hai'],
+    ...plan.week.map(o => ['IS HAFTE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
+    ...plan.month.map(o => ['IS MAHINE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
   ]);
 
-  add('5. Insights', [
-    ['INSIGHTS & ACTIONS'],
-    [],
+  add('5. Item Movers', [
+    ['TOP GAINERS'], [],
+    ['#', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.gainers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+    [], ['TOP LOSERS'], [],
+    ['#', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.losers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+  ]);
+
+  add('6. Insights', [
+    ['INSIGHTS & RECOMMENDATIONS'], [],
     ['#', 'Heading', 'Detail'],
-    ...R.verdict.map((v,i) => [i+1, v.head, v.text.replace(/\*\*/g,'')]),
+    ...R.verdict.map((v, i) => [i+1, v.head, v.text.replace(/\*\*/g, '')]),
   ]);
 
-  const fname = 'Growth_Comparison_' + (isAmz?'Amazon':'Flipkart') + '_'
-    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
-    + new Date().toISOString().slice(0,10) + '.xlsx';
-  XLSX.writeFile(wb, fname);
+  XLSX.writeFile(wb, 'Growth_Comparison_' + (isAmz ? 'Amazon' : 'Flipkart') + '_'
+    + String(_gc.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
+    + new Date().toISOString().slice(0, 10) + '.xlsx');
   showToast('Excel download ho gayi!', 'success');
 }
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────
 function gcAscii(s) {
   return String(s == null ? '' : s)
-    .replace(/[\u2013\u2014]/g,'-').replace(/[\u2192\u2794]/g,'to')
-    .replace(/₹/g,'Rs ').replace(/\*\*/g,'').replace(/[^\x20-\x7E]/g,'');
+    .replace(/[\u2013\u2014]/g, '-').replace(/[\u2192\u2794]/g, '->')
+    .replace(/₹/g, 'Rs ').replace(/\*\*/g, '').replace(/[^\x20-\x7E]/g, '');
 }
 
-function gcExportPDF() {
+async function gcExportPDF() {
   const R = _gc.result;
   if (!R) { showToast('Pehle compare karo!', 'error'); return; }
-  const { jsPDF } = window.jspdf;
-  if (!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...', 'error'); return; }
+  const jsPDFctor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFctor) { showToast('PDF library load ho rahi hai, thoda ruko...', 'error'); return; }
 
-  const M = R.M, isAmz = R.mp === 'amazon';
-  const doc = new jsPDF({ unit:'pt', format:'a4' });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const Mg = 40;
-  const DARK=[45,52,64], GOLD=[201,162,90], GREY=[130,138,148], GREEN=[70,160,90], RED=[200,70,70];
-  const today = gcDateStr(new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())));
-  const pLbl = (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A') + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B');
+  const btn = document.getElementById('gc-pdf-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ PDF ban rahi hai...'; }
 
-  let pageNo = 0;
-  function chrome() {
-    pageNo++;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GREY);
-    doc.text('eNewcleus Technology - Confidential', Mg, H - 20);
-    doc.text('Generated: ' + today, W - Mg, H - 20, { align:'right' });
-    doc.text(String(pageNo), W/2, H - 20, { align:'center' });
-  }
-  function header(title) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GREY);
-    doc.text(gcAscii('Growth Comparison - ' + (isAmz?'Amazon':'Flipkart')), Mg, 30);
-    doc.setTextColor(...DARK); doc.setFontSize(11);
-    doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 45);
-    doc.setDrawColor(230,232,235); doc.setLineWidth(0.5); doc.line(Mg, 52, W - Mg, 52);
-    if (title) { doc.setFontSize(15); doc.setTextColor(...DARK); doc.text(title, Mg, 74); }
-  }
-  function table(y, headers, rows, widths, accent) {
-    const rh = 17;
-    doc.setFillColor(...accent); doc.rect(Mg, y, W - 2*Mg, rh, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
-    let x = Mg + 6;
-    headers.forEach((h,i) => {
-      const al = i===0 ? 'left' : 'right';
-      doc.text(h, al==='left' ? x : x + widths[i] - 8, y + 11, { align: al });
-      x += widths[i];
-    });
-    y += rh;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-    rows.forEach((r,ri) => {
-      if (ri % 2 === 0) { doc.setFillColor(248,249,250); doc.rect(Mg, y, W - 2*Mg, rh, 'F'); }
-      doc.setTextColor(50,56,66);
-      let xx = Mg + 6;
-      r.forEach((c,i) => {
-        const al = i===0 ? 'left' : 'right';
-        doc.text(gcAscii(String(c)), al==='left' ? xx : xx + widths[i] - 8, y + 11, { align: al });
-        xx += widths[i];
-      });
+  try {
+    const M = R.M, isAmz = R.mp === 'amazon';
+    const spec = gcMetricSpec(R);
+    const plan = gcActionPlan(R);
+    const charts = await gcChartImages();
+
+    const doc = new jsPDFctor({ unit:'pt', format:'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const Mg = 40;
+    const DARK=[45,52,64], GOLD=[201,162,90], GREY=[130,138,148], GREEN=[70,160,90], RED=[200,70,70], BLUE=[60,110,180];
+    const now = new Date();
+    const today = gcDateStr(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+    const pLbl = (_gc.A.from || 'Period A') + ' to ' + (_gc.A.to || '') + '   vs   ' + (_gc.B.from || 'Period B') + ' to ' + (_gc.B.to || '');
+
+    let pageNo = 0;
+    const chrome = () => {
+      pageNo++;
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GREY);
+      doc.text('eNewcleus Technology - Confidential', Mg, H - 20);
+      doc.text(String(pageNo), W/2, H - 20, { align:'center' });
+      doc.text('Generated: ' + today, W - Mg, H - 20, { align:'right' });
+    };
+    const header = title => {
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text(gcAscii('Growth Comparison - ' + (isAmz ? 'Amazon' : 'Flipkart')), Mg, 30);
+      doc.setTextColor(...DARK); doc.setFontSize(11);
+      doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 45);
+      doc.setDrawColor(230,232,235); doc.setLineWidth(0.5); doc.line(Mg, 52, W - Mg, 52);
+      if (title) { doc.setFontSize(15); doc.setTextColor(...DARK); doc.text(title, Mg, 74); }
+    };
+    const table = (y, headers, rows, widths, accent, rowColour) => {
+      const rh = 17;
+      doc.setFillColor(...accent); doc.rect(Mg, y, W - 2*Mg, rh, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+      let x = Mg + 6;
+      headers.forEach((h,i) => { const al = i===0?'left':'right';
+        doc.text(h, al==='left'?x:x+widths[i]-8, y+11, {align:al}); x += widths[i]; });
       y += rh;
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      rows.forEach((r,ri) => {
+        if (ri % 2 === 0) { doc.setFillColor(248,249,250); doc.rect(Mg, y, W-2*Mg, rh, 'F'); }
+        let xx = Mg + 6;
+        r.forEach((c,i) => {
+          const col = (rowColour && i === r.length-1) ? rowColour(r) : [50,56,66];
+          doc.setTextColor(...col);
+          const al = i===0?'left':'right';
+          doc.text(gcAscii(String(c)), al==='left'?xx:xx+widths[i]-8, y+11, {align:al});
+          xx += widths[i];
+        });
+        y += rh;
+      });
+      return y;
+    };
+    const chgColour = s => r => {
+      const t = String(r[r.length-1]);
+      if (t === '0' || t === '0%') return [110,116,126];
+      return (t.charAt(0) === '+') === (s.goodUp !== false) ? GREEN : RED;
+    };
+
+    // ══ COVER ══
+    doc.setFillColor(...GOLD);
+    doc.circle(Mg+8, 66, 5, 'F'); doc.circle(Mg+8, 78, 5, 'F'); doc.circle(Mg+19, 72, 6, 'F');
+    doc.setDrawColor(...GOLD); doc.setLineWidth(2);
+    doc.line(Mg+8, 66, Mg+19, 72); doc.line(Mg+8, 78, Mg+19, 72);
+    doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...DARK);
+    doc.text('enewcleus', Mg+33, 78);
+    doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GOLD);
+    doc.text('Sell Easy, Sell More!', Mg+33, 92);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK);
+    doc.text('Growth Comparison', Mg, 160); doc.text('Report', Mg, 188);
+    doc.setDrawColor(...GOLD); doc.setLineWidth(2); doc.line(Mg, 200, Mg+120, 200);
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...DARK);
+    doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 230);
+    doc.setFontSize(10); doc.setTextColor(...GREY);
+    doc.text((isAmz?'Amazon':'Flipkart') + ' - Period over Period Analysis', Mg, 248);
+    doc.setFontSize(9); doc.text(gcAscii(pLbl), Mg, 266);
+    doc.text(R.N.on
+      ? 'Note: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) - daily-average (DRR) basis pe compare kiya gaya'
+      : 'Dono period ' + (R.N.dA || '?') + ' din ke the - direct comparison', Mg, 282);
+
+    const kpi = isAmz
+      ? [[gcChgStr(M.sales),'Sales'], [gcChgStr(M.sessions),'Sessions'],
+         [gcFmtBy('rate',M.acos.b),'ACOS'], [gcFmtBy('ratio',M.roas.b),'ROAS']]
+      : [[gcChgStr(M.gross),'Gross Sales'], [gcFmtBy('rate',M.margin.b),'Margin'],
+         [gcFmtBy('ratio',M.roi.b),'Ad ROI'], [gcChgStr(M.units),'Units']];
+    let y = 310;
+    doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W-2*Mg, 92, 6, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+    doc.text('Headline', Mg+16, y+20);
+    const kw = (W-2*Mg)/kpi.length;
+    kpi.forEach((k,i) => {
+      const cx = Mg + kw*i + kw/2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...GOLD);
+      doc.text(gcAscii(k[0]), cx, y+56, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+      doc.text(k[1], cx, y+74, {align:'center'});
     });
-    return y;
-  }
 
-  // COVER
-  doc.setFillColor(...GOLD);
-  doc.circle(Mg + 8, 66, 5, 'F'); doc.circle(Mg + 8, 78, 5, 'F'); doc.circle(Mg + 19, 72, 6, 'F');
-  doc.setDrawColor(...GOLD); doc.setLineWidth(2);
-  doc.line(Mg + 8, 66, Mg + 19, 72); doc.line(Mg + 8, 78, Mg + 19, 72);
-  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...DARK);
-  doc.text('enewcleus', Mg + 33, 78);
-  doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GOLD);
-  doc.text('Sell Easy, Sell More!', Mg + 33, 92);
+    // action summary on cover
+    y = 424;
+    doc.setFillColor(255,248,231); doc.roundedRect(Mg, y, W-2*Mg, 70, 6, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+    doc.text('Kaam Ki List', Mg+16, y+20);
+    doc.setFontSize(15); doc.setTextColor(...RED);
+    doc.text(String(plan.week.length), Mg+16, y+46);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    doc.text(gcAscii((isAmz?'ASIN':'SKU') + ' - is hafte dekhne hain'), Mg+40, y+46);
+    doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...BLUE);
+    doc.text(String(plan.month.length), Mg+220, y+46);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    doc.text(gcAscii((isAmz?'ASIN':'SKU') + ' - is mahine plan karne hain'), Mg+244, y+46);
+    chrome();
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK);
-  doc.text('Growth Comparison', Mg, 160);
-  doc.text('Report', Mg, 188);
-  doc.setDrawColor(...GOLD); doc.setLineWidth(2); doc.line(Mg, 200, Mg + 120, 200);
+    // ══ METRICS ══
+    doc.addPage(); header('Metric Comparison');
+    if (R.N.on) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...RED);
+      doc.text(gcAscii('Periods alag lambai ke the (A=' + R.N.dA + ' din, B=' + R.N.dB
+        + ' din). "(per day)" wale numbers DAILY AVERAGE hain, total nahi.'), Mg, 88);
+    }
+    const mrow = s => [s.label, gcAscii(gcFmtBy(s.kind, s.d.a)), gcAscii(gcFmtBy(s.kind, s.d.b)), gcChgStr(s.d)];
+    const section = (title, list, accent, yy) => {
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text(title, Mg, yy);
+      return table(yy+10, ['METRIC','PERIOD A','PERIOD B','CHANGE'], list.map(mrow),
+        [220,105,105,85], accent, r => {
+          const s = list.find(z => z.label === r[0]);
+          return chgColour(s || {})(r);
+        });
+    };
+    y = section('Visibility & Traffic', spec.vis, BLUE, R.N.on ? 106 : 92);
+    y = section('Sales', spec.sales, GREEN, y+18);
+    y = section('Ads Performance', spec.ads, GOLD, y+18);
+    if (spec.opt.length) y = section('Optimization', spec.opt, [90,90,110], y+18);
+    chrome();
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...DARK);
-  doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 230);
-  doc.setFontSize(10); doc.setTextColor(...GREY);
-  doc.text((isAmz ? 'Amazon' : 'Flipkart') + ' - Period over Period Analysis', Mg, 248);
-  doc.setFontSize(9);
-  doc.text(gcAscii(pLbl), Mg, 266);
-  if (R.N.on) doc.text('Note: Periods alag the - daily-average (DRR) basis pe compare kiya gaya', Mg, 282);
+    // ══ CHARTS ══
+    if (charts) {
+      doc.addPage(); header('Charts');
+      const cw = W - 2*Mg;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('Period A vs Period B', Mg, 96);
+      doc.addImage(charts.bar, 'PNG', Mg, 104, cw, cw*0.48);
+      let cy = 104 + cw*0.48 + 24;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('Revenue Change - Kahan Se Aaya', Mg, cy);
+      doc.addImage(charts.wf, 'PNG', Mg, cy+8, cw, cw*0.48);
+      chrome();
 
-  // headline KPIs
-  const kpi = isAmz
-    ? [[(M.sales.up?'+':'') + M.sales.pct + '%','Sales'], [(M.sessions.up?'+':'') + M.sessions.pct + '%','Sessions'],
-       [M.acos.b + '%','ACOS'], [M.roas.b + 'x','ROAS']]
-    : [[(M.gross.up?'+':'') + M.gross.pct + '%','Gross Sales'], [M.margin.b + '%','Margin'],
-       [M.roi.b + 'x','Ad ROI'], [(M.units.up?'+':'') + M.units.pct + '%','Units']];
-  let y = 310;
-  doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W - 2*Mg, 92, 6, 6, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
-  doc.text('Headline', Mg + 16, y + 20);
-  const kw = (W - 2*Mg) / kpi.length;
-  kpi.forEach((k,i) => {
-    const cx = Mg + kw*i + kw/2;
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...GOLD);
-    doc.text(k[0], cx, y + 56, { align:'center' });
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
-    doc.text(k[1], cx, y + 74, { align:'center' });
-  });
-  chrome();
+      doc.addPage(); header('Ad vs Organic Split');
+      const pw = (cw - 20) / 2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GREY);
+      doc.text('PERIOD A', Mg, 96);
+      doc.text('PERIOD B', Mg + pw + 20, 96);
+      doc.addImage(charts.pieA, 'PNG', Mg, 104, pw, pw*0.875);
+      doc.addImage(charts.pieB, 'PNG', Mg + pw + 20, 104, pw, pw*0.875);
 
-  // METRICS PAGE
-  doc.addPage(); header('Metric Comparison');
-  const mrow = (label, d, unit) => [label, gcAscii(gcFmt(d.a) + (unit||'')), gcAscii(gcFmt(d.b) + (unit||'')),
-    (d.diff>0?'+':'') + (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%')];
+      cy = 104 + pw*0.875 + 26;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text('Revenue Bridge', Mg, cy);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text('Revenue kitna badla aur kis wajah se.', Mg, cy+14);
+      table(cy+24, ['DRIVER','IMPACT'],
+        [[isAmz?'Traffic (sessions)':'Units', gcAscii(gcFmtBy('money', R.wf.trafficEff))],
+         ['Conversion rate', gcAscii(gcFmtBy('money', R.wf.cvrEff))],
+         ['AOV / price', gcAscii(gcFmtBy('money', R.wf.aovEff))],
+         ['= Net change', gcAscii(gcFmtBy('money', R.wf.total))]],
+        [360,155], DARK);
+      chrome();
+    }
 
-  y = 92;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Visibility & Traffic', Mg, y);
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
-    isAmz ? [mrow('Sessions',M.sessions), mrow('Page Views',M.views), mrow('Impressions',M.impr),
-             mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%')]
-          : [mrow('Ad Views',M.views), mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%'), mrow('CPC',M.cpc)],
-    [220, 105, 105, 85], [60,110,180]);
-
-  y += 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Sales', Mg, y);
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
-    isAmz ? [mrow('Total Sales',M.sales), mrow('Units',M.units), mrow('Conversion',M.cvr,'%'),
-             mrow('AOV',M.aov), mrow('Organic Sales',M.organic)]
-          : [mrow('Gross Sales',M.gross), mrow('Net Earnings',M.net), mrow('Margin',M.margin,'%'),
-             mrow('Units',M.units), mrow('AOV',M.aov), mrow('Organic Sales',M.organic)],
-    [220, 105, 105, 85], GREEN);
-
-  y += 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Ads Performance', Mg, y);
-  const adRows = isAmz
-    ? [mrow('Ad Spend',M.spend), mrow('Ad Sales',M.adSales), mrow('ACOS',M.acos,'%'),
-       mrow('ROAS',M.roas,'x'), mrow('TACOS',M.tacos,'%'), mrow('CPC',M.cpc)]
-    : [mrow('Ad Spend',M.spend), mrow('Ad Revenue',M.adRev), mrow('Direct Revenue',M.dRev),
-       mrow('Total ROI',M.roi,'x'), mrow('Direct ROI',M.dRoi,'x'), mrow('TACOS',M.tacos,'%')];
-  if (R.wasted)  adRows.push(mrow('Wasted Spend', R.wasted));
-  if (R.returns) adRows.push(mrow('Returns', R.returns, R.returns.isPct ? '%' : ''));
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'], adRows, [220, 105, 105, 85], [201,162,90]);
-  chrome();
-
-  // BRIDGE + MOVERS
-  doc.addPage(); header('Revenue Bridge & Movers');
-  y = 92;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
-  doc.text('Revenue kitna badla aur kis wajah se - traffic, conversion ya price.', Mg, y);
-  y = table(y + 14, ['DRIVER','IMPACT'],
-    [[isAmz ? 'Traffic (sessions)' : 'Units', gcAscii('Rs ' + gcFmt(R.wf.trafficEff))],
-     ['Conversion rate', gcAscii('Rs ' + gcFmt(R.wf.cvrEff))],
-     ['AOV / price', gcAscii('Rs ' + gcFmt(R.wf.aovEff))],
-     ['= Net change', gcAscii('Rs ' + gcFmt(R.wf.total))]],
-    [360, 155], [45,52,64]);
-
-  const itemLbl = isAmz ? 'ASIN' : 'SKU';
-  if (R.asins.gainers.length) {
+    // ══ ACTION PLAN ══
+    const lbl = isAmz ? 'ASIN' : 'SKU';
+    doc.addPage(); header('Kaam Ki List - Top 20 ' + lbl);
+    y = 92;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+    doc.text(gcAscii('Business impact ke hisaab se sorted. Har item pe kya hua aur kya karna hai.'), Mg, y);
     y += 20;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
-    doc.text('Top Gainers', Mg, y);
-    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
-      R.asins.gainers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
-        gcAscii('Rs ' + gcFmt(x.bSalesN)), '+' + x.pct + '%']),
-      [220, 105, 105, 85], GREEN);
-  }
-  if (R.asins.losers.length) {
-    y += 20;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
-    doc.text('Top Losers', Mg, y);
-    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
-      R.asins.losers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
-        gcAscii('Rs ' + gcFmt(x.bSalesN)), x.pct + '%']),
-      [220, 105, 105, 85], RED);
-  }
-  chrome();
 
-  // INSIGHTS
-  doc.addPage(); header('Insights & Recommendations');
-  y = 92;
-  R.verdict.forEach((v,i) => {
-    if (y > H - 100) { chrome(); doc.addPage(); header('Insights (contd.)'); y = 92; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-    doc.text(gcAscii((i+1) + '. ' + v.head), Mg, y); y += 15;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
-    const lines = doc.splitTextToSize(gcAscii(v.text), W - 2*Mg);
-    doc.text(lines, Mg, y);
-    y += lines.length * 13 + 14;
-  });
-  chrome();
+    const bucket = (list, title, colour, note) => {
+      if (y > H - 120) { chrome(); doc.addPage(); header('Kaam Ki List (contd.)'); y = 92; }
+      doc.setFillColor(...colour); doc.roundedRect(Mg, y-11, W-2*Mg, 20, 3, 3, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(255,255,255);
+      doc.text(gcAscii(title + '  (' + list.length + ' ' + lbl + ')'), Mg+8, y+3);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      doc.text(gcAscii(note), W-Mg-8, y+3, {align:'right'});
+      y += 26;
 
-  const fname = 'eNewcleus_Growth_' + (isAmz?'Amazon':'Flipkart') + '_'
-    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
-    + new Date().toISOString().slice(0,10) + '.pdf';
-  doc.save(fname);
-  showToast('PDF download ho gayi!', 'success');
+      if (!list.length) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...GREY);
+        doc.text('Is bucket me kuch nahi - achhi baat hai.', Mg+6, y); y += 22; return;
+      }
+      list.forEach((o, idx) => {
+        const actLines = doc.splitTextToSize(gcAscii('-> ' + o.act), W - 2*Mg - 22);
+        const whyLines = doc.splitTextToSize(gcAscii(o.why), W - 2*Mg - 22);
+        const blockH = 15 + whyLines.length*10 + actLines.length*10 + 10;
+        if (y + blockH > H - 55) { chrome(); doc.addPage(); header('Kaam Ki List (contd.)'); y = 92; }
+
+        doc.setDrawColor(...colour); doc.setLineWidth(2);
+        doc.line(Mg+2, y-8, Mg+2, y + blockH - 16);
+
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+        doc.text(gcAscii((idx+1) + '. ' + o.id), Mg+10, y);
+        const pctTxt = (o.pct >= 0 ? '+' : '') + o.pct + '%';
+        doc.setTextColor(...(o.pct >= 0 ? GREEN : RED));
+        doc.text(pctTxt, Mg+10+doc.getTextWidth(gcAscii((idx+1)+'. '+o.id))+8, y);
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+        doc.text(gcAscii(o.tag), W-Mg-6, y, {align:'right'});
+        y += 12;
+
+        doc.setFontSize(8.5); doc.setTextColor(90,96,106);
+        doc.text(whyLines, Mg+10, y); y += whyLines.length*10 + 2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK);
+        doc.text(actLines, Mg+10, y); y += actLines.length*10 + 10;
+      });
+    };
+    bucket(plan.week,  'IS HAFTE', RED,  'urgent - abhi dekho');
+    bucket(plan.month, 'IS MAHINE', BLUE, 'plan karke karo');
+    chrome();
+
+    // ══ MOVERS ══
+    doc.addPage(); header('Top Movers');
+    y = 92;
+    if (R.asins.gainers.length) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+      doc.text('Top Gainers', Mg, y);
+      y = table(y+10, [lbl,'PERIOD A','PERIOD B','CHANGE'],
+        R.asins.gainers.slice(0,10).map(x => [String(x.id).slice(0,28),
+          gcAscii(gcFmtBy('money', x.aSalesN)), gcAscii(gcFmtBy('money', x.bSalesN)), '+' + x.pct + '%']),
+        [220,105,105,85], GREEN);
+    }
+    if (R.asins.losers.length) {
+      y += 20;
+      if (y > H - 120) { chrome(); doc.addPage(); header('Top Movers (contd.)'); y = 92; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
+      doc.text('Top Losers', Mg, y);
+      y = table(y+10, [lbl,'PERIOD A','PERIOD B','CHANGE'],
+        R.asins.losers.slice(0,10).map(x => [String(x.id).slice(0,28),
+          gcAscii(gcFmtBy('money', x.aSalesN)), gcAscii(gcFmtBy('money', x.bSalesN)), x.pct + '%']),
+        [220,105,105,85], RED);
+    }
+    chrome();
+
+    // ══ INSIGHTS ══
+    doc.addPage(); header('Insights & Recommendations');
+    y = 92;
+    R.verdict.forEach((v,i) => {
+      if (y > H - 110) { chrome(); doc.addPage(); header('Insights (contd.)'); y = 92; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text(gcAscii((i+1) + '. ' + v.head), Mg, y); y += 15;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
+      const lines = doc.splitTextToSize(gcAscii(v.text), W - 2*Mg);
+      doc.text(lines, Mg, y); y += lines.length*13 + 14;
+    });
+    chrome();
+
+    doc.save('eNewcleus_Growth_' + (isAmz?'Amazon':'Flipkart') + '_'
+      + String(_gc.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
+      + new Date().toISOString().slice(0,10) + '.pdf');
+    showToast('PDF download ho gayi!', 'success');
+  } catch (e) {
+    console.error('PDF error', e);
+    showToast('PDF banane me dikkat: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 PDF Report'; }
+  }
 }
+
 
 
 // ══════════════════════════════════════════════════════════════════

@@ -10779,7 +10779,15 @@ function gcRenderUploads() {
         const title  = isA ? '📅 Period A — Purana (pehle wala)' : '📅 Period B — Naya (baad wala)';
         return '<div style="border:1.5px solid ' + accent + ';border-radius:12px;padding:12px;background:#fff;">'
           + '<div style="font-weight:800;font-size:13px;color:' + accent + ';margin-bottom:4px;">' + title + '</div>'
-          + '<div id="gc-period-' + side + '" style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Report upload karo — dates apne aap detect ho jayengi</div>'
+          + '<div style="background:var(--bg);border-radius:8px;padding:8px 9px;margin-bottom:10px;">'
+          + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:5px;">Report upload karte hi dates apne aap bhar jayengi. Galat ho to yahin badal do.</div>'
+          + '<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;">'
+          + '<div><div style="font-size:9px;font-weight:700;color:var(--text-muted);">FROM</div>'
+          + '<input type="date" id="gc-from-' + side + '" class="form-control" style="padding:4px 6px;font-size:11px;width:125px;" onchange="gcSetDate(\'' + side + '\')"></div>'
+          + '<div><div style="font-size:9px;font-weight:700;color:var(--text-muted);">TO</div>'
+          + '<input type="date" id="gc-to-' + side + '" class="form-control" style="padding:4px 6px;font-size:11px;width:125px;" onchange="gcSetDate(\'' + side + '\')"></div>'
+          + '<div id="gc-days-' + side + '" style="font-size:11px;font-weight:700;color:var(--red);padding-bottom:5px;">— din</div>'
+          + '</div></div>'
           + reports.map(r => gcUploadCard(side, r)).join('')
           + '</div>';
       }).join('')
@@ -10898,13 +10906,41 @@ function gcDetectPeriod(side, key, parsed) {
   if (from && to) {
     const d1 = gcToDate(from), d2 = gcToDate(to);
     if (d1 && d2) {
-      P.from = gcDateStr(d1);
-      P.to   = gcDateStr(d2);
-      P.days = Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
-      const el = document.getElementById('gc-period-' + side);
-      if (el) el.innerHTML = '<strong style="color:var(--primary);">' + P.from + ' → ' + P.to + '</strong> · ' + P.days + ' din';
+      const iso = d => d.toISOString().slice(0, 10);
+      const fEl = document.getElementById('gc-from-' + side);
+      const tEl = document.getElementById('gc-to-' + side);
+      // sirf tab bharo jab user ne khud kuch set na kiya ho
+      if (fEl && !fEl.value) fEl.value = iso(d1);
+      if (tEl && !tEl.value) tEl.value = iso(d2);
+      gcSetDate(side);
     }
   }
+}
+
+// dates se days nikalo — auto-detect ya manual, dono ka yahi rasta
+function gcSetDate(side) {
+  const P = _gc[side];
+  const f = document.getElementById('gc-from-' + side);
+  const t = document.getElementById('gc-to-' + side);
+  const box = document.getElementById('gc-days-' + side);
+  const fv = f && f.value, tv = t && t.value;
+
+  if (fv && tv) {
+    const d1 = new Date(fv + 'T00:00:00Z'), d2 = new Date(tv + 'T00:00:00Z');
+    if (!isNaN(d1) && !isNaN(d2) && d2 >= d1) {
+      P.days = Math.round((d2 - d1) / 86400000) + 1;
+      P.from = gcDateStr(d1);
+      P.to   = gcDateStr(d2);
+      if (box) { box.textContent = P.days + ' din'; box.style.color = 'var(--green)'; }
+    } else {
+      P.days = 0; P.from = ''; P.to = '';
+      if (box) { box.textContent = 'To date, From se pehle hai'; box.style.color = 'var(--red)'; }
+    }
+  } else {
+    P.days = 0; P.from = ''; P.to = '';
+    if (box) { box.textContent = '— din'; box.style.color = 'var(--red)'; }
+  }
+  gcUpdateReadiness();
 }
 
 function gcToDate(v) {
@@ -10973,7 +11009,13 @@ function gcUpdateReadiness() {
   // period mismatch warning
   let warn = '';
   const dA = _gc.A.days, dB = _gc.B.days;
-  if (dA && dB && dA !== dB) {
+  if (!dA || !dB) {
+    const which = !dA && !dB ? 'Dono periods' : (!dA ? 'Period A' : 'Period B');
+    warn = '<div style="margin-top:8px;padding:9px 11px;background:#fff5f5;border-left:3px solid var(--red);border-radius:0 6px 6px 0;font-size:12px;">'
+      + '🚫 <strong>' + which + ' ki dates nahi bhari hain.</strong> Compare tab tak nahi chalega. '
+      + 'Report se auto-detect nahi hui to upar From/To khud daal do — warna alag-alag length ke period compare hoke '
+      + '<strong>galat girawat</strong> dikhayenge.</div>';
+  } else if (dA !== dB) {
     warn = '<div style="margin-top:8px;padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;">'
       + '⚠️ <strong>Period alag-alag hain</strong> — A: ' + dA + ' din, B: ' + dB + ' din. '
       + 'Comparison <strong>daily-average (DRR) basis</strong> pe hoga taaki fair rahe.</div>';
@@ -11270,6 +11312,13 @@ function gcCompare() {
       showToast('Period ' + side + ' me ' + missing.map(m=>m.name).join(', ') + ' missing hai!', 'error');
       return;
     }
+  }
+
+  if (!_gc.A.days || !_gc.B.days) {
+    showToast('Dono periods ki From/To dates bharo — warna comparison galat aayega!', 'error');
+    const el = document.getElementById('gc-from-' + (!_gc.A.days ? 'A' : 'B'));
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
   }
 
   document.getElementById('gc-results').innerHTML =

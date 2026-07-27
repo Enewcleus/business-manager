@@ -338,6 +338,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ops Lead': [
@@ -359,6 +361,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Lead': [
@@ -381,6 +385,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CSI Lead': [
@@ -397,6 +403,8 @@ const NAV_CONFIG = {
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Account Manager': [
@@ -413,6 +421,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Ads Executive': [
@@ -428,6 +438,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'CRM Executive': [
@@ -447,6 +459,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'SME': [
@@ -463,6 +477,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Senior Executive': [
@@ -477,6 +493,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Team Lead': [
@@ -494,6 +512,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Executive': [
@@ -506,6 +526,8 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
+    {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
   ],
   'Sub Admin': [
@@ -743,11 +765,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report',growthcomp:'📈 Growth Comparison',feedback:'⭐ Feedback',reportanalyzer:'📊 Report Analyzer',fkanalyzer:'📦 Flipkart Analyzer',adsanalyzer:'📢 Ads Analyzer',channelreport:'📊 Channel Report',hurdles:'🚧 Hurdle Tracker',chat:'💬 Team Chat'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention,growthcomp:renderGrowthComparison,feedback:renderFeedback};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -10029,634 +10051,6 @@ async function addHurdleAttempt(hurdleId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// FEATURE 3: AMAZON REPORT ANALYZER
-// ═══════════════════════════════════════════════════════════════════
-
-let _reportData = {
-  business: null,
-  targeting: null,
-  advertised: null,
-  searchterm: null,
-  inventory: null,
-  returns: null,
-};
-let _reportInsights = [];
-let _reportClientCode = '';
-let _reportClientName = '';
-
-async function renderReportAnalyzer() {
-  const clients = await getClients();
-  if (clients) APP.clients = clients;
-
-  document.getElementById('page-content').innerHTML =
-    '<div class="card" style="margin-bottom:16px;">'
-    + '<div class="card-header"><span class="card-title">📊 Amazon Report Analyzer</span>'
-    + '<span style="font-size:12px;color:var(--text-muted);">Upload karo → AI Analysis → Task Create karo</span></div>'
-    + '<div class="card-body">'
-
-    + '<div class="form-group" style="margin-bottom:20px;">'
-    + '<label style="font-weight:700;">Seller Select Karo *</label>'
-    + '<select class="form-control" id="ra-client" onchange="setRAClient()">'
-    + '<option value="">-- Seller Choose Karo --</option>'
-    + (clients || []).map(function(c){ return '<option value="' + c.clientCode + '">' + c.busyName + ' (' + c.marketplace + ')</option>'; }).join('')
-    + '</select>'
-    + '</div>'
-
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">'
-    + buildUploadCard('business', '📊', 'Business Report', 'Sessions, Page Views, Conversion, Sales', '.csv')
-    + buildUploadCard('targeting', '🎯', 'Sponsored Products Targeting', 'Keywords, ACOS, Spend, CTR', '.xlsx,.csv')
-    + buildUploadCard('advertised', '📢', 'Advertised Product Report', 'ASIN-level ads performance', '.xlsx,.csv')
-    + buildUploadCard('searchterm', '🔍', 'Search Term Report', 'Customer search terms', '.xlsx,.csv')
-    + buildUploadCard('inventory', '📦', 'Inventory Report', 'FBA Stock, Replenishment needed', '.xlsx,.csv,.txt')
-    + buildUploadCard('returns', '🔄', 'Returns Report', 'Return reasons and count', '.tsv,.csv')
-    + '</div>'
-
-    + '<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">'
-    + '<button class="btn btn-primary" onclick="runReportAnalysis()" style="font-size:15px;padding:12px 24px;">🔍 Analyze All Reports</button>'
-    + '<button class="btn btn-outline" onclick="clearAllReports()">🗑️ Clear All</button>'
-    + '</div>'
-    + '</div></div>'
-
-    + '<div id="ra-results"></div>';
-}
-
-function buildUploadCard(type, icon, title, subtitle, accept) {
-  return '<div id="card-' + type + '" style="border:2px dashed var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s;background:#fff;" '
-    + 'onclick="document.getElementById(\'file-' + type + '\').click()" '
-    + 'onmouseover="this.style.borderColor=\'var(--secondary)\'" '
-    + 'onmouseout="this.style.borderColor=\'var(--border)\'">'
-    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
-    + '<span style="font-size:24px;">' + icon + '</span>'
-    + '<div>'
-    + '<div style="font-weight:700;font-size:14px;">' + title + '</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);">' + subtitle + '</div>'
-    + '</div>'
-    + '</div>'
-    + '<div id="status-' + type + '" style="font-size:12px;color:var(--text-muted);">Click to upload</div>'
-    + '<input type="file" id="file-' + type + '" accept="' + accept + '" style="display:none;" onchange="handleReportUpload(\'' + type + '\', this)">'
-    + '</div>';
-}
-
-function setRAClient() {
-  var sel = document.getElementById('ra-client');
-  _reportClientCode = sel.value;
-  _reportClientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
-}
-
-async function handleReportUpload(type, input) {
-  if (!input.files || !input.files[0]) return;
-  var file = input.files[0];
-  var statusEl = document.getElementById('status-' + type);
-  var cardEl = document.getElementById('card-' + type);
-  statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
-
-  try {
-    var content = await readFileContent(file, type);
-    _reportData[type] = { raw: content, filename: file.name };
-    statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
-    cardEl.style.borderColor = 'var(--green)';
-    cardEl.style.background = '#f0fff4';
-  } catch(e) {
-    statusEl.innerHTML = '<span style="color:var(--red);">❌ Error: ' + e.message + '</span>';
-  }
-}
-
-function readFileContent(file, type) {
-  return new Promise(function(resolve, reject) {
-    var reader = new FileReader();
-    reader.onload = function(e) { resolve(e.target.result); };
-    reader.onerror = function() { reject(new Error('File read error')); };
-    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-      reader.readAsBinaryString(file);
-    } else {
-      reader.readAsText(file);
-    }
-  });
-}
-
-function clearAllReports() {
-  _reportData = { business: null, targeting: null, advertised: null, searchterm: null, inventory: null, returns: null };
-  renderReportAnalyzer();
-}
-
-async function runReportAnalysis() {
-  if (!_reportClientCode) { showToast('Pehle seller select karo!', 'error'); return; }
-  var hasData = Object.values(_reportData).some(function(v){ return v !== null; });
-  if (!hasData) { showToast('Pehle koi report upload karo!', 'error'); return; }
-
-  var results = document.getElementById('ra-results');
-  results.innerHTML = '<div class="loading"><div class="spinner"></div> Reports analyze ho rahi hain...</div>';
-
-  try {
-    var insights = [];
-
-    // Parse Business Report
-    if (_reportData.business) {
-      var bizInsights = parseBusinessReport(_reportData.business.raw);
-      insights = insights.concat(bizInsights);
-    }
-
-    // Parse Inventory
-    if (_reportData.inventory) {
-      var invInsights = parseInventoryReport(_reportData.inventory.raw);
-      insights = insights.concat(invInsights);
-    }
-
-    // Parse Ads (Targeting)
-    if (_reportData.targeting) {
-      var adsInsights = parseAdsReport(_reportData.targeting.raw);
-      insights = insights.concat(adsInsights);
-    }
-
-    // Parse Advertised Product
-    if (_reportData.advertised) {
-      var advInsights = parseAdvertisedReport(_reportData.advertised.raw);
-      insights = insights.concat(advInsights);
-    }
-
-    // Parse Search Terms
-    if (_reportData.searchterm) {
-      var stInsights = parseSearchTermReport(_reportData.searchterm.raw);
-      insights = insights.concat(stInsights);
-    }
-
-    // Parse Returns
-    if (_reportData.returns) {
-      var retInsights = parseReturnsReport(_reportData.returns.raw);
-      insights = insights.concat(retInsights);
-    }
-
-    _reportInsights = insights;
-    renderInsights(insights);
-
-  } catch(e) {
-    results.innerHTML = '<div class="card"><div class="card-body"><p style="color:var(--red);">Error: ' + e.message + '</p></div></div>';
-  }
-}
-
-function parseCSV(text) {
-  var lines = text.trim().split('\n');
-  if (!lines.length) return [];
-  // Handle BOM
-  lines[0] = lines[0].replace(/^\uFEFF/, '');
-  var headers = parseCSVLine(lines[0]);
-  var rows = [];
-  for (var i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    var vals = parseCSVLine(lines[i]);
-    var obj = {};
-    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
-    rows.push(obj);
-  }
-  return rows;
-}
-
-function parseCSVLine(line) {
-  var result = [];
-  var current = '';
-  var inQuotes = false;
-  for (var i = 0; i < line.length; i++) {
-    var ch = line[i];
-    if (ch === '"') { inQuotes = !inQuotes; }
-    else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
-    else { current += ch; }
-  }
-  result.push(current);
-  return result;
-}
-
-function parseTSV(text) {
-  var lines = text.trim().split('\n');
-  if (!lines.length) return [];
-  var headers = lines[0].split('\t');
-  var rows = [];
-  for (var i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    var vals = lines[i].split('\t');
-    var obj = {};
-    headers.forEach(function(h, idx) { obj[h.trim()] = (vals[idx] || '').trim(); });
-    rows.push(obj);
-  }
-  return rows;
-}
-
-function cleanNum(val) {
-  if (!val) return 0;
-  return parseFloat(String(val).replace(/[₹,%\s]/g,'').replace(/,/g,'')) || 0;
-}
-
-function parseBusinessReport(raw) {
-  var rows = parseCSV(raw);
-  var insights = [];
-  var lowConvItems = [];
-  var highSessionLowConv = [];
-  var lowBuyBox = [];
-
-  rows.forEach(function(row) {
-    var sessions = cleanNum(row['Sessions - Total'] || row['Sessions']);
-    var units = cleanNum(row['Units Ordered']);
-    var sales = cleanNum(row['Ordered Product Sales'] || row['Sales(INR)']);
-    var convRaw = row['Unit Session Percentage'] || row['Conversion rate'] || '0';
-    var conv = cleanNum(convRaw);
-    var fop = cleanNum(row['Featured Offer Percentage'] || '100');
-    var title = (row['Title'] || '').slice(0, 60);
-    var sku = row['SKU'] || row['(Child) ASIN'] || '';
-
-    if (sessions > 100 && conv < 5) {
-      lowConvItems.push({ title: title, sessions: sessions, conv: conv, sales: sales, sku: sku });
-    }
-    if (sessions > 300 && conv < 10) {
-      highSessionLowConv.push({ title: title, sessions: sessions, conv: conv });
-    }
-    if (fop < 80 && sessions > 50) {
-      lowBuyBox.push({ title: title, fop: fop });
-    }
-  });
-
-  if (lowConvItems.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'high',
-      icon: '📉',
-      title: 'Low Conversion Products (' + lowConvItems.length + ')',
-      detail: lowConvItems.slice(0,3).map(function(x){ return x.title + ' — ' + x.sessions + ' sessions, ' + x.conv + '% conv'; }).join(' | '),
-      suggestions: [
-        { text: 'Main images improve karo — white background, zoomable', dept: 'Ops', time: 2 },
-        { text: 'Price competitive karo — competitor price check karo', dept: 'Ops', time: 1 },
-        { text: 'A+ content add karo listing mein', dept: 'Ops', time: 3 },
-        { text: 'Review count badhao — request review button use karo', dept: 'Ops', time: 2 },
-      ]
-    });
-  }
-
-  if (highSessionLowConv.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'medium',
-      icon: '👁️',
-      title: 'High Traffic But Low Sales (' + highSessionLowConv.length + ' products)',
-      detail: highSessionLowConv.slice(0,2).map(function(x){ return x.title + ' (' + x.sessions + ' sessions)'; }).join(' | '),
-      suggestions: [
-        { text: 'Listing bullet points rewrite karo — benefits highlight karo', dept: 'Ops', time: 2 },
-        { text: 'Discount coupon add karo listing pe', dept: 'Ops', time: 1 },
-        { text: 'Video content add karo listing mein', dept: 'Ops', time: 5 },
-      ]
-    });
-  }
-
-  if (lowBuyBox.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'high',
-      icon: '🏆',
-      title: 'Buy Box Loss (' + lowBuyBox.length + ' products)',
-      detail: lowBuyBox.slice(0,2).map(function(x){ return x.title + ' (' + x.fop + '% FOP)'; }).join(' | '),
-      suggestions: [
-        { text: 'Buy Box recover karo — price match competitor', dept: 'Ops', time: 1 },
-        { text: 'FBA se fulfill karo agar MFN hai', dept: 'Ops', time: 3 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function parseInventoryReport(raw) {
-  var insights = [];
-  var rows;
-  if (raw.includes('\t')) {
-    rows = parseTSV(raw);
-  } else {
-    rows = parseCSV(raw);
-  }
-
-  var outOfStock = [];
-  var lowStock = [];
-  var needReplenish = [];
-
-  rows.forEach(function(row) {
-    var qty = cleanNum(row['Quantity Available'] || row['Current FBA Stock'] || '0');
-    var replenish = cleanNum(row['Replenish Inventory'] || '0');
-    var sku = row['seller-sku'] || row['SKU'] || '';
-    var title = (row['Title'] || sku || '').slice(0, 60);
-
-    if (qty === 0) outOfStock.push({ sku: sku, title: title, replenish: replenish });
-    else if (qty < 10 && qty > 0) lowStock.push({ sku: sku, title: title, qty: qty });
-    if (replenish > 0) needReplenish.push({ sku: sku, title: title, replenish: replenish });
-  });
-
-  if (outOfStock.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'urgent',
-      icon: '🚨',
-      title: 'OUT OF STOCK — ' + outOfStock.length + ' Products!',
-      detail: outOfStock.slice(0,3).map(function(x){ return (x.title || x.sku); }).join(' | '),
-      suggestions: [
-        { text: 'FBA mein stock bhejo ASAP — ' + outOfStock.length + ' products out of stock hain. Sales loss ho raha hai!', dept: 'Ops', time: 1 },
-        { text: 'Out of stock SKUs pe ads pause karo — wasted spend rokne ke liye', dept: 'Ads', time: 1 },
-      ]
-    });
-  }
-
-  if (lowStock.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'high',
-      icon: '⚠️',
-      title: 'Low Stock Warning (' + lowStock.length + ' products < 10 units)',
-      detail: lowStock.slice(0,3).map(function(x){ return x.title + ' (' + x.qty + ' left)'; }).join(' | '),
-      suggestions: [
-        { text: 'Replenishment plan banao — low stock products ke liye shipment schedule karo', dept: 'Ops', time: 2 },
-      ]
-    });
-  }
-
-  if (needReplenish.length > outOfStock.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'medium',
-      icon: '📦',
-      title: 'Replenishment Needed (' + needReplenish.length + ' products)',
-      detail: needReplenish.slice(0,3).map(function(x){ return x.title + ' (' + x.replenish + ' units)'; }).join(' | '),
-      suggestions: [
-        { text: 'Inventory plan review karo aur FBA shipment create karo', dept: 'Ops', time: 3 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function parseAdsReport(raw) {
-  var insights = [];
-  var rows = parseCSV(raw);
-  if (!rows.length) return insights;
-
-  var highSpendNoSales = [];
-  var highACOS = [];
-  var goodCTRLowConv = [];
-  var totalSpend = 0;
-  var totalSales = 0;
-
-  rows.forEach(function(row) {
-    var spend = cleanNum(row['Spend'] || '0');
-    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
-    var acos = cleanNum(row['Total Advertising Cost of Sales (ACOS) '] || '0');
-    var clicks = cleanNum(row['Clicks'] || '0');
-    var ctr = cleanNum(row['Click-Through Rate (CTR)'] || '0');
-    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
-    var keyword = row['Targeting'] || row['Customer Search Term'] || '';
-    totalSpend += spend;
-    totalSales += sales;
-
-    if (spend > 100 && sales === 0) highSpendNoSales.push({ keyword: keyword, spend: spend, clicks: clicks });
-    if (acos > 50 && spend > 50) highACOS.push({ keyword: keyword, acos: acos, spend: spend });
-    if (ctr > 0.5 && conv < 5 && spend > 50) goodCTRLowConv.push({ keyword: keyword, ctr: ctr, conv: conv });
-  });
-
-  var overallACOS = totalSales > 0 ? Math.round((totalSpend / totalSales) * 100) : 0;
-
-  if (highSpendNoSales.length) {
-    var totalWasted = highSpendNoSales.reduce(function(s,x){ return s + x.spend; }, 0);
-    insights.push({
-      type: 'ads',
-      priority: 'urgent',
-      icon: '💸',
-      title: 'Wasted Spend — ₹' + Math.round(totalWasted).toLocaleString('en-IN') + ' on ' + highSpendNoSales.length + ' keywords (0 sales)',
-      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.keyword + '" ₹' + Math.round(x.spend); }).join(' | '),
-      suggestions: [
-        { text: 'Ye keywords pause karo ya bid ₹5 tak kam karo: ' + highSpendNoSales.slice(0,5).map(function(x){ return x.keyword; }).join(', '), dept: 'Ads', time: 1 },
-        { text: 'Negative keywords add karo irrelevant traffic rokne ke liye', dept: 'Ads', time: 1 },
-      ]
-    });
-  }
-
-  if (highACOS.length) {
-    insights.push({
-      type: 'ads',
-      priority: 'high',
-      icon: '📊',
-      title: 'High ACOS Keywords (' + highACOS.length + ' keywords > 50% ACOS)',
-      detail: highACOS.slice(0,3).map(function(x){ return '"' + x.keyword + '" ACOS:' + x.acos + '%'; }).join(' | '),
-      suggestions: [
-        { text: 'High ACOS keywords ke bids 20-30% kam karo', dept: 'Ads', time: 1 },
-        { text: 'Campaign structure review karo — exact match mein move karo', dept: 'Ads', time: 2 },
-      ]
-    });
-  }
-
-  if (overallACOS > 30) {
-    insights.push({
-      type: 'ads',
-      priority: 'medium',
-      icon: '📈',
-      title: 'Overall ACOS ' + overallACOS + '% — Target 20-25% hona chahiye',
-      detail: 'Total Spend: ₹' + Math.round(totalSpend).toLocaleString('en-IN') + ' | Total Sales: ₹' + Math.round(totalSales).toLocaleString('en-IN'),
-      suggestions: [
-        { text: 'Budget allocation review karo — top performing campaigns mein shift karo', dept: 'Ads', time: 2 },
-        { text: 'Dayparting set karo — peak hours mein hi ads chalao', dept: 'Ads', time: 2 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function parseAdvertisedReport(raw) {
-  var insights = [];
-  var rows = parseCSV(raw);
-  if (!rows.length) return insights;
-
-  var lowImpression = [];
-  rows.forEach(function(row) {
-    var imp = cleanNum(row['Impressions'] || '0');
-    var spend = cleanNum(row['Spend'] || '0');
-    var asin = row['Advertised ASIN'] || row['(Child) ASIN'] || '';
-    var sku = row['Advertised SKU'] || '';
-    if (imp < 100 && spend > 0) lowImpression.push({ asin: asin, sku: sku, imp: imp, spend: spend });
-  });
-
-  if (lowImpression.length) {
-    insights.push({
-      type: 'ads',
-      priority: 'medium',
-      icon: '👁️',
-      title: 'Low Impression ASINs (' + lowImpression.length + ' products < 100 impressions)',
-      detail: 'Yeh products ads mein proper show nahi ho rahe',
-      suggestions: [
-        { text: 'Low impression ASINs ke bids increase karo 30-50%', dept: 'Ads', time: 1 },
-        { text: 'Campaign mein broader match types add karo', dept: 'Ads', time: 2 },
-        { text: 'Product listing quality check karo — listing suppressed to nahi?', dept: 'Ops', time: 1 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function parseSearchTermReport(raw) {
-  var insights = [];
-  var rows = parseCSV(raw);
-  if (!rows.length) return insights;
-
-  var highConvTerms = [];
-  var highSpendNoSales = [];
-
-  rows.forEach(function(row) {
-    var term = row['Customer Search Term'] || '';
-    var orders = cleanNum(row['7 Day Total Orders (#)'] || '0');
-    var spend = cleanNum(row['Spend'] || '0');
-    var sales = cleanNum(row['7 Day Total Sales (₹)'] || '0');
-    var conv = cleanNum(row['7 Day Conversion Rate'] || '0');
-    var clicks = cleanNum(row['Clicks'] || '0');
-
-    if (orders >= 2 && conv > 10 && term) highConvTerms.push({ term: term, orders: orders, conv: conv });
-    if (spend > 200 && sales === 0 && term) highSpendNoSales.push({ term: term, spend: spend });
-  });
-
-  if (highConvTerms.length) {
-    insights.push({
-      type: 'ads',
-      priority: 'medium',
-      icon: '🌟',
-      title: 'High Converting Search Terms (' + highConvTerms.length + ' terms)',
-      detail: highConvTerms.slice(0,3).map(function(x){ return '"' + x.term + '" ' + x.conv + '% conv'; }).join(' | '),
-      suggestions: [
-        { text: 'Yeh terms exact match mein add karo aur budget badhao: ' + highConvTerms.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
-      ]
-    });
-  }
-
-  if (highSpendNoSales.length) {
-    insights.push({
-      type: 'ads',
-      priority: 'high',
-      icon: '🚫',
-      title: 'Irrelevant Search Terms (' + highSpendNoSales.length + ' terms — spend without sales)',
-      detail: highSpendNoSales.slice(0,3).map(function(x){ return '"' + x.term + '" ₹' + Math.round(x.spend); }).join(' | '),
-      suggestions: [
-        { text: 'Yeh search terms negative mein add karo: ' + highSpendNoSales.slice(0,3).map(function(x){ return x.term; }).join(', '), dept: 'Ads', time: 1 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function parseReturnsReport(raw) {
-  var insights = [];
-  var rows = parseTSV(raw);
-  if (rows.length < 2) return insights;
-
-  var reasons = {};
-  rows.forEach(function(row) {
-    var reason = row['Return reason'] || '';
-    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
-  });
-
-  var topReasons = Object.entries(reasons).sort(function(a,b){ return b[1]-a[1]; }).slice(0,3);
-  if (topReasons.length) {
-    insights.push({
-      type: 'ops',
-      priority: 'medium',
-      icon: '🔄',
-      title: 'Returns Analysis (' + rows.length + ' returns)',
-      detail: topReasons.map(function(r){ return r[0] + ': ' + r[1]; }).join(' | '),
-      suggestions: [
-        { text: 'Return reasons analyze karo aur product quality/packaging improve karo', dept: 'Ops', time: 3 },
-        { text: 'High return rate ASINs ki listings mein accurate size/spec add karo', dept: 'Ops', time: 2 },
-      ]
-    });
-  }
-
-  return insights;
-}
-
-function renderInsights(insights) {
-  var results = document.getElementById('ra-results');
-  if (!insights.length) {
-    results.innerHTML = '<div class="empty-state"><div class="emoji">✅</div><h3>Koi major issue nahi mila!</h3><p>Reports analyze ho gayi — sab theek dikh raha hai.</p></div>';
-    return;
-  }
-
-  var urgent = insights.filter(function(x){ return x.priority === 'urgent'; });
-  var high = insights.filter(function(x){ return x.priority === 'high'; });
-  var medium = insights.filter(function(x){ return x.priority === 'medium'; });
-
-  var html = '<div style="margin-bottom:16px;">'
-    + '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">📊 Analysis Complete — ' + _reportClientName + '</div>'
-    + '<div style="font-size:13px;color:var(--text-muted);">' + insights.length + ' insights mili | '
-    + (urgent.length ? '<span style="color:var(--red);">🚨 ' + urgent.length + ' Urgent</span> | ' : '')
-    + '<span style="color:var(--orange);">⚠️ ' + high.length + ' High</span> | '
-    + '<span style="color:var(--amber);">📌 ' + medium.length + ' Medium</span>'
-    + '</div></div>';
-
-  // All suggestions list for task creation
-  var allSuggestions = [];
-  insights.forEach(function(ins){ allSuggestions = allSuggestions.concat(ins.suggestions || []); });
-
-  insights.forEach(function(ins, idx) {
-    var priorityColor = ins.priority === 'urgent' ? 'var(--red)' : ins.priority === 'high' ? 'var(--orange)' : 'var(--amber)';
-    var priorityBg = ins.priority === 'urgent' ? '#fadbd8' : ins.priority === 'high' ? '#fdebd0' : '#fef9e7';
-    var deptColor = ins.type === 'ads' ? 'badge-blue' : 'badge-green';
-
-    var suggestionsHtml = (ins.suggestions || []).map(function(s, sidx) {
-      var globalIdx = allSuggestions.indexOf(s);
-      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px;background:#fff;border-radius:8px;margin-bottom:6px;border:1px solid var(--border);">'
-        + '<div style="flex:1;">'
-        + '<span class="badge ' + deptColor + '" style="font-size:10px;margin-bottom:4px;">' + s.dept + '</span>'
-        + '<div style="font-size:13px;">' + s.text + '</div>'
-        + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">⏱ ' + s.time + ' din mein karo</div>'
-        + '</div>'
-        + '<button class="btn btn-sm btn-primary" onclick="createTaskFromInsight(' + JSON.stringify(s.text).replace(/'/g,"\\'") + ',' + JSON.stringify(s.dept) + ',' + s.time + ')" style="white-space:nowrap;font-size:11px;">➕ Task</button>'
-        + '</div>';
-    }).join('');
-
-    html += '<div class="card" style="margin-bottom:12px;border-left:4px solid ' + priorityColor + ';">'
-      + '<div class="card-header" style="background:' + priorityBg + ';">'
-      + '<span style="font-size:16px;">' + ins.icon + '</span>'
-      + '<span class="card-title" style="font-size:14px;">' + ins.title + '</span>'
-      + '<span class="badge" style="background:' + priorityColor + '20;color:' + priorityColor + ';font-size:10px;">' + ins.priority.toUpperCase() + '</span>'
-      + '</div>'
-      + '<div class="card-body">'
-      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">' + ins.detail + '</div>'
-      + '<div style="font-weight:700;font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">💡 Suggested Tasks:</div>'
-      + suggestionsHtml
-      + '</div></div>';
-  });
-
-  results.innerHTML = html;
-}
-
-async function createTaskFromInsight(text, dept, days) {
-  if (!_reportClientCode) { showToast('Seller select nahi hai!', 'error'); return; }
-  var deadline = new Date();
-  deadline.setDate(deadline.getDate() + days);
-  var deadlineStr = deadline.toISOString().split('T')[0];
-
-  var category = dept === 'Ads' ? 'Ads Campaign' : 'Account Management';
-  var priority = days <= 1 ? 'Critical' : days <= 2 ? 'High' : 'Medium';
-
-  var r = await api('POST', '/tasks', {
-    title: text.slice(0, 120),
-    description: 'Amazon Report Analysis se auto-generated task. Client: ' + _reportClientName,
-    clientCode: _reportClientCode,
-    clientName: _reportClientName,
-    assignedTo: APP.user.name,
-    assignedBy: APP.user.name,
-    priority: priority,
-    category: category,
-    deadline: deadlineStr,
-  });
-
-  if (r?.success) {
-    showToast('✅ Task created: ' + r.taskId, 'success');
-  } else {
-    showToast('Error creating task', 'error');
-  }
-}
-// ═══════════════════════════════════════════════════════════════════
 // AMAZON REPORT ANALYZER v2 — ASIN LEVEL + SALES PROJECTION
 // Replace previous renderReportAnalyzer section in FRONTEND_ALL.js
 // ═══════════════════════════════════════════════════════════════════
@@ -10935,6 +10329,1767 @@ function chKpi(label, value, sub) {
     + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
     + '<div style="font-size:15px;font-weight:700;">' + value + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════
+// FEEDBACK — screenshot upload with 96-day unique check
+// Target: 5 unique feedback per month per executive
+// ══════════════════════════════════════════════════════════════════
+let _fb = { file: null, preview: null, result: null, busy: false };
+
+const FB_LEAD_ROLES_UI = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+
+async function renderFeedback() {
+  const isLead = FB_LEAD_ROLES_UI.includes(APP.user?.role);
+
+  const [clients, progress, recent, board] = await Promise.all([
+    getClients(),
+    api('GET', '/feedback/progress?_=' + Date.now()),
+    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+    isLead ? api('GET', '/feedback/leaderboard?_=' + Date.now()) : Promise.resolve(null),
+  ]);
+  if (clients) APP.clients = clients;
+
+  // Sirf registered + active sellers (manual entry nahi)
+  const list = (APP.clients || []).filter(c => {
+    const st = String(c.status || '').toLowerCase();
+    return !st.includes('inactive') && !st.includes('closed') && !st.includes('churn');
+  });
+
+  _fb = { file: null, preview: null, result: null, busy: false };
+
+  const p = progress || { target: 5, mine: 0, team_total: 0, flagged_dup: 0 };
+  const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
+  const doneCol = (p.mine || 0) >= (p.target || 5) ? 'var(--green)' : 'var(--amber)';
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">⭐ Feedback Upload</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + (p.target || 5)
+    + ' unique/month · 96-day unique check</span></div>'
+    + '<div class="card-body">'
+
+    // ── KPI ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">'
+    + fbKpi('Aapke unique (is month)', (p.mine || 0) + ' / ' + (p.target || 5), pct + '% complete', doneCol)
+    + fbKpi('Team total', String(p.team_total || 0), 'unique this month')
+    + fbKpi('Duplicate flagged', String(p.flagged_dup || 0), 'count nahi hue', 'var(--red)')
+    + fbKpi('Sellers available', String(list.length), 'registered')
+    + '</div>'
+
+    // progress bar
+    + '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:16px;">'
+    + '<div style="height:100%;width:' + pct + '%;background:' + doneCol + ';transition:width .3s;"></div></div>'
+
+    // ── upload form ──
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">'
+
+    // left: dropzone
+    + '<div>'
+    + '<label style="font-weight:700;font-size:12px;display:block;margin-bottom:6px;">Feedback screenshot (Amazon panel se)</label>'
+    + '<div id="fb-drop" style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:#fff;transition:all .2s;" '
+    +   'onclick="document.getElementById(\'fb-file\').click()" '
+    +   'ondragover="event.preventDefault()" ondrop="fbDrop(event)">'
+    + '<div id="fb-drop-inner">'
+    + '<div style="font-size:34px;margin-bottom:6px;">🖼️</div>'
+    + '<div style="font-weight:700;font-size:13px;">Click karo ya image drag karo</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">JPG / PNG · max 10MB</div>'
+    + '</div></div>'
+    + '<input type="file" id="fb-file" accept="image/*" style="display:none;" onchange="fbPick(this.files[0])">'
+    + '<div id="fb-result" style="margin-top:10px;"></div>'
+    + '</div>'
+
+    // right: fields
+    + '<div>'
+    + '<div class="form-group"><label style="font-weight:700;">Seller * <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(registered only)</span></label>'
+    + '<select class="form-control" id="fb-client">'
+    + '<option value="">-- Seller Choose Karo --</option>'
+    + list.map(c => '<option value="' + fbEsc(c.clientCode) + '">' + fbEsc(c.busyName)
+        + ' (' + fbEsc(c.clientCode) + ')</option>').join('')
+    + '</select></div>'
+    + '<div class="form-group"><label style="font-weight:700;">Feedback type</label>'
+    + '<select class="form-control" id="fb-type">'
+    + '<option>Product feedback</option><option>Seller rating</option><option>Service feedback</option>'
+    + '</select></div>'
+    + '<div class="form-group"><label style="font-weight:700;">Note (optional)</label>'
+    + '<input type="text" class="form-control" id="fb-note" placeholder="e.g. 5★ on packaging"></div>'
+    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;" onclick="fbSubmit()">Upload &amp; Check</button>'
+    + '</div>'
+
+    + '</div></div></div>'
+
+    + (board ? fbLeaderboardHtml(board) : '')
+    + '<div id="fb-recent">' + fbRecentHtml(recent || []) + '</div>';
+}
+
+function fbEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fbKpi(label, value, sub, color) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:20px;font-weight:800;' + (color ? 'color:' + color + ';' : '') + '">' + value + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);">' + sub + '</div></div>';
+}
+
+// ─── FILE PICK ────────────────────────────────────────────────────
+function fbDrop(e) {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0];
+  if (f) fbPick(f);
+}
+
+function fbPick(f) {
+  if (!f) return;
+  if (!String(f.type || '').startsWith('image/')) { showToast('Sirf image file chalegi', 'error'); return; }
+  if (f.size > 10 * 1024 * 1024) { showToast('Image 10MB se choti honi chahiye', 'error'); return; }
+
+  _fb.file = f;
+  _fb.result = null;
+  document.getElementById('fb-result').innerHTML = '';
+
+  const drop = document.getElementById('fb-drop');
+  const inner = document.getElementById('fb-drop-inner');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    inner.innerHTML =
+      '<img src="' + ev.target.result + '" style="max-height:200px;max-width:100%;border-radius:8px;object-fit:contain;">'
+      + '<div style="margin-top:6px;font-size:12px;color:var(--green);font-weight:600;">✓ ' + fbEsc(f.name) + '</div>';
+  };
+  reader.readAsDataURL(f);
+  drop.style.borderColor = 'var(--green)';
+  drop.style.background = '#f0fff4';
+}
+
+// ─── SUBMIT ───────────────────────────────────────────────────────
+async function fbSubmit() {
+  if (_fb.busy) return;
+
+  const clientSel = document.getElementById('fb-client');
+  const clientCode = clientSel.value;
+  if (!clientCode) { showToast('Pehle seller select karo!', 'error'); return; }
+  if (!_fb.file) { showToast('Screenshot choose karo!', 'error'); return; }
+
+  const clientName = clientSel.options[clientSel.selectedIndex]?.text?.split(' (')[0] || '';
+  const btn = document.getElementById('fb-submit');
+  _fb.busy = true;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+
+  try {
+    const fd = new FormData();
+    fd.append('image', _fb.file);
+    fd.append('clientCode', clientCode);
+    fd.append('clientName', clientName);
+    fd.append('fbType', document.getElementById('fb-type').value);
+    fd.append('note', document.getElementById('fb-note').value || '');
+
+    const resp = await fetch('/api/feedback/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + (typeof TOKEN !== 'undefined' && TOKEN
+        ? TOKEN
+        : (localStorage.getItem('en_token') || localStorage.getItem('enewcleus_token') || '')) },
+      body: fd,
+    });
+    const r = await resp.json();
+
+    const box = document.getElementById('fb-result');
+    if (!resp.ok || r.error) {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--red);">⚠️ ' + fbEsc(r.error || 'Upload fail') + '</div></div>';
+    } else if (r.unique) {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--green);background:#f0fff4;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--green);">✅ Unique — counted!</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">'
+        + fbEsc(r.sellerName) + ' — last feedback: '
+        + (r.daysSince == null ? 'kabhi nahi' : r.daysSince + ' din pehle')
+        + '. 96-day window ke bahar, isliye target me add ho gaya.</div></div>';
+      fbResetForm();
+      fbRefresh();
+    } else {
+      box.innerHTML = '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;">'
+        + '<div style="font-weight:700;font-size:13px;color:var(--red);">⛔ Duplicate — count nahi hoga</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">'
+        + fbEsc(r.sellerName) + ' ka feedback <strong>' + r.daysSince + ' din pehle</strong> aa chuka hai '
+        + '(96-day window ke andar). Record ho gaya par target me count nahi hoga.</div></div>';
+      fbRefresh();
+    }
+  } catch (e) {
+    document.getElementById('fb-result').innerHTML =
+      '<div style="padding:12px;border:1px solid var(--red);background:#fff5f5;border-radius:8px;color:var(--red);font-size:13px;">'
+      + '⚠️ ' + fbEsc(e.message) + '</div>';
+  } finally {
+    _fb.busy = false;
+    btn.disabled = false;
+    btn.textContent = 'Upload & Check';
+  }
+}
+
+function fbResetForm() {
+  _fb.file = null;
+  document.getElementById('fb-file').value = '';
+  document.getElementById('fb-note').value = '';
+  const drop = document.getElementById('fb-drop');
+  drop.style.borderColor = 'var(--border)';
+  drop.style.background = '#fff';
+  document.getElementById('fb-drop-inner').innerHTML =
+    '<div style="font-size:34px;margin-bottom:6px;">🖼️</div>'
+    + '<div style="font-weight:700;font-size:13px;">Click karo ya image drag karo</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">JPG / PNG · max 10MB</div>';
+}
+
+async function fbRefresh() {
+  const [progress, recent] = await Promise.all([
+    api('GET', '/feedback/progress?_=' + Date.now()),
+    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+  ]);
+  if (recent) {
+    const el = document.getElementById('fb-recent');
+    if (el) el.innerHTML = fbRecentHtml(recent);
+  }
+  if (progress) {
+    const p = progress;
+    const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
+    const kpis = document.querySelectorAll('#page-content .card-body > div:first-child > div');
+    if (kpis[0]) {
+      const v = kpis[0].querySelector('div:nth-child(2)');
+      const s = kpis[0].querySelector('div:nth-child(3)');
+      if (v) v.textContent = (p.mine || 0) + ' / ' + (p.target || 5);
+      if (s) s.textContent = pct + '% complete';
+    }
+    if (kpis[1]) { const v = kpis[1].querySelector('div:nth-child(2)'); if (v) v.textContent = String(p.team_total || 0); }
+    if (kpis[2]) { const v = kpis[2].querySelector('div:nth-child(2)'); if (v) v.textContent = String(p.flagged_dup || 0); }
+    const bar = document.querySelector('#page-content .card-body > div[style*="height:10px"] > div');
+    if (bar) bar.style.width = pct + '%';
+  }
+}
+
+// ─── RECENT UPLOADS ───────────────────────────────────────────────
+function fbRecentHtml(rows) {
+  if (!rows.length) {
+    return '<div class="card"><div class="card-header"><span class="card-title">🕐 Recent Uploads</span></div>'
+      + '<div class="card-body"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">'
+      + 'Abhi koi upload nahi.</div></div></div>';
+  }
+  return '<div class="card">'
+    + '<div class="card-header"><span class="card-title">🕐 Recent Uploads</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Last ' + rows.length + '</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+    + '<thead><tr><th>#</th><th>Seller</th><th>Type</th><th>Uploaded By</th><th>Status</th><th>Date</th><th>Shot</th></tr></thead><tbody>'
+    + rows.map((r, i) => {
+        const d = new Date(r.createdAt);
+        return '<tr>'
+          + '<td>' + (i + 1) + '</td>'
+          + '<td><strong>' + fbEsc(r.clientName || r.clientCode) + '</strong><br>'
+          + '<span style="font-size:10px;color:var(--text-muted);">' + fbEsc(r.clientCode) + '</span></td>'
+          + '<td style="font-size:12px;">' + fbEsc(r.fbType || '—') + '</td>'
+          + '<td><span style="font-size:12px;">' + fbEsc(r.uploadedBy) + '</span><br>'
+          + '<span style="font-size:10px;color:var(--text-muted);">' + fbEsc(r.uploadedByRole || '') + '</span></td>'
+          + '<td>' + (r.isUnique
+              ? '<span class="badge badge-green">Unique</span>'
+              : '<span class="badge badge-red">Duplicate (' + r.daysSince + 'd)</span>') + '</td>'
+          + '<td style="font-size:12px;">' + d.toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})
+          + '<br><span style="color:var(--text-muted);">' + d.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) + '</span></td>'
+          + '<td>' + (r.url
+              ? '<a href="' + fbEsc(r.url) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="text-decoration:none;padding:4px 10px;">👁 View</a>'
+              : '<span style="color:var(--text-muted);font-size:11px;">—</span>') + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div></div></div>';
+}
+
+// ─── LEADERBOARD (leads only) ─────────────────────────────────────
+function fbLeaderboardHtml(board) {
+  const rows = board.executives || [];
+  if (!rows.length) return '';
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🏆 Monthly Leaderboard</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + board.target + ' unique/executive</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+    + '<thead><tr><th>#</th><th>Executive</th><th>Role</th><th>Unique</th><th>Duplicate</th><th>Progress</th></tr></thead><tbody>'
+    + rows.map((e, i) =>
+        '<tr>'
+        + '<td>' + (i + 1) + '</td>'
+        + '<td><strong>' + fbEsc(e.name) + '</strong></td>'
+        + '<td style="font-size:12px;color:var(--text-muted);">' + fbEsc(e.role) + '</td>'
+        + '<td><span class="badge badge-' + (e.achieved ? 'green' : 'amber') + '">' + e.unique + '</span></td>'
+        + '<td style="color:var(--text-muted);">' + e.duplicate + '</td>'
+        + '<td style="min-width:120px;">'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+        + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + Math.min(100, e.pct) + '%;background:' + (e.achieved ? 'var(--green)' : 'var(--amber)') + ';"></div></div>'
+        + '<span style="font-size:11px;font-weight:700;">' + e.unique + '/' + e.target + '</span>'
+        + '</div></td>'
+        + '</tr>').join('')
+    + '</tbody></table></div></div></div>';
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// GROWTH COMPARISON — Period A vs Period B (Amazon / Flipkart)
+// Auto period detect · DRR normalise · charts · Hinglish verdict
+// ══════════════════════════════════════════════════════════════════
+let _gc = {
+  mp: 'amazon',
+  client: '', clientName: '',
+  A: { files: {}, days: 0, from: '', to: '', label: 'Period A' },
+  B: { files: {}, days: 0, from: '', to: '', label: 'Period B' },
+  result: null,
+  charts: {},
+};
+
+const GC_REPORTS = {
+  amazon: [
+    { key:'business', icon:'📊', name:'Business Report', must:true, accept:'.csv,.xlsx,.xls',
+      where:'Seller Central → Reports → Business Reports → Detail Page Sales & Traffic',
+      gives:'Sessions, Page Views, Conversion %, Units, Sales' },
+    { key:'campaign', icon:'📢', name:'Campaign Report', must:true, accept:'.csv,.xlsx,.xls',
+      where:'Ads Console → Measurement & Reporting → Sponsored Products → Campaign',
+      gives:'Spend, Ad Sales, ACOS, ROAS, Impressions, Clicks' },
+    { key:'searchterm', icon:'🔍', name:'Search Term Report', must:false, accept:'.csv,.xlsx,.xls',
+      where:'Ads Console → Sponsored Products → Search Term',
+      gives:'Wasted spend kitna kam hua' },
+    { key:'advertised', icon:'📦', name:'Advertised Product', must:false, accept:'.csv,.xlsx,.xls',
+      where:'Ads Console → Sponsored Products → Advertised Product',
+      gives:'ASIN-level ads comparison' },
+  ],
+  flipkart: [
+    { key:'pnl', icon:'💹', name:'Profit & Loss', must:true, accept:'.xlsx,.xls',
+      where:'Seller Hub → Reports → Business Reports',
+      gives:'Gross sales, Net earnings, Margin %, SKU-level' },
+    { key:'placement', icon:'📍', name:'Placement Report', must:true, accept:'.csv',
+      where:'Flipkart Ads → Reports → Placement',
+      gives:'Ad spend, Direct/Indirect revenue, ROI' },
+    { key:'orders', icon:'📦', name:'Orders', must:false, accept:'.xlsx,.xls',
+      where:'Seller Hub → Reports → Orders',
+      gives:'Delivered / Cancelled ka delta' },
+    { key:'returns', icon:'↩️', name:'Returns', must:false, accept:'.xlsx,.xls',
+      where:'Seller Hub → Reports → Returns',
+      gives:'Return rate improve hua ya nahi' },
+    { key:'fksearch', icon:'🔍', name:'Search Term', must:false, accept:'.csv',
+      where:'Flipkart Ads → Reports → Search Term',
+      gives:'Query-level wasted spend delta' },
+  ],
+};
+
+// ─── MAIN PAGE ────────────────────────────────────────────────────
+async function renderGrowthComparison() {
+  const clients = await getClients();
+  if (clients) APP.clients = clients;
+
+  _gc = {
+    mp: 'amazon', client: '', clientName: '',
+    A: { files:{}, days:0, from:'', to:'', label:'Period A' },
+    B: { files:{}, days:0, from:'', to:'', label:'Period B' },
+    result: null, charts: {},
+  };
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📈 Growth Comparison</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Do period compare karo — jitne din ki report, utne din ka</span></div>'
+    + '<div class="card-body">'
+
+    // marketplace tabs
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);">'
+    + '<button id="gc-tab-amazon" class="btn btn-sm btn-primary" style="border-radius:8px 8px 0 0;" onclick="gcSwitchMp(\'amazon\')">📦 Amazon</button>'
+    + '<button id="gc-tab-flipkart" class="btn btn-sm btn-outline" style="border-radius:8px 8px 0 0;" onclick="gcSwitchMp(\'flipkart\')">🛒 Flipkart</button>'
+    + '</div>'
+
+    + '<div id="gc-seller-wrap"></div>'
+    + '<div id="gc-upload-wrap"></div>'
+    + '<div id="gc-readiness"></div>'
+
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">'
+    + '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;" onclick="gcCompare()">📊 Compare Karo</button>'
+    + '<button class="btn btn-outline" id="gc-pdf-btn" style="display:none;" onclick="gcExportPDF()">📄 PDF Report</button>'
+    + '<button class="btn btn-outline" id="gc-xls-btn" style="display:none;" onclick="gcExportExcel()">📥 Excel</button>'
+    + '<button class="btn btn-outline" onclick="renderGrowthComparison()">🗑 Clear All</button>'
+    + '</div></div></div>'
+
+    + '<div id="gc-results"></div>';
+
+  gcRenderSellerPicker();
+  gcRenderUploads();
+}
+
+function gcEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function gcSwitchMp(mp) {
+  _gc.mp = mp;
+  _gc.A = { files:{}, days:0, from:'', to:'', label:'Period A' };
+  _gc.B = { files:{}, days:0, from:'', to:'', label:'Period B' };
+  _gc.result = null;
+  gcDestroyCharts();
+  document.getElementById('gc-tab-amazon').className   = 'btn btn-sm ' + (mp==='amazon'   ? 'btn-primary' : 'btn-outline');
+  document.getElementById('gc-tab-flipkart').className = 'btn btn-sm ' + (mp==='flipkart' ? 'btn-primary' : 'btn-outline');
+  document.getElementById('gc-results').innerHTML = '';
+  document.getElementById('gc-pdf-btn').style.display = 'none';
+  document.getElementById('gc-xls-btn').style.display = 'none';
+  gcRenderSellerPicker();
+  gcRenderUploads();
+}
+
+function gcRenderSellerPicker() {
+  const mp = _gc.mp;
+  const list = (APP.clients || []).filter(c => {
+    const m = String(c.marketplace || '').toLowerCase();
+    return mp === 'amazon' ? m.includes('amazon') : m.includes('flipkart');
+  });
+  const wrap = document.getElementById('gc-seller-wrap');
+  if (!wrap) return;
+
+  wrap.innerHTML = list.length
+    ? '<div class="form-group" style="max-width:420px;">'
+      + '<label style="font-weight:700;">Seller * <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(registered ' + (mp==='amazon'?'Amazon':'Flipkart') + ')</span></label>'
+      + '<select class="form-control" id="gc-client" onchange="gcSetClient()">'
+      + '<option value="">-- Seller Choose Karo --</option>'
+      + list.map(c => '<option value="' + gcEsc(c.clientCode) + '">' + gcEsc(c.busyName) + ' (' + gcEsc(c.clientCode) + ')</option>').join('')
+      + '</select></div>'
+    : '<div style="padding:10px;background:#fff5f5;border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:13px;margin-bottom:12px;">'
+      + '⚠️ Koi ' + (mp==='amazon'?'Amazon':'Flipkart') + ' seller registered nahi hai. Pehle Client Manager me add karo.</div>';
+}
+
+function gcSetClient() {
+  const sel = document.getElementById('gc-client');
+  _gc.client = sel.value;
+  _gc.clientName = sel.options[sel.selectedIndex]?.text?.split(' (')[0] || '';
+}
+
+// ─── UPLOAD GRID (2 columns: Period A | Period B) ─────────────────
+function gcRenderUploads() {
+  const reports = GC_REPORTS[_gc.mp];
+  const wrap = document.getElementById('gc-upload-wrap');
+  if (!wrap) return;
+
+  wrap.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">'
+    + ['A','B'].map(side => {
+        const isA = side === 'A';
+        const accent = isA ? 'var(--text-muted)' : 'var(--secondary)';
+        const title  = isA ? '📅 Period A — Purana (pehle wala)' : '📅 Period B — Naya (baad wala)';
+        return '<div style="border:1.5px solid ' + accent + ';border-radius:12px;padding:12px;background:#fff;">'
+          + '<div style="font-weight:800;font-size:13px;color:' + accent + ';margin-bottom:4px;">' + title + '</div>'
+          + '<div id="gc-period-' + side + '" style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Report upload karo — dates apne aap detect ho jayengi</div>'
+          + reports.map(r => gcUploadCard(side, r)).join('')
+          + '</div>';
+      }).join('')
+    + '</div>';
+
+  gcUpdateReadiness();
+}
+
+function gcUploadCard(side, r) {
+  const id = 'gc-' + side + '-' + r.key;
+  const badge = r.must
+    ? '<span class="badge badge-red" style="font-size:9px;">MUST</span>'
+    : '<span class="badge badge-gray" style="font-size:9px;">Optional</span>';
+  return '<div id="card-' + id + '" style="border:1.5px dashed var(--border);border-radius:9px;padding:9px 10px;cursor:pointer;margin-bottom:7px;background:var(--bg);" '
+    + 'onclick="document.getElementById(\'file-' + id + '\').click()">'
+    + '<div style="display:flex;gap:7px;align-items:center;">'
+    + '<span style="font-size:17px;">' + r.icon + '</span>'
+    + '<div style="flex:1;min-width:0;">'
+    + '<div style="font-weight:700;font-size:12px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;">' + r.name + ' ' + badge + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);line-height:1.4;">' + r.gives + '</div>'
+    + '</div></div>'
+    + '<div style="font-size:9.5px;color:var(--text-muted);margin-top:5px;padding-left:24px;font-style:italic;">📍 ' + r.where + '</div>'
+    + '<div id="status-' + id + '" style="font-size:11px;color:var(--text-muted);margin-top:5px;padding-left:24px;">Click karke upload karo</div>'
+    + '<input type="file" id="file-' + id + '" accept="' + r.accept + '" style="display:none;" onchange="gcHandleFile(\'' + side + '\',\'' + r.key + '\',this)">'
+    + '</div>';
+}
+
+// ─── FILE HANDLING ────────────────────────────────────────────────
+async function gcReadFile(file) {
+  const name = String(file.name || '').toLowerCase();
+  const isCsv = name.endsWith('.csv');
+  if (isCsv) {
+    const text = await file.text();
+    const wb = XLSX.read(text, { type:'string' });
+    return { text, wb, rows: XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval:null }) };
+  }
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type:'array' });
+  return { text:'', wb, rows: XLSX.utils.sheet_to_json(gcFixRef(wb.Sheets[wb.SheetNames[0]]), { defval:null }) };
+}
+
+// Amazon/Flipkart xlsx me '!ref' galat hota hai — actual cells se range recompute karo
+function gcFixRef(sheet) {
+  if (!sheet) return sheet;
+  let maxR = 0, maxC = 0;
+  for (const k in sheet) {
+    if (k[0] === '!') continue;
+    const m = /^([A-Z]+)(\d+)$/.exec(k);
+    if (!m) continue;
+    const r = parseInt(m[2], 10);
+    let c = 0;
+    for (const ch of m[1]) c = c * 26 + (ch.charCodeAt(0) - 64);
+    if (r > maxR) maxR = r;
+    if (c > maxC) maxC = c;
+  }
+  if (maxR && maxC) sheet['!ref'] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:maxR-1,c:maxC-1} });
+  return sheet;
+}
+
+function gcSheet(wb, ...nameKeys) {
+  if (!wb) return null;
+  let n = wb.SheetNames.find(s => nameKeys.some(k => s.toLowerCase() === k.toLowerCase()));
+  if (!n) n = wb.SheetNames.find(s => nameKeys.some(k => s.toLowerCase().includes(k.toLowerCase())));
+  return n ? gcFixRef(wb.Sheets[n]) : null;
+}
+
+async function gcHandleFile(side, key, input) {
+  if (!input.files?.[0]) return;
+  const file = input.files[0];
+  const id = 'gc-' + side + '-' + key;
+  const status = document.getElementById('status-' + id);
+  const card = document.getElementById('card-' + id);
+  status.innerHTML = '<span style="color:var(--amber);">⏳ Padh raha hoon...</span>';
+
+  try {
+    const parsed = await gcReadFile(file);
+    _gc[side].files[key] = { ...parsed, filename: file.name };
+
+    // period detect
+    gcDetectPeriod(side, key, parsed);
+
+    const n = parsed.rows?.length || 0;
+    status.innerHTML = '<span style="color:var(--green);">✅ ' + gcEsc(file.name) + (n ? ' (' + n + ' rows)' : '') + '</span>';
+    card.style.borderColor = 'var(--green)';
+    card.style.borderStyle = 'solid';
+    card.style.background = '#f0fff4';
+  } catch (e) {
+    status.innerHTML = '<span style="color:var(--red);">❌ ' + gcEsc(e.message) + '</span>';
+    card.style.borderColor = 'var(--red)';
+  }
+  gcUpdateReadiness();
+}
+
+// Period nikalo — Amazon campaign report se dates, Flipkart CSV se metadata
+function gcDetectPeriod(side, key, parsed) {
+  const P = _gc[side];
+  let from = '', to = '';
+
+  if (_gc.mp === 'flipkart' && parsed.text) {
+    const lines = String(parsed.text).split(/\r?\n/).slice(0, 8);
+    for (const ln of lines) {
+      const low = ln.toLowerCase();
+      if (low.startsWith('start time')) from = ln.split(',').slice(1).join(',').trim();
+      if (low.startsWith('end time'))   to   = ln.split(',').slice(1).join(',').trim();
+    }
+  }
+
+  if (!from && parsed.rows?.length) {
+    const r0 = parsed.rows[0];
+    const kS = gcKey(r0, 'start', 'date') || gcKey(r0, 'start', 'time');
+    const kE = gcKey(r0, 'end', 'date')   || gcKey(r0, 'end', 'time');
+    if (kS) from = r0[kS];
+    if (kE) to   = r0[kE];
+  }
+
+  if (from && to) {
+    const d1 = gcToDate(from), d2 = gcToDate(to);
+    if (d1 && d2) {
+      P.from = gcDateStr(d1);
+      P.to   = gcDateStr(d2);
+      P.days = Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+      const el = document.getElementById('gc-period-' + side);
+      if (el) el.innerHTML = '<strong style="color:var(--primary);">' + P.from + ' → ' + P.to + '</strong> · ' + P.days + ' din';
+    }
+  }
+}
+
+function gcToDate(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+  const d = new Date(String(v).replace(' ', 'T'));
+  return isNaN(d) ? null : d;
+}
+
+function gcDateStr(d) {
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getUTCDate() + ' ' + M[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+}
+
+function gcKey(row, ...keys) {
+  for (const k of Object.keys(row || {})) {
+    const lk = k.toLowerCase();
+    if (keys.every(q => lk.includes(q.toLowerCase()))) return k;
+  }
+  return null;
+}
+
+function gcNum(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  const n = parseFloat(String(v).replace(/[₹,%\s]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function gcPct(a, b) { return b ? Math.round(a / b * 10000) / 100 : 0; }
+
+function gcFmt(n) {
+  n = Math.round(n || 0);
+  const s = n < 0 ? '-' : '';
+  n = Math.abs(n);
+  if (n >= 1e7) return s + (n/1e7).toFixed(2).replace(/\.?0+$/,'') + 'Cr';
+  if (n >= 1e5) return s + (n/1e5).toFixed(2).replace(/\.?0+$/,'') + 'L';
+  if (n >= 1e3) return s + (n/1e3).toFixed(1).replace(/\.0$/,'') + 'K';
+  return s + n;
+}
+function gcR(n) { return '₹' + gcFmt(n); }
+
+// ─── READINESS BAR ────────────────────────────────────────────────
+function gcUpdateReadiness() {
+  const box = document.getElementById('gc-readiness');
+  if (!box) return;
+  const reports = GC_REPORTS[_gc.mp];
+  const musts = reports.filter(r => r.must);
+  const opts  = reports.filter(r => !r.must);
+
+  const line = side => {
+    const P = _gc[side];
+    const haveMust = musts.filter(r => P.files[r.key]);
+    const haveOpt  = opts.filter(r => P.files[r.key]);
+    const missing  = musts.filter(r => !P.files[r.key]);
+    const ok = missing.length === 0;
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:5px;">'
+      + '<strong style="min-width:64px;">Period ' + side + ':</strong>'
+      + '<span style="color:' + (ok ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">'
+      + (ok ? '✅' : '⚠️') + ' ' + haveMust.length + '/' + musts.length + ' must</span>'
+      + '<span style="color:var(--text-muted);">· ' + haveOpt.length + '/' + opts.length + ' optional</span>'
+      + (missing.length ? '<span style="color:var(--red);">— ' + missing.map(m => m.name).join(', ') + ' missing</span>' : '')
+      + '</div>';
+  };
+
+  // period mismatch warning
+  let warn = '';
+  const dA = _gc.A.days, dB = _gc.B.days;
+  if (dA && dB && dA !== dB) {
+    warn = '<div style="margin-top:8px;padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;">'
+      + '⚠️ <strong>Period alag-alag hain</strong> — A: ' + dA + ' din, B: ' + dB + ' din. '
+      + 'Comparison <strong>daily-average (DRR) basis</strong> pe hoga taaki fair rahe.</div>';
+  } else if (dA && dB) {
+    warn = '<div style="margin-top:8px;font-size:12px;color:var(--green);">✅ Dono period ' + dA + ' din ke hain — direct comparison.</div>';
+  }
+
+  // what will be skipped
+  const skips = [];
+  for (const r of opts) {
+    const a = !!_gc.A.files[r.key], b = !!_gc.B.files[r.key];
+    if (a !== b || (!a && !b)) skips.push(r.name);
+  }
+  const skipHtml = skips.length
+    ? '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);">ℹ️ Ye sections skip honge (dono period me nahi hain): ' + skips.join(', ') + '</div>'
+    : '';
+
+  box.innerHTML = '<div style="margin-top:14px;padding:11px 13px;background:var(--bg);border-radius:9px;border:1px solid var(--border);">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">📋 Readiness</div>'
+    + line('A') + line('B') + warn + skipHtml + '</div>';
+}
+
+// ─── PARSERS: AMAZON ──────────────────────────────────────────────
+function gcAmzBusiness(side) {
+  const f = _gc[side].files.business;
+  if (!f) return null;
+  const rows = f.rows || [];
+  if (!rows.length) return null;
+  const r0 = rows[0];
+  const kAsin  = gcKey(r0,'child','asin') || gcKey(r0,'asin');
+  const kTitle = gcKey(r0,'title');
+  const kSess  = gcKey(r0,'sessions','total') || gcKey(r0,'sessions');
+  const kViews = gcKey(r0,'page views','total') || gcKey(r0,'page views');
+  const kUnits = gcKey(r0,'units ordered');
+  const kSales = gcKey(r0,'ordered product sales');
+  const kBuyBox= gcKey(r0,'featured offer') || gcKey(r0,'buy box');
+
+  let sessions=0, views=0, units=0, sales=0, bbSum=0, bbN=0;
+  const items = [];
+  for (const r of rows) {
+    const s = gcNum(kSess ? r[kSess] : 0);
+    const u = gcNum(kUnits ? r[kUnits] : 0);
+    const v = gcNum(kSales ? r[kSales] : 0);
+    sessions += s;
+    views    += gcNum(kViews ? r[kViews] : 0);
+    units    += u;
+    sales    += v;
+    if (kBuyBox && r[kBuyBox] != null && r[kBuyBox] !== '') { bbSum += gcNum(r[kBuyBox]); bbN++; }
+    const asin = kAsin ? String(r[kAsin] || '').trim() : '';
+    if (asin) items.push({ asin, title: kTitle ? String(r[kTitle]||'').trim() : '', sessions:s, units:u, sales:v });
+  }
+  return {
+    sessions, views, units, sales,
+    cvr: gcPct(units, sessions),
+    aov: units ? Math.round(sales / units * 100) / 100 : 0,
+    buyBox: bbN ? Math.round(bbSum / bbN * 100) / 100 : null,
+    items,
+  };
+}
+
+function gcAmzCampaign(side) {
+  const f = _gc[side].files.campaign;
+  if (!f) return null;
+  const rows = f.rows || [];
+  if (!rows.length) return null;
+  const r0 = rows[0];
+  const kSales = gcSalesKey(r0);
+  const kOrd   = gcOrdersKey(r0);
+  const kName  = gcKey(r0,'campaign','name');
+
+  let spend=0, sales=0, orders=0, impr=0, clicks=0;
+  const camps = [];
+  for (const r of rows) {
+    const sp = gcNum(r['Spend'] != null ? r['Spend'] : (gcKey(r,'spend') ? r[gcKey(r,'spend')] : 0));
+    const sl = gcNum(kSales ? r[kSales] : 0);
+    const od = gcNum(kOrd ? r[kOrd] : 0);
+    const im = gcNum(r['Impressions'] != null ? r['Impressions'] : 0);
+    const cl = gcNum(r['Clicks'] != null ? r['Clicks'] : 0);
+    spend+=sp; sales+=sl; orders+=od; impr+=im; clicks+=cl;
+    const nm = kName ? String(r[kName]||'').trim() : '';
+    if (nm) camps.push({ name:nm, spend:sp, sales:sl, orders:od, acos: gcPct(sp, sl) });
+  }
+  return {
+    spend, sales, orders, impr, clicks,
+    acos: gcPct(spend, sales),
+    roas: spend ? Math.round(sales / spend * 100) / 100 : 0,
+    ctr:  gcPct(clicks, impr),
+    cvr:  gcPct(orders, clicks),
+    cpc:  clicks ? Math.round(spend / clicks * 100) / 100 : 0,
+    camps,
+  };
+}
+
+// "sales" column dhoondo par "Cost of Sales (ACOS)" ko chhod do
+function gcSalesKey(row) {
+  const ks = Object.keys(row || {});
+  for (const k of ks) {
+    const lk = k.toLowerCase();
+    if (lk.includes('sales') && !lk.includes('cost') && !lk.includes('acos') &&
+        (lk.includes('total') || lk.includes('7 day') || lk.includes('₹') || lk.includes('ordered product'))) return k;
+  }
+  for (const k of ks) {
+    const lk = k.toLowerCase();
+    if (lk.includes('sales') && !lk.includes('cost') && !lk.includes('acos')) return k;
+  }
+  return null;
+}
+function gcOrdersKey(row) {
+  const ks = Object.keys(row || {});
+  for (const k of ks) {
+    const lk = k.toLowerCase();
+    if (lk.includes('orders') && (lk.includes('total') || lk.includes('7 day'))) return k;
+  }
+  for (const k of ks) if (k.toLowerCase().includes('orders')) return k;
+  return null;
+}
+
+function gcAmzWasted(side) {
+  const f = _gc[side].files.searchterm;
+  if (!f) return null;
+  const rows = f.rows || [];
+  if (!rows.length) return null;
+  const r0 = rows[0];
+  const kSpend = gcKey(r0,'spend');
+  const kOrd   = gcOrdersKey(r0);
+  let wasted = 0, terms = 0;
+  for (const r of rows) {
+    const sp = gcNum(kSpend ? r[kSpend] : 0);
+    const od = gcNum(kOrd ? r[kOrd] : 0);
+    if (sp > 0 && od === 0) { wasted += sp; terms++; }
+  }
+  return { wasted, terms };
+}
+
+// ─── PARSERS: FLIPKART ────────────────────────────────────────────
+function gcFkPnl(side) {
+  const f = _gc[side].files.pnl;
+  if (!f) return null;
+  const sh = gcSheet(f.wb, 'Overall Summary');
+  const items = {};
+  if (sh) {
+    const raw = XLSX.utils.sheet_to_json(sh, { header:1, defval:null });
+    for (const r of raw) {
+      const vals = (r || []).filter(c => c != null && c !== '');
+      if (vals.length < 2) continue;
+      const label = String(vals[0]).replace(/^[•\s]+/, '').trim();
+      if (!label || label.startsWith('-')) continue;
+      items[label] = gcNum(vals[1]);
+    }
+  }
+  const pv = (...names) => { for (const n of names) if (items[n] != null) return items[n]; return 0; };
+  const gross = pv('Estimated Net Sales', 'Gross Sales');
+  const net   = pv('Earnings on Platform', 'Net Earnings');
+  const exp   = pv('Total Expenses');
+
+  // SKU sheet
+  const shSku = gcSheet(f.wb, 'SKU-level', 'SKU level');
+  const skus = [];
+  if (shSku) {
+    const raw = XLSX.utils.sheet_to_json(shSku, { header:1, defval:null });
+    if (raw.length > 2) {
+      const h0 = raw[0]||[], h1 = raw[1]||[];
+      const cols = [];
+      for (let i = 0; i < Math.max(h0.length, h1.length); i++) {
+        cols.push(((h0[i]?String(h0[i]).trim():'') + ' ' + (h1[i]?String(h1[i]).trim():'')).trim());
+      }
+      const idx = (...keys) => cols.findIndex(c => c && keys.every(k => c.toLowerCase().includes(k.toLowerCase())));
+      const iSku=idx('SKU ID'), iNetU=idx('Net Units'), iSales=idx('Estimated Net Sales'), iEarn=idx('Net Earnings'), iRet=idx('Returned & Cancelled Units'), iGross=idx('Gross Units');
+      for (let i = 2; i < raw.length; i++) {
+        const r = raw[i]||[];
+        const sku = iSku>=0 ? r[iSku] : null;
+        if (!sku || !String(sku).trim()) continue;
+        skus.push({
+          sku: String(sku).trim(),
+          units: gcNum(r[iNetU]),
+          sales: gcNum(r[iSales]),
+          earnings: gcNum(r[iEarn]),
+          returned: Math.abs(gcNum(r[iRet])),
+          grossUnits: gcNum(r[iGross]),
+        });
+      }
+    }
+  }
+  const units = skus.reduce((s,k) => s + k.units, 0);
+  return {
+    gross, net, expenses: exp,
+    margin: gcPct(net, gross),
+    units,
+    aov: units ? Math.round(gross / units * 100) / 100 : 0,
+    skus,
+  };
+}
+
+function gcFkPlacement(side) {
+  const f = _gc[side].files.placement;
+  if (!f) return null;
+  const rows = gcCsvRows(f);
+  if (!rows.length) return null;
+  let spend=0, dRev=0, iRev=0, dU=0, iU=0, views=0, clicks=0;
+  const plc = {};
+  for (const r of rows) {
+    const m = gcFkMetrics(r);
+    spend+=m.spend; dRev+=m.dRev; iRev+=m.iRev; dU+=m.dU; iU+=m.iU; views+=m.views; clicks+=m.clicks;
+    const p = String(r[gcKey(r,'placement','type')] || '').trim();
+    if (p) {
+      const x = plc[p] || (plc[p] = { placement:p, spend:0, rev:0 });
+      x.spend += m.spend; x.rev += m.dRev + m.iRev;
+    }
+  }
+  const totRev = dRev + iRev;
+  return {
+    spend, dRev, iRev, totRev, units: dU + iU, views, clicks,
+    dRoi:   spend ? Math.round(dRev/spend*100)/100 : 0,
+    totRoi: spend ? Math.round(totRev/spend*100)/100 : 0,
+    ctr: gcPct(clicks, views),
+    cvr: clicks ? Math.round((dU+iU)/clicks*10000)/100 : 0,
+    cpc: clicks ? Math.round(spend/clicks*100)/100 : 0,
+    placements: Object.values(plc).map(p => ({ ...p, roi: p.spend ? Math.round(p.rev/p.spend*100)/100 : 0 })),
+  };
+}
+
+// Flipkart CSV me header se pehle metadata rows hoti hain
+function gcCsvRows(f) {
+  if (!f.text) return f.rows || [];
+  const wb = XLSX.read(f.text, { type:'string' });
+  const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:null });
+  let hdr = -1;
+  for (let i = 0; i < Math.min(12, raw.length); i++) {
+    const j = (raw[i]||[]).map(c => String(c||'').toLowerCase()).join('|');
+    if (j.includes('campaign') || j.includes('adgroup') || j.includes('placement')) { hdr = i; break; }
+  }
+  if (hdr < 0) return f.rows || [];
+  const cols = (raw[hdr]||[]).map(c => String(c||'').trim());
+  const out = [];
+  for (let i = hdr+1; i < raw.length; i++) {
+    const r = raw[i]||[];
+    if (!r.length || r.every(c => c==null || c==='')) continue;
+    const o = {};
+    cols.forEach((c, j) => { if (c) o[c] = r[j]; });
+    out.push(o);
+  }
+  return out;
+}
+
+function gcFkMetrics(r) {
+  const g = (...k) => { const key = gcKey(r, ...k); return key ? gcNum(r[key]) : 0; };
+  return {
+    spend:  gcKey(r,'sum(cost)') ? gcNum(r[gcKey(r,'sum(cost)')]) : g('ad spend') || g('spend'),
+    views:  g('views'),
+    clicks: g('clicks'),
+    dRev:   g('direct','revenue'),
+    iRev:   g('indirect','revenue'),
+    dU:     g('direct','units'),
+    iU:     g('indirect','units'),
+  };
+}
+
+function gcFkReturns(side) {
+  const f = _gc[side].files.returns;
+  if (!f) return null;
+  const sh = gcSheet(f.wb, 'Returns');
+  const rows = sh ? XLSX.utils.sheet_to_json(sh, { defval:null }) : (f.rows || []);
+  return rows.length ? { total: rows.length } : null;
+}
+
+function gcFkOrders(side) {
+  const f = _gc[side].files.orders;
+  if (!f) return null;
+  const sh = gcSheet(f.wb, 'Orders');
+  const rows = sh ? XLSX.utils.sheet_to_json(sh, { defval:null }) : (f.rows || []);
+  if (!rows.length) return null;
+  const kSt = gcKey(rows[0],'order_item_status') || gcKey(rows[0],'status');
+  const st = {};
+  for (const r of rows) {
+    const s = String(r[kSt] || 'UNKNOWN').toUpperCase().trim();
+    st[s] = (st[s]||0) + 1;
+  }
+  return {
+    total: rows.length,
+    delivered: st['DELIVERED']||0,
+    cancelled: st['CANCELLED']||0,
+    returned:  st['RETURNED']||0,
+  };
+}
+
+// ─── COMPARE ENGINE ───────────────────────────────────────────────
+function gcCompare() {
+  if (!_gc.client) { showToast('Pehle seller select karo!', 'error'); return; }
+  const reports = GC_REPORTS[_gc.mp];
+  const musts = reports.filter(r => r.must);
+  for (const side of ['A','B']) {
+    const missing = musts.filter(r => !_gc[side].files[r.key]);
+    if (missing.length) {
+      showToast('Period ' + side + ' me ' + missing.map(m=>m.name).join(', ') + ' missing hai!', 'error');
+      return;
+    }
+  }
+
+  document.getElementById('gc-results').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Compare kar raha hoon...</div>';
+
+  try {
+    _gc.result = _gc.mp === 'amazon' ? gcBuildAmazon() : gcBuildFlipkart();
+    gcRenderResults();
+    document.getElementById('gc-pdf-btn').style.display = '';
+    document.getElementById('gc-xls-btn').style.display = '';
+  } catch (e) {
+    console.error('GC compare error', e);
+    document.getElementById('gc-results').innerHTML =
+      '<div class="card"><div class="card-body" style="color:var(--red);">❌ Comparison fail: ' + gcEsc(e.message) + '</div></div>';
+  }
+}
+
+// normalise factor — agar din alag hain to daily-average pe laao
+function gcNorm() {
+  const dA = _gc.A.days, dB = _gc.B.days;
+  if (dA && dB && dA !== dB) return { on:true, fA: 1/dA, fB: 1/dB, dA, dB };
+  return { on:false, fA:1, fB:1, dA, dB };
+}
+
+function gcDelta(a, b, isPct) {
+  const diff = b - a;
+  const pct = a ? Math.round(diff / Math.abs(a) * 1000) / 10 : (b ? 100 : 0);
+  return { a, b, diff, pct, up: diff > 0, flat: Math.abs(diff) < 1e-9, isPct: !!isPct };
+}
+
+function gcBuildAmazon() {
+  const N = gcNorm();
+  const bizA = gcAmzBusiness('A'), bizB = gcAmzBusiness('B');
+  const cmpA = gcAmzCampaign('A'), cmpB = gcAmzCampaign('B');
+  const wstA = gcAmzWasted('A'),   wstB = gcAmzWasted('B');
+
+  const sc = (v, side) => N.on ? v * (side==='A' ? N.fA : N.fB) : v;
+
+  const M = {
+    sessions: gcDelta(sc(bizA.sessions,'A'), sc(bizB.sessions,'B')),
+    views:    gcDelta(sc(bizA.views,'A'),    sc(bizB.views,'B')),
+    units:    gcDelta(sc(bizA.units,'A'),    sc(bizB.units,'B')),
+    sales:    gcDelta(sc(bizA.sales,'A'),    sc(bizB.sales,'B')),
+    cvr:      gcDelta(bizA.cvr, bizB.cvr, true),
+    aov:      gcDelta(bizA.aov, bizB.aov),
+    spend:    gcDelta(sc(cmpA.spend,'A'),    sc(cmpB.spend,'B')),
+    adSales:  gcDelta(sc(cmpA.sales,'A'),    sc(cmpB.sales,'B')),
+    acos:     gcDelta(cmpA.acos, cmpB.acos, true),
+    roas:     gcDelta(cmpA.roas, cmpB.roas),
+    impr:     gcDelta(sc(cmpA.impr,'A'),     sc(cmpB.impr,'B')),
+    clicks:   gcDelta(sc(cmpA.clicks,'A'),   sc(cmpB.clicks,'B')),
+    ctr:      gcDelta(cmpA.ctr, cmpB.ctr, true),
+    cpc:      gcDelta(cmpA.cpc, cmpB.cpc),
+  };
+
+  // TACOS + organic split
+  const tacosA = gcPct(cmpA.spend, bizA.sales), tacosB = gcPct(cmpB.spend, bizB.sales);
+  M.tacos = gcDelta(tacosA, tacosB, true);
+  const orgA = Math.max(0, bizA.sales - cmpA.sales), orgB = Math.max(0, bizB.sales - cmpB.sales);
+  M.organic = gcDelta(sc(orgA,'A'), sc(orgB,'B'));
+
+  const split = {
+    A: { ad: cmpA.sales, organic: orgA },
+    B: { ad: cmpB.sales, organic: orgB },
+  };
+
+  // wasted spend (dono period me ho to hi)
+  let wasted = null;
+  if (wstA && wstB) wasted = gcDelta(sc(wstA.wasted,'A'), sc(wstB.wasted,'B'));
+
+  // waterfall: revenue change kahan se aaya
+  const wf = gcWaterfall(
+    { traffic: bizA.sessions, cvr: bizA.cvr/100, aov: bizA.aov },
+    { traffic: bizB.sessions, cvr: bizB.cvr/100, aov: bizB.aov },
+    N
+  );
+
+  // ASIN-level delta
+  const asins = gcItemDelta(bizA.items, bizB.items, 'asin', N);
+
+  return {
+    mp:'amazon', M, split, wasted, wf, asins, N,
+    raw: { bizA, bizB, cmpA, cmpB, wstA, wstB },
+    verdict: gcVerdictAmazon(M, wasted, wf, N),
+  };
+}
+
+function gcBuildFlipkart() {
+  const N = gcNorm();
+  const pnlA = gcFkPnl('A'), pnlB = gcFkPnl('B');
+  const plcA = gcFkPlacement('A'), plcB = gcFkPlacement('B');
+  const retA = gcFkReturns('A'), retB = gcFkReturns('B');
+  const ordA = gcFkOrders('A'),  ordB = gcFkOrders('B');
+
+  const sc = (v, side) => N.on ? v * (side==='A' ? N.fA : N.fB) : v;
+
+  const M = {
+    gross:   gcDelta(sc(pnlA.gross,'A'),   sc(pnlB.gross,'B')),
+    net:     gcDelta(sc(pnlA.net,'A'),     sc(pnlB.net,'B')),
+    margin:  gcDelta(pnlA.margin, pnlB.margin, true),
+    units:   gcDelta(sc(pnlA.units,'A'),   sc(pnlB.units,'B')),
+    aov:     gcDelta(pnlA.aov, pnlB.aov),
+    spend:   gcDelta(sc(plcA.spend,'A'),   sc(plcB.spend,'B')),
+    adRev:   gcDelta(sc(plcA.totRev,'A'),  sc(plcB.totRev,'B')),
+    dRev:    gcDelta(sc(plcA.dRev,'A'),    sc(plcB.dRev,'B')),
+    iRev:    gcDelta(sc(plcA.iRev,'A'),    sc(plcB.iRev,'B')),
+    roi:     gcDelta(plcA.totRoi, plcB.totRoi),
+    dRoi:    gcDelta(plcA.dRoi, plcB.dRoi),
+    views:   gcDelta(sc(plcA.views,'A'),   sc(plcB.views,'B')),
+    clicks:  gcDelta(sc(plcA.clicks,'A'),  sc(plcB.clicks,'B')),
+    ctr:     gcDelta(plcA.ctr, plcB.ctr, true),
+    cpc:     gcDelta(plcA.cpc, plcB.cpc),
+  };
+
+  const tacosA = gcPct(plcA.spend, pnlA.gross), tacosB = gcPct(plcB.spend, pnlB.gross);
+  M.tacos = gcDelta(tacosA, tacosB, true);
+  const orgA = Math.max(0, pnlA.gross - plcA.totRev), orgB = Math.max(0, pnlB.gross - plcB.totRev);
+  M.organic = gcDelta(sc(orgA,'A'), sc(orgB,'B'));
+
+  const split = { A:{ ad: plcA.totRev, organic: orgA }, B:{ ad: plcB.totRev, organic: orgB } };
+
+  let returns = null;
+  if (retA && retB && ordA && ordB) {
+    returns = gcDelta(gcPct(retA.total, ordA.total), gcPct(retB.total, ordB.total), true);
+  } else if (retA && retB) {
+    returns = gcDelta(sc(retA.total,'A'), sc(retB.total,'B'));
+  }
+
+  let orders = null;
+  if (ordA && ordB) orders = gcDelta(sc(ordA.total,'A'), sc(ordB.total,'B'));
+
+  const wf = gcWaterfall(
+    { traffic: pnlA.units, cvr: 1, aov: pnlA.aov },
+    { traffic: pnlB.units, cvr: 1, aov: pnlB.aov },
+    N
+  );
+
+  const skus = gcItemDelta(
+    pnlA.skus.map(s => ({ asin:s.sku, title:'', sessions:0, units:s.units, sales:s.sales })),
+    pnlB.skus.map(s => ({ asin:s.sku, title:'', sessions:0, units:s.units, sales:s.sales })),
+    'asin', N
+  );
+
+  return {
+    mp:'flipkart', M, split, returns, orders, wf, asins: skus, N,
+    raw: { pnlA, pnlB, plcA, plcB, retA, retB, ordA, ordB },
+    verdict: gcVerdictFlipkart(M, returns, wf, N),
+  };
+}
+
+// Revenue change decomposition: traffic × conversion × AOV
+function gcWaterfall(a, b, N) {
+  const tA = N.on ? a.traffic * N.fA : a.traffic;
+  const tB = N.on ? b.traffic * N.fB : b.traffic;
+  const trafficEff = (tB - tA) * a.cvr * a.aov;
+  const cvrEff     = tB * (b.cvr - a.cvr) * a.aov;
+  const aovEff     = tB * b.cvr * (b.aov - a.aov);
+  const total      = trafficEff + cvrEff + aovEff;
+  return { trafficEff, cvrEff, aovEff, total,
+           startVal: tA * a.cvr * a.aov, endVal: tB * b.cvr * b.aov };
+}
+
+// per-item (ASIN/SKU) delta, top movers
+function gcItemDelta(itemsA, itemsB, key, N) {
+  const map = {};
+  const add = (list, side) => {
+    for (const it of list) {
+      const k = it[key];
+      if (!k) continue;
+      const x = map[k] || (map[k] = { id:k, title:it.title||'', aSales:0, bSales:0, aUnits:0, bUnits:0, aSess:0, bSess:0 });
+      if (!x.title && it.title) x.title = it.title;
+      if (side === 'A') { x.aSales += it.sales; x.aUnits += it.units; x.aSess += it.sessions; }
+      else              { x.bSales += it.sales; x.bUnits += it.units; x.bSess += it.sessions; }
+    }
+  };
+  add(itemsA, 'A'); add(itemsB, 'B');
+  const out = Object.values(map).map(x => {
+    const a = N.on ? x.aSales * N.fA : x.aSales;
+    const b = N.on ? x.bSales * N.fB : x.bSales;
+    return { ...x, aSalesN:a, bSalesN:b, diff: b - a, pct: a ? Math.round((b-a)/Math.abs(a)*1000)/10 : (b?100:0) };
+  });
+  out.sort((p,q) => q.diff - p.diff);
+  return { gainers: out.filter(x=>x.diff>0).slice(0,10), losers: out.filter(x=>x.diff<0).reverse().slice(0,10), all: out };
+}
+
+// ─── VERDICTS (Hinglish) ──────────────────────────────────────────
+function gcArrow(d, goodUp) {
+  if (d.flat) return '→';
+  const good = goodUp ? d.up : !d.up;
+  return (d.up ? '↑' : '↓') + (good ? '' : '');
+}
+
+function gcVerdictAmazon(M, wasted, wf, N) {
+  const L = [];
+  const salesUp = M.sales.up;
+  const base = N.on ? ' (daily-average / DRR basis pe)' : '';
+
+  L.push({
+    head: salesUp ? '📈 Sales badhi hai' : '📉 Sales giri hai',
+    text: 'Revenue ' + (salesUp?'+':'') + M.sales.pct + '% ' + (salesUp?'badha':'gira') + ' — '
+      + gcR(M.sales.a) + ' se ' + gcR(M.sales.b) + base + '. '
+      + 'Sessions ' + (M.sessions.up?'+':'') + M.sessions.pct + '%, conversion ' + M.cvr.a + '% → ' + M.cvr.b + '%.',
+  });
+
+  // traffic vs conversion — kya kaam kar raha hai
+  const tr = wf.trafficEff, cv = wf.cvrEff, av = wf.aovEff;
+  const biggest = Math.abs(tr) >= Math.abs(cv) && Math.abs(tr) >= Math.abs(av) ? 'traffic'
+                : Math.abs(cv) >= Math.abs(av) ? 'conversion' : 'AOV';
+  L.push({
+    head: '🔍 Growth kahan se aayi',
+    text: 'Traffic ka asar ' + gcR(tr) + ', conversion ka ' + gcR(cv) + ', price/AOV ka ' + gcR(av) + '. '
+      + 'Sabse bada driver **' + biggest + '** hai. '
+      + (M.sessions.up && !M.cvr.up
+          ? 'Traffic to aa raha hai par convert nahi ho raha — listing (images, price, reviews, A+ content) pe kaam karo.'
+          : !M.sessions.up && M.cvr.up
+          ? 'Listing convert achha kar rahi hai par traffic kam hai — ads aur keywords pe budget badhao.'
+          : M.sessions.up && M.cvr.up
+          ? 'Traffic aur conversion dono improve hue — abhi budget badhane ka sahi time hai.'
+          : 'Traffic aur conversion dono neeche hain — pehle listing theek karo, phir ads scale karo.'),
+  });
+
+  L.push({
+    head: M.acos.up ? '⚠️ ACOS badh gaya' : '✅ ACOS improve hua',
+    text: 'ACOS ' + M.acos.a + '% → ' + M.acos.b + '% (' + (M.acos.up?'+':'') + (M.acos.b - M.acos.a).toFixed(1) + ' points), '
+      + 'ROAS ' + M.roas.a + 'x → ' + M.roas.b + 'x. Ad spend ' + gcR(M.spend.a) + ' → ' + gcR(M.spend.b) + '. '
+      + (M.acos.up
+          ? 'Spend efficiency giri hai — high-ACOS campaigns ke bids kam karo aur wasted keywords negate karo.'
+          : 'Spend ka return behtar hua — winning campaigns pe budget aur badha sakte ho.'),
+  });
+
+  L.push({
+    head: '🌊 Organic vs Ads',
+    text: 'Organic revenue ' + gcR(M.organic.a) + ' → ' + gcR(M.organic.b) + ' (' + (M.organic.up?'+':'') + M.organic.pct + '%), '
+      + 'TACOS ' + M.tacos.a + '% → ' + M.tacos.b + '%. '
+      + (M.tacos.up
+          ? 'Ads pe dependency badh rahi hai — organic ranking pe kaam karo (keywords, reviews, backend terms).'
+          : 'Ads pe dependency kam hui — organic strong ho raha hai, achhi baat hai.'),
+  });
+
+  if (wasted) {
+    L.push({
+      head: wasted.up ? '🗑️ Wasted spend badha' : '💰 Wasted spend bacha',
+      text: 'Bina sale wala spend ' + gcR(wasted.a) + ' → ' + gcR(wasted.b) + ' (' + (wasted.up?'+':'') + wasted.pct + '%). '
+        + (wasted.up ? 'Negative keywords turant add karo.' : 'Optimization kaam kar rahi hai — aise hi continue karo.'),
+    });
+  }
+
+  L.push({
+    head: '👁️ Visibility',
+    text: 'Impressions ' + (M.impr.up?'+':'') + M.impr.pct + '%, clicks ' + (M.clicks.up?'+':'') + M.clicks.pct + '%, '
+      + 'CTR ' + M.ctr.a + '% → ' + M.ctr.b + '%, CPC ₹' + M.cpc.a + ' → ₹' + M.cpc.b + '. '
+      + (M.impr.up ? 'Visibility badhi hai.' : 'Visibility ghat gayi — bids ya budget check karo.'),
+  });
+
+  return L;
+}
+
+function gcVerdictFlipkart(M, returns, wf, N) {
+  const L = [];
+  const base = N.on ? ' (daily-average / DRR basis pe)' : '';
+
+  L.push({
+    head: M.gross.up ? '📈 Sales badhi hai' : '📉 Sales giri hai',
+    text: 'Gross sales ' + (M.gross.up?'+':'') + M.gross.pct + '% — ' + gcR(M.gross.a) + ' se ' + gcR(M.gross.b) + base + '. '
+      + 'Net earnings ' + gcR(M.net.a) + ' → ' + gcR(M.net.b) + ', margin ' + M.margin.a + '% → ' + M.margin.b + '%.',
+  });
+
+  L.push({
+    head: M.margin.up ? '✅ Margin improve hua' : '⚠️ Margin gira',
+    text: 'Margin ' + (M.margin.up?'+':'') + (M.margin.b - M.margin.a).toFixed(1) + ' points ' + (M.margin.up?'badha':'gira') + '. '
+      + 'Units ' + (M.units.up?'+':'') + M.units.pct + '%, AOV ₹' + M.aov.a + ' → ₹' + M.aov.b + '. '
+      + (M.margin.up ? 'Expense control achha hai.' : 'Commission, shipping aur returns ka expense check karo.'),
+  });
+
+  L.push({
+    head: M.roi.up ? '✅ Ad ROI improve hua' : '⚠️ Ad ROI gira',
+    text: 'Total ROI ' + M.roi.a + 'x → ' + M.roi.b + 'x (Direct ' + M.dRoi.a + 'x → ' + M.dRoi.b + 'x). '
+      + 'Spend ' + gcR(M.spend.a) + ' → ' + gcR(M.spend.b) + ', ad revenue ' + gcR(M.adRev.a) + ' → ' + gcR(M.adRev.b) + '. '
+      + (M.roi.up ? 'Ads ka return behtar hua — budget badhane ka scope hai.'
+                  : 'Weak campaigns ke bids kam karo aur zero-sale queries negate karo.'),
+  });
+
+  L.push({
+    head: '🌊 Organic vs Ads',
+    text: 'Organic revenue ' + gcR(M.organic.a) + ' → ' + gcR(M.organic.b) + ' (' + (M.organic.up?'+':'') + M.organic.pct + '%), '
+      + 'TACOS ' + M.tacos.a + '% → ' + M.tacos.b + '%. '
+      + (M.tacos.up ? 'Ads pe dependency badh rahi hai — listing quality aur ratings pe kaam karo.'
+                    : 'Organic share badha — healthy growth hai.'),
+  });
+
+  L.push({
+    head: '👁️ Visibility',
+    text: 'Views ' + (M.views.up?'+':'') + M.views.pct + '%, clicks ' + (M.clicks.up?'+':'') + M.clicks.pct + '%, '
+      + 'CTR ' + M.ctr.a + '% → ' + M.ctr.b + '%, CPC ₹' + M.cpc.a + ' → ₹' + M.cpc.b + '. '
+      + (M.views.up ? 'Visibility badhi hai.' : 'Visibility ghat gayi — bids/budget review karo.'),
+  });
+
+  if (returns) {
+    const better = !returns.up;
+    L.push({
+      head: better ? '✅ Returns kam hue' : '⚠️ Returns badhe',
+      text: 'Return ' + (returns.isPct ? 'rate ' + returns.a + '% → ' + returns.b + '%' : 'count ' + Math.round(returns.a) + ' → ' + Math.round(returns.b))
+        + '. ' + (better ? 'Quality/packaging improvement ka asar dikh raha hai.'
+                         : 'Top return reasons check karo — listing accuracy aur packaging pe kaam karo.'),
+    });
+  }
+
+  return L;
+}
+
+// ─── RESULTS RENDER ───────────────────────────────────────────────
+function gcDestroyCharts() {
+  Object.values(_gc.charts || {}).forEach(c => { try { c.destroy(); } catch(e){} });
+  _gc.charts = {};
+}
+
+function gcDeltaCard(label, d, opts) {
+  opts = opts || {};
+  const goodUp = opts.goodUp !== false;
+  const fmt = opts.fmt || (v => gcFmt(v));
+  const good = d.flat ? null : (goodUp ? d.up : !d.up);
+  const col = good === null ? 'var(--text-muted)' : good ? 'var(--green)' : 'var(--red)';
+  const sign = d.diff > 0 ? '+' : '';
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:9px;padding:11px;">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:5px;">' + label + '</div>'
+    + '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">'
+    + '<span style="font-size:16px;font-weight:800;">' + fmt(d.b) + '</span>'
+    + '<span style="font-size:11px;color:var(--text-muted);">se pehle ' + fmt(d.a) + '</span>'
+    + '</div>'
+    + '<div style="font-size:12px;font-weight:700;color:' + col + ';margin-top:3px;">'
+    + (d.flat ? '→ koi change nahi' : (d.up?'▲':'▼') + ' ' + sign + (d.isPct ? (d.diff).toFixed(1) + ' pts' : d.pct + '%'))
+    + '</div></div>';
+}
+
+function gcRenderResults() {
+  const R = _gc.result;
+  if (!R) return;
+  gcDestroyCharts();
+  const M = R.M;
+  const pLbl = (_gc.A.from ? _gc.A.from + ' → ' + _gc.A.to : 'Period A')
+             + '  vs  ' + (_gc.B.from ? _gc.B.from + ' → ' + _gc.B.to : 'Period B');
+
+  let html = '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📈 ' + gcEsc(_gc.clientName) + ' — Growth Comparison</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">' + gcEsc(pLbl) + '</span></div>'
+    + '<div class="card-body">';
+
+  if (R.N.on) {
+    html += '<div style="padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:12px;">'
+      + '⚠️ Period alag the (A: ' + R.N.dA + ' din, B: ' + R.N.dB + ' din) — saare numbers <strong>per-day average</strong> pe compare kiye gaye hain.</div>';
+  }
+
+  // ── KPI blocks ──
+  const isAmz = R.mp === 'amazon';
+  html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">👁️ Visibility &amp; Traffic</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
+    + (isAmz
+        ? gcDeltaCard('SESSIONS', M.sessions) + gcDeltaCard('PAGE VIEWS', M.views)
+          + gcDeltaCard('IMPRESSIONS', M.impr) + gcDeltaCard('CLICKS', M.clicks)
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'})
+        : gcDeltaCard('AD VIEWS', M.views) + gcDeltaCard('CLICKS', M.clicks)
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v}))
+    + '</div>';
+
+  html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">💰 Sales</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
+    + (isAmz
+        ? gcDeltaCard('TOTAL SALES', M.sales, {fmt:gcR}) + gcDeltaCard('UNITS', M.units)
+          + gcDeltaCard('CONVERSION', M.cvr, {fmt:v=>v+'%'}) + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v})
+          + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR})
+        : gcDeltaCard('GROSS SALES', M.gross, {fmt:gcR}) + gcDeltaCard('NET EARNINGS', M.net, {fmt:gcR})
+          + gcDeltaCard('MARGIN', M.margin, {fmt:v=>v+'%'}) + gcDeltaCard('UNITS', M.units)
+          + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v}) + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR}))
+    + '</div>';
+
+  html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">📢 Ads Performance</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
+    + (isAmz
+        ? gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD SALES', M.adSales, {fmt:gcR})
+          + gcDeltaCard('ACOS', M.acos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('ROAS', M.roas, {fmt:v=>v+'x'})
+          + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v})
+        : gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD REVENUE', M.adRev, {fmt:gcR})
+          + gcDeltaCard('DIRECT REVENUE', M.dRev, {fmt:gcR}) + gcDeltaCard('TOTAL ROI', M.roi, {fmt:v=>v+'x'})
+          + gcDeltaCard('DIRECT ROI', M.dRoi, {fmt:v=>v+'x'}) + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}))
+    + '</div>';
+
+  // optimization block
+  const optCards = [];
+  if (R.wasted) optCards.push(gcDeltaCard('WASTED SPEND', R.wasted, {goodUp:false, fmt:gcR}));
+  if (R.returns) optCards.push(gcDeltaCard('RETURNS', R.returns, {goodUp:false, fmt: R.returns.isPct ? (v=>v+'%') : (v=>Math.round(v))}));
+  if (R.orders)  optCards.push(gcDeltaCard('ORDERS', R.orders));
+  if (optCards.length) {
+    html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">⚡ Optimization</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:6px;">'
+      + optCards.join('') + '</div>';
+  }
+
+  html += '</div></div>';
+
+  // ── Charts ──
+  html += '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📊 Charts</span></div>'
+    + '<div class="card-body">'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;">'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period A vs B — Key Metrics</div><canvas id="gc-chart-bar" height="200"></canvas></div>'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Revenue Change — Kahan Se Aaya</div><canvas id="gc-chart-wf" height="200"></canvas></div>'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period A — Ad vs Organic</div><canvas id="gc-chart-pieA" height="200"></canvas></div>'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period B — Ad vs Organic</div><canvas id="gc-chart-pieB" height="200"></canvas></div>'
+    + '</div></div></div>';
+
+  // ── Verdict ──
+  html += '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">💡 Kya Samajh Aaya</span></div>'
+    + '<div class="card-body">'
+    + R.verdict.map((v,i) =>
+        '<div style="margin-bottom:11px;padding:10px 12px;border-left:3px solid var(--secondary);background:var(--bg);border-radius:0 7px 7px 0;">'
+        + '<div style="font-weight:700;font-size:13px;margin-bottom:3px;">' + (i+1) + '. ' + v.head + '</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);line-height:1.6;">'
+        + gcEsc(v.text).replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--primary);">$1</strong>') + '</div></div>'
+      ).join('')
+    + '</div></div>';
+
+  // ── Movers ──
+  const itemLbl = isAmz ? 'ASIN' : 'SKU';
+  if (R.asins.gainers.length || R.asins.losers.length) {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">';
+    if (R.asins.gainers.length) {
+      html += gcMoverCard('🚀 Top Gainers — ' + itemLbl, R.asins.gainers, 'var(--green)', isAmz);
+    }
+    if (R.asins.losers.length) {
+      html += gcMoverCard('🔻 Top Losers — ' + itemLbl, R.asins.losers, 'var(--red)', isAmz);
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('gc-results').innerHTML = html;
+  setTimeout(gcDrawCharts, 60);
+}
+
+function gcMoverCard(title, list, color, isAmz) {
+  return '<div class="card" style="border-left:4px solid ' + color + ';margin:0;">'
+    + '<div class="card-header"><span class="card-title">' + title + '</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table>'
+    + '<thead><tr><th>#</th><th>' + (isAmz?'ASIN':'SKU') + '</th><th>Period A</th><th>Period B</th><th>Change</th></tr></thead><tbody>'
+    + list.map((x,i) =>
+        '<tr><td>' + (i+1) + '</td>'
+        + '<td><strong style="font-size:12px;">' + gcEsc(x.id) + '</strong>'
+        + (x.title ? '<br><span style="font-size:10px;color:var(--text-muted);">' + gcEsc(x.title.slice(0,42)) + '</span>' : '') + '</td>'
+        + '<td>' + gcR(x.aSalesN) + '</td><td>' + gcR(x.bSalesN) + '</td>'
+        + '<td><span class="badge badge-' + (x.diff>0?'green':'red') + '">' + (x.diff>0?'+':'') + x.pct + '%</span></td></tr>'
+      ).join('')
+    + '</tbody></table></div></div></div>';
+}
+
+function gcDrawCharts() {
+  const R = _gc.result;
+  if (!R || typeof Chart === 'undefined') return;
+  const M = R.M, isAmz = R.mp === 'amazon';
+  const GOLD = '#D4A03D', DARK = '#1C2B2D', GREEN = '#27ae60', RED = '#e74c3c', BLUE = '#2980b9';
+
+  // 1. Grouped bar — normalised to % of A so alag scale wale metrics ek saath dikhein
+  const barMetrics = isAmz
+    ? [['Sessions',M.sessions],['Sales',M.sales],['Units',M.units],['Ad Spend',M.spend],['Ad Sales',M.adSales],['Clicks',M.clicks]]
+    : [['Gross Sales',M.gross],['Net Earnings',M.net],['Units',M.units],['Ad Spend',M.spend],['Ad Revenue',M.adRev],['Clicks',M.clicks]];
+  const barEl = document.getElementById('gc-chart-bar');
+  if (barEl) {
+    _gc.charts.bar = new Chart(barEl, {
+      type: 'bar',
+      data: {
+        labels: barMetrics.map(m => m[0]),
+        datasets: [
+          { label: 'Period A', data: barMetrics.map(m => Math.round(m[1].a)), backgroundColor: '#b9c2cc', borderRadius: 4 },
+          { label: 'Period B', data: barMetrics.map(m => Math.round(m[1].b)), backgroundColor: GOLD, borderRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position:'bottom' },
+          tooltip: { callbacks: { label: c => c.dataset.label + ': ' + gcFmt(c.parsed.y) } },
+        },
+        scales: { y: { beginAtZero:true, ticks: { callback: v => gcFmt(v) } } },
+      },
+    });
+  }
+
+  // 2. Waterfall — traffic / conversion / AOV contribution
+  const wf = R.wf;
+  const wfEl = document.getElementById('gc-chart-wf');
+  if (wfEl) {
+    const labels = isAmz ? ['Traffic','Conversion','AOV','Net Change'] : ['Units','—','AOV','Net Change'];
+    const vals   = isAmz ? [wf.trafficEff, wf.cvrEff, wf.aovEff, wf.total] : [wf.trafficEff, 0, wf.aovEff, wf.total];
+    _gc.charts.wf = new Chart(wfEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue impact',
+          data: vals.map(v => Math.round(v)),
+          backgroundColor: vals.map((v,i) => i === 3 ? (v>=0?DARK:RED) : (v>=0?GREEN:RED)),
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display:false },
+          tooltip: { callbacks: { label: c => (c.parsed.y>=0?'+':'') + '₹' + gcFmt(c.parsed.y) } },
+        },
+        scales: { y: { ticks: { callback: v => gcFmt(v) } } },
+      },
+    });
+  }
+
+  // 3+4. Pies — ad vs organic
+  ['A','B'].forEach(side => {
+    const el = document.getElementById('gc-chart-pie' + side);
+    if (!el) return;
+    const s = R.split[side];
+    _gc.charts['pie'+side] = new Chart(el, {
+      type: 'doughnut',
+      data: {
+        labels: ['Ad-driven', 'Organic'],
+        datasets: [{ data: [Math.round(s.ad), Math.round(s.organic)], backgroundColor: [GOLD, BLUE], borderWidth: 0 }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position:'bottom' },
+          tooltip: { callbacks: { label: c => c.label + ': ₹' + gcFmt(c.parsed)
+            + ' (' + gcPct(c.parsed, s.ad + s.organic) + '%)' } },
+        },
+      },
+    });
+  });
+}
+
+// ─── EXCEL EXPORT ─────────────────────────────────────────────────
+function gcExportExcel() {
+  const R = _gc.result;
+  if (!R) { showToast('Pehle compare karo!', 'error'); return; }
+  const M = R.M, isAmz = R.mp === 'amazon';
+  const wb = XLSX.utils.book_new();
+  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0,31));
+
+  const row = (label, d, unit) => [label, Math.round(d.a*100)/100, Math.round(d.b*100)/100,
+    Math.round(d.diff*100)/100, (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%'), unit || ''];
+
+  const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %', 'Unit'];
+  const metricRows = isAmz ? [
+    row('Sessions', M.sessions), row('Page Views', M.views), row('Impressions', M.impr),
+    row('Clicks', M.clicks), row('CTR', M.ctr, '%'), row('Conversion Rate', M.cvr, '%'),
+    row('Units Ordered', M.units), row('Total Sales', M.sales, 'Rs'), row('AOV', M.aov, 'Rs'),
+    row('Organic Sales', M.organic, 'Rs'), row('Ad Spend', M.spend, 'Rs'), row('Ad Sales', M.adSales, 'Rs'),
+    row('ACOS', M.acos, '%'), row('ROAS', M.roas, 'x'), row('TACOS', M.tacos, '%'), row('CPC', M.cpc, 'Rs'),
+  ] : [
+    row('Gross Sales', M.gross, 'Rs'), row('Net Earnings', M.net, 'Rs'), row('Margin', M.margin, '%'),
+    row('Units', M.units), row('AOV', M.aov, 'Rs'), row('Organic Sales', M.organic, 'Rs'),
+    row('Ad Spend', M.spend, 'Rs'), row('Ad Revenue', M.adRev, 'Rs'), row('Direct Revenue', M.dRev, 'Rs'),
+    row('Indirect Revenue', M.iRev, 'Rs'), row('Total ROI', M.roi, 'x'), row('Direct ROI', M.dRoi, 'x'),
+    row('TACOS', M.tacos, '%'), row('Ad Views', M.views), row('Clicks', M.clicks),
+    row('CTR', M.ctr, '%'), row('CPC', M.cpc, 'Rs'),
+  ];
+  if (R.wasted)  metricRows.push(row('Wasted Ad Spend', R.wasted, 'Rs'));
+  if (R.returns) metricRows.push(row('Returns', R.returns, R.returns.isPct ? '%' : 'count'));
+  if (R.orders)  metricRows.push(row('Orders', R.orders));
+
+  add('1. Summary', [
+    ['GROWTH COMPARISON — ' + _gc.clientName],
+    [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A')
+      + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B')],
+    [R.N.on ? 'NOTE: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) — daily-average basis pe compare kiya gaya' : 'Dono period same length ke the'],
+    [],
+    head, ...metricRows,
+  ]);
+
+  add('2. Revenue Bridge', [
+    ['REVENUE CHANGE DECOMPOSITION'],
+    ['Kaunsi cheez ne revenue kitna badla'],
+    [],
+    ['Driver', 'Impact (Rs)'],
+    [isAmz ? 'Traffic (sessions)' : 'Units', Math.round(R.wf.trafficEff)],
+    ['Conversion rate', Math.round(R.wf.cvrEff)],
+    ['AOV / price', Math.round(R.wf.aovEff)],
+    ['= Net change', Math.round(R.wf.total)],
+  ]);
+
+  add('3. Ad vs Organic', [
+    ['AD-DRIVEN vs ORGANIC REVENUE'],
+    [],
+    ['Period', 'Ad-driven (Rs)', 'Organic (Rs)', 'Total (Rs)', 'Ad share %'],
+    ['Period A', Math.round(R.split.A.ad), Math.round(R.split.A.organic),
+      Math.round(R.split.A.ad + R.split.A.organic), gcPct(R.split.A.ad, R.split.A.ad + R.split.A.organic)],
+    ['Period B', Math.round(R.split.B.ad), Math.round(R.split.B.organic),
+      Math.round(R.split.B.ad + R.split.B.organic), gcPct(R.split.B.ad, R.split.B.ad + R.split.B.organic)],
+  ]);
+
+  const itemLbl = isAmz ? 'ASIN' : 'SKU';
+  add('4. Item Movers', [
+    ['TOP GAINERS & LOSERS'],
+    [],
+    ['TOP GAINERS'],
+    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.gainers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+    [],
+    ['TOP LOSERS'],
+    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.losers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+  ]);
+
+  add('5. Insights', [
+    ['INSIGHTS & ACTIONS'],
+    [],
+    ['#', 'Heading', 'Detail'],
+    ...R.verdict.map((v,i) => [i+1, v.head, v.text.replace(/\*\*/g,'')]),
+  ]);
+
+  const fname = 'Growth_Comparison_' + (isAmz?'Amazon':'Flipkart') + '_'
+    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
+    + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  showToast('Excel download ho gayi!', 'success');
+}
+
+// ─── PDF EXPORT ───────────────────────────────────────────────────
+function gcAscii(s) {
+  return String(s == null ? '' : s)
+    .replace(/[\u2013\u2014]/g,'-').replace(/[\u2192\u2794]/g,'to')
+    .replace(/₹/g,'Rs ').replace(/\*\*/g,'').replace(/[^\x20-\x7E]/g,'');
+}
+
+function gcExportPDF() {
+  const R = _gc.result;
+  if (!R) { showToast('Pehle compare karo!', 'error'); return; }
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...', 'error'); return; }
+
+  const M = R.M, isAmz = R.mp === 'amazon';
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const Mg = 40;
+  const DARK=[45,52,64], GOLD=[201,162,90], GREY=[130,138,148], GREEN=[70,160,90], RED=[200,70,70];
+  const today = gcDateStr(new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())));
+  const pLbl = (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A') + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B');
+
+  let pageNo = 0;
+  function chrome() {
+    pageNo++;
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GREY);
+    doc.text('eNewcleus Technology - Confidential', Mg, H - 20);
+    doc.text('Generated: ' + today, W - Mg, H - 20, { align:'right' });
+    doc.text(String(pageNo), W/2, H - 20, { align:'center' });
+  }
+  function header(title) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GREY);
+    doc.text(gcAscii('Growth Comparison - ' + (isAmz?'Amazon':'Flipkart')), Mg, 30);
+    doc.setTextColor(...DARK); doc.setFontSize(11);
+    doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 45);
+    doc.setDrawColor(230,232,235); doc.setLineWidth(0.5); doc.line(Mg, 52, W - Mg, 52);
+    if (title) { doc.setFontSize(15); doc.setTextColor(...DARK); doc.text(title, Mg, 74); }
+  }
+  function table(y, headers, rows, widths, accent) {
+    const rh = 17;
+    doc.setFillColor(...accent); doc.rect(Mg, y, W - 2*Mg, rh, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+    let x = Mg + 6;
+    headers.forEach((h,i) => {
+      const al = i===0 ? 'left' : 'right';
+      doc.text(h, al==='left' ? x : x + widths[i] - 8, y + 11, { align: al });
+      x += widths[i];
+    });
+    y += rh;
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    rows.forEach((r,ri) => {
+      if (ri % 2 === 0) { doc.setFillColor(248,249,250); doc.rect(Mg, y, W - 2*Mg, rh, 'F'); }
+      doc.setTextColor(50,56,66);
+      let xx = Mg + 6;
+      r.forEach((c,i) => {
+        const al = i===0 ? 'left' : 'right';
+        doc.text(gcAscii(String(c)), al==='left' ? xx : xx + widths[i] - 8, y + 11, { align: al });
+        xx += widths[i];
+      });
+      y += rh;
+    });
+    return y;
+  }
+
+  // COVER
+  doc.setFillColor(...GOLD);
+  doc.circle(Mg + 8, 66, 5, 'F'); doc.circle(Mg + 8, 78, 5, 'F'); doc.circle(Mg + 19, 72, 6, 'F');
+  doc.setDrawColor(...GOLD); doc.setLineWidth(2);
+  doc.line(Mg + 8, 66, Mg + 19, 72); doc.line(Mg + 8, 78, Mg + 19, 72);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...DARK);
+  doc.text('enewcleus', Mg + 33, 78);
+  doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GOLD);
+  doc.text('Sell Easy, Sell More!', Mg + 33, 92);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK);
+  doc.text('Growth Comparison', Mg, 160);
+  doc.text('Report', Mg, 188);
+  doc.setDrawColor(...GOLD); doc.setLineWidth(2); doc.line(Mg, 200, Mg + 120, 200);
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...DARK);
+  doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 230);
+  doc.setFontSize(10); doc.setTextColor(...GREY);
+  doc.text((isAmz ? 'Amazon' : 'Flipkart') + ' - Period over Period Analysis', Mg, 248);
+  doc.setFontSize(9);
+  doc.text(gcAscii(pLbl), Mg, 266);
+  if (R.N.on) doc.text('Note: Periods alag the - daily-average (DRR) basis pe compare kiya gaya', Mg, 282);
+
+  // headline KPIs
+  const kpi = isAmz
+    ? [[(M.sales.up?'+':'') + M.sales.pct + '%','Sales'], [(M.sessions.up?'+':'') + M.sessions.pct + '%','Sessions'],
+       [M.acos.b + '%','ACOS'], [M.roas.b + 'x','ROAS']]
+    : [[(M.gross.up?'+':'') + M.gross.pct + '%','Gross Sales'], [M.margin.b + '%','Margin'],
+       [M.roi.b + 'x','Ad ROI'], [(M.units.up?'+':'') + M.units.pct + '%','Units']];
+  let y = 310;
+  doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W - 2*Mg, 92, 6, 6, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+  doc.text('Headline', Mg + 16, y + 20);
+  const kw = (W - 2*Mg) / kpi.length;
+  kpi.forEach((k,i) => {
+    const cx = Mg + kw*i + kw/2;
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...GOLD);
+    doc.text(k[0], cx, y + 56, { align:'center' });
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+    doc.text(k[1], cx, y + 74, { align:'center' });
+  });
+  chrome();
+
+  // METRICS PAGE
+  doc.addPage(); header('Metric Comparison');
+  const mrow = (label, d, unit) => [label, gcAscii(gcFmt(d.a) + (unit||'')), gcAscii(gcFmt(d.b) + (unit||'')),
+    (d.diff>0?'+':'') + (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%')];
+
+  y = 92;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('Visibility & Traffic', Mg, y);
+  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
+    isAmz ? [mrow('Sessions',M.sessions), mrow('Page Views',M.views), mrow('Impressions',M.impr),
+             mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%')]
+          : [mrow('Ad Views',M.views), mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%'), mrow('CPC',M.cpc)],
+    [220, 105, 105, 85], [60,110,180]);
+
+  y += 18;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('Sales', Mg, y);
+  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
+    isAmz ? [mrow('Total Sales',M.sales), mrow('Units',M.units), mrow('Conversion',M.cvr,'%'),
+             mrow('AOV',M.aov), mrow('Organic Sales',M.organic)]
+          : [mrow('Gross Sales',M.gross), mrow('Net Earnings',M.net), mrow('Margin',M.margin,'%'),
+             mrow('Units',M.units), mrow('AOV',M.aov), mrow('Organic Sales',M.organic)],
+    [220, 105, 105, 85], GREEN);
+
+  y += 18;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+  doc.text('Ads Performance', Mg, y);
+  const adRows = isAmz
+    ? [mrow('Ad Spend',M.spend), mrow('Ad Sales',M.adSales), mrow('ACOS',M.acos,'%'),
+       mrow('ROAS',M.roas,'x'), mrow('TACOS',M.tacos,'%'), mrow('CPC',M.cpc)]
+    : [mrow('Ad Spend',M.spend), mrow('Ad Revenue',M.adRev), mrow('Direct Revenue',M.dRev),
+       mrow('Total ROI',M.roi,'x'), mrow('Direct ROI',M.dRoi,'x'), mrow('TACOS',M.tacos,'%')];
+  if (R.wasted)  adRows.push(mrow('Wasted Spend', R.wasted));
+  if (R.returns) adRows.push(mrow('Returns', R.returns, R.returns.isPct ? '%' : ''));
+  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'], adRows, [220, 105, 105, 85], [201,162,90]);
+  chrome();
+
+  // BRIDGE + MOVERS
+  doc.addPage(); header('Revenue Bridge & Movers');
+  y = 92;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+  doc.text('Revenue kitna badla aur kis wajah se - traffic, conversion ya price.', Mg, y);
+  y = table(y + 14, ['DRIVER','IMPACT'],
+    [[isAmz ? 'Traffic (sessions)' : 'Units', gcAscii('Rs ' + gcFmt(R.wf.trafficEff))],
+     ['Conversion rate', gcAscii('Rs ' + gcFmt(R.wf.cvrEff))],
+     ['AOV / price', gcAscii('Rs ' + gcFmt(R.wf.aovEff))],
+     ['= Net change', gcAscii('Rs ' + gcFmt(R.wf.total))]],
+    [360, 155], [45,52,64]);
+
+  const itemLbl = isAmz ? 'ASIN' : 'SKU';
+  if (R.asins.gainers.length) {
+    y += 20;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+    doc.text('Top Gainers', Mg, y);
+    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
+      R.asins.gainers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
+        gcAscii('Rs ' + gcFmt(x.bSalesN)), '+' + x.pct + '%']),
+      [220, 105, 105, 85], GREEN);
+  }
+  if (R.asins.losers.length) {
+    y += 20;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
+    doc.text('Top Losers', Mg, y);
+    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
+      R.asins.losers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
+        gcAscii('Rs ' + gcFmt(x.bSalesN)), x.pct + '%']),
+      [220, 105, 105, 85], RED);
+  }
+  chrome();
+
+  // INSIGHTS
+  doc.addPage(); header('Insights & Recommendations');
+  y = 92;
+  R.verdict.forEach((v,i) => {
+    if (y > H - 100) { chrome(); doc.addPage(); header('Insights (contd.)'); y = 92; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+    doc.text(gcAscii((i+1) + '. ' + v.head), Mg, y); y += 15;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
+    const lines = doc.splitTextToSize(gcAscii(v.text), W - 2*Mg);
+    doc.text(lines, Mg, y);
+    y += lines.length * 13 + 14;
+  });
+  chrome();
+
+  const fname = 'eNewcleus_Growth_' + (isAmz?'Amazon':'Flipkart') + '_'
+    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
+    + new Date().toISOString().slice(0,10) + '.pdf';
+  doc.save(fname);
+  showToast('PDF download ho gayi!', 'success');
 }
 
 

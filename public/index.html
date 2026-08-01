@@ -328,6 +328,7 @@ const NAV_CONFIG = {
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'adstasks',icon:'📋',label:'Ads Tasks'},
@@ -361,6 +362,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -379,6 +381,7 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
@@ -421,6 +424,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -477,6 +481,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -493,6 +498,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -512,6 +518,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -544,6 +551,7 @@ const NAV_CONFIG = {
     {id:'seller360', label:'Seller 360 View', icon:'🔍'},
     {id:'payments', label:'Payment Manager', icon:'💰'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
   ],
   'CSI Executive': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
@@ -765,11 +773,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report',growthcomp:'📈 Growth Comparison',feedback:'⭐ Feedback',reportanalyzer:'📊 Report Analyzer',fkanalyzer:'📦 Flipkart Analyzer',adsanalyzer:'📢 Ads Analyzer',channelreport:'📊 Channel Report',hurdles:'🚧 Hurdle Tracker',chat:'💬 Team Chat'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report',growthcomp:'📈 Growth Comparison',dsrdaywise:'📅 DSR Day-wise Report',feedback:'⭐ Feedback',reportanalyzer:'📊 Report Analyzer',fkanalyzer:'📦 Flipkart Analyzer',adsanalyzer:'📢 Ads Analyzer',channelreport:'📊 Channel Report',hurdles:'🚧 Hurdle Tracker',chat:'💬 Team Chat'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,feedback:renderFeedback,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention,growthcomp:renderGrowthComparison};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,feedback:renderFeedback,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention,growthcomp:renderGrowthComparison,dsrdaywise:renderDSRDayWise};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -11964,7 +11972,14 @@ async function gcFetchWork() {
     && /^(completed|done)$/i.test(String(t.status || '').trim())
     && inRange(t.completedAt));
 
-  if (!logs.length && !tasks.length) return { empty:true, from, to };
+  if (!logs.length && !tasks.length) {
+    const hOnly = await gcFetchHurdles(from, to);
+    if (hOnly && (hOnly.raised || hOnly.openTotal)) {
+      return { empty:false, from, to, logCount:0, taskCount:0, mins:0, execs:0, days:0,
+               byType:[], byCat:[], comms:{count:0,mins:0}, hurdles:hOnly };
+    }
+    return { empty:true, from, to };
+  }
 
   const byType = {};
   let mins = 0;
@@ -11987,12 +12002,61 @@ async function gcFetchWork() {
     if (t.completedAt) days.add(String(t.completedAt).slice(0,10));
   }
 
+  // Communication — worklog se hi, alag fetch nahi (double count se bachne ke liye)
+  const COMMS = ['Coordination Calls','Strategy Meetings','Follow-ups','Store Visits'];
+  const commTypes = Object.values(byType).filter(t => COMMS.indexOf(t.label) >= 0);
+  const comms = { count: commTypes.reduce((s,t)=>s+t.count,0),
+                  mins:  commTypes.reduce((s,t)=>s+t.mins,0) };
+
+  const hurdles = await gcFetchHurdles(from, to);
+
   return {
-    empty: false, from, to,
+    empty: false, from, to, comms, hurdles,
     logCount: logs.length, taskCount: tasks.length,
     mins, execs: execs.size, days: days.size,
     byType: Object.values(byType).sort((a,b) => b.count - a.count),
     byCat: Object.entries(byCat).map(([k,v]) => ({ cat:k, count:v })).sort((a,b) => b.count - a.count),
+  };
+}
+
+// Hurdles — client ke issues. Note: hurdle record me resolve ka time nahi hota
+// (sirf status + created_at), isliye "is period me resolve hua" claim nahi karte.
+async function gcFetchHurdles(from, to) {
+  let rows = [];
+  try {
+    const r = await api('GET', '/hurdles?client=' + encodeURIComponent(_gc.client) + '&_=' + Date.now());
+    rows = Array.isArray(r) ? r : [];
+  } catch (e) { console.warn('hurdles fetch failed', e); return null; }
+
+  // backend snake_case deta hai; camelCase bhi handle kar lo
+  const g = (o, ...keys) => { for (const k of keys) if (o[k] != null) return o[k]; return null; };
+  const mine = c => String(c || '').trim().toUpperCase() === String(_gc.client).trim().toUpperCase();
+  const all = rows.filter(x => mine(g(x, 'client_code', 'clientCode')));
+
+  const inRange = d => { if (!d) return false; const s = String(d).slice(0,10); return s >= from && s <= to; };
+  const isOpen = x => !/resolved|closed/i.test(String(g(x, 'status') || 'Open'));
+
+  const raised = all.filter(x => inRange(g(x, 'created_at', 'createdAt')));
+  const open   = all.filter(isOpen);
+
+  // seller ko jo email ja chuka hai wahi dikhate hain — internal description kabhi nahi
+  const today = new Date();
+  const pending = open.map(x => {
+    const subj = g(x, 'email_subject', 'emailSubject');
+    const dt   = g(x, 'email_date', 'emailDate') || g(x, 'created_at', 'createdAt');
+    const sent = g(x, 'email_sent', 'emailSent');
+    const d = dt ? new Date(String(dt).slice(0,10) + 'T00:00:00Z') : null;
+    const age = d && !isNaN(d) ? Math.max(0, Math.round((today - d) / 86400000)) : null;
+    return { subject: (sent && subj) ? String(subj) : null,
+             date: dt ? String(dt).slice(0,10) : null, age };
+  }).sort((a,b) => (b.age || 0) - (a.age || 0));
+
+  return {
+    raised: raised.length,
+    raisedResolved: raised.filter(x => !isOpen(x)).length,
+    openTotal: open.length,
+    pending: pending.slice(0, 8),
+    withSubject: pending.filter(p => p.subject).length,
   };
 }
 
@@ -12064,9 +12128,45 @@ function gcWorkHtml(W, R) {
     + '<thead><tr><th>Work Area</th><th style="text-align:center;">Kaam</th><th style="text-align:center;">Time</th><th>Related Metric</th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table></div>'
     + catRows
+    + gcCommsHtml(W)
+    + gcIssuesHtml(W)
     + '<div style="margin-top:10px;font-size:10.5px;color:var(--text-muted);font-style:italic;">'
     + 'Note: sirf work summary dikhayi gayi hai — internal notes report me shaamil nahi hote.</div>'
     + '</div></div>';
+}
+
+function gcCommsHtml(W) {
+  const c = W.comms;
+  if (!c || !c.count) return '';
+  return '<div style="margin-top:12px;padding:9px 11px;background:var(--bg);border-radius:7px;">'
+    + '<span style="font-weight:700;font-size:12px;">📞 Communication</span> '
+    + '<span style="font-size:12px;color:var(--text-muted);">— ' + c.count + ' calls / meetings / follow-ups'
+    + (c.mins ? ' · ' + gcHrs(c.mins) : '') + '</span></div>';
+}
+
+function gcIssuesHtml(W) {
+  const H = W.hurdles;
+  if (!H || (!H.raised && !H.openTotal)) return '';
+  let s = '<div style="margin-top:12px;">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">🚧 Issues</div>'
+    + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;">'
+    + '<span class="badge badge-blue">Is period me uthe: ' + H.raised + '</span>'
+    + (H.raised ? '<span class="badge badge-green">Inme se resolve ho chuke: ' + H.raisedResolved + '</span>' : '')
+    + '<span class="badge badge-' + (H.openTotal ? 'red' : 'green') + '">Abhi pending: ' + H.openTotal + '</span>'
+    + '</div>';
+
+  if (H.openTotal) {
+    const withSub = H.pending.filter(p => p.subject);
+    s += '<div style="border-left:3px solid var(--amber);background:#fff8e7;border-radius:0 7px 7px 0;padding:9px 11px;">'
+      + '<div style="font-weight:700;font-size:11.5px;margin-bottom:4px;">⏳ Aapke end se pending</div>';
+    s += withSub.length
+      ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:5px;">Ye aapko email ki gayi thi, abhi tak resolve nahi hui:</div>'
+        + withSub.map(p => '<div style="font-size:11.5px;padding:3px 0;">• ' + gcEsc(p.subject)
+            + (p.age != null ? ' <span style="color:var(--red);font-weight:700;">(' + p.age + ' din)</span>' : '') + '</div>').join('')
+      : '<div style="font-size:11.5px;">' + H.openTotal + ' item pending hain — detail account manager se lo.</div>';
+    s += '</div>';
+  }
+  return s + '</div>';
 }
 
 function gcKpiMini(label, value) {
@@ -12404,6 +12504,14 @@ function gcExportExcel() {
       }),
       ...(W.byCat.length ? [[], ['COMPLETED TASKS'], ['Category','Count'],
         ...W.byCat.map(c => [c.cat, c.count])] : []),
+      ...(W.comms && W.comms.count ? [[], ['COMMUNICATION'],
+        ['Calls / Meetings / Follow-ups', W.comms.count], ['Time', gcHrs(W.comms.mins)]] : []),
+      ...(W.hurdles && (W.hurdles.raised || W.hurdles.openTotal) ? [[], ['ISSUES'],
+        ['Is period me uthe', W.hurdles.raised],
+        ['Inme se resolve ho chuke', W.hurdles.raisedResolved],
+        ['Abhi pending', W.hurdles.openTotal], [],
+        ['PENDING (aapke end se)', 'Din'],
+        ...W.hurdles.pending.filter(p=>p.subject).map(p => [p.subject, p.age])] : []),
     ]);
   }
 
@@ -12715,6 +12823,38 @@ async function gcExportPDF() {
                   im ? gcAscii(im.metric + ' ' + im.from + ' -> ' + im.to + '  ' + im.txt) : '-'];
         }), [175, 55, 60, 225], [90,90,110]);
 
+      if (WK.comms && WK.comms.count) {
+        y += 16;
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+        doc.text(gcAscii('Communication: ' + WK.comms.count + ' calls / meetings / follow-ups'
+          + (WK.comms.mins ? ' (' + gcHrs(WK.comms.mins) + ')' : '')), Mg, y);
+      }
+
+      const HD = WK.hurdles;
+      if (HD && (HD.raised || HD.openTotal)) {
+        y += 24;
+        if (y > H - 150) { chrome(); doc.addPage(); header('Issues'); y = 92; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+        doc.text('Issues', Mg, y);
+        y = table(y+10, ['','COUNT'],
+          [['Is period me uthe', String(HD.raised)],
+           ['Inme se resolve ho chuke', String(HD.raisedResolved)],
+           ['Abhi pending', String(HD.openTotal)]], [400, 115], [90,90,110]);
+
+        const withSub = HD.pending.filter(p => p.subject);
+        if (withSub.length) {
+          y += 20;
+          if (y > H - 130) { chrome(); doc.addPage(); header('Issues (contd.)'); y = 92; }
+          doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
+          doc.text('Aapke End Se Pending', Mg, y);
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+          doc.text(gcAscii('Ye aapko email ki gayi thi, abhi tak resolve nahi hui.'), Mg, y+13);
+          y = table(y+22, ['ITEM','DIN'],
+            withSub.map(p => [String(p.subject).slice(0,70), p.age == null ? '-' : String(p.age)]),
+            [430, 85], RED);
+        }
+      }
+
       if (WK.byCat.length) {
         y += 20;
         doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
@@ -12777,6 +12917,416 @@ async function gcExportPDF() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════════
+// DSR DAY-WISE GRID — seller rows × day columns
+// Jo din bhara hai wahan value, jo khali hai wahan 0
+// ══════════════════════════════════════════════════════════════════
+let _dg = { from:'', to:'', metric:'sales_amount', rows:[], days:[], onlyGaps:false, q:'' };
+
+const DG_METRICS = {
+  sales_amount:  { label:'Sales (₹)',  short:'Sales',   money:true  },
+  orders_count:  { label:'Orders',     short:'Orders',  money:false },
+  ad_spend:      { label:'Ad Spend (₹)', short:'Spend', money:true  },
+  returns_count: { label:'Returns',    short:'Returns', money:false },
+};
+
+function dgLastMonth() {
+  const n = new Date();
+  const first = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+  const last  = new Date(n.getFullYear(), n.getMonth(), 0);
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return { from: iso(first), to: iso(last) };
+}
+
+async function renderDSRDayWise() {
+  const lm = dgLastMonth();
+  if (!_dg.from) { _dg.from = lm.from; _dg.to = lm.to; }
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📅 DSR Day-wise Report</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Seller × din — bhara hua value, khali 0</span></div>'
+    + '<div class="card-body">'
+    + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">FROM</div>'
+    + '<input type="date" id="dg-from" class="form-control" style="padding:5px 8px;font-size:12px;width:145px;" value="' + _dg.from + '"></div>'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">TO</div>'
+    + '<input type="date" id="dg-to" class="form-control" style="padding:5px 8px;font-size:12px;width:145px;" value="' + _dg.to + '"></div>'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">METRIC</div>'
+    + '<select id="dg-metric" class="form-control" style="padding:5px 8px;font-size:12px;width:150px;">'
+    + Object.keys(DG_METRICS).map(k => '<option value="' + k + '"' + (k === _dg.metric ? ' selected' : '') + '>'
+        + DG_METRICS[k].label + '</option>').join('')
+    + '</select></div>'
+    + '<button class="btn btn-primary" onclick="dgLoad()">📊 Report Nikalo</button>'
+    + '<button class="btn btn-outline" onclick="dgSetLastMonth()">Last Month</button>'
+    + '</div></div></div>'
+    + '<div id="dg-out"></div>';
+}
+
+function dgSetLastMonth() {
+  const lm = dgLastMonth();
+  document.getElementById('dg-from').value = lm.from;
+  document.getElementById('dg-to').value = lm.to;
+  dgLoad();
+}
+
+function dgDayList(from, to) {
+  const out = [];
+  const d = new Date(from + 'T00:00:00Z'), end = new Date(to + 'T00:00:00Z');
+  let guard = 0;
+  while (d <= end && guard++ < 400) {
+    out.push(d.toISOString().slice(0,10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+async function dgLoad() {
+  const from = document.getElementById('dg-from').value;
+  const to   = document.getElementById('dg-to').value;
+  if (!from || !to) { showToast('From aur To date daalo!', 'error'); return; }
+  if (to < from) { showToast('To date, From se pehle nahi ho sakti!', 'error'); return; }
+
+  _dg.from = from; _dg.to = to;
+  _dg.metric = document.getElementById('dg-metric').value;
+  const out = document.getElementById('dg-out');
+  out.innerHTML = '<div class="loading"><div class="spinner"></div> DSR data la raha hoon...</div>';
+
+  try {
+    const [clients, data] = await Promise.all([
+      getClients(),
+      api('GET', '/dsr?x=1&from=' + from + '&to=' + to + '&_=' + Date.now()),
+    ]);
+    if (clients) APP.clients = clients;
+    const rows = Array.isArray(data) ? data : [];
+
+    const days = dgDayList(from, to);
+    _dg.days = days;
+
+    // seller ke hisaab se din ka data
+    const byClient = {};
+    for (const r of rows) {
+      const cc = String(r.client_code || r.clientCode || '').trim();
+      if (!cc) continue;
+      const dt = String(r.report_date || r.reportDate || r.date || '').slice(0,10);
+      if (!dt) continue;
+      const k = cc.toUpperCase();
+      const c = byClient[k] || (byClient[k] = { code: cc, days: {} });
+      // ek din ke multiple entries aa jayein to jod do
+      const cur = c.days[dt] || (c.days[dt] = { sales_amount:0, orders_count:0, ad_spend:0, returns_count:0, by:null });
+      cur.sales_amount  += Number(r.sales_amount)  || 0;
+      cur.orders_count  += Number(r.orders_count)  || 0;
+      cur.ad_spend      += Number(r.ad_spend)      || 0;
+      cur.returns_count += Number(r.returns_count) || 0;
+      cur.by = r.entered_by || cur.by;
+    }
+
+    // sabhi active sellers dikhao — jinki ek bhi entry nahi unhe bhi (wahi to problem hai)
+    const active = (APP.clients || []).filter(c => {
+      const st = String(c.status || '').toLowerCase();
+      return !st.includes('inactive') && !st.includes('closed') && !st.includes('churn');
+    });
+
+    const list = [];
+    const seen = {};
+    for (const c of active) {
+      const k = String(c.clientCode || '').trim().toUpperCase();
+      seen[k] = true;
+      list.push({
+        code: c.clientCode, name: c.busyName || c.clientCode,
+        am: c.amName || '—', marketplace: c.marketplace || '',
+        days: (byClient[k] || {}).days || {},
+      });
+    }
+    // jo DSR me hai par client list me nahi (safety)
+    for (const k in byClient) {
+      if (!seen[k]) list.push({ code: byClient[k].code, name: byClient[k].code, am:'—', marketplace:'', days: byClient[k].days });
+    }
+
+    for (const s of list) {
+      s.filled = days.filter(d => s.days[d]).length;
+      s.missing = days.length - s.filled;
+      s.pct = days.length ? Math.round(s.filled / days.length * 100) : 0;
+      s.total = days.reduce((t,d) => t + ((s.days[d] || {})[_dg.metric] || 0), 0);
+    }
+    list.sort((a,b) => a.pct - b.pct || String(a.name).localeCompare(String(b.name)));
+    _dg.rows = list;
+
+    dgRender();
+  } catch (e) {
+    console.error('dsr daywise error', e);
+    out.innerHTML = '<div class="card"><div class="card-body" style="color:var(--red);">❌ ' + gcEsc(e.message) + '</div></div>';
+  }
+}
+
+function dgFmtCell(v, money) {
+  if (!v) return '0';
+  if (!money) return String(Math.round(v));
+  const a = Math.abs(v);
+  if (a >= 1e7) return (v/1e7).toFixed(1) + 'Cr';
+  if (a >= 1e5) return (v/1e5).toFixed(1) + 'L';
+  if (a >= 1e3) return Math.round(v/1e3) + 'K';
+  return String(Math.round(v));
+}
+
+function dgRender() {
+  const days = _dg.days, M = DG_METRICS[_dg.metric];
+  let rows = _dg.rows;
+  if (_dg.onlyGaps) rows = rows.filter(r => r.missing > 0);
+  if (_dg.q) {
+    const q = _dg.q.toLowerCase();
+    rows = rows.filter(r => String(r.name).toLowerCase().includes(q)
+                         || String(r.code).toLowerCase().includes(q)
+                         || String(r.am).toLowerCase().includes(q));
+  }
+
+  const totalCells = _dg.rows.length * days.length;
+  const filledCells = _dg.rows.reduce((s,r) => s + r.filled, 0);
+  const fullyOk = _dg.rows.filter(r => r.missing === 0).length;
+  const zeroEntry = _dg.rows.filter(r => r.filled === 0).length;
+
+  // din ke hisaab se compliance
+  const perDay = days.map(d => _dg.rows.filter(r => r.days[d]).length);
+
+  const hdr = days.map(d => {
+    const dd = new Date(d + 'T00:00:00Z');
+    const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dd.getUTCDay()];
+    const wk = dd.getUTCDay() === 0;
+    return '<th style="padding:4px 3px;text-align:center;font-size:9px;min-width:34px;'
+      + (wk ? 'background:#f1f3f5;' : '') + '">'
+      + '<div style="font-weight:800;">' + dd.getUTCDate() + '</div>'
+      + '<div style="font-weight:400;color:var(--text-muted);font-size:8px;">' + dow + '</div></th>';
+  }).join('');
+
+  const body = rows.map(r => {
+    const cells = days.map(d => {
+      const e = r.days[d];
+      if (!e) return '<td style="padding:3px;text-align:center;font-size:10px;background:#fdf2f2;color:var(--red);font-weight:700;">0</td>';
+      const v = e[_dg.metric] || 0;
+      const title = 'Sales ₹' + Math.round(e.sales_amount) + ' · Orders ' + Math.round(e.orders_count)
+                  + ' · Spend ₹' + Math.round(e.ad_spend) + (e.by ? ' · ' + e.by : '');
+      return '<td title="' + gcEsc(title) + '" style="padding:3px;text-align:center;font-size:10px;background:#f0fff4;'
+        + (v ? '' : 'color:var(--text-muted);') + '">' + dgFmtCell(v, M.money) + '</td>';
+    }).join('');
+    const col = r.pct === 100 ? 'var(--green)' : r.pct >= 70 ? 'var(--amber)' : 'var(--red)';
+    return '<tr>'
+      + '<td style="padding:4px 7px;position:sticky;left:0;background:#fff;border-right:2px solid var(--border);min-width:170px;z-index:1;">'
+      + '<div style="font-weight:700;font-size:11px;">' + gcEsc(r.name) + '</div>'
+      + '<div style="font-size:9px;color:var(--text-muted);">' + gcEsc(r.code) + ' · ' + gcEsc(r.am) + '</div></td>'
+      + '<td style="padding:4px;text-align:center;font-size:10px;font-weight:800;color:' + col + ';">'
+      + r.filled + '/' + days.length + '</td>'
+      + cells
+      + '<td style="padding:4px 7px;text-align:right;font-size:10px;font-weight:700;">' + dgFmtCell(r.total, M.money) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('dg-out').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:14px;">'
+    + gcKpiMini('Sellers', String(_dg.rows.length))
+    + gcKpiMini('Din', String(days.length))
+    + gcKpiMini('Overall Compliance', (totalCells ? Math.round(filledCells/totalCells*100) : 0) + '%')
+    + gcKpiMini('Poori Bhari', String(fullyOk))
+    + gcKpiMini('Ek Bhi Nahi', String(zeroEntry))
+    + '</div>'
+
+    + '<div class="card"><div class="card-header">'
+    + '<span class="card-title">📅 ' + gcEsc(M.label) + ' — ' + gcEsc(_dg.from) + ' se ' + gcEsc(_dg.to) + '</span>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    + '<input id="dg-q" placeholder="Seller / AM dhundo..." value="' + gcEsc(_dg.q) + '" '
+    + 'oninput="_dg.q=this.value;dgRender();document.getElementById(\'dg-q\').focus()" '
+    + 'class="form-control" style="padding:4px 8px;font-size:11px;width:170px;">'
+    + '<label style="font-size:11px;display:flex;gap:5px;align-items:center;cursor:pointer;">'
+    + '<input type="checkbox"' + (_dg.onlyGaps ? ' checked' : '') + ' onchange="_dg.onlyGaps=this.checked;dgRender()"> Sirf gaps wale</label>'
+    + '<button class="btn btn-sm btn-outline" onclick="dgExportExcel()">📥 Excel</button>'
+    + '</div></div>'
+    + '<div class="card-body" style="padding:0;">'
+    + '<div style="overflow-x:auto;max-height:70vh;">'
+    + '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead style="position:sticky;top:0;background:var(--bg);z-index:2;"><tr>'
+    + '<th style="padding:5px 7px;text-align:left;font-size:10px;position:sticky;left:0;background:var(--bg);border-right:2px solid var(--border);z-index:3;">SELLER</th>'
+    + '<th style="padding:5px;text-align:center;font-size:10px;">FILLED</th>'
+    + hdr
+    + '<th style="padding:5px 7px;text-align:right;font-size:10px;">TOTAL</th>'
+    + '</tr></thead><tbody>'
+    + (rows.length ? body : '<tr><td colspan="' + (days.length+3) + '" style="padding:20px;text-align:center;color:var(--text-muted);">Koi seller nahi mila</td></tr>')
+    + '</tbody>'
+    + '<tfoot style="position:sticky;bottom:0;background:var(--bg);"><tr>'
+    + '<td style="padding:5px 7px;font-size:10px;font-weight:800;position:sticky;left:0;background:var(--bg);border-right:2px solid var(--border);">DIN KA TOTAL</td>'
+    + '<td></td>'
+    + perDay.map(c => {
+        const pc = _dg.rows.length ? Math.round(c/_dg.rows.length*100) : 0;
+        const cl = pc === 100 ? 'var(--green)' : pc >= 70 ? 'var(--amber)' : 'var(--red)';
+        return '<td style="padding:4px 2px;text-align:center;font-size:9px;font-weight:800;color:' + cl + ';">' + c + '</td>';
+      }).join('')
+    + '<td></td></tr></tfoot>'
+    + '</table></div></div></div>'
+    + '<div style="margin-top:8px;font-size:11px;color:var(--text-muted);">'
+    + '🟥 laal 0 = us din DSR bhari hi nahi · 🟩 hara = bhari hui (0 value bhi ho sakti hai) · cell pe hover karo to poori detail</div>';
+}
+
+// Plain SheetJS cell styling ignore karta hai. xlsx-js-style (same API) alag se
+// load karke use karte hain, aur window.XLSX ko wapas restore kar dete hain.
+function dgStyledXLSX() {
+  return new Promise(resolve => {
+    if (window.__XLSXStyle) return resolve(window.__XLSXStyle);
+    const prev = window.XLSX;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload = () => {
+      window.__XLSXStyle = window.XLSX;      // styled build
+      window.XLSX = prev;                    // baaki app ke liye purana wapas
+      resolve(window.__XLSXStyle);
+    };
+    s.onerror = () => { window.XLSX = prev; resolve(null); };
+    document.head.appendChild(s);
+  });
+}
+
+async function dgExportExcel() {
+  if (!_dg.rows.length) { showToast('Pehle report nikalo!', 'error'); return; }
+  const XL = (await dgStyledXLSX()) || XLSX;   // load fail ho to bina styling hi de do
+  const days = _dg.days;
+  const d0 = new Date(_dg.from + 'T00:00:00Z');
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONFULL = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+  const mIdx = d0.getUTCMonth();
+  // saara period ek hi mahine ka ho tabhi mahine ka naam, warna date range
+  const sameMonth = _dg.from.slice(0,7) === _dg.to.slice(0,7);
+  const tabName = sameMonth ? ('DSR ' + MONFULL[mIdx] + ' Audit') : 'DSR Audit';
+  const fileMonth = sameMonth ? (MONFULL[mIdx] + '_' + d0.getUTCFullYear())
+                              : (_dg.from + '_to_' + _dg.to);
+  const dayHdr = days.map(d => d.slice(8) + '-' + MON[parseInt(d.slice(5,7),10) - 1]);
+
+  // ── AM ke hisaab se group karo (naam se sorted) ──
+  const groups = {};
+  for (const r of _dg.rows) {
+    const am = (r.am && r.am !== '—') ? r.am : '—';
+    (groups[am] || (groups[am] = [])).push(r);
+  }
+  const amNames = Object.keys(groups).sort((a,b) =>
+    a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b));
+
+  const aoa = [];
+  const meta = [];   // har row ka type yaad rakho taaki styling lag sake
+  aoa.push(['Client Code','Client Name','AM Name','Marketplace','Days Filled','Days Missed',
+            'Total Sales','Total Returns','Returns %'].concat(dayHdr));
+  meta.push({ t:'head' });
+
+  for (const am of amNames) {
+    const list = groups[am].slice().sort((a,b) =>
+      String(a.name).localeCompare(String(b.name)));
+    aoa.push(['▼ ' + am + '  (' + list.length + ' seller' + (list.length > 1 ? 's' : '') + ')']);
+    meta.push({ t:'am' });
+    for (const r of list) {
+      const sales   = days.reduce((s,d) => s + ((r.days[d] || {}).sales_amount  || 0), 0);
+      const returns = days.reduce((s,d) => s + ((r.days[d] || {}).returns_count || 0), 0);
+      aoa.push([r.code, r.name, am, r.marketplace || '', r.filled, r.missing,
+                Math.round(sales * 100) / 100, returns,
+                sales ? Math.round(returns / sales * 1000) / 10 : 0]
+        .concat(days.map(d => r.days[d] ? (Math.round(((r.days[d].sales_amount) || 0) * 100) / 100) : 0)));
+      meta.push({ t:'data', filledDays: days.map(d => !!r.days[d]) });
+    }
+  }
+
+  const ws = XL.utils.aoa_to_sheet(aoa);
+  const nCols = 9 + days.length;
+
+  // ── styling (xlsx-js-style ho to lagegi; warna data phir bhi sahi) ──
+  const F = { name:'Arial' };
+  const border = { top:{style:'thin',color:{rgb:'FFD9D9D9'}}, bottom:{style:'thin',color:{rgb:'FFD9D9D9'}},
+                   left:{style:'thin',color:{rgb:'FFD9D9D9'}}, right:{style:'thin',color:{rgb:'FFD9D9D9'}} };
+  const setCell = (r, c, style, fmt) => {
+    const ref = XL.utils.encode_cell({ r, c });
+    const cell = ws[ref];
+    if (!cell) return;
+    cell.s = style;
+    if (fmt) cell.z = fmt;
+  };
+  const HEAD = { font:{...F, sz:9, bold:true, color:{rgb:'FFFFFFFF'}},
+                 fill:{fgColor:{rgb:'FF1F4E79'}, patternType:'solid'},
+                 alignment:{horizontal:'center', vertical:'center', wrapText:true}, border };
+  const AMROW = { font:{...F, sz:10, bold:true, color:{rgb:'FF1F4E79'}},
+                  fill:{fgColor:{rgb:'FFD6E4F0'}, patternType:'solid'},
+                  alignment:{horizontal:'left', vertical:'center'} };
+
+  const merges = [];
+  for (let r = 0; r < meta.length; r++) {
+    const m = meta[r];
+    if (m.t === 'head') {
+      for (let c = 0; c < nCols; c++) setCell(r, c, HEAD);
+      continue;
+    }
+    if (m.t === 'am') {
+      for (let c = 0; c < nCols; c++) setCell(r, c, AMROW);
+      merges.push({ s:{r, c:0}, e:{r, c:nCols - 1} });
+      continue;
+    }
+    const zebra = r % 2 === 0 ? 'FFF2F2F2' : 'FFFFFFFF';
+    const base  = { font:{...F, sz:9}, fill:{fgColor:{rgb:zebra}, patternType:'solid'},
+                    alignment:{horizontal:'center'}, border };
+    setCell(r, 0, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 1, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 2, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 3, base);
+    setCell(r, 4, base);
+    setCell(r, 5, { ...base, font:{...F, sz:9, color:{rgb:'FFCC0000'}} });   // missed = laal
+    setCell(r, 6, base, '#,##0.00');
+    setCell(r, 7, base, '#,##0.00');
+    setCell(r, 8, base, '0.0"%"');
+    for (let i = 0; i < days.length; i++) {
+      const filled = m.filledDays[i];
+      setCell(r, 9 + i, filled
+        ? { font:{...F, sz:8}, fill:{fgColor:{rgb:zebra}, patternType:'solid'},
+            alignment:{horizontal:'center'}, border }
+        : { font:{...F, sz:8, color:{rgb:'FFAAAAAA'}},                        // bhari nahi
+            fill:{fgColor:{rgb:'FFFFF0CC'}, patternType:'solid'},
+            alignment:{horizontal:'center'}, border },
+        filled ? '#,##0.00' : null);
+    }
+  }
+
+  ws['!cols'] = [{wch:12},{wch:28},{wch:18},{wch:12},{wch:9},{wch:9},{wch:12},{wch:11},{wch:9}]
+    .concat(days.map(() => ({ wch:8 })));
+  ws['!rows'] = meta.map(m => m.t === 'head' ? { hpt:30 } : m.t === 'am' ? { hpt:18 } : {});
+  ws['!merges'] = merges;
+  ws['!freeze'] = { xSplit:9, ySplit:1 };
+  ws['!autofilter'] = { ref: XL.utils.encode_range({ s:{r:0,c:0}, e:{r:0,c:nCols-1} }) };
+
+  // ── AM Summary ──
+  const sum = [['AM Name','Total Sellers','Total Sales (₹)','Avg Sales/Seller','Days Filled Avg']];
+  for (const am of amNames) {
+    const list = groups[am];
+    const sales = list.reduce((s,r) =>
+      s + days.reduce((t,d) => t + ((r.days[d] || {}).sales_amount || 0), 0), 0);
+    const fill = list.reduce((s,r) => s + r.filled, 0);
+    sum.push([am, list.length, Math.round(sales * 100) / 100,
+              Math.round(sales / list.length * 100) / 100,
+              Math.round(fill / list.length * 10) / 10]);
+  }
+  const ws2 = XL.utils.aoa_to_sheet(sum);
+  for (let c = 0; c < 5; c++) {
+    const ref = XL.utils.encode_cell({ r:0, c });
+    if (ws2[ref]) ws2[ref].s = HEAD;
+  }
+  for (let r = 1; r < sum.length; r++) {
+    for (let c = 0; c < 5; c++) {
+      const ref = XL.utils.encode_cell({ r, c });
+      if (!ws2[ref]) continue;
+      ws2[ref].s = { font:{...F, sz:9}, alignment:{horizontal: c === 0 ? 'left' : 'center'}, border };
+      if (c === 2 || c === 3) ws2[ref].z = '#,##0.00';
+    }
+  }
+  ws2['!cols'] = [{wch:24},{wch:13},{wch:16},{wch:16},{wch:15}];
+  ws2['!freeze'] = { xSplit:0, ySplit:1 };
+
+  const wb = XL.utils.book_new();
+  XL.utils.book_append_sheet(wb, ws,  tabName.slice(0, 31));
+  XL.utils.book_append_sheet(wb, ws2, 'AM Summary');
+  XL.writeFile(wb, 'DSR_' + fileMonth + '_Audit.xlsx');
+  showToast('Audit file download ho gayi!', 'success');
+}
 
 // ══════════════════════════════════════════════════════════════════
 // FLIPKART SELLER ANALYZER  —  Business + Ads (ek page)

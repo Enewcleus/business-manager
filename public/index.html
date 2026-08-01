@@ -12994,23 +12994,49 @@ async function dgLoad() {
   out.innerHTML = '<div class="loading"><div class="spinner"></div> DSR data la raha hoon...</div>';
 
   try {
-    const [clients, data] = await Promise.all([
-      getClients(),
-      api('GET', '/dsr?x=1&from=' + from + '&to=' + to + '&_=' + Date.now()),
-    ]);
-    if (clients) APP.clients = clients;
-    const rows = Array.isArray(data) ? data : [];
-
     const days = dgDayList(from, to);
     _dg.days = days;
+
+    const clients = await getClients();
+    if (clients) APP.clients = clients;
+
+    // /dsr endpoint ek din ke liye bana hai — poore mahine ki ek request pe
+    // backend row-limit laga deta hai aur data kat jata hai. Isliye din-by-din
+    // laate hain (5 ek saath), phir sab jod dete hain.
+    const rows = [];
+    const perDay = {};
+    let done = 0, failed = 0;
+    const box = document.getElementById('dg-out');
+    const CONC = 5;
+
+    for (let i = 0; i < days.length; i += CONC) {
+      const batch = days.slice(i, i + CONC);
+      const res = await Promise.all(batch.map(async d => {
+        try {
+          const r = await api('GET', '/dsr?x=1&from=' + d + '&to=' + d + '&_=' + Date.now());
+          return { d, rows: Array.isArray(r) ? r : [] };
+        } catch (e) { return { d, rows: [], err: true }; }
+      }));
+      for (const x of res) {
+        if (x.err) failed++;
+        perDay[x.d] = x.rows.length;
+        // kuch backend from/to ignore karke aur dates bhi de sakte hain —
+        // isliye har row pe date force kar dete hain
+        for (const r of x.rows) rows.push({ ...r, __day: x.d });
+        done++;
+      }
+      if (box) box.innerHTML = '<div class="loading"><div class="spinner"></div> '
+        + done + '/' + days.length + ' din load ho gaye...</div>';
+    }
+    _dg.fetchStats = { days: days.length, failed, perDay, total: rows.length };
 
     // seller ke hisaab se din ka data
     const byClient = {};
     for (const r of rows) {
       const cc = String(r.client_code || r.clientCode || '').trim();
       if (!cc) continue;
-      const dt = String(r.report_date || r.reportDate || r.date || '').slice(0,10);
-      if (!dt) continue;
+      const dt = String(r.__day || r.report_date || r.reportDate || r.date || '').slice(0,10);
+      if (!dt || days.indexOf(dt) < 0) continue;
       const k = cc.toUpperCase();
       const c = byClient[k] || (byClient[k] = { code: cc, days: {} });
       // ek din ke multiple entries aa jayein to jod do
@@ -13121,7 +13147,31 @@ function dgRender() {
       + '</tr>';
   }).join('');
 
-  document.getElementById('dg-out').innerHTML =
+  // agar har din exactly ek jaisa cap dikhe to backend limit ka shak
+  const FS = _dg.fetchStats || {};
+  let warn = '';
+  if (FS.failed) {
+    warn += '<div style="padding:9px 11px;background:#fff5f5;border-left:3px solid var(--red);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:10px;">'
+      + '⚠️ ' + FS.failed + ' din ka data load nahi ho paya — numbers adhoore ho sakte hain. Dobara try karo.</div>';
+  }
+  const counts = Object.values(FS.perDay || {}).filter(c => c > 0);
+  if (counts.length > 2) {
+    const mx = Math.max.apply(null, counts);
+    const atCap = counts.filter(c => c === mx).length;
+    if (mx >= 100 && atCap >= Math.max(3, counts.length * 0.6)) {
+      warn += '<div style="padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:10px;">'
+        + '⚠️ <strong>Shak hai ki backend row limit laga raha hai</strong> — ' + atCap + ' din me exactly '
+        + mx + ' rows aayi. Actual data isse zyada ho sakta hai — <code>allroutes.js</code> ke '
+        + '<code>/dsr</code> route me row limit badhani padegi.</div>';
+    }
+  }
+  const zeroDays = Object.keys(FS.perDay || {}).filter(d => !FS.perDay[d]);
+  if (zeroDays.length && zeroDays.length < (FS.days || 0)) {
+    warn += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">'
+      + 'ℹ️ In dino koi bhi DSR entry nahi mili: ' + zeroDays.map(d => d.slice(8)).join(', ') + '</div>';
+  }
+
+  document.getElementById('dg-out').innerHTML = warn +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:14px;">'
     + gcKpiMini('Sellers', String(_dg.rows.length))
     + gcKpiMini('Din', String(days.length))

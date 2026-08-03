@@ -328,6 +328,7 @@ const NAV_CONFIG = {
     {id:'renewals',icon:'🔄',label:'Renewals'},
     {id:'ads',icon:'📢',label:'Ads Manager'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'adstasks',icon:'📋',label:'Ads Tasks'},
@@ -361,6 +362,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -379,6 +381,7 @@ const NAV_CONFIG = {
     {id:'dsr',icon:'📊',label:'Daily Sales Report'},
     {id:'seller360',icon:'🔍',label:'Seller 360 View'},
     {id:'reports',icon:'📋',label:'Reports'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'misreport',icon:'📑',label:'MIS Report'},
     {id:'payments',icon:'💰',label:'Payment Manager'},
     {id:'hurdles',icon:'🚧',label:'Hurdle Tracker'},
@@ -421,6 +424,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -477,6 +481,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -493,6 +498,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -512,6 +518,7 @@ const NAV_CONFIG = {
     {id:'reportanalyzer',icon:'📊',label:'Report Analyzer'},
     {id:'fkanalyzer',icon:'📦',label:'Flipkart Analyzer'},
     {id:'adsanalyzer',icon:'📢',label:'Ads Analyzer'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
     {id:'growthcomp',icon:'📈',label:'Growth Comparison'},
     {id:'feedback',icon:'⭐',label:'Feedback'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
@@ -544,6 +551,7 @@ const NAV_CONFIG = {
     {id:'seller360', label:'Seller 360 View', icon:'🔍'},
     {id:'payments', label:'Payment Manager', icon:'💰'},
     {id:'chat',icon:'💬',label:'Team Chat',badge:'chat'},
+    {id:'dsrdaywise',icon:'📅',label:'DSR Day-wise'},
   ],
   'CSI Executive': [
     {id:'dashboard', label:'Dashboard', icon:'🏠'},
@@ -765,11 +773,11 @@ function navigate(page) {
   document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.getElementById('mnav-'+page)?.classList.add('active');
-  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report',growthcomp:'📈 Growth Comparison',feedback:'⭐ Feedback',reportanalyzer:'📊 Report Analyzer',fkanalyzer:'📦 Flipkart Analyzer',adsanalyzer:'📢 Ads Analyzer',channelreport:'📊 Channel Report',hurdles:'🚧 Hurdle Tracker',chat:'💬 Team Chat'};
+  const titles = {dsr:'📊 Daily Sales Report',seller360:'🔍 Seller 360 View',dashboard:'Dashboard',clients:'Client Manager',tickets:'Tickets',crm:'CRM Log',csi:'CSI Health',renewals:'Renewals',ads:'Ads Manager',reports:'Reports',admin:'Admin Panel',tasks:'Task Manager',worklog:'Work Log',stafftransfer:'🔁 Staff Transfer',mycalls:'📞 My Call Log',adstasks:'📋 Ads Tasks',execperf:'📈 My Performance',misreport:'📑 MIS Report',approvals:'✅ Approvals',productivity:'📈 AI Productivity Report',retention:'💰 Sales Retention Report',growthcomp:'📈 Growth Comparison',dsrdaywise:'📅 DSR Day-wise Report',feedback:'⭐ Feedback',reportanalyzer:'📊 Report Analyzer',fkanalyzer:'📦 Flipkart Analyzer',adsanalyzer:'📢 Ads Analyzer',channelreport:'📊 Channel Report',hurdles:'🚧 Hurdle Tracker',chat:'💬 Team Chat'};
   document.getElementById('page-title').textContent = titles[page]||page;
   closeSidebar();
   document.getElementById('page-content').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
-  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,feedback:renderFeedback,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention,growthcomp:renderGrowthComparison};
+  const pages = {dsr:renderDSR,seller360:renderSeller360,dashboard:renderDashboard,clients:renderClients,tickets:renderTickets,crm:renderCRM,channelreport:renderChannelReport,csi:renderCSI,renewals:renderRenewals,ads:renderAds,reports:renderReports,admin:renderAdmin,hurdles:renderHurdleTracker,reportanalyzer:renderReportAnalyzer,fkanalyzer:renderFlipkartAnalyzer,adsanalyzer:renderAdsAnalyzer,feedback:renderFeedback,tasks:renderTasks,worklog:renderWorkLog,stafftransfer:renderStaffTransfer,mycalls:renderMyCalls,adstasks:renderAdsTasks,payments:renderPayments,chat:renderChat,execperf:renderExecPerf,misreport:renderMISReport,approvals:renderApprovals,productivity:renderProductivityReport,retention:renderSalesRetention,growthcomp:renderGrowthComparison,dsrdaywise:renderDSRDayWise};
   (pages[page] || (() => { document.getElementById('page-content').innerHTML='<div class="empty-state"><div class="emoji">🚧</div><h3>Coming Soon</h3></div>'; }))();
 }
 
@@ -10340,16 +10348,51 @@ let _fb = { file: null, preview: null, result: null, busy: false };
 
 const FB_LEAD_ROLES_UI = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
 
+// Feedback ke apne calls — toast spam nahi, ek jagah saaf status
+async function fbApi(path) {
+  try {
+    const res = await fetch(API + path, {
+      headers: { 'Authorization':'Bearer ' + TOKEN, 'Cache-Control':'no-cache' },
+      cache: 'no-store',
+    });
+    if (res.status === 401) { doLogout(); return { fail:'auth' }; }
+    if (res.status === 404) return { fail:'missing' };
+    if (!res.ok) return { fail:'http', code: res.status };
+    const txt = await res.text();
+    try { return { data: JSON.parse(txt) }; }
+    catch (e) {
+      // JSON ki jagah HTML mila = route mount nahi hua (SPA fallback)
+      return { fail: /^\s*</.test(txt) ? 'missing' : 'badjson' };
+    }
+  } catch (e) { return { fail:'network' }; }
+}
+
 async function renderFeedback() {
   const isLead = FB_LEAD_ROLES_UI.includes(APP.user?.role);
 
-  const [clients, progress, recent, board] = await Promise.all([
+  const [clients, rProg, rRec, rBoard] = await Promise.all([
     getClients(),
-    api('GET', '/feedback/progress?_=' + Date.now()),
-    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
-    isLead ? api('GET', '/feedback/leaderboard?_=' + Date.now()) : Promise.resolve(null),
+    fbApi('/feedback/progress?_=' + Date.now()),
+    fbApi('/feedback/recent?limit=30&_=' + Date.now()),
+    isLead ? fbApi('/feedback/leaderboard?_=' + Date.now()) : Promise.resolve({ data:null }),
   ]);
   if (clients) APP.clients = clients;
+
+  const progress = rProg.data, recent = rRec.data, board = rBoard.data;
+  const fails = [rProg, rRec, rBoard].filter(x => x && x.fail);
+  const backendDown = fails.some(f => f.fail === 'missing');
+  const banner = backendDown
+    ? '<div style="padding:12px 14px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;margin-bottom:16px;">'
+      + '<div style="font-weight:700;font-size:13px;color:var(--red);">⚠️ Feedback backend abhi live nahi hai</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6;">'
+      + 'Page to khul gaya par server pe <code>/feedback/*</code> routes mount nahi hue — '
+      + 'upload aur leaderboard tab tak kaam nahi karenge. '
+      + 'Ye <code>allroutes.js</code> me theek hoga (feedback router aur multer <code>upload</code> ka order).'
+      + '</div></div>'
+    : fails.length
+      ? '<div style="padding:11px 13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;margin-bottom:16px;font-size:12px;">'
+        + '⚠️ Kuch data load nahi ho paya — page refresh karke dekho.</div>'
+      : '';
 
   // Sirf registered + active sellers (manual entry nahi)
   const list = (APP.clients || []).filter(c => {
@@ -10363,8 +10406,8 @@ async function renderFeedback() {
   const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
   const doneCol = (p.mine || 0) >= (p.target || 5) ? 'var(--green)' : 'var(--amber)';
 
-  document.getElementById('page-content').innerHTML =
-    '<div class="card" style="margin-bottom:16px;">'
+  document.getElementById('page-content').innerHTML = banner
+    + '<div class="card" style="margin-bottom:16px;">'
     + '<div class="card-header"><span class="card-title">⭐ Feedback Upload</span>'
     + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + (p.target || 5)
     + ' unique/month · 96-day unique check</span></div>'
@@ -10414,7 +10457,9 @@ async function renderFeedback() {
     + '</select></div>'
     + '<div class="form-group"><label style="font-weight:700;">Note (optional)</label>'
     + '<input type="text" class="form-control" id="fb-note" placeholder="e.g. 5★ on packaging"></div>'
-    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;" onclick="fbSubmit()">Upload &amp; Check</button>'
+    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;"'
+    + (backendDown ? ' disabled title="Backend routes live nahi hain"' : '') + ' onclick="fbSubmit()">'
+    + (backendDown ? 'Backend live nahi hai' : 'Upload &amp; Check') + '</button>'
     + '</div>'
 
     + '</div></div></div>'
@@ -10543,10 +10588,11 @@ function fbResetForm() {
 }
 
 async function fbRefresh() {
-  const [progress, recent] = await Promise.all([
-    api('GET', '/feedback/progress?_=' + Date.now()),
-    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+  const [rp, rr] = await Promise.all([
+    fbApi('/feedback/progress?_=' + Date.now()),
+    fbApi('/feedback/recent?limit=30&_=' + Date.now()),
   ]);
+  const progress = rp.data, recent = rr.data;
   if (recent) {
     const el = document.getElementById('fb-recent');
     if (el) el.innerHTML = fbRecentHtml(recent);
@@ -10709,6 +10755,8 @@ async function renderGrowthComparison() {
     + '<button class="btn btn-primary" style="font-size:14px;padding:10px 24px;" onclick="gcCompare()">📊 Compare Karo</button>'
     + '<button class="btn btn-outline" id="gc-pdf-btn" style="display:none;" onclick="gcExportPDF()">📄 PDF Report</button>'
     + '<button class="btn btn-outline" id="gc-xls-btn" style="display:none;" onclick="gcExportExcel()">📥 Excel</button>'
+    + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:0 8px;">'
+    + '<input type="checkbox" id="gc-inc-work" checked onchange="_gc.includeWork=this.checked"> Work done include karo</label>'
     + '<button class="btn btn-outline" onclick="renderGrowthComparison()">🗑 Clear All</button>'
     + '</div></div></div>'
 
@@ -10847,6 +10895,25 @@ function gcFixRef(sheet) {
   return sheet;
 }
 
+// content ka chhota fingerprint — same file dono periods me to pakad lo
+function gcFingerprint(parsed) {
+  const r = parsed.rows || [];
+  if (!r.length) return 'empty';
+  try {
+    return r.length + '|' + JSON.stringify(r[0]) + '|' + JSON.stringify(r[r.length - 1]);
+  } catch (e) { return r.length + '|?'; }
+}
+
+// kaunsi reports dono periods me bilkul same hain
+function gcDupeReports() {
+  const out = [];
+  for (const r of GC_REPORTS[_gc.mp]) {
+    const a = _gc.A.files[r.key], b = _gc.B.files[r.key];
+    if (a && b && a.fp && b.fp && a.fp === b.fp) out.push(r.name);
+  }
+  return out;
+}
+
 function gcSheet(wb, ...nameKeys) {
   if (!wb) return null;
   let n = wb.SheetNames.find(s => nameKeys.some(k => s.toLowerCase() === k.toLowerCase()));
@@ -10864,7 +10931,7 @@ async function gcHandleFile(side, key, input) {
 
   try {
     const parsed = await gcReadFile(file);
-    _gc[side].files[key] = { ...parsed, filename: file.name };
+    _gc[side].files[key] = { ...parsed, filename: file.name, fp: gcFingerprint(parsed) };
 
     // period detect
     gcDetectPeriod(side, key, parsed);
@@ -11029,13 +11096,21 @@ function gcUpdateReadiness() {
     const a = !!_gc.A.files[r.key], b = !!_gc.B.files[r.key];
     if (a !== b || (!a && !b)) skips.push(r.name);
   }
+  const dupes = gcDupeReports();
+  const dupeHtml = dupes.length
+    ? '<div style="margin-top:8px;padding:10px 12px;background:#fff5f5;border-left:3px solid var(--red);border-radius:0 6px 6px 0;font-size:12px;">'
+      + '🚫 <strong>Dono periods me bilkul same file upload hui hai:</strong> ' + dupes.join(', ') + '. '
+      + 'Comparison bekaar aayega — us report ke saare metrics me 0% change dikhega. '
+      + 'Check karo ki Period A aur Period B ki alag-alag reports upload ki hain.</div>'
+    : '';
+
   const skipHtml = skips.length
     ? '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);">ℹ️ Ye sections skip honge (dono period me nahi hain): ' + skips.join(', ') + '</div>'
     : '';
 
   box.innerHTML = '<div style="margin-top:14px;padding:11px 13px;background:var(--bg);border-radius:9px;border:1px solid var(--border);">'
     + '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">📋 Readiness</div>'
-    + line('A') + line('B') + warn + skipHtml + '</div>';
+    + line('A') + line('B') + warn + dupeHtml + skipHtml + '</div>';
 }
 
 // ─── PARSERS: AMAZON ──────────────────────────────────────────────
@@ -11302,7 +11377,7 @@ function gcFkOrders(side) {
 }
 
 // ─── COMPARE ENGINE ───────────────────────────────────────────────
-function gcCompare() {
+async function gcCompare() {
   if (!_gc.client) { showToast('Pehle seller select karo!', 'error'); return; }
   const reports = GC_REPORTS[_gc.mp];
   const musts = reports.filter(r => r.must);
@@ -11326,6 +11401,7 @@ function gcCompare() {
 
   try {
     _gc.result = _gc.mp === 'amazon' ? gcBuildAmazon() : gcBuildFlipkart();
+    _gc.work = _gc.includeWork === false ? null : await gcFetchWork();
     gcRenderResults();
     document.getElementById('gc-pdf-btn').style.display = '';
     document.getElementById('gc-xls-btn').style.display = '';
@@ -11400,7 +11476,7 @@ function gcBuildAmazon() {
   const asins = gcItemDelta(bizA.items, bizB.items, 'asin', N);
 
   return {
-    mp:'amazon', M, split, wasted, wf, asins, N,
+    mp:'amazon', M, split, wasted, wf, asins, N, dupes: gcDupeReports(),
     raw: { bizA, bizB, cmpA, cmpB, wstA, wstB },
     verdict: gcVerdictAmazon(M, wasted, wf, N),
   };
@@ -11463,7 +11539,7 @@ function gcBuildFlipkart() {
   );
 
   return {
-    mp:'flipkart', M, split, returns, orders, wf, asins: skus, N,
+    mp:'flipkart', M, split, returns, orders, wf, asins: skus, N, dupes: gcDupeReports(),
     raw: { pnlA, pnlB, plcA, plcB, retA, retB, ordA, ordB },
     verdict: gcVerdictFlipkart(M, returns, wf, N),
   };
@@ -11629,6 +11705,514 @@ function gcVerdictFlipkart(M, returns, wf, N) {
   return L;
 }
 
+// ─── PRECISE FORMATTING (rates/ratios ko round mat karo) ──────────
+function gcMoney(v) {
+  const a = Math.abs(v || 0);
+  if (a >= 1e5) return gcFmt(v);                       // 1L+ pe short form
+  if (a > 0 && a < 1) return (v < 0 ? '-' : '') + a.toFixed(2);   // 0 dikha ke bhram mat phailao
+  return (v < 0 ? '-' : '') + Math.round(a).toLocaleString('en-IN');
+}
+function gcFmtBy(kind, v) {
+  if (v == null || !isFinite(v)) return '—';
+  switch (kind) {
+    case 'money':  return '₹' + gcMoney(v);
+    case 'money2': return '₹' + (Math.round(v * 100) / 100).toFixed(2);
+    case 'rate':   return (Math.round(v * 100) / 100).toFixed(2) + '%';
+    case 'ratio':  return (Math.round(v * 100) / 100).toFixed(2) + 'x';
+    default:       return gcMoney(v);
+  }
+}
+function gcChgStr(d) {
+  if (d.flat) return '0';
+  return (d.diff > 0 ? '+' : '') + (d.isPct ? d.diff.toFixed(2) + ' pts' : d.pct + '%');
+}
+
+// ─── SINGLE SOURCE OF TRUTH for metric tables (screen/PDF/Excel) ──
+function gcMetricSpec(R) {
+  const M = R.M, isAmz = R.mp === 'amazon';
+  // DRR on ho to sirf count/money metrics per-day hote hain; rates/ratios nahi
+  const perDay = !!(R.N && R.N.on);
+  const S = (label, d, kind, goodUp) => {
+    kind = kind || 'int';
+    const scaled = perDay && (kind === 'int' || kind === 'money');
+    return { label: label + (scaled ? ' (per day)' : ''), d, kind,
+             goodUp: goodUp !== false, perDay: scaled };
+  };
+  return {
+    vis: isAmz
+      ? [S('Sessions', M.sessions), S('Page Views', M.views), S('Impressions', M.impr),
+         S('Clicks', M.clicks), S('CTR', M.ctr, 'rate')]
+      : [S('Ad Views', M.views), S('Clicks', M.clicks), S('CTR', M.ctr, 'rate'),
+         S('CPC', M.cpc, 'money2', false)],
+    sales: isAmz
+      ? [S('Total Sales', M.sales, 'money'), S('Units', M.units), S('Conversion Rate', M.cvr, 'rate'),
+         S('AOV', M.aov, 'money2'), S('Organic Sales', M.organic, 'money')]
+      : [S('Gross Sales', M.gross, 'money'), S('Net Earnings', M.net, 'money'), S('Margin', M.margin, 'rate'),
+         S('Units', M.units), S('AOV', M.aov, 'money2'), S('Organic Sales', M.organic, 'money')],
+    ads: isAmz
+      ? [S('Ad Spend', M.spend, 'money', false), S('Ad Sales', M.adSales, 'money'),
+         S('ACOS', M.acos, 'rate', false), S('ROAS', M.roas, 'ratio'),
+         S('TACOS', M.tacos, 'rate', false), S('CPC', M.cpc, 'money2', false)]
+      : [S('Ad Spend', M.spend, 'money', false), S('Ad Revenue', M.adRev, 'money'),
+         S('Direct Revenue', M.dRev, 'money'), S('Total ROI', M.roi, 'ratio'),
+         S('Direct ROI', M.dRoi, 'ratio'), S('TACOS', M.tacos, 'rate', false)],
+    opt: [].concat(
+      R.wasted  ? [S('Wasted Ad Spend', R.wasted, 'money', false)] : [],
+      R.returns ? [S('Returns', R.returns, R.returns.isPct ? 'rate' : 'int', false)] : [],
+      R.orders  ? [S('Orders', R.orders)] : []),
+  };
+}
+
+// ─── ACTION PLAN — top 20 items, week vs month ────────────────────
+function gcActionPlan(R) {
+  const N = R.N, isAmz = R.mp === 'amazon';
+  const sc = (v, side) => N.on ? v * (side === 'A' ? N.fA : N.fB) : v;
+
+  const items = (R.asins.all || []).filter(x => (x.aSalesN + x.bSalesN) > 0);
+  // business impact ke hisaab se rank — jitna bada change, utna upar
+  items.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const top = items.slice(0, 20);
+
+  const out = [];
+  for (const x of top) {
+    const sA = sc(x.aSess, 'A'), sB = sc(x.bSess, 'B');
+    const uA = sc(x.aUnits, 'A'), uB = sc(x.bUnits, 'B');
+    const cvrA = x.aSess ? x.aUnits / x.aSess : 0;
+    const cvrB = x.bSess ? x.bUnits / x.bSess : 0;
+    const sessDrop = sA > 0 && sB < sA * 0.9;
+    const sessRise = sA > 0 && sB > sA * 1.1;
+    const cvrDrop  = cvrA > 0 && cvrB < cvrA * 0.9;
+    const cvrRise  = cvrA > 0 && cvrB > cvrA * 1.1;
+    const pct = x.pct;
+
+    let when = 'month', tag = '', why = '', act = '';
+
+    if (x.bSalesN === 0 && x.aSalesN > 0) {
+      when = 'week'; tag = '🚨 Sale band';
+      why = 'Pichhle period me ' + gcFmtBy('money', x.aSalesN) + ' ki sale thi, ab zero.';
+      act = 'Turant check karo — stock out hai, listing suppress hui, ya Buy Box gaya. Listing status aur inventory dekho.';
+    } else if (isAmz && sB > 0 && uB === 0 && uA > 0) {
+      when = 'week'; tag = '🚨 Traffic hai, sale nahi';
+      why = 'Sessions ' + Math.round(sB) + ' aa rahe hain par ek bhi unit nahi bika.';
+      act = 'Buy Box, price aur stock check karo. Competitor ne price gira diya ho sakta hai.';
+    } else if (pct <= -25 && sessDrop && (!isAmz || cvrB >= cvrA * 0.9)) {
+      when = 'week'; tag = '📉 Visibility gir gayi';
+      why = 'Sale ' + pct + '%' + (isAmz ? ', sessions ' + Math.round(sA) + ' → ' + Math.round(sB) : '')
+          + '. Conversion theek hai — sirf traffic kam hua.';
+      act = 'Keyword ranking check karo. Is ASIN ko alag campaign do, top keywords pe bid badhao, aur backend search terms refresh karo.';
+    } else if (pct <= -25 && cvrDrop) {
+      when = 'week'; tag = '📉 Convert nahi ho raha';
+      why = 'Sale ' + pct + '%, conversion ' + (cvrA * 100).toFixed(2) + '% → ' + (cvrB * 100).toFixed(2) + '%'
+          + '. Traffic theek hai par khareed nahi rahe.';
+      act = 'Listing audit karo — main image, A+ content, title, bullet points, price aur recent reviews. Competitor se price compare karo.';
+    } else if (pct <= -10) {
+      when = 'month'; tag = '⚠️ Halki girawat';
+      why = 'Sale ' + pct + '% gir gayi (' + gcFmtBy('money', x.aSalesN) + ' → ' + gcFmtBy('money', x.bSalesN) + ').';
+      act = 'Nazar rakho. Agle 2 hafte me ' + (sessDrop ? 'keywords aur bids' : 'listing content') + ' pe kaam karo.';
+    } else if (x.aSalesN === 0 && x.bSalesN > 0) {
+      when = 'month'; tag = '🆕 Naya launch';
+      why = 'Naya ASIN, pehle period me sale nahi thi, ab ' + gcFmtBy('money', x.bSalesN) + '.';
+      act = 'Launch phase me hai — review generation aur keyword indexing pe focus karo.';
+    } else if (pct >= 25 && (cvrRise || sessRise)) {
+      when = 'month'; tag = '🚀 Winner — scale karo';
+      why = 'Sale +' + pct + '% badhi' + (sessRise ? ', traffic bhi badha' : ', conversion improve hui') + '.';
+      act = 'Budget badhao. Related keywords expand karo, aur is ASIN ke variations/bundles pe bhi push do.';
+    } else if (pct >= 10) {
+      when = 'month'; tag = '📈 Achha chal raha';
+      why = 'Sale +' + pct + '% (' + gcFmtBy('money', x.aSalesN) + ' → ' + gcFmtBy('money', x.bSalesN) + ').';
+      act = 'Momentum banaye rakho — stock kaafi rakho aur bid stable rakho.';
+    } else {
+      when = 'month'; tag = '➖ Stable';
+      why = 'Sale lagbhag same (' + (pct > 0 ? '+' : '') + pct + '%).';
+      act = 'Koi urgent kaam nahi. Monthly review me dobara dekho.';
+    }
+
+    out.push({ id: x.id, title: x.title, when, tag, why, act,
+               aSales: x.aSalesN, bSales: x.bSalesN, pct, sA, sB, cvrA, cvrB });
+  }
+  return { week: out.filter(o => o.when === 'week'), month: out.filter(o => o.when === 'month'), all: out };
+}
+
+// ─── PDF ke liye offscreen high-res charts ────────────────────────
+async function gcChartImages() {
+  const R = _gc.result;
+  if (!R || typeof Chart === 'undefined') return null;
+
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1100px;background:#fff;';
+  document.body.appendChild(host);
+
+  const made = [];
+  const mk = (w, h) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'width:' + w + 'px;height:' + h + 'px;background:#fff;';
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    wrap.appendChild(c); host.appendChild(wrap);
+    return c;
+  };
+  const base = { responsive:false, animation:false, devicePixelRatio:2 };
+  const GOLD='#C9A25A', DARK='#2D3440', GREEN='#46A05A', RED='#C84646', BLUE='#2980b9', GREY='#B9C2CC';
+  const M = R.M, isAmz = R.mp === 'amazon';
+
+  try {
+    // 1. grouped bar
+    const barM = isAmz
+      ? [['Sales',M.sales],['Ad Spend',M.spend],['Ad Sales',M.adSales]]
+      : [['Gross Sales',M.gross],['Net Earn',M.net],['Ad Spend',M.spend],['Ad Revenue',M.adRev]];
+    const pctM = isAmz
+      ? [['Sessions',M.sessions],['Units',M.units],['Sales',M.sales],['Clicks',M.clicks],['Ad Spend',M.spend],['Ad Sales',M.adSales]]
+      : [['Units',M.units],['Gross Sales',M.gross],['Net Earn',M.net],['Clicks',M.clicks],['Ad Spend',M.spend],['Ad Revenue',M.adRev]];
+    made.push(new Chart(mk(1000, 480), {
+      type:'bar',
+      data:{ labels: barM.map(m=>m[0]), datasets:[
+        { label:'Period A', data: barM.map(m=>Math.round(m[1].a)), backgroundColor:GREY, borderRadius:4 },
+        { label:'Period B', data: barM.map(m=>Math.round(m[1].b)), backgroundColor:GOLD, borderRadius:4 }]},
+      options:{ ...base, plugins:{ legend:{position:'bottom',labels:{font:{size:15}}} },
+        scales:{ y:{ beginAtZero:true, ticks:{ font:{size:13}, callback:v=>gcFmt(v) } },
+                 x:{ ticks:{ font:{size:13} } } } },
+    }));
+
+    // 1b. % change chart
+    made.push(new Chart(mk(1000, 480), {
+      type:'bar',
+      data:{ labels: pctM.map(m=>m[0]), datasets:[{ data: pctM.map(m=>m[1].pct),
+        backgroundColor: pctM.map(m=>m[1].pct>=0?GREEN:RED), borderRadius:4 }]},
+      options:{ ...base, plugins:{ legend:{display:false} },
+        scales:{ y:{ ticks:{ font:{size:13}, callback:v=>v+'%' } }, x:{ ticks:{ font:{size:13} } } } },
+    }));
+
+    // 2. waterfall
+    const wf = R.wf;
+    const wLbl = isAmz ? ['Traffic','Conversion','AOV','Net Change'] : ['Units','—','AOV','Net Change'];
+    const wVal = isAmz ? [wf.trafficEff, wf.cvrEff, wf.aovEff, wf.total] : [wf.trafficEff, 0, wf.aovEff, wf.total];
+    made.push(new Chart(mk(1000, 480), {
+      type:'bar',
+      data:{ labels:wLbl, datasets:[{ data: wVal.map(v=>Math.round(v*100)/100),
+        backgroundColor: wVal.map((v,i)=> i===3 ? (v>=0?DARK:RED) : (v>=0?GREEN:RED)), borderRadius:4 }]},
+      options:{ ...base, plugins:{ legend:{display:false} },
+        scales:{ y:{ ticks:{ font:{size:13}, callback:v=>Math.abs(v)<10?v:gcFmt(v) } }, x:{ ticks:{ font:{size:14} } } } },
+    }));
+
+    // 3+4. pies
+    ['A','B'].forEach(side => {
+      const s = R.split[side];
+      made.push(new Chart(mk(480, 420), {
+        type:'doughnut',
+        data:{ labels:['Ad-driven','Organic'], datasets:[{ data:[Math.round(s.ad),Math.round(s.organic)],
+          backgroundColor:[GOLD,BLUE], borderWidth:0 }]},
+        options:{ ...base, plugins:{ legend:{position:'bottom',labels:{font:{size:14}}} } },
+      }));
+    });
+
+    await new Promise(r => setTimeout(r, 300));
+    const imgs = {
+      bar:  made[0].canvas.toDataURL('image/png'),
+      pct:  made[1].canvas.toDataURL('image/png'),
+      wf:   made[2].canvas.toDataURL('image/png'),
+      pieA: made[3].canvas.toDataURL('image/png'),
+      pieB: made[4].canvas.toDataURL('image/png'),
+    };
+    return imgs;
+  } catch (e) {
+    console.error('chart image error', e);
+    return null;
+  } finally {
+    made.forEach(c => { try { c.destroy(); } catch (e) {} });
+    host.remove();
+  }
+}
+
+// ─── ACTION PLAN — screen HTML ────────────────────────────────────
+function gcActionHtml(plan, isAmz) {
+  if (!plan.all.length) return '';
+  const lbl = isAmz ? 'ASIN' : 'SKU';
+  const group = (list, title, colour, sub) =>
+    '<div style="margin-bottom:16px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+    + '<span style="font-weight:800;font-size:13px;color:' + colour + ';">' + title + '</span>'
+    + '<span class="badge" style="background:' + colour + ';color:#fff;">' + list.length + ' ' + lbl + '</span>'
+    + '<span style="font-size:11px;color:var(--text-muted);">' + sub + '</span></div>'
+    + (list.length
+        ? list.map(o =>
+            '<div style="border-left:3px solid ' + colour + ';background:var(--bg);border-radius:0 7px 7px 0;padding:9px 11px;margin-bottom:7px;">'
+            + '<div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:3px;">'
+            + '<strong style="font-size:12px;">' + gcEsc(o.id) + '</strong>'
+            + '<span style="font-size:11px;font-weight:700;color:' + (o.pct >= 0 ? 'var(--green)' : 'var(--red)') + ';">'
+            + (o.pct >= 0 ? '+' : '') + o.pct + '%</span>'
+            + '<span style="font-size:10px;color:var(--text-muted);">' + o.tag + '</span></div>'
+            + (o.title ? '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + gcEsc(o.title.slice(0,60)) + '</div>' : '')
+            + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">' + gcEsc(o.why) + '</div>'
+            + '<div style="font-size:11.5px;font-weight:600;">👉 ' + gcEsc(o.act) + '</div>'
+            + '</div>').join('')
+        : '<div style="font-size:12px;color:var(--text-muted);padding:8px;">Is bucket me kuch nahi — achhi baat hai.</div>')
+    + '</div>';
+
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🗓️ Kaam Ki List — Top 20 ' + lbl + '</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">business impact ke hisaab se sorted</span></div>'
+    + '<div class="card-body">'
+    + group(plan.week, '🔥 IS HAFTE', 'var(--red)', 'urgent — abhi dekho')
+    + group(plan.month, '📅 IS MAHINE', 'var(--secondary)', 'plan karke karo')
+    + '</div></div>';
+}
+
+// ─── WORK DONE — worklog + completed tasks (client-safe summary) ──
+// Raw description/outcome kabhi nahi dikhate — executive ke internal notes
+// seller ke paas nahi jaane chahiye. Sirf work-type, count, time.
+const GC_WORK_MAP = {
+  'ads optimization': { label:'Advertising Optimisation',     icon:'📢', link:'ads' },
+  'listing update':   { label:'Listing Improvements',         icon:'📝', link:'listing' },
+  'health fix':       { label:'Account Health Fixes',         icon:'🩺', link:'' },
+  'csi review':       { label:'Customer Satisfaction Review', icon:'⭐', link:'returns' },
+  'call':             { label:'Coordination Calls',           icon:'📞', link:'' },
+  'meeting':          { label:'Strategy Meetings',            icon:'🤝', link:'' },
+  'follow-up':        { label:'Follow-ups',                   icon:'🔁', link:'' },
+  'store visit':      { label:'Store Visits',                 icon:'🏬', link:'' },
+  'other':            { label:'Other Account Work',           icon:'🔧', link:'' },
+};
+function gcWorkMeta(t) {
+  const k = String(t || 'other').trim().toLowerCase();
+  return GC_WORK_MAP[k] || { label: String(t || 'Other Account Work'), icon:'🔧', link:'' };
+}
+
+function gcIsoOf(side) {
+  const el = document.getElementById('gc-' + (side === 'A' ? 'from' : 'to') + '-' + side);
+  return el ? el.value : '';
+}
+
+// Period B ke window ka kaam nikalo
+async function gcFetchWork() {
+  const from = (document.getElementById('gc-from-B') || {}).value;
+  const to   = (document.getElementById('gc-to-B')   || {}).value;
+  if (!_gc.client || !from || !to) return null;
+
+  const q = 'from=' + from + '&to=' + to + '&client=' + encodeURIComponent(_gc.client);
+  let logs = [], tasks = [];
+  try {
+    const res = await Promise.all([
+      api('GET', '/tasks/worklog?' + q + '&_=' + Date.now()),
+      api('GET', '/tasks?_=' + Date.now()),
+    ]);
+    logs  = Array.isArray(res[0]) ? res[0] : [];
+    tasks = Array.isArray(res[1]) ? res[1] : [];
+  } catch (e) {
+    console.warn('work fetch failed', e);
+    return null;
+  }
+
+  // Backend client filter na ho to yahin filter kar lo (dono taraf safe)
+  const inRange = d => { if (!d) return false; const s = String(d).slice(0,10); return s >= from && s <= to; };
+  const mine = c => String(c || '').trim().toUpperCase() === String(_gc.client).trim().toUpperCase();
+
+  logs = logs.filter(l => mine(l.clientCode) && inRange(l.logDate || l.loggedAt));
+  tasks = tasks.filter(t => mine(t.clientCode)
+    && /^(completed|done)$/i.test(String(t.status || '').trim())
+    && inRange(t.completedAt));
+
+  if (!logs.length && !tasks.length) {
+    const hOnly = await gcFetchHurdles(from, to);
+    if (hOnly && (hOnly.raised || hOnly.openTotal)) {
+      return { empty:false, from, to, logCount:0, taskCount:0, mins:0, execs:0, days:0,
+               byType:[], byCat:[], comms:{count:0,mins:0}, hurdles:hOnly };
+    }
+    return { empty:true, from, to };
+  }
+
+  const byType = {};
+  let mins = 0;
+  const execs = new Set(), days = new Set();
+  for (const l of logs) {
+    const meta = gcWorkMeta(l.workType);
+    const x = byType[meta.label] || (byType[meta.label] = { ...meta, count:0, mins:0 });
+    x.count++;
+    const m = parseInt(l.timeSpent, 10) || 0;
+    x.mins += m; mins += m;
+    if (l.executiveName) execs.add(l.executiveName);
+    if (l.logDate) days.add(String(l.logDate).slice(0,10));
+  }
+
+  const byCat = {};
+  for (const t of tasks) {
+    const c = String(t.category || 'Other').trim();
+    byCat[c] = (byCat[c] || 0) + 1;
+    if (t.assignedTo) execs.add(t.assignedTo);
+    if (t.completedAt) days.add(String(t.completedAt).slice(0,10));
+  }
+
+  // Communication — worklog se hi, alag fetch nahi (double count se bachne ke liye)
+  const COMMS = ['Coordination Calls','Strategy Meetings','Follow-ups','Store Visits'];
+  const commTypes = Object.values(byType).filter(t => COMMS.indexOf(t.label) >= 0);
+  const comms = { count: commTypes.reduce((s,t)=>s+t.count,0),
+                  mins:  commTypes.reduce((s,t)=>s+t.mins,0) };
+
+  const hurdles = await gcFetchHurdles(from, to);
+
+  return {
+    empty: false, from, to, comms, hurdles,
+    logCount: logs.length, taskCount: tasks.length,
+    mins, execs: execs.size, days: days.size,
+    byType: Object.values(byType).sort((a,b) => b.count - a.count),
+    byCat: Object.entries(byCat).map(([k,v]) => ({ cat:k, count:v })).sort((a,b) => b.count - a.count),
+  };
+}
+
+// Hurdles — client ke issues. Note: hurdle record me resolve ka time nahi hota
+// (sirf status + created_at), isliye "is period me resolve hua" claim nahi karte.
+async function gcFetchHurdles(from, to) {
+  let rows = [];
+  try {
+    const r = await api('GET', '/hurdles?client=' + encodeURIComponent(_gc.client) + '&_=' + Date.now());
+    rows = Array.isArray(r) ? r : [];
+  } catch (e) { console.warn('hurdles fetch failed', e); return null; }
+
+  // backend snake_case deta hai; camelCase bhi handle kar lo
+  const g = (o, ...keys) => { for (const k of keys) if (o[k] != null) return o[k]; return null; };
+  const mine = c => String(c || '').trim().toUpperCase() === String(_gc.client).trim().toUpperCase();
+  const all = rows.filter(x => mine(g(x, 'client_code', 'clientCode')));
+
+  const inRange = d => { if (!d) return false; const s = String(d).slice(0,10); return s >= from && s <= to; };
+  const isOpen = x => !/resolved|closed/i.test(String(g(x, 'status') || 'Open'));
+
+  const raised = all.filter(x => inRange(g(x, 'created_at', 'createdAt')));
+  const open   = all.filter(isOpen);
+
+  // seller ko jo email ja chuka hai wahi dikhate hain — internal description kabhi nahi
+  const today = new Date();
+  const pending = open.map(x => {
+    const subj = g(x, 'email_subject', 'emailSubject');
+    const dt   = g(x, 'email_date', 'emailDate') || g(x, 'created_at', 'createdAt');
+    const sent = g(x, 'email_sent', 'emailSent');
+    const d = dt ? new Date(String(dt).slice(0,10) + 'T00:00:00Z') : null;
+    const age = d && !isNaN(d) ? Math.max(0, Math.round((today - d) / 86400000)) : null;
+    return { subject: (sent && subj) ? String(subj) : null,
+             date: dt ? String(dt).slice(0,10) : null, age };
+  }).sort((a,b) => (b.age || 0) - (a.age || 0));
+
+  return {
+    raised: raised.length,
+    raisedResolved: raised.filter(x => !isOpen(x)).length,
+    openTotal: open.length,
+    pending: pending.slice(0, 8),
+    withSubject: pending.filter(p => p.subject).length,
+  };
+}
+
+function gcHrs(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? (h + 'h' + (m ? ' ' + m + 'm' : '')) : (m + 'm');
+}
+
+// kaam ko metric movement se jodo — yahi seller ko value dikhata hai
+function gcWorkImpact(link, R) {
+  const M = R.M, isAmz = R.mp === 'amazon';
+  const arrow = (d, goodUp) => {
+    if (d.flat) return { txt:'koi badlaav nahi', good:null };
+    const good = goodUp ? d.up : !d.up;
+    return { txt: gcChgStr(d), good };
+  };
+  if (link === 'ads') {
+    const a = arrow(M.acos || M.roi, false);
+    return isAmz
+      ? { metric:'ACOS', from:gcFmtBy('rate',M.acos.a), to:gcFmtBy('rate',M.acos.b), ...arrow(M.acos,false) }
+      : { metric:'Ad ROI', from:gcFmtBy('ratio',M.roi.a), to:gcFmtBy('ratio',M.roi.b), ...arrow(M.roi,true) };
+  }
+  if (link === 'listing') {
+    const d = isAmz ? M.cvr : M.margin;
+    return { metric: isAmz ? 'Conversion' : 'Margin',
+             from:gcFmtBy('rate',d.a), to:gcFmtBy('rate',d.b), ...arrow(d,true) };
+  }
+  if (link === 'returns' && R.returns) {
+    return { metric:'Returns', from:gcFmtBy(R.returns.isPct?'rate':'int',R.returns.a),
+             to:gcFmtBy(R.returns.isPct?'rate':'int',R.returns.b), ...arrow(R.returns,false) };
+  }
+  return null;
+}
+
+function gcWorkHtml(W, R) {
+  if (!W || W.empty) return '';
+  const rows = W.byType.map(t => {
+    const im = gcWorkImpact(t.link, R);
+    const impCol = im ? (im.good === null ? 'var(--text-muted)' : im.good ? 'var(--green)' : 'var(--red)') : '';
+    return '<tr>'
+      + '<td><span style="font-size:15px;">' + t.icon + '</span> <strong style="font-size:12px;">' + gcEsc(t.label) + '</strong></td>'
+      + '<td style="text-align:center;"><span class="badge badge-blue">' + t.count + '</span></td>'
+      + '<td style="text-align:center;font-size:12px;">' + gcHrs(t.mins) + '</td>'
+      + '<td style="font-size:11px;">' + (im
+          ? gcEsc(im.metric) + ': ' + im.from + ' → ' + im.to
+            + ' <span style="color:' + impCol + ';font-weight:700;">' + gcEsc(im.txt) + '</span>'
+          : '<span style="color:var(--text-muted);">—</span>') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  const catRows = W.byCat.length
+    ? '<div style="margin-top:12px;"><div style="font-weight:700;font-size:12px;margin-bottom:6px;">✅ Completed Tasks</div>'
+      + '<div style="display:flex;gap:7px;flex-wrap:wrap;">'
+      + W.byCat.map(c => '<span class="badge badge-green">' + gcEsc(c.cat) + ': ' + c.count + '</span>').join('')
+      + '</div></div>'
+    : '';
+
+  return '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🛠️ Is Period Me Kya Kaam Hua</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">' + gcEsc(W.from) + ' → ' + gcEsc(W.to) + '</span></div>'
+    + '<div class="card-body">'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin-bottom:14px;">'
+    + gcKpiMini('Total Activities', String(W.logCount + W.taskCount))
+    + gcKpiMini('Time Invested', gcHrs(W.mins))
+    + gcKpiMini('Team Members', String(W.execs))
+    + gcKpiMini('Active Days', String(W.days))
+    + '</div>'
+    + '<div class="table-wrap"><table>'
+    + '<thead><tr><th>Work Area</th><th style="text-align:center;">Kaam</th><th style="text-align:center;">Time</th><th>Related Metric</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>'
+    + catRows
+    + gcCommsHtml(W)
+    + gcIssuesHtml(W)
+    + '<div style="margin-top:10px;font-size:10.5px;color:var(--text-muted);font-style:italic;">'
+    + 'Note: sirf work summary dikhayi gayi hai — internal notes report me shaamil nahi hote.</div>'
+    + '</div></div>';
+}
+
+function gcCommsHtml(W) {
+  const c = W.comms;
+  if (!c || !c.count) return '';
+  return '<div style="margin-top:12px;padding:9px 11px;background:var(--bg);border-radius:7px;">'
+    + '<span style="font-weight:700;font-size:12px;">📞 Communication</span> '
+    + '<span style="font-size:12px;color:var(--text-muted);">— ' + c.count + ' calls / meetings / follow-ups'
+    + (c.mins ? ' · ' + gcHrs(c.mins) : '') + '</span></div>';
+}
+
+function gcIssuesHtml(W) {
+  const H = W.hurdles;
+  if (!H || (!H.raised && !H.openTotal)) return '';
+  let s = '<div style="margin-top:12px;">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">🚧 Issues</div>'
+    + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px;">'
+    + '<span class="badge badge-blue">Is period me uthe: ' + H.raised + '</span>'
+    + (H.raised ? '<span class="badge badge-green">Inme se resolve ho chuke: ' + H.raisedResolved + '</span>' : '')
+    + '<span class="badge badge-' + (H.openTotal ? 'red' : 'green') + '">Abhi pending: ' + H.openTotal + '</span>'
+    + '</div>';
+
+  if (H.openTotal) {
+    const withSub = H.pending.filter(p => p.subject);
+    s += '<div style="border-left:3px solid var(--amber);background:#fff8e7;border-radius:0 7px 7px 0;padding:9px 11px;">'
+      + '<div style="font-weight:700;font-size:11.5px;margin-bottom:4px;">⏳ Aapke end se pending</div>';
+    s += withSub.length
+      ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:5px;">Ye aapko email ki gayi thi, abhi tak resolve nahi hui:</div>'
+        + withSub.map(p => '<div style="font-size:11.5px;padding:3px 0;">• ' + gcEsc(p.subject)
+            + (p.age != null ? ' <span style="color:var(--red);font-weight:700;">(' + p.age + ' din)</span>' : '') + '</div>').join('')
+      : '<div style="font-size:11.5px;">' + H.openTotal + ' item pending hain — detail account manager se lo.</div>';
+    s += '</div>';
+  }
+  return s + '</div>';
+}
+
+function gcKpiMini(label, value) {
+  return '<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;">' + label + '</div>'
+    + '<div style="font-size:17px;font-weight:800;">' + value + '</div></div>';
+}
+
 // ─── RESULTS RENDER ───────────────────────────────────────────────
 function gcDestroyCharts() {
   Object.values(_gc.charts || {}).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -11649,7 +12233,7 @@ function gcDeltaCard(label, d, opts) {
     + '<span style="font-size:11px;color:var(--text-muted);">se pehle ' + fmt(d.a) + '</span>'
     + '</div>'
     + '<div style="font-size:12px;font-weight:700;color:' + col + ';margin-top:3px;">'
-    + (d.flat ? '→ koi change nahi' : (d.up?'▲':'▼') + ' ' + sign + (d.isPct ? (d.diff).toFixed(1) + ' pts' : d.pct + '%'))
+    + (d.flat ? '→ koi change nahi' : (d.up?'▲':'▼') + ' ' + gcChgStr(d).replace(/^\+/, '+'))
     + '</div></div>';
 }
 
@@ -11666,9 +12250,15 @@ function gcRenderResults() {
     + '<span style="font-size:12px;color:var(--text-muted);">' + gcEsc(pLbl) + '</span></div>'
     + '<div class="card-body">';
 
+  if (R.dupes && R.dupes.length) {
+    html += '<div style="padding:10px 12px;background:#fff5f5;border-left:3px solid var(--red);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:12px;">'
+      + '🚫 <strong>Dhyan do:</strong> ' + gcEsc(R.dupes.join(', ')) + ' dono periods me same file thi — '
+      + 'us report ke numbers me 0% change dikhega. Sahi reports upload karke dobara compare karo.</div>';
+  }
   if (R.N.on) {
     html += '<div style="padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:12px;">'
-      + '⚠️ Period alag the (A: ' + R.N.dA + ' din, B: ' + R.N.dB + ' din) — saare numbers <strong>per-day average</strong> pe compare kiye gaye hain.</div>';
+      + '⚠️ Period alag lambai ke the (A: ' + R.N.dA + ' din, B: ' + R.N.dB + ' din) — Sessions, Sales, Spend jaise numbers '
+      + '<strong>per-day average</strong> hain, poore period ka total nahi. ACOS, CTR, conversion jaise rates waise ke waise hain.</div>';
   }
 
   // ── KPI blocks ──
@@ -11678,31 +12268,31 @@ function gcRenderResults() {
     + (isAmz
         ? gcDeltaCard('SESSIONS', M.sessions) + gcDeltaCard('PAGE VIEWS', M.views)
           + gcDeltaCard('IMPRESSIONS', M.impr) + gcDeltaCard('CLICKS', M.clicks)
-          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'})
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>gcFmtBy('rate',v)})
         : gcDeltaCard('AD VIEWS', M.views) + gcDeltaCard('CLICKS', M.clicks)
-          + gcDeltaCard('CTR', M.ctr, {fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v}))
+          + gcDeltaCard('CTR', M.ctr, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>gcFmtBy('money2',v)}))
     + '</div>';
 
   html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">💰 Sales</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
     + (isAmz
         ? gcDeltaCard('TOTAL SALES', M.sales, {fmt:gcR}) + gcDeltaCard('UNITS', M.units)
-          + gcDeltaCard('CONVERSION', M.cvr, {fmt:v=>v+'%'}) + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v})
+          + gcDeltaCard('CONVERSION', M.cvr, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('AOV', M.aov, {fmt:v=>gcFmtBy('money2',v)})
           + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR})
         : gcDeltaCard('GROSS SALES', M.gross, {fmt:gcR}) + gcDeltaCard('NET EARNINGS', M.net, {fmt:gcR})
-          + gcDeltaCard('MARGIN', M.margin, {fmt:v=>v+'%'}) + gcDeltaCard('UNITS', M.units)
-          + gcDeltaCard('AOV', M.aov, {fmt:v=>'₹'+v}) + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR}))
+          + gcDeltaCard('MARGIN', M.margin, {fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('UNITS', M.units)
+          + gcDeltaCard('AOV', M.aov, {fmt:v=>gcFmtBy('money2',v)}) + gcDeltaCard('ORGANIC SALES', M.organic, {fmt:gcR}))
     + '</div>';
 
   html += '<div style="font-weight:700;font-size:12px;margin-bottom:7px;">📢 Ads Performance</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:14px;">'
     + (isAmz
         ? gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD SALES', M.adSales, {fmt:gcR})
-          + gcDeltaCard('ACOS', M.acos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('ROAS', M.roas, {fmt:v=>v+'x'})
-          + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>'₹'+v})
+          + gcDeltaCard('ACOS', M.acos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('ROAS', M.roas, {fmt:v=>gcFmtBy('ratio',v)})
+          + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}) + gcDeltaCard('CPC', M.cpc, {goodUp:false, fmt:v=>gcFmtBy('money2',v)})
         : gcDeltaCard('AD SPEND', M.spend, {goodUp:false, fmt:gcR}) + gcDeltaCard('AD REVENUE', M.adRev, {fmt:gcR})
-          + gcDeltaCard('DIRECT REVENUE', M.dRev, {fmt:gcR}) + gcDeltaCard('TOTAL ROI', M.roi, {fmt:v=>v+'x'})
-          + gcDeltaCard('DIRECT ROI', M.dRoi, {fmt:v=>v+'x'}) + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>v+'%'}))
+          + gcDeltaCard('DIRECT REVENUE', M.dRev, {fmt:gcR}) + gcDeltaCard('TOTAL ROI', M.roi, {fmt:v=>gcFmtBy('ratio',v)})
+          + gcDeltaCard('DIRECT ROI', M.dRoi, {fmt:v=>gcFmtBy('ratio',v)}) + gcDeltaCard('TACOS', M.tacos, {goodUp:false, fmt:v=>gcFmtBy('rate',v)}))
     + '</div>';
 
   // optimization block
@@ -11723,7 +12313,8 @@ function gcRenderResults() {
     + '<div class="card-header"><span class="card-title">📊 Charts</span></div>'
     + '<div class="card-body">'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;">'
-    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period A vs B — Key Metrics</div><canvas id="gc-chart-bar" height="200"></canvas></div>'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">% Change — Har Metric</div><canvas id="gc-chart-pct" height="200"></canvas></div>'
+    + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period A vs B — Paise Wale Metrics (₹)</div><canvas id="gc-chart-bar" height="200"></canvas></div>'
     + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Revenue Change — Kahan Se Aaya</div><canvas id="gc-chart-wf" height="200"></canvas></div>'
     + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period A — Ad vs Organic</div><canvas id="gc-chart-pieA" height="200"></canvas></div>'
     + '<div><div style="font-weight:700;font-size:12px;margin-bottom:8px;">Period B — Ad vs Organic</div><canvas id="gc-chart-pieB" height="200"></canvas></div>'
@@ -11754,6 +12345,9 @@ function gcRenderResults() {
     html += '</div>';
   }
 
+  html += gcWorkHtml(_gc.work, R);
+  html += gcActionHtml(gcActionPlan(R), isAmz);
+
   document.getElementById('gc-results').innerHTML = html;
   setTimeout(gcDrawCharts, 60);
 }
@@ -11780,9 +12374,10 @@ function gcDrawCharts() {
   const GOLD = '#D4A03D', DARK = '#1C2B2D', GREEN = '#27ae60', RED = '#e74c3c', BLUE = '#2980b9';
 
   // 1. Grouped bar — normalised to % of A so alag scale wale metrics ek saath dikhein
+  // sirf paise wale metrics ek axis pe — counts alag chart me (warna Units invisible ho jate hain)
   const barMetrics = isAmz
-    ? [['Sessions',M.sessions],['Sales',M.sales],['Units',M.units],['Ad Spend',M.spend],['Ad Sales',M.adSales],['Clicks',M.clicks]]
-    : [['Gross Sales',M.gross],['Net Earnings',M.net],['Units',M.units],['Ad Spend',M.spend],['Ad Revenue',M.adRev],['Clicks',M.clicks]];
+    ? [['Sales',M.sales],['Ad Spend',M.spend],['Ad Sales',M.adSales]]
+    : [['Gross Sales',M.gross],['Net Earnings',M.net],['Ad Spend',M.spend],['Ad Revenue',M.adRev]];
   const barEl = document.getElementById('gc-chart-bar');
   if (barEl) {
     _gc.charts.bar = new Chart(barEl, {
@@ -11805,6 +12400,23 @@ function gcDrawCharts() {
     });
   }
 
+  // 1b. % change — har metric ek hi scale pe, isliye compare karne layak
+  const pctM = isAmz
+    ? [['Sessions',M.sessions],['Units',M.units],['Sales',M.sales],['Clicks',M.clicks],['Ad Spend',M.spend],['Ad Sales',M.adSales]]
+    : [['Units',M.units],['Gross Sales',M.gross],['Net Earnings',M.net],['Clicks',M.clicks],['Ad Spend',M.spend],['Ad Revenue',M.adRev]];
+  const pctEl = document.getElementById('gc-chart-pct');
+  if (pctEl) {
+    _gc.charts.pct = new Chart(pctEl, {
+      type:'bar',
+      data:{ labels: pctM.map(m=>m[0]), datasets:[{ label:'% change',
+        data: pctM.map(m=>m[1].pct),
+        backgroundColor: pctM.map(m=>m[1].pct>=0?GREEN:RED), borderRadius:4 }]},
+      options:{ responsive:true, plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:c=>(c.parsed.y>=0?'+':'')+c.parsed.y+'%' } } },
+        scales:{ y:{ ticks:{ callback:v=>v+'%' } } } },
+    });
+  }
+
   // 2. Waterfall — traffic / conversion / AOV contribution
   const wf = R.wf;
   const wfEl = document.getElementById('gc-chart-wf');
@@ -11817,7 +12429,7 @@ function gcDrawCharts() {
         labels,
         datasets: [{
           label: 'Revenue impact',
-          data: vals.map(v => Math.round(v)),
+          data: vals.map(v => Math.round(v * 100) / 100),
           backgroundColor: vals.map((v,i) => i === 3 ? (v>=0?DARK:RED) : (v>=0?GREEN:RED)),
           borderRadius: 4,
         }],
@@ -11828,7 +12440,7 @@ function gcDrawCharts() {
           legend: { display:false },
           tooltip: { callbacks: { label: c => (c.parsed.y>=0?'+':'') + '₹' + gcFmt(c.parsed.y) } },
         },
-        scales: { y: { ticks: { callback: v => gcFmt(v) } } },
+        scales: { y: { ticks: { callback: v => Math.abs(v) < 10 ? v : gcFmt(v) } } },
       },
     });
   }
@@ -11857,48 +12469,36 @@ function gcDrawCharts() {
 }
 
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────
+// ─── EXCEL EXPORT ─────────────────────────────────────────────────
 function gcExportExcel() {
   const R = _gc.result;
   if (!R) { showToast('Pehle compare karo!', 'error'); return; }
-  const M = R.M, isAmz = R.mp === 'amazon';
+  const isAmz = R.mp === 'amazon';
+  const spec = gcMetricSpec(R);
+  const plan = gcActionPlan(R);
   const wb = XLSX.utils.book_new();
-  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0,31));
+  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0, 31));
 
-  const row = (label, d, unit) => [label, Math.round(d.a*100)/100, Math.round(d.b*100)/100,
-    Math.round(d.diff*100)/100, (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%'), unit || ''];
-
-  const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %', 'Unit'];
-  const metricRows = isAmz ? [
-    row('Sessions', M.sessions), row('Page Views', M.views), row('Impressions', M.impr),
-    row('Clicks', M.clicks), row('CTR', M.ctr, '%'), row('Conversion Rate', M.cvr, '%'),
-    row('Units Ordered', M.units), row('Total Sales', M.sales, 'Rs'), row('AOV', M.aov, 'Rs'),
-    row('Organic Sales', M.organic, 'Rs'), row('Ad Spend', M.spend, 'Rs'), row('Ad Sales', M.adSales, 'Rs'),
-    row('ACOS', M.acos, '%'), row('ROAS', M.roas, 'x'), row('TACOS', M.tacos, '%'), row('CPC', M.cpc, 'Rs'),
-  ] : [
-    row('Gross Sales', M.gross, 'Rs'), row('Net Earnings', M.net, 'Rs'), row('Margin', M.margin, '%'),
-    row('Units', M.units), row('AOV', M.aov, 'Rs'), row('Organic Sales', M.organic, 'Rs'),
-    row('Ad Spend', M.spend, 'Rs'), row('Ad Revenue', M.adRev, 'Rs'), row('Direct Revenue', M.dRev, 'Rs'),
-    row('Indirect Revenue', M.iRev, 'Rs'), row('Total ROI', M.roi, 'x'), row('Direct ROI', M.dRoi, 'x'),
-    row('TACOS', M.tacos, '%'), row('Ad Views', M.views), row('Clicks', M.clicks),
-    row('CTR', M.ctr, '%'), row('CPC', M.cpc, 'Rs'),
-  ];
-  if (R.wasted)  metricRows.push(row('Wasted Ad Spend', R.wasted, 'Rs'));
-  if (R.returns) metricRows.push(row('Returns', R.returns, R.returns.isPct ? '%' : 'count'));
-  if (R.orders)  metricRows.push(row('Orders', R.orders));
+  const mrow = s => [s.label, Math.round(s.d.a * 100) / 100, Math.round(s.d.b * 100) / 100,
+                     Math.round(s.d.diff * 100) / 100, gcChgStr(s.d)];
+  const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %'];
 
   add('1. Summary', [
     ['GROWTH COMPARISON — ' + _gc.clientName],
-    [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A')
-      + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B')],
-    [R.N.on ? 'NOTE: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) — daily-average basis pe compare kiya gaya' : 'Dono period same length ke the'],
+    [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from || 'Period A') + ' to ' + (_gc.A.to || '')
+      + '   vs   ' + (_gc.B.from || 'Period B') + ' to ' + (_gc.B.to || '')],
+    [R.N.on ? 'NOTE: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) — "(per day)" wale numbers DAILY AVERAGE hain, total nahi'
+            : 'Dono period ' + (R.N.dA || '?') + ' din ke the — direct comparison'],
     [],
-    head, ...metricRows,
+    ['VISIBILITY & TRAFFIC'], head, ...spec.vis.map(mrow), [],
+    ['SALES'],                head, ...spec.sales.map(mrow), [],
+    ['ADS PERFORMANCE'],      head, ...spec.ads.map(mrow),
+    ...(spec.opt.length ? [[], ['OPTIMIZATION'], head, ...spec.opt.map(mrow)] : []),
   ]);
 
   add('2. Revenue Bridge', [
-    ['REVENUE CHANGE DECOMPOSITION'],
-    ['Kaunsi cheez ne revenue kitna badla'],
-    [],
+    ['REVENUE CHANGE — KAHAN SE AAYA'],
+    ['Kaunsi cheez ne revenue kitna badla'], [],
     ['Driver', 'Impact (Rs)'],
     [isAmz ? 'Traffic (sessions)' : 'Units', Math.round(R.wf.trafficEff)],
     ['Conversion rate', Math.round(R.wf.cvrEff)],
@@ -11907,8 +12507,7 @@ function gcExportExcel() {
   ]);
 
   add('3. Ad vs Organic', [
-    ['AD-DRIVEN vs ORGANIC REVENUE'],
-    [],
+    ['AD-DRIVEN vs ORGANIC REVENUE'], [],
     ['Period', 'Ad-driven (Rs)', 'Organic (Rs)', 'Total (Rs)', 'Ad share %'],
     ['Period A', Math.round(R.split.A.ad), Math.round(R.split.A.organic),
       Math.round(R.split.A.ad + R.split.A.organic), gcPct(R.split.A.ad, R.split.A.ad + R.split.A.organic)],
@@ -11916,231 +12515,906 @@ function gcExportExcel() {
       Math.round(R.split.B.ad + R.split.B.organic), gcPct(R.split.B.ad, R.split.B.ad + R.split.B.organic)],
   ]);
 
-  const itemLbl = isAmz ? 'ASIN' : 'SKU';
-  add('4. Item Movers', [
-    ['TOP GAINERS & LOSERS'],
-    [],
-    ['TOP GAINERS'],
-    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
-    ...R.asins.gainers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
-    [],
-    ['TOP LOSERS'],
-    ['#', itemLbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
-    ...R.asins.losers.map((x,i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+  const lbl = isAmz ? 'ASIN' : 'SKU';
+  add('4. Action Plan', [
+    ['KAAM KI LIST — TOP 20 ' + lbl],
+    ['Business impact ke hisaab se sorted'], [],
+    ['Kab', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change %', 'Kya hua', 'Kya karna hai'],
+    ...plan.week.map(o => ['IS HAFTE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
+    ...plan.month.map(o => ['IS MAHINE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
   ]);
 
-  add('5. Insights', [
-    ['INSIGHTS & ACTIONS'],
-    [],
+  const W = _gc.work;
+  if (W && !W.empty) {
+    add('5. Work Done', [
+      ['IS PERIOD ME KYA KAAM HUA'],
+      [W.from + ' to ' + W.to],
+      ['Note: sirf work summary — internal notes shaamil nahi'], [],
+      ['Total Activities', W.logCount + W.taskCount],
+      ['Time Invested', gcHrs(W.mins)],
+      ['Team Members', W.execs],
+      ['Active Days', W.days], [],
+      ['Work Area', 'Kaam', 'Time', 'Related Metric'],
+      ...W.byType.map(t => {
+        const im = gcWorkImpact(t.link, R);
+        return [t.label, t.count, gcHrs(t.mins),
+                im ? im.metric + ': ' + im.from + ' -> ' + im.to + ' (' + im.txt + ')' : '—'];
+      }),
+      ...(W.byCat.length ? [[], ['COMPLETED TASKS'], ['Category','Count'],
+        ...W.byCat.map(c => [c.cat, c.count])] : []),
+      ...(W.comms && W.comms.count ? [[], ['COMMUNICATION'],
+        ['Calls / Meetings / Follow-ups', W.comms.count], ['Time', gcHrs(W.comms.mins)]] : []),
+      ...(W.hurdles && (W.hurdles.raised || W.hurdles.openTotal) ? [[], ['ISSUES'],
+        ['Is period me uthe', W.hurdles.raised],
+        ['Inme se resolve ho chuke', W.hurdles.raisedResolved],
+        ['Abhi pending', W.hurdles.openTotal], [],
+        ['PENDING (aapke end se)', 'Din'],
+        ...W.hurdles.pending.filter(p=>p.subject).map(p => [p.subject, p.age])] : []),
+    ]);
+  }
+
+  add((W && !W.empty ? '6' : '5') + '. Item Movers', [
+    ['TOP GAINERS'], [],
+    ['#', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.gainers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+    [], ['TOP LOSERS'], [],
+    ['#', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
+    ...R.asins.losers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
+  ]);
+
+  add((W && !W.empty ? '7' : '6') + '. Insights', [
+    ['INSIGHTS & RECOMMENDATIONS'], [],
     ['#', 'Heading', 'Detail'],
-    ...R.verdict.map((v,i) => [i+1, v.head, v.text.replace(/\*\*/g,'')]),
+    ...R.verdict.map((v, i) => [i+1, v.head, v.text.replace(/\*\*/g, '')]),
   ]);
 
-  const fname = 'Growth_Comparison_' + (isAmz?'Amazon':'Flipkart') + '_'
-    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
-    + new Date().toISOString().slice(0,10) + '.xlsx';
-  XLSX.writeFile(wb, fname);
+  XLSX.writeFile(wb, 'Growth_Comparison_' + (isAmz ? 'Amazon' : 'Flipkart') + '_'
+    + String(_gc.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
+    + new Date().toISOString().slice(0, 10) + '.xlsx');
   showToast('Excel download ho gayi!', 'success');
 }
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────
 function gcAscii(s) {
   return String(s == null ? '' : s)
-    .replace(/[\u2013\u2014]/g,'-').replace(/[\u2192\u2794]/g,'to')
-    .replace(/₹/g,'Rs ').replace(/\*\*/g,'').replace(/[^\x20-\x7E]/g,'');
+    .replace(/[\u2013\u2014]/g, '-').replace(/[\u2192\u2794]/g, '->')
+    .replace(/₹/g, 'Rs ').replace(/\*\*/g, '').replace(/[^\x20-\x7E]/g, '');
 }
 
-function gcExportPDF() {
+async function gcExportPDF() {
   const R = _gc.result;
   if (!R) { showToast('Pehle compare karo!', 'error'); return; }
-  const { jsPDF } = window.jspdf;
-  if (!jsPDF) { showToast('PDF library load ho rahi hai, thoda ruko...', 'error'); return; }
+  const jsPDFctor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFctor) { showToast('PDF library load ho rahi hai, thoda ruko...', 'error'); return; }
 
-  const M = R.M, isAmz = R.mp === 'amazon';
-  const doc = new jsPDF({ unit:'pt', format:'a4' });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const Mg = 40;
-  const DARK=[45,52,64], GOLD=[201,162,90], GREY=[130,138,148], GREEN=[70,160,90], RED=[200,70,70];
-  const today = gcDateStr(new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())));
-  const pLbl = (_gc.A.from ? _gc.A.from + ' to ' + _gc.A.to : 'Period A') + '  vs  ' + (_gc.B.from ? _gc.B.from + ' to ' + _gc.B.to : 'Period B');
+  const btn = document.getElementById('gc-pdf-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ PDF ban rahi hai...'; }
 
-  let pageNo = 0;
-  function chrome() {
-    pageNo++;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GREY);
-    doc.text('eNewcleus Technology - Confidential', Mg, H - 20);
-    doc.text('Generated: ' + today, W - Mg, H - 20, { align:'right' });
-    doc.text(String(pageNo), W/2, H - 20, { align:'center' });
-  }
-  function header(title) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GREY);
-    doc.text(gcAscii('Growth Comparison - ' + (isAmz?'Amazon':'Flipkart')), Mg, 30);
-    doc.setTextColor(...DARK); doc.setFontSize(11);
-    doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 45);
-    doc.setDrawColor(230,232,235); doc.setLineWidth(0.5); doc.line(Mg, 52, W - Mg, 52);
-    if (title) { doc.setFontSize(15); doc.setTextColor(...DARK); doc.text(title, Mg, 74); }
-  }
-  function table(y, headers, rows, widths, accent) {
-    const rh = 17;
-    doc.setFillColor(...accent); doc.rect(Mg, y, W - 2*Mg, rh, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
-    let x = Mg + 6;
-    headers.forEach((h,i) => {
-      const al = i===0 ? 'left' : 'right';
-      doc.text(h, al==='left' ? x : x + widths[i] - 8, y + 11, { align: al });
-      x += widths[i];
-    });
-    y += rh;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-    rows.forEach((r,ri) => {
-      if (ri % 2 === 0) { doc.setFillColor(248,249,250); doc.rect(Mg, y, W - 2*Mg, rh, 'F'); }
-      doc.setTextColor(50,56,66);
-      let xx = Mg + 6;
-      r.forEach((c,i) => {
-        const al = i===0 ? 'left' : 'right';
-        doc.text(gcAscii(String(c)), al==='left' ? xx : xx + widths[i] - 8, y + 11, { align: al });
-        xx += widths[i];
-      });
+  try {
+    const M = R.M, isAmz = R.mp === 'amazon';
+    const spec = gcMetricSpec(R);
+    const plan = gcActionPlan(R);
+    const charts = await gcChartImages();
+
+    const doc = new jsPDFctor({ unit:'pt', format:'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const Mg = 40;
+    const DARK=[45,52,64], GOLD=[201,162,90], GREY=[130,138,148], GREEN=[70,160,90], RED=[200,70,70], BLUE=[60,110,180];
+    const now = new Date();
+    const today = gcDateStr(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+    const pLbl = (_gc.A.from || 'Period A') + ' to ' + (_gc.A.to || '') + '   vs   ' + (_gc.B.from || 'Period B') + ' to ' + (_gc.B.to || '');
+
+    let pageNo = 0;
+    // ek image kharab ho to poori PDF na gire
+    const safeImg = (img, x, y, w, hh) => {
+      if (!img) return false;
+      try { doc.addImage(img, 'PNG', x, y, w, hh); return true; }
+      catch (err) { console.warn('chart image skip', err);
+        doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(130,138,148);
+        doc.text('(chart render nahi ho paya)', x, y + 14);
+        return false; }
+    };
+    const chrome = () => {
+      pageNo++;
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GREY);
+      doc.text('eNewcleus Technology - Confidential', Mg, H - 20);
+      doc.text(String(pageNo), W/2, H - 20, { align:'center' });
+      doc.text('Generated: ' + today, W - Mg, H - 20, { align:'right' });
+    };
+    const header = title => {
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text(gcAscii('Growth Comparison - ' + (isAmz ? 'Amazon' : 'Flipkart')), Mg, 30);
+      doc.setTextColor(...DARK); doc.setFontSize(11);
+      doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 45);
+      doc.setDrawColor(230,232,235); doc.setLineWidth(0.5); doc.line(Mg, 52, W - Mg, 52);
+      if (title) { doc.setFontSize(15); doc.setTextColor(...DARK); doc.text(title, Mg, 74); }
+    };
+    const table = (y, headers, rows, widths, accent, rowColour) => {
+      const rh = 17;
+      doc.setFillColor(...accent); doc.rect(Mg, y, W - 2*Mg, rh, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+      let x = Mg + 6;
+      headers.forEach((h,i) => { const al = i===0?'left':'right';
+        doc.text(h, al==='left'?x:x+widths[i]-8, y+11, {align:al}); x += widths[i]; });
       y += rh;
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      rows.forEach((r,ri) => {
+        if (ri % 2 === 0) { doc.setFillColor(248,249,250); doc.rect(Mg, y, W-2*Mg, rh, 'F'); }
+        let xx = Mg + 6;
+        r.forEach((c,i) => {
+          const col = (rowColour && i === r.length-1) ? rowColour(r) : [50,56,66];
+          doc.setTextColor(...col);
+          const al = i===0?'left':'right';
+          doc.text(gcAscii(String(c)), al==='left'?xx:xx+widths[i]-8, y+11, {align:al});
+          xx += widths[i];
+        });
+        y += rh;
+      });
+      return y;
+    };
+    const chgColour = s => r => {
+      const t = String(r[r.length-1]);
+      if (t === '0' || t === '0%') return [110,116,126];
+      return (t.charAt(0) === '+') === (s.goodUp !== false) ? GREEN : RED;
+    };
+
+    // ══ COVER ══
+    doc.setFillColor(...GOLD);
+    doc.circle(Mg+8, 66, 5, 'F'); doc.circle(Mg+8, 78, 5, 'F'); doc.circle(Mg+19, 72, 6, 'F');
+    doc.setDrawColor(...GOLD); doc.setLineWidth(2);
+    doc.line(Mg+8, 66, Mg+19, 72); doc.line(Mg+8, 78, Mg+19, 72);
+    doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...DARK);
+    doc.text('enewcleus', Mg+33, 78);
+    doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GOLD);
+    doc.text('Sell Easy, Sell More!', Mg+33, 92);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK);
+    doc.text('Growth Comparison', Mg, 160); doc.text('Report', Mg, 188);
+    doc.setDrawColor(...GOLD); doc.setLineWidth(2); doc.line(Mg, 200, Mg+120, 200);
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...DARK);
+    doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 230);
+    doc.setFontSize(10); doc.setTextColor(...GREY);
+    doc.text((isAmz?'Amazon':'Flipkart') + ' - Period over Period Analysis', Mg, 248);
+    doc.setFontSize(9); doc.text(gcAscii(pLbl), Mg, 266);
+    doc.text(R.N.on
+      ? 'Note: Periods alag the (A=' + R.N.dA + 'd, B=' + R.N.dB + 'd) - daily-average (DRR) basis pe compare kiya gaya'
+      : 'Dono period ' + (R.N.dA || '?') + ' din ke the - direct comparison', Mg, 282);
+
+    const kpi = isAmz
+      ? [[gcChgStr(M.sales),'Sales'], [gcChgStr(M.sessions),'Sessions'],
+         [gcFmtBy('rate',M.acos.b),'ACOS'], [gcFmtBy('ratio',M.roas.b),'ROAS']]
+      : [[gcChgStr(M.gross),'Gross Sales'], [gcFmtBy('rate',M.margin.b),'Margin'],
+         [gcFmtBy('ratio',M.roi.b),'Ad ROI'], [gcChgStr(M.units),'Units']];
+    let y = 310;
+    doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W-2*Mg, 92, 6, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+    doc.text('Headline', Mg+16, y+20);
+    const kw = (W-2*Mg)/kpi.length;
+    kpi.forEach((k,i) => {
+      const cx = Mg + kw*i + kw/2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...GOLD);
+      doc.text(gcAscii(k[0]), cx, y+56, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+      doc.text(k[1], cx, y+74, {align:'center'});
     });
-    return y;
-  }
 
-  // COVER
-  doc.setFillColor(...GOLD);
-  doc.circle(Mg + 8, 66, 5, 'F'); doc.circle(Mg + 8, 78, 5, 'F'); doc.circle(Mg + 19, 72, 6, 'F');
-  doc.setDrawColor(...GOLD); doc.setLineWidth(2);
-  doc.line(Mg + 8, 66, Mg + 19, 72); doc.line(Mg + 8, 78, Mg + 19, 72);
-  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...DARK);
-  doc.text('enewcleus', Mg + 33, 78);
-  doc.setFont('helvetica','italic'); doc.setFontSize(10); doc.setTextColor(...GOLD);
-  doc.text('Sell Easy, Sell More!', Mg + 33, 92);
+    // action summary on cover
+    y = 424;
+    doc.setFillColor(255,248,231); doc.roundedRect(Mg, y, W-2*Mg, 70, 6, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+    doc.text('Kaam Ki List', Mg+16, y+20);
+    doc.setFontSize(15); doc.setTextColor(...RED);
+    doc.text(String(plan.week.length), Mg+16, y+46);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    doc.text(gcAscii((isAmz?'ASIN':'SKU') + ' - is hafte dekhne hain'), Mg+40, y+46);
+    doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...BLUE);
+    doc.text(String(plan.month.length), Mg+220, y+46);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    doc.text(gcAscii((isAmz?'ASIN':'SKU') + ' - is mahine plan karne hain'), Mg+244, y+46);
+    chrome();
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK);
-  doc.text('Growth Comparison', Mg, 160);
-  doc.text('Report', Mg, 188);
-  doc.setDrawColor(...GOLD); doc.setLineWidth(2); doc.line(Mg, 200, Mg + 120, 200);
+    // ══ METRICS ══
+    doc.addPage(); header('Metric Comparison');
+    if (R.N.on) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...RED);
+      doc.text(gcAscii('Periods alag lambai ke the (A=' + R.N.dA + ' din, B=' + R.N.dB
+        + ' din). "(per day)" wale numbers DAILY AVERAGE hain, total nahi.'), Mg, 88);
+    }
+    const mrow = s => [s.label, gcAscii(gcFmtBy(s.kind, s.d.a)), gcAscii(gcFmtBy(s.kind, s.d.b)), gcChgStr(s.d)];
+    const section = (title, list, accent, yy) => {
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text(title, Mg, yy);
+      return table(yy+10, ['METRIC','PERIOD A','PERIOD B','CHANGE'], list.map(mrow),
+        [220,105,105,85], accent, r => {
+          const s = list.find(z => z.label === r[0]);
+          return chgColour(s || {})(r);
+        });
+    };
+    y = section('Visibility & Traffic', spec.vis, BLUE, R.N.on ? 106 : 92);
+    y = section('Sales', spec.sales, GREEN, y+18);
+    y = section('Ads Performance', spec.ads, GOLD, y+18);
+    if (spec.opt.length) y = section('Optimization', spec.opt, [90,90,110], y+18);
+    chrome();
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(13); doc.setTextColor(...DARK);
-  doc.text(gcAscii(_gc.clientName || 'Seller'), Mg, 230);
-  doc.setFontSize(10); doc.setTextColor(...GREY);
-  doc.text((isAmz ? 'Amazon' : 'Flipkart') + ' - Period over Period Analysis', Mg, 248);
-  doc.setFontSize(9);
-  doc.text(gcAscii(pLbl), Mg, 266);
-  if (R.N.on) doc.text('Note: Periods alag the - daily-average (DRR) basis pe compare kiya gaya', Mg, 282);
+    // ══ CHARTS ══
+    if (charts) {
+      doc.addPage(); header('Charts');
+      const cw = W - 2*Mg;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('% Change - Har Metric', Mg, 96);
+      safeImg(charts.pct, Mg, 104, cw, cw*0.42);
+      let cy = 104 + cw*0.42 + 24;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('Period A vs Period B - Paise Wale Metrics (Rs)', Mg, cy);
+      safeImg(charts.bar, Mg, cy+8, cw, cw*0.42);
+      chrome();
 
-  // headline KPIs
-  const kpi = isAmz
-    ? [[(M.sales.up?'+':'') + M.sales.pct + '%','Sales'], [(M.sessions.up?'+':'') + M.sessions.pct + '%','Sessions'],
-       [M.acos.b + '%','ACOS'], [M.roas.b + 'x','ROAS']]
-    : [[(M.gross.up?'+':'') + M.gross.pct + '%','Gross Sales'], [M.margin.b + '%','Margin'],
-       [M.roi.b + 'x','Ad ROI'], [(M.units.up?'+':'') + M.units.pct + '%','Units']];
-  let y = 310;
-  doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W - 2*Mg, 92, 6, 6, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
-  doc.text('Headline', Mg + 16, y + 20);
-  const kw = (W - 2*Mg) / kpi.length;
-  kpi.forEach((k,i) => {
-    const cx = Mg + kw*i + kw/2;
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...GOLD);
-    doc.text(k[0], cx, y + 56, { align:'center' });
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
-    doc.text(k[1], cx, y + 74, { align:'center' });
-  });
-  chrome();
+      doc.addPage(); header('Revenue Bridge');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('Revenue Change - Kahan Se Aaya', Mg, 96);
+      safeImg(charts.wf, Mg, 104, cw, cw*0.45);
+      cy = 104 + cw*0.45 + 20;
+      if (Math.abs(R.wf.total) < 1) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...GREY);
+        doc.text(gcAscii('Dono periods me revenue lagbhag same raha - isliye bars khali dikh rahe hain.'), Mg, cy);
+      }
+      chrome();
 
-  // METRICS PAGE
-  doc.addPage(); header('Metric Comparison');
-  const mrow = (label, d, unit) => [label, gcAscii(gcFmt(d.a) + (unit||'')), gcAscii(gcFmt(d.b) + (unit||'')),
-    (d.diff>0?'+':'') + (d.isPct ? d.diff.toFixed(1) + ' pts' : d.pct + '%')];
+      doc.addPage(); header('Ad vs Organic Split');
+      const pw = (cw - 20) / 2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GREY);
+      doc.text('PERIOD A', Mg, 96);
+      doc.text('PERIOD B', Mg + pw + 20, 96);
+      safeImg(charts.pieA, Mg, 104, pw, pw*0.875);
+      safeImg(charts.pieB, Mg + pw + 20, 104, pw, pw*0.875);
 
-  y = 92;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Visibility & Traffic', Mg, y);
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
-    isAmz ? [mrow('Sessions',M.sessions), mrow('Page Views',M.views), mrow('Impressions',M.impr),
-             mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%')]
-          : [mrow('Ad Views',M.views), mrow('Clicks',M.clicks), mrow('CTR',M.ctr,'%'), mrow('CPC',M.cpc)],
-    [220, 105, 105, 85], [60,110,180]);
+      cy = 104 + pw*0.875 + 26;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text('Revenue Bridge', Mg, cy);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text('Revenue kitna badla aur kis wajah se.', Mg, cy+14);
+      table(cy+24, ['DRIVER','IMPACT'],
+        [[isAmz?'Traffic (sessions)':'Units', gcAscii(gcFmtBy('money', R.wf.trafficEff))],
+         ['Conversion rate', gcAscii(gcFmtBy('money', R.wf.cvrEff))],
+         ['AOV / price', gcAscii(gcFmtBy('money', R.wf.aovEff))],
+         ['= Net change', gcAscii(gcFmtBy('money', R.wf.total))]],
+        [360,155], DARK);
+      chrome();
+    }
 
-  y += 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Sales', Mg, y);
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'],
-    isAmz ? [mrow('Total Sales',M.sales), mrow('Units',M.units), mrow('Conversion',M.cvr,'%'),
-             mrow('AOV',M.aov), mrow('Organic Sales',M.organic)]
-          : [mrow('Gross Sales',M.gross), mrow('Net Earnings',M.net), mrow('Margin',M.margin,'%'),
-             mrow('Units',M.units), mrow('AOV',M.aov), mrow('Organic Sales',M.organic)],
-    [220, 105, 105, 85], GREEN);
-
-  y += 18;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-  doc.text('Ads Performance', Mg, y);
-  const adRows = isAmz
-    ? [mrow('Ad Spend',M.spend), mrow('Ad Sales',M.adSales), mrow('ACOS',M.acos,'%'),
-       mrow('ROAS',M.roas,'x'), mrow('TACOS',M.tacos,'%'), mrow('CPC',M.cpc)]
-    : [mrow('Ad Spend',M.spend), mrow('Ad Revenue',M.adRev), mrow('Direct Revenue',M.dRev),
-       mrow('Total ROI',M.roi,'x'), mrow('Direct ROI',M.dRoi,'x'), mrow('TACOS',M.tacos,'%')];
-  if (R.wasted)  adRows.push(mrow('Wasted Spend', R.wasted));
-  if (R.returns) adRows.push(mrow('Returns', R.returns, R.returns.isPct ? '%' : ''));
-  y = table(y + 10, ['METRIC','PERIOD A','PERIOD B','CHANGE'], adRows, [220, 105, 105, 85], [201,162,90]);
-  chrome();
-
-  // BRIDGE + MOVERS
-  doc.addPage(); header('Revenue Bridge & Movers');
-  y = 92;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
-  doc.text('Revenue kitna badla aur kis wajah se - traffic, conversion ya price.', Mg, y);
-  y = table(y + 14, ['DRIVER','IMPACT'],
-    [[isAmz ? 'Traffic (sessions)' : 'Units', gcAscii('Rs ' + gcFmt(R.wf.trafficEff))],
-     ['Conversion rate', gcAscii('Rs ' + gcFmt(R.wf.cvrEff))],
-     ['AOV / price', gcAscii('Rs ' + gcFmt(R.wf.aovEff))],
-     ['= Net change', gcAscii('Rs ' + gcFmt(R.wf.total))]],
-    [360, 155], [45,52,64]);
-
-  const itemLbl = isAmz ? 'ASIN' : 'SKU';
-  if (R.asins.gainers.length) {
+    // ══ ACTION PLAN ══
+    const lbl = isAmz ? 'ASIN' : 'SKU';
+    doc.addPage(); header('Kaam Ki List - Top 20 ' + lbl);
+    y = 92;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+    doc.text(gcAscii('Business impact ke hisaab se sorted. Har item pe kya hua aur kya karna hai.'), Mg, y);
     y += 20;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
-    doc.text('Top Gainers', Mg, y);
-    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
-      R.asins.gainers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
-        gcAscii('Rs ' + gcFmt(x.bSalesN)), '+' + x.pct + '%']),
-      [220, 105, 105, 85], GREEN);
-  }
-  if (R.asins.losers.length) {
-    y += 20;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
-    doc.text('Top Losers', Mg, y);
-    y = table(y + 10, [itemLbl,'PERIOD A','PERIOD B','CHANGE'],
-      R.asins.losers.slice(0,8).map(x => [x.id.slice(0,28), gcAscii('Rs ' + gcFmt(x.aSalesN)),
-        gcAscii('Rs ' + gcFmt(x.bSalesN)), x.pct + '%']),
-      [220, 105, 105, 85], RED);
-  }
-  chrome();
 
-  // INSIGHTS
-  doc.addPage(); header('Insights & Recommendations');
-  y = 92;
-  R.verdict.forEach((v,i) => {
-    if (y > H - 100) { chrome(); doc.addPage(); header('Insights (contd.)'); y = 92; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-    doc.text(gcAscii((i+1) + '. ' + v.head), Mg, y); y += 15;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
-    const lines = doc.splitTextToSize(gcAscii(v.text), W - 2*Mg);
-    doc.text(lines, Mg, y);
-    y += lines.length * 13 + 14;
-  });
-  chrome();
+    const bucket = (list, title, colour, note) => {
+      if (y > H - 120) { chrome(); doc.addPage(); header('Kaam Ki List (contd.)'); y = 92; }
+      doc.setFillColor(...colour); doc.roundedRect(Mg, y-11, W-2*Mg, 20, 3, 3, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(255,255,255);
+      doc.text(gcAscii(title + '  (' + list.length + ' ' + lbl + ')'), Mg+8, y+3);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      doc.text(gcAscii(note), W-Mg-8, y+3, {align:'right'});
+      y += 26;
 
-  const fname = 'eNewcleus_Growth_' + (isAmz?'Amazon':'Flipkart') + '_'
-    + String(_gc.clientName||'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
-    + new Date().toISOString().slice(0,10) + '.pdf';
-  doc.save(fname);
-  showToast('PDF download ho gayi!', 'success');
+      if (!list.length) {
+        doc.setFont('helvetica','italic'); doc.setFontSize(9); doc.setTextColor(...GREY);
+        doc.text('Is bucket me kuch nahi - achhi baat hai.', Mg+6, y); y += 22; return;
+      }
+      list.forEach((o, idx) => {
+        const actLines = doc.splitTextToSize(gcAscii('-> ' + o.act), W - 2*Mg - 22);
+        const whyLines = doc.splitTextToSize(gcAscii(o.why), W - 2*Mg - 22);
+        const blockH = 15 + whyLines.length*10 + actLines.length*10 + 10;
+        if (y + blockH > H - 55) { chrome(); doc.addPage(); header('Kaam Ki List (contd.)'); y = 92; }
+
+        doc.setDrawColor(...colour); doc.setLineWidth(2);
+        doc.line(Mg+2, y-8, Mg+2, y + blockH - 16);
+
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+        doc.text(gcAscii((idx+1) + '. ' + o.id), Mg+10, y);
+        const pctTxt = (o.pct >= 0 ? '+' : '') + o.pct + '%';
+        doc.setTextColor(...(o.pct >= 0 ? GREEN : RED));
+        doc.text(pctTxt, Mg+10+doc.getTextWidth(gcAscii((idx+1)+'. '+o.id))+8, y);
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+        doc.text(gcAscii(o.tag), W-Mg-6, y, {align:'right'});
+        y += 12;
+
+        doc.setFontSize(8.5); doc.setTextColor(90,96,106);
+        doc.text(whyLines, Mg+10, y); y += whyLines.length*10 + 2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...DARK);
+        doc.text(actLines, Mg+10, y); y += actLines.length*10 + 10;
+      });
+    };
+    bucket(plan.week,  'IS HAFTE', RED,  'urgent - abhi dekho');
+    bucket(plan.month, 'IS MAHINE', BLUE, 'plan karke karo');
+    chrome();
+
+    // ══ WORK DONE ══
+    const WK = _gc.work;
+    if (WK && !WK.empty) {
+      doc.addPage(); header('Is Period Me Kya Kaam Hua');
+      y = 92;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      doc.text(gcAscii(WK.from + ' to ' + WK.to), Mg, y); y += 20;
+
+      const stats = [[String(WK.logCount + WK.taskCount),'Activities'], [gcHrs(WK.mins),'Time Invested'],
+                     [String(WK.execs),'Team Members'], [String(WK.days),'Active Days']];
+      doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W - 2*Mg, 66, 6, 6, 'F');
+      const sw = (W - 2*Mg) / stats.length;
+      stats.forEach((s,i) => {
+        const cx = Mg + sw*i + sw/2;
+        doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...GOLD);
+        doc.text(gcAscii(s[0]), cx, y+30, {align:'center'});
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+        doc.text(s[1], cx, y+48, {align:'center'});
+      });
+      y += 84;
+
+      y = table(y, ['WORK AREA','KAAM','TIME','RELATED METRIC'],
+        WK.byType.map(t => {
+          const im = gcWorkImpact(t.link, R);
+          return [t.label, String(t.count), gcHrs(t.mins),
+                  im ? gcAscii(im.metric + ' ' + im.from + ' -> ' + im.to + '  ' + im.txt) : '-'];
+        }), [175, 55, 60, 225], [90,90,110]);
+
+      if (WK.comms && WK.comms.count) {
+        y += 16;
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+        doc.text(gcAscii('Communication: ' + WK.comms.count + ' calls / meetings / follow-ups'
+          + (WK.comms.mins ? ' (' + gcHrs(WK.comms.mins) + ')' : '')), Mg, y);
+      }
+
+      const HD = WK.hurdles;
+      if (HD && (HD.raised || HD.openTotal)) {
+        y += 24;
+        if (y > H - 150) { chrome(); doc.addPage(); header('Issues'); y = 92; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+        doc.text('Issues', Mg, y);
+        y = table(y+10, ['','COUNT'],
+          [['Is period me uthe', String(HD.raised)],
+           ['Inme se resolve ho chuke', String(HD.raisedResolved)],
+           ['Abhi pending', String(HD.openTotal)]], [400, 115], [90,90,110]);
+
+        const withSub = HD.pending.filter(p => p.subject);
+        if (withSub.length) {
+          y += 20;
+          if (y > H - 130) { chrome(); doc.addPage(); header('Issues (contd.)'); y = 92; }
+          doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
+          doc.text('Aapke End Se Pending', Mg, y);
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+          doc.text(gcAscii('Ye aapko email ki gayi thi, abhi tak resolve nahi hui.'), Mg, y+13);
+          y = table(y+22, ['ITEM','DIN'],
+            withSub.map(p => [String(p.subject).slice(0,70), p.age == null ? '-' : String(p.age)]),
+            [430, 85], RED);
+        }
+      }
+
+      if (WK.byCat.length) {
+        y += 20;
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+        doc.text('Completed Tasks', Mg, y);
+        y = table(y+10, ['CATEGORY','COUNT'],
+          WK.byCat.map(c => [c.cat, String(c.count)]), [400, 115], GREEN);
+      }
+      y += 18;
+      doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+      doc.text('Note: sirf work summary dikhayi gayi hai - internal notes report me shaamil nahi hote.', Mg, y);
+      chrome();
+    }
+
+    // ══ MOVERS ══
+    doc.addPage(); header('Top Movers');
+    y = 92;
+    if (R.asins.gainers.length) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GREEN);
+      doc.text('Top Gainers', Mg, y);
+      y = table(y+10, [lbl,'PERIOD A','PERIOD B','CHANGE'],
+        R.asins.gainers.slice(0,10).map(x => [String(x.id).slice(0,28),
+          gcAscii(gcFmtBy('money', x.aSalesN)), gcAscii(gcFmtBy('money', x.bSalesN)), '+' + x.pct + '%']),
+        [220,105,105,85], GREEN);
+    }
+    if (R.asins.losers.length) {
+      y += 20;
+      if (y > H - 120) { chrome(); doc.addPage(); header('Top Movers (contd.)'); y = 92; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...RED);
+      doc.text('Top Losers', Mg, y);
+      y = table(y+10, [lbl,'PERIOD A','PERIOD B','CHANGE'],
+        R.asins.losers.slice(0,10).map(x => [String(x.id).slice(0,28),
+          gcAscii(gcFmtBy('money', x.aSalesN)), gcAscii(gcFmtBy('money', x.bSalesN)), x.pct + '%']),
+        [220,105,105,85], RED);
+    }
+    chrome();
+
+    // ══ INSIGHTS ══
+    doc.addPage(); header('Insights & Recommendations');
+    y = 92;
+    R.verdict.forEach((v,i) => {
+      if (y > H - 110) { chrome(); doc.addPage(); header('Insights (contd.)'); y = 92; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
+      doc.text(gcAscii((i+1) + '. ' + v.head), Mg, y); y += 15;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
+      const lines = doc.splitTextToSize(gcAscii(v.text), W - 2*Mg);
+      doc.text(lines, Mg, y); y += lines.length*13 + 14;
+    });
+    chrome();
+
+    doc.save('eNewcleus_Growth_' + (isAmz?'Amazon':'Flipkart') + '_'
+      + String(_gc.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g,'_') + '_'
+      + new Date().toISOString().slice(0,10) + '.pdf');
+    showToast('PDF download ho gayi!', 'success');
+  } catch (e) {
+    console.error('PDF error', e);
+    showToast('PDF banane me dikkat: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 PDF Report'; }
+  }
 }
 
+
+
+// ══════════════════════════════════════════════════════════════════
+// DSR DAY-WISE GRID — seller rows × day columns
+// Jo din bhara hai wahan value, jo khali hai wahan 0
+// ══════════════════════════════════════════════════════════════════
+let _dg = { from:'', to:'', metric:'sales_amount', rows:[], days:[], onlyGaps:false, q:'' };
+
+const DG_METRICS = {
+  sales_amount:  { label:'Sales (₹)',  short:'Sales',   money:true  },
+  orders_count:  { label:'Orders',     short:'Orders',  money:false },
+  ad_spend:      { label:'Ad Spend (₹)', short:'Spend', money:true  },
+  returns_count: { label:'Returns',    short:'Returns', money:false },
+};
+
+function dgLastMonth() {
+  const n = new Date();
+  const first = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+  const last  = new Date(n.getFullYear(), n.getMonth(), 0);
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return { from: iso(first), to: iso(last) };
+}
+
+async function renderDSRDayWise() {
+  const lm = dgLastMonth();
+  if (!_dg.from) { _dg.from = lm.from; _dg.to = lm.to; }
+
+  document.getElementById('page-content').innerHTML =
+    '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">📅 DSR Day-wise Report</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">Seller × din — bhara hua value, khali 0</span></div>'
+    + '<div class="card-body">'
+    + '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">FROM</div>'
+    + '<input type="date" id="dg-from" class="form-control" style="padding:5px 8px;font-size:12px;width:145px;" value="' + _dg.from + '"></div>'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">TO</div>'
+    + '<input type="date" id="dg-to" class="form-control" style="padding:5px 8px;font-size:12px;width:145px;" value="' + _dg.to + '"></div>'
+    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">METRIC</div>'
+    + '<select id="dg-metric" class="form-control" style="padding:5px 8px;font-size:12px;width:150px;">'
+    + Object.keys(DG_METRICS).map(k => '<option value="' + k + '"' + (k === _dg.metric ? ' selected' : '') + '>'
+        + DG_METRICS[k].label + '</option>').join('')
+    + '</select></div>'
+    + '<button class="btn btn-primary" onclick="dgLoad()">📊 Report Nikalo</button>'
+    + '<button class="btn btn-outline" onclick="dgSetLastMonth()">Last Month</button>'
+    + '</div></div></div>'
+    + '<div id="dg-out"></div>';
+}
+
+function dgSetLastMonth() {
+  const lm = dgLastMonth();
+  document.getElementById('dg-from').value = lm.from;
+  document.getElementById('dg-to').value = lm.to;
+  dgLoad();
+}
+
+function dgDayList(from, to) {
+  const out = [];
+  const d = new Date(from + 'T00:00:00Z'), end = new Date(to + 'T00:00:00Z');
+  let guard = 0;
+  while (d <= end && guard++ < 400) {
+    out.push(d.toISOString().slice(0,10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+async function dgLoad() {
+  const from = document.getElementById('dg-from').value;
+  const to   = document.getElementById('dg-to').value;
+  if (!from || !to) { showToast('From aur To date daalo!', 'error'); return; }
+  if (to < from) { showToast('To date, From se pehle nahi ho sakti!', 'error'); return; }
+
+  _dg.from = from; _dg.to = to;
+  _dg.metric = document.getElementById('dg-metric').value;
+  const out = document.getElementById('dg-out');
+  out.innerHTML = '<div class="loading"><div class="spinner"></div> DSR data la raha hoon...</div>';
+
+  try {
+    const days = dgDayList(from, to);
+    _dg.days = days;
+
+    const clients = await getClients();
+    if (clients) APP.clients = clients;
+
+    // /dsr endpoint ek din ke liye bana hai — poore mahine ki ek request pe
+    // backend row-limit laga deta hai aur data kat jata hai. Isliye din-by-din
+    // laate hain (5 ek saath), phir sab jod dete hain.
+    const rows = [];
+    const perDay = {};
+    let done = 0, failed = 0;
+    const box = document.getElementById('dg-out');
+    const CONC = 5;
+
+    for (let i = 0; i < days.length; i += CONC) {
+      const batch = days.slice(i, i + CONC);
+      const res = await Promise.all(batch.map(async d => {
+        try {
+          const r = await api('GET', '/dsr?x=1&from=' + d + '&to=' + d + '&_=' + Date.now());
+          return { d, rows: Array.isArray(r) ? r : [] };
+        } catch (e) { return { d, rows: [], err: true }; }
+      }));
+      for (const x of res) {
+        if (x.err) failed++;
+        perDay[x.d] = x.rows.length;
+        // kuch backend from/to ignore karke aur dates bhi de sakte hain —
+        // isliye har row pe date force kar dete hain
+        for (const r of x.rows) rows.push({ ...r, __day: x.d });
+        done++;
+      }
+      if (box) box.innerHTML = '<div class="loading"><div class="spinner"></div> '
+        + done + '/' + days.length + ' din load ho gaye...</div>';
+    }
+    _dg.fetchStats = { days: days.length, failed, perDay, total: rows.length };
+
+    // seller ke hisaab se din ka data
+    const byClient = {};
+    for (const r of rows) {
+      const cc = String(r.client_code || r.clientCode || '').trim();
+      if (!cc) continue;
+      const dt = String(r.__day || r.report_date || r.reportDate || r.date || '').slice(0,10);
+      if (!dt || days.indexOf(dt) < 0) continue;
+      const k = cc.toUpperCase();
+      const c = byClient[k] || (byClient[k] = { code: cc, days: {} });
+      // ek din ke multiple entries aa jayein to jod do
+      const cur = c.days[dt] || (c.days[dt] = { sales_amount:0, orders_count:0, ad_spend:0, returns_count:0, by:null });
+      cur.sales_amount  += Number(r.sales_amount)  || 0;
+      cur.orders_count  += Number(r.orders_count)  || 0;
+      cur.ad_spend      += Number(r.ad_spend)      || 0;
+      cur.returns_count += Number(r.returns_count) || 0;
+      cur.by = r.entered_by || cur.by;
+    }
+
+    // sabhi active sellers dikhao — jinki ek bhi entry nahi unhe bhi (wahi to problem hai)
+    const active = (APP.clients || []).filter(c => {
+      const st = String(c.status || '').toLowerCase();
+      return !st.includes('inactive') && !st.includes('closed') && !st.includes('churn');
+    });
+
+    const list = [];
+    const seen = {};
+    for (const c of active) {
+      const k = String(c.clientCode || '').trim().toUpperCase();
+      seen[k] = true;
+      list.push({
+        code: c.clientCode, name: c.busyName || c.clientCode,
+        am: c.amName || '—', marketplace: c.marketplace || '',
+        days: (byClient[k] || {}).days || {},
+      });
+    }
+    // jo DSR me hai par client list me nahi (safety)
+    for (const k in byClient) {
+      if (!seen[k]) list.push({ code: byClient[k].code, name: byClient[k].code, am:'—', marketplace:'', days: byClient[k].days });
+    }
+
+    for (const s of list) {
+      s.filled = days.filter(d => s.days[d]).length;
+      s.missing = days.length - s.filled;
+      s.pct = days.length ? Math.round(s.filled / days.length * 100) : 0;
+      s.total = days.reduce((t,d) => t + ((s.days[d] || {})[_dg.metric] || 0), 0);
+    }
+    list.sort((a,b) => a.pct - b.pct || String(a.name).localeCompare(String(b.name)));
+    _dg.rows = list;
+
+    dgRender();
+  } catch (e) {
+    console.error('dsr daywise error', e);
+    out.innerHTML = '<div class="card"><div class="card-body" style="color:var(--red);">❌ ' + gcEsc(e.message) + '</div></div>';
+  }
+}
+
+function dgFmtCell(v, money) {
+  if (!v) return '0';
+  if (!money) return String(Math.round(v));
+  const a = Math.abs(v);
+  if (a >= 1e7) return (v/1e7).toFixed(1) + 'Cr';
+  if (a >= 1e5) return (v/1e5).toFixed(1) + 'L';
+  if (a >= 1e3) return Math.round(v/1e3) + 'K';
+  return String(Math.round(v));
+}
+
+function dgRender() {
+  const days = _dg.days, M = DG_METRICS[_dg.metric];
+  let rows = _dg.rows;
+  if (_dg.onlyGaps) rows = rows.filter(r => r.missing > 0);
+  if (_dg.q) {
+    const q = _dg.q.toLowerCase();
+    rows = rows.filter(r => String(r.name).toLowerCase().includes(q)
+                         || String(r.code).toLowerCase().includes(q)
+                         || String(r.am).toLowerCase().includes(q));
+  }
+
+  const totalCells = _dg.rows.length * days.length;
+  const filledCells = _dg.rows.reduce((s,r) => s + r.filled, 0);
+  const fullyOk = _dg.rows.filter(r => r.missing === 0).length;
+  const zeroEntry = _dg.rows.filter(r => r.filled === 0).length;
+
+  // din ke hisaab se compliance
+  const perDay = days.map(d => _dg.rows.filter(r => r.days[d]).length);
+
+  const hdr = days.map(d => {
+    const dd = new Date(d + 'T00:00:00Z');
+    const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dd.getUTCDay()];
+    const wk = dd.getUTCDay() === 0;
+    return '<th style="padding:4px 3px;text-align:center;font-size:9px;min-width:34px;'
+      + (wk ? 'background:#f1f3f5;' : '') + '">'
+      + '<div style="font-weight:800;">' + dd.getUTCDate() + '</div>'
+      + '<div style="font-weight:400;color:var(--text-muted);font-size:8px;">' + dow + '</div></th>';
+  }).join('');
+
+  const body = rows.map(r => {
+    const cells = days.map(d => {
+      const e = r.days[d];
+      if (!e) return '<td style="padding:3px;text-align:center;font-size:10px;background:#fdf2f2;color:var(--red);font-weight:700;">0</td>';
+      const v = e[_dg.metric] || 0;
+      const title = 'Sales ₹' + Math.round(e.sales_amount) + ' · Orders ' + Math.round(e.orders_count)
+                  + ' · Spend ₹' + Math.round(e.ad_spend) + (e.by ? ' · ' + e.by : '');
+      return '<td title="' + gcEsc(title) + '" style="padding:3px;text-align:center;font-size:10px;background:#f0fff4;'
+        + (v ? '' : 'color:var(--text-muted);') + '">' + dgFmtCell(v, M.money) + '</td>';
+    }).join('');
+    const col = r.pct === 100 ? 'var(--green)' : r.pct >= 70 ? 'var(--amber)' : 'var(--red)';
+    return '<tr>'
+      + '<td style="padding:4px 7px;position:sticky;left:0;background:#fff;border-right:2px solid var(--border);min-width:170px;z-index:1;">'
+      + '<div style="font-weight:700;font-size:11px;">' + gcEsc(r.name) + '</div>'
+      + '<div style="font-size:9px;color:var(--text-muted);">' + gcEsc(r.code) + ' · ' + gcEsc(r.am) + '</div></td>'
+      + '<td style="padding:4px;text-align:center;font-size:10px;font-weight:800;color:' + col + ';">'
+      + r.filled + '/' + days.length + '</td>'
+      + cells
+      + '<td style="padding:4px 7px;text-align:right;font-size:10px;font-weight:700;">' + dgFmtCell(r.total, M.money) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // agar har din exactly ek jaisa cap dikhe to backend limit ka shak
+  const FS = _dg.fetchStats || {};
+  let warn = '';
+  if (FS.failed) {
+    warn += '<div style="padding:9px 11px;background:#fff5f5;border-left:3px solid var(--red);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:10px;">'
+      + '⚠️ ' + FS.failed + ' din ka data load nahi ho paya — numbers adhoore ho sakte hain. Dobara try karo.</div>';
+  }
+  const counts = Object.values(FS.perDay || {}).filter(c => c > 0);
+  if (counts.length > 2) {
+    const mx = Math.max.apply(null, counts);
+    const atCap = counts.filter(c => c === mx).length;
+    if (mx >= 100 && atCap >= Math.max(3, counts.length * 0.6)) {
+      warn += '<div style="padding:9px 11px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;font-size:12px;margin-bottom:10px;">'
+        + '⚠️ <strong>Shak hai ki backend row limit laga raha hai</strong> — ' + atCap + ' din me exactly '
+        + mx + ' rows aayi. Actual data isse zyada ho sakta hai — <code>allroutes.js</code> ke '
+        + '<code>/dsr</code> route me row limit badhani padegi.</div>';
+    }
+  }
+  const zeroDays = Object.keys(FS.perDay || {}).filter(d => !FS.perDay[d]);
+  if (zeroDays.length && zeroDays.length < (FS.days || 0)) {
+    warn += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">'
+      + 'ℹ️ In dino koi bhi DSR entry nahi mili: ' + zeroDays.map(d => d.slice(8)).join(', ') + '</div>';
+  }
+
+  document.getElementById('dg-out').innerHTML = warn +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:14px;">'
+    + gcKpiMini('Sellers', String(_dg.rows.length))
+    + gcKpiMini('Din', String(days.length))
+    + gcKpiMini('Overall Compliance', (totalCells ? Math.round(filledCells/totalCells*100) : 0) + '%')
+    + gcKpiMini('Poori Bhari', String(fullyOk))
+    + gcKpiMini('Ek Bhi Nahi', String(zeroEntry))
+    + '</div>'
+
+    + '<div class="card"><div class="card-header">'
+    + '<span class="card-title">📅 ' + gcEsc(M.label) + ' — ' + gcEsc(_dg.from) + ' se ' + gcEsc(_dg.to) + '</span>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    + '<input id="dg-q" placeholder="Seller / AM dhundo..." value="' + gcEsc(_dg.q) + '" '
+    + 'oninput="_dg.q=this.value;dgRender();document.getElementById(\'dg-q\').focus()" '
+    + 'class="form-control" style="padding:4px 8px;font-size:11px;width:170px;">'
+    + '<label style="font-size:11px;display:flex;gap:5px;align-items:center;cursor:pointer;">'
+    + '<input type="checkbox"' + (_dg.onlyGaps ? ' checked' : '') + ' onchange="_dg.onlyGaps=this.checked;dgRender()"> Sirf gaps wale</label>'
+    + '<button class="btn btn-sm btn-outline" onclick="dgExportExcel()">📥 Excel</button>'
+    + '</div></div>'
+    + '<div class="card-body" style="padding:0;">'
+    + '<div style="overflow-x:auto;max-height:70vh;">'
+    + '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead style="position:sticky;top:0;background:var(--bg);z-index:2;"><tr>'
+    + '<th style="padding:5px 7px;text-align:left;font-size:10px;position:sticky;left:0;background:var(--bg);border-right:2px solid var(--border);z-index:3;">SELLER</th>'
+    + '<th style="padding:5px;text-align:center;font-size:10px;">FILLED</th>'
+    + hdr
+    + '<th style="padding:5px 7px;text-align:right;font-size:10px;">TOTAL</th>'
+    + '</tr></thead><tbody>'
+    + (rows.length ? body : '<tr><td colspan="' + (days.length+3) + '" style="padding:20px;text-align:center;color:var(--text-muted);">Koi seller nahi mila</td></tr>')
+    + '</tbody>'
+    + '<tfoot style="position:sticky;bottom:0;background:var(--bg);"><tr>'
+    + '<td style="padding:5px 7px;font-size:10px;font-weight:800;position:sticky;left:0;background:var(--bg);border-right:2px solid var(--border);">DIN KA TOTAL</td>'
+    + '<td></td>'
+    + perDay.map(c => {
+        const pc = _dg.rows.length ? Math.round(c/_dg.rows.length*100) : 0;
+        const cl = pc === 100 ? 'var(--green)' : pc >= 70 ? 'var(--amber)' : 'var(--red)';
+        return '<td style="padding:4px 2px;text-align:center;font-size:9px;font-weight:800;color:' + cl + ';">' + c + '</td>';
+      }).join('')
+    + '<td></td></tr></tfoot>'
+    + '</table></div></div></div>'
+    + '<div style="margin-top:8px;font-size:11px;color:var(--text-muted);">'
+    + '🟥 laal 0 = us din DSR bhari hi nahi · 🟩 hara = bhari hui (0 value bhi ho sakti hai) · cell pe hover karo to poori detail</div>';
+}
+
+// Plain SheetJS cell styling ignore karta hai. xlsx-js-style (same API) alag se
+// load karke use karte hain, aur window.XLSX ko wapas restore kar dete hain.
+function dgStyledXLSX() {
+  return new Promise(resolve => {
+    if (window.__XLSXStyle) return resolve(window.__XLSXStyle);
+    const prev = window.XLSX;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload = () => {
+      window.__XLSXStyle = window.XLSX;      // styled build
+      window.XLSX = prev;                    // baaki app ke liye purana wapas
+      resolve(window.__XLSXStyle);
+    };
+    s.onerror = () => { window.XLSX = prev; resolve(null); };
+    document.head.appendChild(s);
+  });
+}
+
+async function dgExportExcel() {
+  if (!_dg.rows.length) { showToast('Pehle report nikalo!', 'error'); return; }
+  const XL = (await dgStyledXLSX()) || XLSX;   // load fail ho to bina styling hi de do
+  const days = _dg.days;
+  const d0 = new Date(_dg.from + 'T00:00:00Z');
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONFULL = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+  const mIdx = d0.getUTCMonth();
+  // saara period ek hi mahine ka ho tabhi mahine ka naam, warna date range
+  const sameMonth = _dg.from.slice(0,7) === _dg.to.slice(0,7);
+  const tabName = sameMonth ? ('DSR ' + MONFULL[mIdx] + ' Audit') : 'DSR Audit';
+  const fileMonth = sameMonth ? (MONFULL[mIdx] + '_' + d0.getUTCFullYear())
+                              : (_dg.from + '_to_' + _dg.to);
+  const dayHdr = days.map(d => d.slice(8) + '-' + MON[parseInt(d.slice(5,7),10) - 1]);
+
+  // ── AM ke hisaab se group karo (naam se sorted) ──
+  const groups = {};
+  for (const r of _dg.rows) {
+    const am = (r.am && r.am !== '—') ? r.am : '—';
+    (groups[am] || (groups[am] = [])).push(r);
+  }
+  const amNames = Object.keys(groups).sort((a,b) =>
+    a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b));
+
+  const aoa = [];
+  const meta = [];   // har row ka type yaad rakho taaki styling lag sake
+  aoa.push(['Client Code','Client Name','AM Name','Marketplace','Days Filled','Days Missed',
+            'Total Sales','Total Returns','Returns %'].concat(dayHdr));
+  meta.push({ t:'head' });
+
+  for (const am of amNames) {
+    const list = groups[am].slice().sort((a,b) =>
+      String(a.name).localeCompare(String(b.name)));
+    aoa.push(['▼ ' + am + '  (' + list.length + ' seller' + (list.length > 1 ? 's' : '') + ')']);
+    meta.push({ t:'am' });
+    for (const r of list) {
+      const sales   = days.reduce((s,d) => s + ((r.days[d] || {}).sales_amount  || 0), 0);
+      const returns = days.reduce((s,d) => s + ((r.days[d] || {}).returns_count || 0), 0);
+      aoa.push([r.code, r.name, am, r.marketplace || '', r.filled, r.missing,
+                Math.round(sales * 100) / 100, returns,
+                sales ? Math.round(returns / sales * 1000) / 10 : 0]
+        .concat(days.map(d => r.days[d] ? (Math.round(((r.days[d].sales_amount) || 0) * 100) / 100) : 0)));
+      meta.push({ t:'data', filledDays: days.map(d => !!r.days[d]) });
+    }
+  }
+
+  const ws = XL.utils.aoa_to_sheet(aoa);
+  const nCols = 9 + days.length;
+
+  // ── styling (xlsx-js-style ho to lagegi; warna data phir bhi sahi) ──
+  const F = { name:'Arial' };
+  const border = { top:{style:'thin',color:{rgb:'FFD9D9D9'}}, bottom:{style:'thin',color:{rgb:'FFD9D9D9'}},
+                   left:{style:'thin',color:{rgb:'FFD9D9D9'}}, right:{style:'thin',color:{rgb:'FFD9D9D9'}} };
+  const setCell = (r, c, style, fmt) => {
+    const ref = XL.utils.encode_cell({ r, c });
+    const cell = ws[ref];
+    if (!cell) return;
+    cell.s = style;
+    if (fmt) cell.z = fmt;
+  };
+  const HEAD = { font:{...F, sz:9, bold:true, color:{rgb:'FFFFFFFF'}},
+                 fill:{fgColor:{rgb:'FF1F4E79'}, patternType:'solid'},
+                 alignment:{horizontal:'center', vertical:'center', wrapText:true}, border };
+  const AMROW = { font:{...F, sz:10, bold:true, color:{rgb:'FF1F4E79'}},
+                  fill:{fgColor:{rgb:'FFD6E4F0'}, patternType:'solid'},
+                  alignment:{horizontal:'left', vertical:'center'} };
+
+  const merges = [];
+  for (let r = 0; r < meta.length; r++) {
+    const m = meta[r];
+    if (m.t === 'head') {
+      for (let c = 0; c < nCols; c++) setCell(r, c, HEAD);
+      continue;
+    }
+    if (m.t === 'am') {
+      for (let c = 0; c < nCols; c++) setCell(r, c, AMROW);
+      merges.push({ s:{r, c:0}, e:{r, c:nCols - 1} });
+      continue;
+    }
+    const zebra = r % 2 === 0 ? 'FFF2F2F2' : 'FFFFFFFF';
+    const base  = { font:{...F, sz:9}, fill:{fgColor:{rgb:zebra}, patternType:'solid'},
+                    alignment:{horizontal:'center'}, border };
+    setCell(r, 0, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 1, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 2, { ...base, alignment:{horizontal:'left'} });
+    setCell(r, 3, base);
+    setCell(r, 4, base);
+    setCell(r, 5, { ...base, font:{...F, sz:9, color:{rgb:'FFCC0000'}} });   // missed = laal
+    setCell(r, 6, base, '#,##0.00');
+    setCell(r, 7, base, '#,##0.00');
+    setCell(r, 8, base, '0.0"%"');
+    for (let i = 0; i < days.length; i++) {
+      const filled = m.filledDays[i];
+      setCell(r, 9 + i, filled
+        ? { font:{...F, sz:8}, fill:{fgColor:{rgb:zebra}, patternType:'solid'},
+            alignment:{horizontal:'center'}, border }
+        : { font:{...F, sz:8, color:{rgb:'FFAAAAAA'}},                        // bhari nahi
+            fill:{fgColor:{rgb:'FFFFF0CC'}, patternType:'solid'},
+            alignment:{horizontal:'center'}, border },
+        filled ? '#,##0.00' : null);
+    }
+  }
+
+  ws['!cols'] = [{wch:12},{wch:28},{wch:18},{wch:12},{wch:9},{wch:9},{wch:12},{wch:11},{wch:9}]
+    .concat(days.map(() => ({ wch:8 })));
+  ws['!rows'] = meta.map(m => m.t === 'head' ? { hpt:30 } : m.t === 'am' ? { hpt:18 } : {});
+  ws['!merges'] = merges;
+  ws['!freeze'] = { xSplit:9, ySplit:1 };
+  ws['!autofilter'] = { ref: XL.utils.encode_range({ s:{r:0,c:0}, e:{r:0,c:nCols-1} }) };
+
+  // ── AM Summary ──
+  const sum = [['AM Name','Total Sellers','Total Sales (₹)','Avg Sales/Seller','Days Filled Avg']];
+  for (const am of amNames) {
+    const list = groups[am];
+    const sales = list.reduce((s,r) =>
+      s + days.reduce((t,d) => t + ((r.days[d] || {}).sales_amount || 0), 0), 0);
+    const fill = list.reduce((s,r) => s + r.filled, 0);
+    sum.push([am, list.length, Math.round(sales * 100) / 100,
+              Math.round(sales / list.length * 100) / 100,
+              Math.round(fill / list.length * 10) / 10]);
+  }
+  const ws2 = XL.utils.aoa_to_sheet(sum);
+  for (let c = 0; c < 5; c++) {
+    const ref = XL.utils.encode_cell({ r:0, c });
+    if (ws2[ref]) ws2[ref].s = HEAD;
+  }
+  for (let r = 1; r < sum.length; r++) {
+    for (let c = 0; c < 5; c++) {
+      const ref = XL.utils.encode_cell({ r, c });
+      if (!ws2[ref]) continue;
+      ws2[ref].s = { font:{...F, sz:9}, alignment:{horizontal: c === 0 ? 'left' : 'center'}, border };
+      if (c === 2 || c === 3) ws2[ref].z = '#,##0.00';
+    }
+  }
+  ws2['!cols'] = [{wch:24},{wch:13},{wch:16},{wch:16},{wch:15}];
+  ws2['!freeze'] = { xSplit:0, ySplit:1 };
+
+  const wb = XL.utils.book_new();
+  XL.utils.book_append_sheet(wb, ws,  tabName.slice(0, 31));
+  XL.utils.book_append_sheet(wb, ws2, 'AM Summary');
+  XL.writeFile(wb, 'DSR_' + fileMonth + '_Audit.xlsx');
+  showToast('Audit file download ho gayi!', 'success');
+}
 
 // ══════════════════════════════════════════════════════════════════
 // FLIPKART SELLER ANALYZER  —  Business + Ads (ek page)

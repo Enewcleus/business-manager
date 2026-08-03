@@ -10068,11 +10068,439 @@ var _ra = {
   client: '', clientName: '',
   business: null, targeting: null, advertised: null,
   searchterm: null, inventory: null, returns: null,
+  listing: null,          // Category Listings Report (.xlsm)
   dsrHistory: null,
-  asinMap: {},        // ASIN -> merged data
-  keywordMap: {},     // ASIN -> best keywords
-  tasks: [],          // Generated tasks
+  asinMap: {},            // ASIN -> merged data
+  keywordMap: {},         // ASIN -> best keywords
+  listingItems: [],       // Category Listings rows
+  listingBySku: {},
+  listingSummary: null,
+  tasks: [],              // Generated tasks
 };
+
+// ══════════════════════════════════════════════════════════════════
+// CATEGORY LISTINGS REPORT — listing intelligence
+// Fulfillment channel (asli MFN/FBA), content quality, pricing gaps
+// ══════════════════════════════════════════════════════════════════
+
+// Amazon IN FBA fees (approx, Standard size) — seller ko estimate dena hai,
+// exact nahi. Amazon fee structure badalta rehta hai.
+const RA_FBA = {
+  // weight slab (grams) -> fulfillment fee (INR) for local/regional
+  slabs: [
+    { upTo: 500,   fee: 47  },
+    { upTo: 1000,  fee: 63  },
+    { upTo: 2000,  fee: 86  },
+    { upTo: 5000,  fee: 136 },
+    { upTo: 12000, fee: 218 },
+    { upTo: 1e9,   fee: 310 },
+  ],
+  storagePerCbmMonth: 45,       // ₹/cbm/month approx
+  pickPack: 0,                  // fulfillment fee me included
+  closingFeeByPrice: [
+    { upTo: 250,  fee: 5  },
+    { upTo: 500,  fee: 12 },
+    { upTo: 1000, fee: 25 },
+    { upTo: 1e9,  fee: 45 },
+  ],
+  mfnShipCost: 75,              // seller ka apna courier — typical
+};
+
+function raFbaFee(weightGrams, price) {
+  const w = weightGrams > 0 ? weightGrams : 500;
+  const slab = RA_FBA.slabs.find(s => w <= s.upTo) || RA_FBA.slabs[RA_FBA.slabs.length - 1];
+  const closing = (RA_FBA.closingFeeByPrice.find(c => price <= c.upTo) || { fee: 45 }).fee;
+  return { fulfillment: slab.fee, closing, total: slab.fee + closing };
+}
+
+// ─── PARSER ───────────────────────────────────────────────────────
+// Column positions category ke hisaab se badalte hain — isliye header
+// NAME se match karte hain, fixed index se nahi.
+function raParseListing() {
+  const wb = _ra.listing && _ra.listing.wb;
+  if (!wb) return;
+
+  const sh = wb.Sheets['Template'] || wb.Sheets[wb.SheetNames[0]];
+  if (!sh) return;
+  const raw = XLSX.utils.sheet_to_json(gcFixRef(sh), { header: 1, defval: null });
+  if (raw.length < 6) return;
+
+  // row 4 = display names, row 5 = technical names, row 6 = Amazon ka sample,
+  // row 7+ = asli data
+  const disp = (raw[3] || []).map(x => String(x == null ? '' : x).trim());
+  const tech = (raw[4] || []).map(x => String(x == null ? '' : x).trim());
+
+  const findCol = (dispMatch, techMatch) => {
+    for (let i = 0; i < disp.length; i++) {
+      if (dispMatch && dispMatch.test(disp[i])) return i;
+    }
+    for (let i = 0; i < tech.length; i++) {
+      if (techMatch && techMatch.test(tech[i])) return i;
+    }
+    return -1;
+  };
+  const findAll = (dispMatch, techMatch) => {
+    const out = [];
+    for (let i = 0; i < Math.max(disp.length, tech.length); i++) {
+      if ((dispMatch && dispMatch.test(disp[i] || '')) ||
+          (techMatch && techMatch.test(tech[i] || ''))) out.push(i);
+    }
+    return out;
+  };
+
+  const C = {
+    status:   findCol(/^Status$/i, /::listing_status/),
+    sku:      findCol(/^SKU$/i, /contribution_sku/),
+    name:     findCol(/^Item Name$/i, /^item_name\[/),
+    brand:    findCol(/^Brand Name$/i, /^brand\[/),
+    ptype:    findCol(/^Product Type$/i, /product_type#1/),
+    parent:   findCol(/^Parent SKU$/i, /child_parent_sku/),
+    desc:     findCol(/^Product Description$/i, /^product_description\[/),
+    fulfill:  findCol(/Fulfillment Channel/i, /fulfillment_channel_code/),
+    qty:      findCol(/^Quantity\s*\(/i, /fulfillment_availability#1\.quantity/),
+    handling: findCol(/Handling Time/i, /lead_time_to_ship/),
+    price:    findCol(/^Your Price.*Sell on Amazon/i, null),
+    mrp:      findCol(/^Maximum Retail Price.*Sell on Amazon/i, null),
+    sale:     findCol(/^Sale Price.*Sell on Amazon/i, null),
+    saleFrom: findCol(/^Sale Start Date/i, null),
+    saleTo:   findCol(/^Sale End Date/i, null),
+    weight:   findCol(/Item Weight$/i, /^item_weight\[/),
+    wUnit:    findCol(/Item Weight Unit/i, null),
+  };
+  const bulletCols = findAll(/^Bullet Point$/i, /^bullet_point\[/);
+  const kwCols     = findAll(/^Generic Keyword$/i, /^generic_keyword\[/);
+
+  const val = (r, i) => (i >= 0 && i < r.length && r[i] != null && r[i] !== '') ? r[i] : null;
+  const num = v => { const n = parseFloat(String(v).replace(/[^\d.-]/g, '')); return isNaN(n) ? 0 : n; };
+
+  const items = [];
+  for (let i = 5; i < raw.length; i++) {        // index 5 = row 6 (sample) — skip
+    const r = raw[i] || [];
+    const sku = val(r, C.sku);
+    if (!sku) continue;
+    const skuStr = String(sku).trim();
+    if (i === 5 && /^ABC123$/i.test(skuStr)) continue;   // Amazon ka sample row
+    if (/^ABC123$/i.test(skuStr)) continue;
+
+    const fulfillRaw = String(val(r, C.fulfill) || '').trim();
+    // AMAZON_IN / AMAZON_NA = FBA ; "Fulfillment by Merchant" = MFN
+    const isFBA = /^AMAZON/i.test(fulfillRaw);
+    const isMFN = /merchant/i.test(fulfillRaw) || (!isFBA && !!fulfillRaw);
+
+    const bullets = bulletCols.map(c => val(r, c)).filter(Boolean).map(String);
+    const keywords = kwCols.map(c => val(r, c)).filter(Boolean).map(String);
+    const desc = val(r, C.desc);
+
+    let weightG = 0;
+    if (C.weight >= 0) {
+      const w = num(val(r, C.weight));
+      const u = String(val(r, C.wUnit) || '').toLowerCase();
+      weightG = /kilogram|^kg/.test(u) ? w * 1000 : /pound|lb/.test(u) ? w * 453.6 : /gram|^g/.test(u) ? w : w;
+    }
+
+    items.push({
+      sku: skuStr,
+      status: String(val(r, C.status) || '').trim(),
+      name: String(val(r, C.name) || '').trim(),
+      brand: String(val(r, C.brand) || '').trim(),
+      ptype: String(val(r, C.ptype) || '').trim(),
+      parent: String(val(r, C.parent) || '').trim(),
+      fulfillRaw, isFBA, isMFN,
+      qty: num(val(r, C.qty)),
+      handling: num(val(r, C.handling)),
+      price: num(val(r, C.price)),
+      mrp: num(val(r, C.mrp)),
+      sale: num(val(r, C.sale)),
+      saleFrom: val(r, C.saleFrom),
+      saleTo: val(r, C.saleTo),
+      weightG,
+      bullets, bulletCount: bullets.length,
+      keywords, keywordSlots: kwCols.length,
+      desc: desc ? String(desc) : '',
+      descLen: desc ? String(desc).length : 0,
+      titleLen: String(val(r, C.name) || '').length,
+    });
+  }
+
+  _ra.listingItems = items;
+  _ra.listingBySku = {};
+  for (const it of items) _ra.listingBySku[it.sku.toUpperCase()] = it;
+
+  // summary
+  const active = items.filter(x => /active/i.test(x.status));
+  _ra.listingSummary = {
+    total: items.length,
+    active: active.length,
+    fba: items.filter(x => x.isFBA).length,
+    mfn: items.filter(x => x.isMFN).length,
+    noKeywords: items.filter(x => !x.keywords.length).length,
+    kwSlots: items.length ? items[0].keywordSlots : 5,
+    partialKeywords: items.filter(x => x.keywords.length && x.keywords.length < x.keywordSlots).length,
+    shortBullets: items.filter(x => x.bulletCount < 5).length,
+    noDesc: items.filter(x => !x.descLen).length,
+    longTitle: items.filter(x => x.titleLen > 200).length,
+    shortTitle: items.filter(x => x.titleLen > 0 && x.titleLen < 80).length,
+    onSale: items.filter(x => x.sale > 0).length,
+    zeroQty: items.filter(x => x.isMFN && x.qty === 0).length,
+    noPrice: items.filter(x => !x.price).length,
+  };
+}
+
+// Kya is product ke liye FBA suggest karna banta hai?
+// Sirf tab jab: top-30 revenue me ho, aur fee price ka 30% se kam ho.
+function raFbaWorthIt(a, li) {
+  if (!_ra.listingItems || !_ra.listingItems.length) return true;   // listing report nahi hai to purana behaviour
+  if (!_ra._topSkus) {
+    const perf = Object.values(_ra.asinMap || {})
+      .filter(x => x.sku).sort((x, y) => (y.sales || 0) - (x.sales || 0)).slice(0, 30);
+    _ra._topSkus = {};
+    perf.forEach(x => { _ra._topSkus[String(x.sku).toUpperCase()] = true; });
+  }
+  if (!a.sku || !_ra._topSkus[String(a.sku).toUpperCase()]) return false;
+  const price = (li && li.price) || (a.units ? a.sales / a.units : 0);
+  if (!price) return false;
+  const fee = raFbaFee(li ? li.weightG : 0, price);
+  return fee.total <= price * 0.30;
+}
+
+// ─── FBA CANDIDATES — top 30 only, economics ke saath ─────────────
+function raFbaCandidates() {
+  if (!_ra.listingItems || !_ra.listingItems.length) return [];
+
+  // performance data ASIN map se, SKU pe join
+  const perf = {};
+  Object.values(_ra.asinMap || {}).forEach(a => {
+    if (a.sku) perf[String(a.sku).toUpperCase()] = a;
+  });
+
+  const rows = _ra.listingItems
+    .filter(x => x.isMFN && /active/i.test(x.status))
+    .map(x => {
+      const p = perf[x.sku.toUpperCase()] || {};
+      const units = p.units || 0;
+      const sales = p.sales || 0;
+      const price = x.price || (units ? sales / units : 0) || x.mrp || 0;
+      const fee = raFbaFee(x.weightG, price);
+      // MFN me seller khud courier deta hai
+      const mfnCost = RA_FBA.mfnShipCost;
+      const perUnitDelta = fee.total - mfnCost;
+      return {
+        ...x, units, sales, sessions: p.sessions || 0, cvr: p.cvr || 0,
+        price, fee,
+        monthlyFeeImpact: Math.round(perUnitDelta * units),
+        perUnitDelta: Math.round(perUnitDelta),
+      };
+    })
+    .filter(x => x.units > 0)                     // sirf jo bik raha hai
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 30);
+
+  return rows.map(x => {
+    // FBA se conversion typically badhta hai (Prime badge) — conservative 25%
+    const upliftUnits = Math.round(x.units * 0.25);
+    const extraRevenue = Math.round(upliftUnits * x.price);
+    const extraFees = Math.round(upliftUnits * x.fee.total) + x.monthlyFeeImpact;
+    const net = extraRevenue - extraFees;
+    let verdict, why;
+    if (x.price < 300 && x.fee.total > x.price * 0.30) {
+      verdict = 'skip';
+      why = 'Price ₹' + Math.round(x.price) + ' hai aur FBA fee ₹' + x.fee.total
+          + ' (' + Math.round(x.fee.total / x.price * 100) + '% of price). Margin kha jayegi — MFN hi rakho.';
+    } else if (net > 0 && x.units >= 10) {
+      verdict = 'go';
+      why = 'Monthly ' + x.units + ' units bik rahe hain. FBA fee ₹' + x.fee.total + '/unit, '
+          + 'par Prime badge se ~25% zyada units (' + upliftUnits + ') aur net ~₹'
+          + Math.round(net) + '/month ka fayda.';
+    } else if (x.units >= 5) {
+      verdict = 'test';
+      why = x.units + ' units/month — borderline hai. Pehle 50-100 units ka chhota FBA shipment bhej ke test karo.';
+    } else {
+      verdict = 'skip';
+      why = 'Sirf ' + x.units + ' units/month. FBA storage + fee justify nahi hoti.';
+    }
+    return { ...x, upliftUnits, extraRevenue, extraFees, net, verdict, why };
+  });
+}
+
+// ─── CONTENT AUDIT — title / bullets / desc / keywords ────────────
+function raListingAudit() {
+  if (!_ra.listingItems || !_ra.listingItems.length) return [];
+
+  const perf = {};
+  Object.values(_ra.asinMap || {}).forEach(a => {
+    if (a.sku) perf[String(a.sku).toUpperCase()] = a;
+  });
+
+  // SAARI active listings score karo — phir quality ke hisaab se bucket
+  const ranked = _ra.listingItems
+    .filter(x => /active/i.test(x.status))
+    .map(x => {
+      const p = perf[x.sku.toUpperCase()] || {};
+      return { ...x, units: p.units || 0, sales: p.sales || 0, sessions: p.sessions || 0,
+               cvr: p.cvr || 0, asin: p.asin || '' };
+    });
+
+  return ranked.map(x => {
+    const issues = [];
+    const kwFromSearch = (_ra.keywordMap && x.asin ? _ra.keywordMap[x.asin] : null) || [];
+
+    // TITLE
+    if (x.titleLen > 200) {
+      issues.push({ area: 'Title', sev: 'high',
+        what: 'Title ' + x.titleLen + ' characters ka hai (200 se upar truncate ho jata hai).',
+        fix: 'Sabse zaroori keywords pehle 80 characters me le aao. Brand + main keyword + key feature + size/qty — is order me.' });
+    } else if (x.titleLen < 80) {
+      issues.push({ area: 'Title', sev: 'high',
+        what: 'Title sirf ' + x.titleLen + ' characters ka hai — search space waste ho raha hai.',
+        fix: 'Title 150-200 characters tak le jao. Brand, material, size, quantity, use-case add karo.'
+           + (kwFromSearch.length ? ' Search Term report se converting keywords: ' + kwFromSearch.slice(0,3).join(', ') : '') });
+    }
+
+    // BULLETS
+    if (x.bulletCount < 5) {
+      issues.push({ area: 'Bullets', sev: x.bulletCount < 3 ? 'high' : 'medium',
+        what: 'Sirf ' + x.bulletCount + '/5 bullet points bhare hain.',
+        fix: (5 - x.bulletCount) + ' aur bullets add karo. Har bullet CAPS me benefit se shuru karo, phir detail. '
+           + 'Missing angles: warranty, usage instructions, gift-worthiness, material quality.' });
+    } else {
+      const shortB = x.bullets.filter(b => b.length < 100).length;
+      if (shortB >= 3) {
+        issues.push({ area: 'Bullets', sev: 'medium',
+          what: shortB + ' bullets 100 characters se chhote hain.',
+          fix: 'Har bullet 150-200 characters ka karo — feature ke saath benefit bhi likho.' });
+      }
+    }
+
+    // DESCRIPTION
+    if (!x.descLen) {
+      issues.push({ area: 'Description', sev: 'high',
+        what: 'Product description khali hai.',
+        fix: 'A+ content nahi hai to description zaroori hai. 800-1500 characters likho, keywords natural tarike se daalo.' });
+    } else if (x.descLen < 500) {
+      issues.push({ area: 'Description', sev: 'medium',
+        what: 'Description sirf ' + x.descLen + ' characters ka hai.',
+        fix: '1000+ characters tak le jao — use cases, care instructions, aur brand story add karo.' });
+    }
+
+    // BACKEND KEYWORDS — sabse bada aur sabse aasaan gap
+    if (!x.keywords.length) {
+      issues.push({ area: 'Backend Keywords', sev: 'high',
+        what: 'Ek bhi backend search term nahi bhara — indexing miss ho rahi hai.',
+        fix: 'Saare ' + x.keywordSlots + ' slots bharo (har slot ~250 chars). Title/bullets wale words repeat mat karo. '
+           + (kwFromSearch.length
+              ? 'Search Term report se: ' + kwFromSearch.slice(0,6).join(', ')
+              : 'Misspellings, Hindi transliteration, aur use-case words daalo.') });
+    } else if (x.keywords.length < x.keywordSlots) {
+      issues.push({ area: 'Backend Keywords', sev: 'medium',
+        what: x.keywords.length + '/' + x.keywordSlots + ' keyword slots bhare hain.',
+        fix: (x.keywordSlots - x.keywords.length) + ' slots khali hain — free SEO space waste ho raha hai. '
+           + (kwFromSearch.length ? 'Add karo: ' + kwFromSearch.slice(0,5).join(', ') : 'Synonyms aur regional terms daalo.') });
+    }
+
+    // low conversion despite traffic
+    if (x.sessions >= 50 && x.cvr > 0 && x.cvr < 5) {
+      issues.push({ area: 'Conversion', sev: 'high',
+        what: x.sessions + ' sessions par conversion sirf ' + x.cvr.toFixed(1) + '% hai.',
+        fix: 'Traffic aa raha hai par convert nahi ho raha — main image, price, aur reviews check karo. A+ content add karo.' });
+    }
+
+    const score = Math.max(0, 100 - issues.reduce((s, i) => s + (i.sev === 'high' ? 20 : 10), 0));
+    const grade = score < 40 ? 'low' : score < 70 ? 'medium' : 'good';
+    return { ...x, issues, score, grade };
+  }).filter(x => x.issues.length);
+}
+
+// Quality buckets — low aur medium se 10-10, revenue impact ke hisaab se
+function raListingBuckets(n) {
+  n = n || 10;
+  const all = raListingAudit();
+  const pick = g => all.filter(x => x.grade === g)
+    .sort((a, b) => (b.sales - a.sales) || (a.score - b.score))
+    .slice(0, n);
+  return {
+    all,
+    low: pick('low'),
+    medium: pick('medium'),
+    counts: {
+      low: all.filter(x => x.grade === 'low').length,
+      medium: all.filter(x => x.grade === 'medium').length,
+      good: all.filter(x => x.grade === 'good').length,
+      clean: (_ra.listingItems || []).filter(x => /active/i.test(x.status)).length - all.length,
+    },
+  };
+}
+
+// ─── DISCOUNT / COUPON SUGGESTIONS ────────────────────────────────
+function raPricingPlays() {
+  if (!_ra.listingItems || !_ra.listingItems.length) return [];
+
+  const perf = {};
+  Object.values(_ra.asinMap || {}).forEach(a => {
+    if (a.sku) perf[String(a.sku).toUpperCase()] = a;
+  });
+
+  return _ra.listingItems
+    .filter(x => /active/i.test(x.status))
+    .map(x => {
+      const p = perf[x.sku.toUpperCase()] || {};
+      return { ...x, units: p.units || 0, sales: p.sales || 0,
+               sessions: p.sessions || 0, cvr: p.cvr || 0 };
+    })
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, 30)
+    .map(x => {
+      const plays = [];
+      const price = x.price || x.mrp;
+      const discPct = (x.mrp && x.price) ? Math.round((x.mrp - x.price) / x.mrp * 100) : 0;
+
+      // 1. traffic hai par conversion kam -> coupon
+      if (x.sessions >= 100 && x.cvr > 0 && x.cvr < 8 && !x.sale) {
+        const cAmt = Math.max(10, Math.round(price * 0.05 / 5) * 5);
+        plays.push({ type: 'Coupon', sev: 'high',
+          what: '₹' + cAmt + ' ya 5% coupon lagao',
+          why: x.sessions + ' sessions aa rahe hain par conversion ' + x.cvr.toFixed(1) + '% hai. '
+             + 'Coupon ka green badge search results me dikhta hai — CTR aur conversion dono badhte hain.' });
+      }
+
+      // 2. koi discount hi nahi
+      if (!x.sale && x.mrp && x.price && discPct < 10 && x.units > 0) {
+        plays.push({ type: 'Sale Price', sev: 'medium',
+          what: 'Sale Price set karo (MRP se 15-20% neeche)',
+          why: 'Abhi MRP ₹' + Math.round(x.mrp) + ' aur price ₹' + Math.round(x.price) + ' — sirf ' + discPct + '% off dikh raha hai. '
+             + 'Strike-through price se perceived value badhti hai.' });
+      }
+
+      // 3. bahut zyada discount already
+      if (discPct > 60) {
+        plays.push({ type: 'Margin Alert', sev: 'high',
+          what: 'Discount ' + discPct + '% hai — margin check karo',
+          why: 'MRP ₹' + Math.round(x.mrp) + ' se ₹' + Math.round(x.price) + '. Itna gap ho to Amazon MRP verification maang sakta hai, '
+             + 'aur customer ko MRP fake lagta hai.' });
+      }
+
+      // 4. sale chal rahi par expire
+      if (x.sale && x.saleTo) {
+        const end = new Date(x.saleTo);
+        if (!isNaN(end) && end < new Date()) {
+          plays.push({ type: 'Expired Sale', sev: 'medium',
+            what: 'Sale price expire ho chuki hai',
+            why: 'Sale end date ' + String(x.saleTo).slice(0,10) + ' thi. Renew karo ya hata do.' });
+        }
+      }
+
+      // 5. MFN + qty 0 = phantom listing
+      if (x.isMFN && x.qty === 0 && x.sessions > 0) {
+        plays.push({ type: 'Stock', sev: 'high',
+          what: 'Quantity 0 hai par sessions aa rahe hain',
+          why: x.sessions + ' log dekh rahe hain par khareed nahi sakte. Quantity update karo — '
+             + 'warna ranking gir jayegi.' });
+      }
+
+      return { ...x, plays, discPct };
+    })
+    .filter(x => x.plays.length);
+}
+
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
@@ -10385,9 +10813,12 @@ async function renderFeedback() {
     ? '<div style="padding:12px 14px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;margin-bottom:16px;">'
       + '<div style="font-weight:700;font-size:13px;color:var(--red);">⚠️ Feedback backend abhi live nahi hai</div>'
       + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6;">'
-      + 'Page to khul gaya par server pe <code>/feedback/*</code> routes mount nahi hue — '
-      + 'upload aur leaderboard tab tak kaam nahi karenge. '
-      + 'Ye <code>allroutes.js</code> me theek hoga (feedback router aur multer <code>upload</code> ka order).'
+      + 'Server pe <code>/api/feedback/*</code> routes respond nahi kar rahe — '
+      + 'upload aur leaderboard tab tak kaam nahi karenge.<br>'
+      + '<strong>Check karo:</strong> (1) <code>server.js</code> me '
+      + '<code>app.use(\'/api/feedback\', feedbackRouter)</code> hai? '
+      + '(2) <code>allroutes.js</code> me <code>feedbackRouter</code> export hua? '
+      + '(3) Railway ne redeploy kiya? (4) Supabase me <code>feedback_records</code> table bani?'
       + '</div></div>'
     : fails.length
       ? '<div style="padding:11px 13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;margin-bottom:16px;font-size:12px;">'
@@ -12213,6 +12644,190 @@ function gcKpiMini(label, value) {
     + '<div style="font-size:17px;font-weight:800;">' + value + '</div></div>';
 }
 
+// ══════════════════════════════════════════════════════════════════
+// NEXT QUARTER PROJECTION
+// Do period se quarter project karna patla base hai — isliye range
+// dete hain, single number nahi. Growth damped hai kyunki growth rates
+// hamesha mean-revert karte hain (22% MoM ko 3 mahine compound kar do
+// to +81% ban jata hai, jo realistic nahi).
+// ══════════════════════════════════════════════════════════════════
+
+const GC_FEST = {
+  // Indian marketplace ka mahina-wise demand index (1.0 = normal)
+  0:0.95, 1:0.90, 2:0.95, 3:1.00, 4:1.00, 5:1.00,
+  6:1.00, 7:1.05, 8:1.10, 9:1.35, 10:1.25, 11:1.05,
+};
+const GC_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function gcProjection() {
+  const R = _gc.result;
+  if (!R) return null;
+  const isAmz = R.mp === 'amazon';
+  const M = R.M;
+
+  // per-day run rate — periods alag lambai ke ho sakte hain
+  const dA = R.N.dA || 30, dB = R.N.dB || 30;
+  const salesA = isAmz ? M.sales.a : M.gross.a;
+  const salesB = isAmz ? M.sales.b : M.gross.b;
+  if (!salesB) return null;
+
+  // M.sales pehle se DRR-normalised hai agar N.on true tha
+  const drrA = R.N.on ? salesA : salesA / dA;
+  const drrB = R.N.on ? salesB : salesB / dB;
+  const unitsA = R.N.on ? M.units.a : M.units.a / dA;
+  const unitsB = R.N.on ? M.units.b : M.units.b / dB;
+  if (!drrA || !drrB) return null;
+
+  const growth = (drrB - drrA) / drrA;          // period-over-period
+  const uGrowth = unitsA ? (unitsB - unitsA) / unitsA : 0;
+
+  // agla quarter kaunse mahine
+  const now = new Date();
+  const startM = now.getMonth() + 1;
+  const months = [0, 1, 2].map(i => {
+    const m = (startM + i) % 12;
+    const y = now.getFullYear() + Math.floor((startM + i) / 12);
+    const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return { idx: m, name: GC_MON[m], year: y, days, season: GC_FEST[m] || 1.0 };
+  });
+
+  // baseline seasonality — Period B kis mahine ka tha
+  let baseSeason = 1.0;
+  if (_gc.B.from) {
+    const d = new Date(_gc.B.from.replace(/(\d+) (\w+) (\d+)/, '$2 $1, $3'));
+    if (!isNaN(d)) baseSeason = GC_FEST[d.getMonth()] || 1.0;
+  }
+
+  // ── scenarios ──
+  // damping: growth har mahine kam hota jata hai
+  const build = (label, decay, cap, note) => {
+    let rate = Math.max(-0.5, Math.min(cap, growth));
+    let drr = drrB;
+    const rows = months.map((mo, i) => {
+      if (i > 0) rate *= decay;
+      drr = drr * (1 + rate);
+      const seasonAdj = mo.season / baseSeason;
+      const sales = drr * mo.days * seasonAdj;
+      return { ...mo, drr, sales, rate };
+    });
+    return { label, note, months: rows, total: rows.reduce((s, m) => s + m.sales, 0) };
+  };
+
+  const cons = build('Conservative', 0, 0, 'Growth ruk gaya — abhi ka run-rate hi chalta raha');
+  const base = build('Base', 0.55, 0.25, 'Growth jaari par dheere-dheere kam hota hua (realistic)');
+  const opti = build('Optimistic', 0.85, 0.35, 'Growth lagbhag banaye rakha — sab kuch sahi chala to');
+  // conservative me growth zero
+  cons.months.forEach((m, i) => {
+    m.drr = drrB; m.rate = 0;
+    m.sales = drrB * m.days * (m.season / baseSeason);
+  });
+  cons.total = cons.months.reduce((s, m) => s + m.sales, 0);
+
+  // pichhla quarter ka comparison base (Period B run-rate × 90 din)
+  const lastQtrEquiv = drrB * 90;
+
+  // confidence — kitna data hai uspe
+  const warns = [];
+  if (dA < 20 || dB < 20)
+    warns.push('Periods chhote hain (' + dA + ' aur ' + dB + ' din) — quarter project karne ke liye base patla hai.');
+  if (Math.abs(growth) > 0.5)
+    warns.push('Growth ' + Math.round(growth * 100) + '% hai — itna bada swing aksar one-off hota hai (sale event, stock issue). Base case usi hisaab se damp kiya gaya hai.');
+  if (months.some(m => m.season >= 1.25))
+    warns.push('Agle quarter me festive season (' + months.filter(m => m.season >= 1.25).map(m => m.name).join(', ') + ') aa raha hai — demand normally badhti hai, wo factor kar liya gaya hai.');
+  if (R.dupes && R.dupes.length)
+    warns.push('Dono periods me same file thi — projection bharosemand nahi hai.');
+
+  return {
+    growth, uGrowth, drrA, drrB, dA, dB, baseSeason,
+    lastQtrEquiv, months, warns,
+    scenarios: [cons, base, opti],
+    unitsPerDayB: unitsB,
+    aov: unitsB ? drrB / unitsB : 0,
+  };
+}
+
+function gcProjectionHtml() {
+  const P = gcProjection();
+  if (!P) return '';
+  const R = _gc.result;
+  const isAmz = R.mp === 'amazon';
+  const [cons, base, opti] = P.scenarios;
+  const g = Math.round(P.growth * 1000) / 10;
+
+  const card = (s, colour, big) =>
+    '<div style="flex:1;min-width:150px;background:#fff;border:1px solid var(--border);'
+    + 'border-top:3px solid ' + colour + ';border-radius:8px;padding:11px;">'
+    + '<div style="font-size:10px;color:var(--text-muted);font-weight:700;">' + s.label.toUpperCase() + '</div>'
+    + '<div style="font-size:' + (big ? '22' : '18') + 'px;font-weight:800;color:' + colour + ';margin:3px 0;">'
+    + gcR(s.total) + '</div>'
+    + '<div style="font-size:10.5px;color:var(--text-muted);line-height:1.45;">' + gcEsc(s.note) + '</div>'
+    + '</div>';
+
+  let html = '<div class="card" style="margin-bottom:16px;">'
+    + '<div class="card-header"><span class="card-title">🔮 Agle Quarter Ka Projection</span>'
+    + '<span style="font-size:12px;color:var(--text-muted);">'
+    + P.months.map(m => m.name).join(' · ') + ' ' + P.months[0].year + '</span></div>'
+    + '<div class="card-body">'
+
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">'
+    + 'Do period ke comparison se banaya gaya hai. Period-over-period growth <strong>'
+    + (g >= 0 ? '+' : '') + g + '%</strong> thi. Neeche teen scenario diye gaye hain — '
+    + 'ek number ke bajaye <strong>range</strong> dekhna zyada sahi hai.</div>'
+
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+    + card(cons, 'var(--text-muted)', false)
+    + card(base, 'var(--secondary)', true)
+    + card(opti, 'var(--green)', false)
+    + '</div>'
+
+    // month-wise
+    + '<div class="table-wrap"><table><thead><tr>'
+    + '<th>MAHINA</th><th>DIN</th><th>CONSERVATIVE</th><th>BASE</th><th>OPTIMISTIC</th><th>SEASON</th>'
+    + '</tr></thead><tbody>'
+    + P.months.map((m, i) =>
+        '<tr><td><strong>' + m.name + ' ' + m.year + '</strong></td>'
+        + '<td style="text-align:center;">' + m.days + '</td>'
+        + '<td>' + gcR(cons.months[i].sales) + '</td>'
+        + '<td style="font-weight:700;">' + gcR(base.months[i].sales) + '</td>'
+        + '<td>' + gcR(opti.months[i].sales) + '</td>'
+        + '<td style="text-align:center;font-size:11px;color:'
+        + (m.season >= 1.2 ? 'var(--green)' : m.season < 0.98 ? 'var(--red)' : 'var(--text-muted)') + ';">'
+        + (m.season >= 1.2 ? '🎉 ' : '') + Math.round(m.season * 100) + '%</td></tr>').join('')
+    + '<tr style="border-top:2px solid var(--border);font-weight:800;">'
+    + '<td>QUARTER TOTAL</td><td style="text-align:center;">'
+    + P.months.reduce((s, m) => s + m.days, 0) + '</td>'
+    + '<td>' + gcR(cons.total) + '</td>'
+    + '<td style="color:var(--secondary);">' + gcR(base.total) + '</td>'
+    + '<td>' + gcR(opti.total) + '</td><td></td></tr>'
+    + '</tbody></table></div>'
+
+    // what it means
+    + '<div style="margin-top:14px;padding:11px 13px;background:var(--bg);border-radius:8px;">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:5px;">📌 Iska matlab</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);line-height:1.6;">'
+    + 'Abhi ka run-rate <strong>' + gcR(P.drrB) + '/din</strong> hai. '
+    + 'Agar kuch na badla to agle quarter me <strong>' + gcR(cons.total) + '</strong> hoga. '
+    + 'Base case <strong>' + gcR(base.total) + '</strong> hai — matlab '
+    + '<strong>' + gcR(base.total - cons.total) + '</strong> ka extra, jo growth aur season se aayega. '
+    + 'Target rakhna ho to base case pe rakho, optimistic pe nahi.'
+    + '</div></div>';
+
+  // warnings — bharose ki hadd
+  if (P.warns.length) {
+    html += '<div style="margin-top:12px;padding:11px 13px;background:#fff8e7;border-left:3px solid var(--amber);border-radius:0 7px 7px 0;">'
+      + '<div style="font-weight:700;font-size:12px;margin-bottom:5px;">⚠️ Dhyan rakhne wali baatein</div>'
+      + P.warns.map(w => '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">• ' + gcEsc(w) + '</div>').join('')
+      + '</div>';
+  }
+
+  html += '<div style="margin-top:10px;font-size:10.5px;color:var(--text-muted);font-style:italic;">'
+    + 'Note: sirf do period ke data se projection bana hai. Jitne zyada mahine ka data hoga, '
+    + 'projection utna sahi hoga. Ise target set karne ke liye use karo, guarantee ke roop me nahi.'
+    + '</div></div></div>';
+
+  return html;
+}
+
 // ─── RESULTS RENDER ───────────────────────────────────────────────
 function gcDestroyCharts() {
   Object.values(_gc.charts || {}).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -12345,6 +12960,7 @@ function gcRenderResults() {
     html += '</div>';
   }
 
+  html += gcProjectionHtml();
   html += gcWorkHtml(_gc.work, R);
   html += gcActionHtml(gcActionPlan(R), isAmz);
 
@@ -12477,13 +13093,17 @@ function gcExportExcel() {
   const spec = gcMetricSpec(R);
   const plan = gcActionPlan(R);
   const wb = XLSX.utils.book_new();
-  const add = (name, aoa) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), name.slice(0, 31));
+  let _sh = 0;
+  const add = (name, aoa) => {
+    _sh++;
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), (_sh + '. ' + name).slice(0, 31));
+  };
 
   const mrow = s => [s.label, Math.round(s.d.a * 100) / 100, Math.round(s.d.b * 100) / 100,
                      Math.round(s.d.diff * 100) / 100, gcChgStr(s.d)];
   const head = ['Metric', 'Period A', 'Period B', 'Change', 'Change %'];
 
-  add('1. Summary', [
+  add('Summary', [
     ['GROWTH COMPARISON — ' + _gc.clientName],
     [(isAmz ? 'Amazon' : 'Flipkart') + ' · ' + (_gc.A.from || 'Period A') + ' to ' + (_gc.A.to || '')
       + '   vs   ' + (_gc.B.from || 'Period B') + ' to ' + (_gc.B.to || '')],
@@ -12496,7 +13116,7 @@ function gcExportExcel() {
     ...(spec.opt.length ? [[], ['OPTIMIZATION'], head, ...spec.opt.map(mrow)] : []),
   ]);
 
-  add('2. Revenue Bridge', [
+  add('Revenue Bridge', [
     ['REVENUE CHANGE — KAHAN SE AAYA'],
     ['Kaunsi cheez ne revenue kitna badla'], [],
     ['Driver', 'Impact (Rs)'],
@@ -12506,7 +13126,7 @@ function gcExportExcel() {
     ['= Net change', Math.round(R.wf.total)],
   ]);
 
-  add('3. Ad vs Organic', [
+  add('Ad vs Organic', [
     ['AD-DRIVEN vs ORGANIC REVENUE'], [],
     ['Period', 'Ad-driven (Rs)', 'Organic (Rs)', 'Total (Rs)', 'Ad share %'],
     ['Period A', Math.round(R.split.A.ad), Math.round(R.split.A.organic),
@@ -12516,7 +13136,7 @@ function gcExportExcel() {
   ]);
 
   const lbl = isAmz ? 'ASIN' : 'SKU';
-  add('4. Action Plan', [
+  add('Action Plan', [
     ['KAAM KI LIST — TOP 20 ' + lbl],
     ['Business impact ke hisaab se sorted'], [],
     ['Kab', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change %', 'Kya hua', 'Kya karna hai'],
@@ -12524,9 +13144,30 @@ function gcExportExcel() {
     ...plan.month.map(o => ['IS MAHINE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
   ]);
 
+  const PJ = gcProjection();
+  if (PJ) {
+    const [cn, bs, op] = PJ.scenarios;
+    add('Projection', [
+      ['NEXT QUARTER PROJECTION'],
+      ['Period-over-period growth: ' + (Math.round(PJ.growth * 1000) / 10) + '%'],
+      ['NOTE: 2 period ka base patla hai — range dekho, single number nahi.'], [],
+      ['Current run-rate (Rs/din)', Math.round(PJ.drrB)], [],
+      ['Month', 'Days', 'Conservative', 'Base', 'Optimistic', 'Season Index %'],
+      ...PJ.months.map((m, i) => [m.name + ' ' + m.year, m.days,
+        Math.round(cn.months[i].sales), Math.round(bs.months[i].sales),
+        Math.round(op.months[i].sales), Math.round(m.season * 100)]),
+      ['QUARTER TOTAL', PJ.months.reduce((s, m) => s + m.days, 0),
+        Math.round(cn.total), Math.round(bs.total), Math.round(op.total), ''],
+      [],
+      ['Scenario', 'Assumption'],
+      [cn.label, cn.note], [bs.label, bs.note], [op.label, op.note],
+      ...(PJ.warns.length ? [[], ['DHYAN RAKHNE WALI BAATEIN'], ...PJ.warns.map(w => [w])] : []),
+    ]);
+  }
+
   const W = _gc.work;
   if (W && !W.empty) {
-    add('5. Work Done', [
+    add('Work Done', [
       ['IS PERIOD ME KYA KAAM HUA'],
       [W.from + ' to ' + W.to],
       ['Note: sirf work summary — internal notes shaamil nahi'], [],
@@ -12553,7 +13194,7 @@ function gcExportExcel() {
     ]);
   }
 
-  add((W && !W.empty ? '6' : '5') + '. Item Movers', [
+  add('Item Movers', [
     ['TOP GAINERS'], [],
     ['#', lbl, 'Title', 'Period A (Rs)', 'Period B (Rs)', 'Change (Rs)', 'Change %'],
     ...R.asins.gainers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
@@ -12562,7 +13203,7 @@ function gcExportExcel() {
     ...R.asins.losers.map((x, i) => [i+1, x.id, x.title, Math.round(x.aSalesN), Math.round(x.bSalesN), Math.round(x.diff), x.pct]),
   ]);
 
-  add((W && !W.empty ? '7' : '6') + '. Insights', [
+  add('Insights', [
     ['INSIGHTS & RECOMMENDATIONS'], [],
     ['#', 'Heading', 'Detail'],
     ...R.verdict.map((v, i) => [i+1, v.head, v.text.replace(/\*\*/g, '')]),
@@ -12832,6 +13473,64 @@ async function gcExportPDF() {
     bucket(plan.week,  'IS HAFTE', RED,  'urgent - abhi dekho');
     bucket(plan.month, 'IS MAHINE', BLUE, 'plan karke karo');
     chrome();
+
+    // ══ PROJECTION ══
+    const PJ = gcProjection();
+    if (PJ) {
+      const [cn, bs, op] = PJ.scenarios;
+      doc.addPage(); header('Agle Quarter Ka Projection');
+      y = 92;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
+      const intro = doc.splitTextToSize(gcAscii(
+        'Do period ke comparison se banaya gaya. Period-over-period growth '
+        + (Math.round(PJ.growth*1000)/10) + '%. Ek number ke bajaye range dekhna zyada sahi hai.'), W - 2*Mg);
+      doc.text(intro, Mg, y); y += intro.length*12 + 8;
+
+      const cards = [[cn.label, cn.total, GREY], [bs.label, bs.total, GOLD], [op.label, op.total, GREEN]];
+      doc.setFillColor(248,249,250); doc.roundedRect(Mg, y, W - 2*Mg, 68, 6, 6, 'F');
+      const cw2 = (W - 2*Mg) / 3;
+      cards.forEach((cd, i) => {
+        const cx = Mg + cw2*i + cw2/2;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+        doc.text(cd[0].toUpperCase(), cx, y + 18, { align:'center' });
+        doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...cd[2]);
+        doc.text(gcAscii(gcFmtBy('money', cd[1])), cx, y + 42, { align:'center' });
+      });
+      y += 84;
+
+      y = table(y, ['MONTH','DAYS','CONSERVATIVE','BASE','OPTIMISTIC'],
+        PJ.months.map((m,i) => [m.name + ' ' + m.year, String(m.days),
+          gcAscii(gcFmtBy('money', cn.months[i].sales)),
+          gcAscii(gcFmtBy('money', bs.months[i].sales)),
+          gcAscii(gcFmtBy('money', op.months[i].sales))])
+          .concat([['QUARTER TOTAL', String(PJ.months.reduce((s,m)=>s+m.days,0)),
+            gcAscii(gcFmtBy('money', cn.total)),
+            gcAscii(gcFmtBy('money', bs.total)),
+            gcAscii(gcFmtBy('money', op.total))]]),
+        [150, 60, 105, 105, 95], [45,52,64]);
+
+      y += 14;
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+      doc.text('Iska matlab', Mg, y); y += 14;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(70,76,86);
+      const mean = doc.splitTextToSize(gcAscii(
+        'Abhi ka run-rate ' + gcFmtBy('money', PJ.drrB) + '/din hai. Agar kuch na badla to agle quarter me '
+        + gcFmtBy('money', cn.total) + ' hoga. Base case ' + gcFmtBy('money', bs.total)
+        + ' hai. Target base case pe rakho, optimistic pe nahi.'), W - 2*Mg);
+      doc.text(mean, Mg, y); y += mean.length*12 + 10;
+
+      if (PJ.warns.length) {
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK);
+        doc.text('Dhyan rakhne wali baatein', Mg, y); y += 13;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+        PJ.warns.forEach(wn => {
+          if (y > H - 70) { chrome(); doc.addPage(); header('Projection (contd.)'); y = 92; }
+          const ls = doc.splitTextToSize(gcAscii('- ' + wn), W - 2*Mg);
+          doc.text(ls, Mg, y); y += ls.length*11 + 3;
+        });
+      }
+      chrome();
+    }
 
     // ══ WORK DONE ══
     const WK = _gc.work;
@@ -17003,6 +17702,7 @@ async function renderReportAnalyzer() {
     + raUploadCard('advertised','📢', 'Advertised Product',      'ASIN-level ads perf',                 '.xlsx,.csv')
     + raUploadCard('searchterm','🔍', 'Search Term Report',      'Customer keywords',                   '.xlsx,.csv')
     + raUploadCard('inventory', '📦', 'Inventory Report',        'FBA stock levels',                    '.xlsx,.csv,.txt')
+    + raUploadCard('listing',   '📋', 'Category Listings Report','Title, bullets, keywords, MFN/FBA', '.xlsm,.xlsx,.csv')
     + raUploadCard('returns',   '🔄', 'Returns Report',          'Return reasons',                      '.tsv,.csv')
     + '</div>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
@@ -17035,6 +17735,16 @@ async function raHandleUpload(type, input) {
   const cardEl = document.getElementById('racard-'+type);
   statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
   try {
+    // Category Listings Report .xlsm hai — binary padhna padega
+    if (/\.(xlsm|xlsx|xls)$/i.test(file.name)) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array', bookVBA: false });
+      _ra[type] = { wb, filename: file.name };
+      statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
+      cardEl.style.borderColor = 'var(--green)';
+      cardEl.style.background = '#f0fff4';
+      return;
+    }
     const text = await new Promise((res, rej) => {
       const r = new FileReader();
       r.onload = e => res(e.target.result);
@@ -17050,10 +17760,982 @@ async function raHandleUpload(type, input) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// P&L CALCULATOR — seller ka asli profit/loss
+// Cost price seller daalta hai, baaki sab reports se aata hai.
+// Saare rates EDITABLE hain — Amazon fee structure badalta rehta hai,
+// aur referral fee category ke hisaab se 2%–17% tak alag hoti hai.
+// ══════════════════════════════════════════════════════════════════
+var _pl = {
+  costs: {},            // SKU -> cost price (seller enters)
+  rates: null,
+  rows: [],
+  showAll: false,
+};
+
+function plDefaultRates() {
+  return {
+    referral: 8,        // % of selling price — CATEGORY WISE ALAG, verify karo
+    closingMode: 'slab',// slab | flat
+    closingFlat: 25,
+    shipMode: 'easyship', // fba | easyship | selfship
+    shipFlat: 65,
+    gstOnFees: 18,      // % — Amazon ki fees pe GST
+    gstOnSale: 18,      // % — product ka GST (output tax)
+    tds: 0.1,           // % u/s 194-O — Oct 2024 se 0.1% (pehle 1% tha)
+    tcs: 0.5,           // % under GST — verify current rate
+    returnRate: null,   // null = reports se auto
+    returnCost: 60,     // ₹ per returned unit (reverse logistics)
+    packaging: 8,       // ₹ per unit
+    otherPct: 0,        // % misc
+  };
+}
+
+function plClosingFee(price, rates) {
+  if (rates.closingMode === 'flat') return rates.closingFlat;
+  if (price <= 250) return 5;
+  if (price <= 500) return 12;
+  if (price <= 1000) return 25;
+  return 45;
+}
+
+function plShipFee(item, rates) {
+  if (rates.shipMode === 'fba') return raFbaFee(item.weightG || 500, item.price || 0).fulfillment;
+  if (rates.shipMode === 'selfship') return 0;   // seller apna courier — otherPct me daale
+  return rates.shipFlat;                          // easy ship
+}
+
+// ─── BUILD P&L ────────────────────────────────────────────────────
+function plBuild() {
+  const rates = _pl.rates || (_pl.rates = plDefaultRates());
+  const listing = _ra.listingBySku || {};
+
+  // ASIN-level performance ko SKU pe laao
+  const bySku = {};
+  Object.values(_ra.asinMap || {}).forEach(a => {
+    if (a.asin === '_returns') return;
+    const sku = String(a.sku || a.asin || '').trim();
+    if (!sku) return;
+    const k = sku.toUpperCase();
+    const x = bySku[k] || (bySku[k] = {
+      sku, asin: a.asin || '', title: a.title || '',
+      units: 0, sales: 0, adSpend: 0, adSales: 0, returns: 0, sessions: 0,
+    });
+    x.units   += a.units   || 0;
+    x.sales   += a.sales   || 0;
+    x.adSpend += a.adSpend || 0;
+    x.adSales += a.adSales || 0;
+    x.returns += a.returns || 0;
+    x.sessions += a.sessions || 0;
+  });
+
+  const rows = Object.values(bySku).filter(x => x.units > 0 || x.sales > 0).map(x => {
+    const li = listing[x.sku.toUpperCase()] || {};
+    const units = x.units || 0;
+    const revenue = x.sales || 0;
+    const asp = units ? revenue / units : (li.price || 0);   // average selling price
+
+    // ── returns ──
+    const retUnits = rates.returnRate != null
+      ? Math.round(units * rates.returnRate / 100)
+      : (x.returns || 0);
+    const netUnits = Math.max(0, units - retUnits);
+    const returnRevLoss = retUnits * asp;                    // refund
+    const returnHandling = retUnits * rates.returnCost;      // reverse logistics
+
+    // ── cost of goods ──
+    const cost = _pl.costs[x.sku.toUpperCase()];
+    const hasCost = cost != null && cost !== '' && !isNaN(cost);
+    const cogs = hasCost ? netUnits * Number(cost) : null;
+
+    // ── Amazon fees (net units pe — return pe fee refund ho jaati hai,
+    //    par closing/shipping aksar nahi hoti; conservative rakhte hain) ──
+    const referral = revenue * rates.referral / 100;
+    const closing  = units * plClosingFee(asp, rates);
+    const shipping = units * plShipFee(li, rates);
+    const feeSubtotal = referral + closing + shipping;
+    const gstOnFees = feeSubtotal * rates.gstOnFees / 100;
+
+    // ── taxes deducted by Amazon ──
+    const tds = revenue * rates.tds / 100;
+    const tcs = revenue * rates.tcs / 100;
+
+    // ── seller ke apne kharche ──
+    const packaging = units * rates.packaging;
+    const adSpend = x.adSpend || 0;
+    const other = revenue * rates.otherPct / 100;
+
+    const totalDeductions = feeSubtotal + gstOnFees + tds + tcs
+                          + returnRevLoss + returnHandling + packaging + adSpend + other;
+    const netReceipt = revenue - totalDeductions;
+    const profit = hasCost ? netReceipt - cogs : null;
+    const margin = (hasCost && revenue) ? (profit / revenue * 100) : null;
+    const perUnit = (hasCost && netUnits) ? profit / netUnits : null;
+    const breakEven = hasCost && netUnits
+      ? (Number(cost) + (totalDeductions / Math.max(1, units)))
+      : null;
+
+    return {
+      ...x, li, asp, units, netUnits, retUnits, revenue,
+      cost: hasCost ? Number(cost) : null, hasCost, cogs,
+      referral, closing, shipping, feeSubtotal, gstOnFees,
+      tds, tcs, returnRevLoss, returnHandling, packaging, adSpend, other,
+      totalDeductions, netReceipt, profit, margin, perUnit, breakEven,
+      retPct: units ? retUnits / units * 100 : 0,
+      acos: x.adSales ? adSpend / x.adSales * 100 : (revenue ? adSpend / revenue * 100 : 0),
+    };
+  });
+
+  rows.sort((a, b) => b.revenue - a.revenue);
+  _pl.rows = rows;
+  return rows;
+}
+
+function plTotals(rows) {
+  const t = {
+    units: 0, netUnits: 0, retUnits: 0, revenue: 0, cogs: 0,
+    referral: 0, closing: 0, shipping: 0, gstOnFees: 0, tds: 0, tcs: 0,
+    returnRevLoss: 0, returnHandling: 0, packaging: 0, adSpend: 0, other: 0,
+    totalDeductions: 0, netReceipt: 0, profit: 0, withCost: 0,
+  };
+  rows.forEach(r => {
+    t.units += r.units; t.netUnits += r.netUnits; t.retUnits += r.retUnits;
+    t.revenue += r.revenue;
+    t.referral += r.referral; t.closing += r.closing; t.shipping += r.shipping;
+    t.gstOnFees += r.gstOnFees; t.tds += r.tds; t.tcs += r.tcs;
+    t.returnRevLoss += r.returnRevLoss; t.returnHandling += r.returnHandling;
+    t.packaging += r.packaging; t.adSpend += r.adSpend; t.other += r.other;
+    t.totalDeductions += r.totalDeductions; t.netReceipt += r.netReceipt;
+    if (r.hasCost) { t.cogs += r.cogs; t.profit += r.profit; t.withCost++; }
+  });
+  t.margin = t.revenue ? t.profit / t.revenue * 100 : 0;
+  t.coverage = rows.length ? t.withCost / rows.length * 100 : 0;
+  return t;
+}
+
+// ─── UI ───────────────────────────────────────────────────────────
+function plMoney(v) {
+  if (v == null || !isFinite(v)) return '—';
+  const a = Math.abs(v), s = v < 0 ? '-' : '';
+  if (a >= 1e7) return s + '₹' + (a/1e7).toFixed(2) + 'Cr';
+  if (a >= 1e5) return s + '₹' + (a/1e5).toFixed(2) + 'L';
+  return s + '₹' + Math.round(a).toLocaleString('en-IN');
+}
+
+function plSectionHtml() {
+  if (!_ra.asinMap || !Object.keys(_ra.asinMap).length) return '';
+  const rates = _pl.rates || (_pl.rates = plDefaultRates());
+  const rows = plBuild();
+  if (!rows.length) return '';
+  const t = plTotals(rows);
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const num = (id, label, val, step, suffix) =>
+    '<div><div style="font-size:9.5px;font-weight:700;color:var(--text-muted);">' + label + '</div>'
+    + '<div style="display:flex;align-items:center;gap:3px;">'
+    + '<input type="number" id="' + id + '" value="' + val + '" step="' + (step||'0.1') + '" '
+    + 'style="width:68px;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;" '
+    + 'onchange="plSetRate()">'
+    + '<span style="font-size:10px;color:var(--text-muted);">' + (suffix||'%') + '</span></div></div>';
+
+  let html = '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+    + '💰 Profit &amp; Loss</div>';
+
+  // ── rates panel ──
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">'
+    + '<div style="font-weight:700;font-size:12px;margin-bottom:8px;">⚙️ Rates — apne hisaab se badal lo</div>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
+    + num('pl-referral', 'Referral fee', rates.referral)
+    + num('pl-gstfees', 'GST on fees', rates.gstOnFees)
+    + num('pl-tds', 'TDS (194-O)', rates.tds, '0.01')
+    + num('pl-tcs', 'TCS (GST)', rates.tcs, '0.01')
+    + num('pl-retcost', 'Return cost', rates.returnCost, '1', '₹/unit')
+    + num('pl-pack', 'Packaging', rates.packaging, '1', '₹/unit')
+    + num('pl-other', 'Other', rates.otherPct)
+    + '<div><div style="font-size:9.5px;font-weight:700;color:var(--text-muted);">Shipping</div>'
+    + '<select id="pl-shipmode" onchange="plSetRate()" style="padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;">'
+    + '<option value="easyship"' + (rates.shipMode==='easyship'?' selected':'') + '>Easy Ship</option>'
+    + '<option value="fba"' + (rates.shipMode==='fba'?' selected':'') + '>FBA</option>'
+    + '<option value="selfship"' + (rates.shipMode==='selfship'?' selected':'') + '>Self Ship</option>'
+    + '</select></div>'
+    + (rates.shipMode === 'easyship' ? num('pl-shipflat', 'Ship cost', rates.shipFlat, '1', '₹/unit') : '')
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--text-muted);margin-top:8px;font-style:italic;">'
+    + 'Referral fee category ke hisaab se 2%–17% tak alag hoti hai — apni category ka rate Seller Central se dekh ke daalo. '
+    + 'TDS/TCS rates government change karti rehti hai, verify kar lena.</div>'
+    + '</div>';
+
+  // ── cost entry ──
+  const missing = rows.filter(r => !r.hasCost).length;
+  html += '<div style="background:' + (missing ? '#fff8e7' : '#f0fff4') + ';border-left:4px solid '
+    + (missing ? 'var(--amber)' : 'var(--green)') + ';border-radius:0 8px 8px 0;padding:11px 13px;margin-bottom:14px;">'
+    + '<div style="font-weight:700;font-size:12.5px;margin-bottom:4px;">'
+    + (missing ? '📝 ' + missing + ' SKU ka cost price daalna baaki hai' : '✅ Sabhi ' + rows.length + ' SKU ka cost price bhara hai')
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">'
+    + 'Cost price = product ka apna kharcha (manufacturing ya purchase). '
+    + 'Iske bina fees to dikh jayengi par asli profit nahi.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<button class="btn btn-sm btn-outline" onclick="plOpenCostEntry()">✏️ Cost Price Daalo</button>'
+    + '<button class="btn btn-sm btn-outline" onclick="plBulkCost()">⚡ Sabko ek hi % margin</button>'
+    + '<button class="btn btn-sm btn-outline" onclick="plExportExcel()">📥 Excel</button>'
+    + '</div></div>';
+
+  // ── waterfall summary ──
+  const line = (label, val, cls, note) =>
+    '<tr' + (cls === 'total' ? ' style="border-top:2px solid var(--border);font-weight:800;"' : '') + '>'
+    + '<td style="padding:5px 8px;font-size:12px;">' + label
+    + (note ? '<br><span style="font-size:9.5px;color:var(--text-muted);">' + note + '</span>' : '') + '</td>'
+    + '<td style="padding:5px 8px;text-align:right;font-size:12px;'
+    + (cls === 'neg' ? 'color:var(--red);' : cls === 'pos' ? 'color:var(--green);' : '') + '">'
+    + (cls === 'neg' ? '− ' : '') + plMoney(Math.abs(val)) + '</td>'
+    + '<td style="padding:5px 8px;text-align:right;font-size:11px;color:var(--text-muted);">'
+    + (t.revenue ? (val / t.revenue * 100).toFixed(1) + '%' : '—') + '</td></tr>';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:16px;">'
+    + '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;">'
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Breakdown — sab alag-alag</div>'
+    + '<table style="width:100%;border-collapse:collapse;"><tbody>'
+    + line('💵 Gross Revenue', t.revenue, 'pos')
+    + line('🏪 Referral / Commission', t.referral, 'neg', rates.referral + '% of sales')
+    + line('🧾 Closing Fee', t.closing, 'neg', 'price slab ke hisaab se')
+    + line('🚚 Shipping / Fulfilment', t.shipping, 'neg', rates.shipMode.toUpperCase())
+    + line('📊 GST on Amazon fees', t.gstOnFees, 'neg', rates.gstOnFees + '% of fees')
+    + line('🧮 TDS (194-O)', t.tds, 'neg', rates.tds + '% of sales')
+    + line('🧮 TCS (GST)', t.tcs, 'neg', rates.tcs + '% of sales')
+    + line('↩️ Return refunds', t.returnRevLoss, 'neg', t.retUnits + ' units wapas')
+    + line('📦 Return handling', t.returnHandling, 'neg', '₹' + rates.returnCost + '/unit')
+    + line('🎁 Packaging', t.packaging, 'neg', '₹' + rates.packaging + '/unit')
+    + line('📢 Ad Spend', t.adSpend, 'neg', 'ACOS ' + (t.revenue ? (t.adSpend/t.revenue*100).toFixed(1) : 0) + '% of sales')
+    + (t.other ? line('🔧 Other', t.other, 'neg') : '')
+    + line('= Net Receipt (COGS se pehle)', t.netReceipt, t.netReceipt >= 0 ? 'pos' : 'neg', 'total')
+    + (t.withCost ? line('🏭 COGS (' + t.withCost + '/' + rows.length + ' SKU)', t.cogs, 'neg') : '')
+    + (t.withCost ? line('= NET PROFIT', t.profit, t.profit >= 0 ? 'pos' : 'neg', 'total') : '')
+    + '</tbody></table></div>';
+
+  // ── KPI cards ──
+  const pc = t.profit >= 0 ? 'var(--green)' : 'var(--red)';
+  html += '<div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;">'
+    + gcKpiMini('Gross Revenue', plMoney(t.revenue))
+    + gcKpiMini('Total Deductions', plMoney(t.totalDeductions))
+    + gcKpiMini('Units (net)', String(t.netUnits))
+    + gcKpiMini('Return %', (t.units ? (t.retUnits/t.units*100).toFixed(1) : 0) + '%')
+    + '</div>'
+    + (t.withCost
+        ? '<div style="margin-top:10px;background:#fff;border:1px solid var(--border);border-left:4px solid ' + pc + ';border-radius:0 10px 10px 0;padding:13px;">'
+          + '<div style="font-size:11px;color:var(--text-muted);">NET ' + (t.profit >= 0 ? 'PROFIT' : 'LOSS') + '</div>'
+          + '<div style="font-size:26px;font-weight:800;color:' + pc + ';">' + plMoney(t.profit) + '</div>'
+          + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;">'
+          + 'Margin ' + t.margin.toFixed(1) + '% · ' + t.withCost + '/' + rows.length + ' SKU ka cost bhara hai'
+          + (t.coverage < 100 ? ' (baaki ka cost daalo to poora picture milega)' : '') + '</div></div>'
+        : '<div style="margin-top:10px;padding:13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 10px 10px 0;">'
+          + '<div style="font-size:12.5px;font-weight:700;">Cost price ke bina profit nahi nikal sakta</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">'
+          + 'Upar deductions sab dikh rahi hain. Net Receipt <strong>' + plMoney(t.netReceipt) + '</strong> hai — '
+          + 'isme se product cost ghatao to profit milega.</div></div>')
+    + '</div></div>';
+
+  // ── per SKU table ──
+  const show = _pl.showAll ? rows : rows.slice(0, 25);
+  html += '<div class="card"><div class="card-header">'
+    + '<span class="card-title">📋 SKU-wise P&amp;L</span>'
+    + '<span style="font-size:11px;color:var(--text-muted);">' + show.length + ' of ' + rows.length
+    + (rows.length > 25 ? ' · <a href="#" onclick="_pl.showAll=!_pl.showAll;raRenderResults();return false;">'
+        + (_pl.showAll ? 'kam dikhao' : 'sab dikhao') + '</a>' : '') + '</span></div>'
+    + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table><thead><tr>'
+    + '<th>SKU</th><th>Units</th><th>Revenue</th><th>Fees</th><th>Ads</th><th>Returns</th>'
+    + '<th>Cost</th><th>Profit</th><th>Margin</th><th>Break-even</th>'
+    + '</tr></thead><tbody>'
+    + show.map(r => {
+        const col = r.profit == null ? 'var(--text-muted)' : r.profit >= 0 ? 'var(--green)' : 'var(--red)';
+        return '<tr>'
+          + '<td><strong style="font-size:11px;">' + esc(r.sku) + '</strong><br>'
+          + '<span style="font-size:9.5px;color:var(--text-muted);">' + esc((r.title||'').slice(0,34)) + '</span></td>'
+          + '<td style="text-align:center;">' + r.units
+          + (r.retUnits ? '<br><span style="font-size:9px;color:var(--red);">-' + r.retUnits + '</span>' : '') + '</td>'
+          + '<td>' + plMoney(r.revenue) + '</td>'
+          + '<td>' + plMoney(r.feeSubtotal + r.gstOnFees + r.tds + r.tcs) + '</td>'
+          + '<td>' + plMoney(r.adSpend) + '</td>'
+          + '<td>' + plMoney(r.returnRevLoss + r.returnHandling) + '</td>'
+          + '<td>' + (r.hasCost
+              ? '₹' + r.cost + '<br><span style="font-size:9px;color:var(--text-muted);">' + plMoney(r.cogs) + '</span>'
+              : '<button class="btn btn-sm btn-outline" style="padding:2px 7px;font-size:10px;" onclick="plOpenCostEntry(\'' + esc(r.sku).replace(/'/g,"\\'") + '\')">daalo</button>') + '</td>'
+          + '<td style="font-weight:700;color:' + col + ';">' + (r.profit == null ? '—' : plMoney(r.profit)) + '</td>'
+          + '<td style="color:' + col + ';">' + (r.margin == null ? '—' : r.margin.toFixed(1) + '%') + '</td>'
+          + '<td style="font-size:11px;">' + (r.breakEven == null ? '—' : '₹' + Math.round(r.breakEven))
+          + (r.breakEven != null && r.asp ? '<br><span style="font-size:9px;color:'
+              + (r.asp > r.breakEven ? 'var(--green)' : 'var(--red)') + ';">bech rahe ₹' + Math.round(r.asp) + '</span>' : '')
+          + '</td></tr>';
+      }).join('')
+    + '</tbody></table></div></div></div>';
+
+  // ── loss makers ──
+  const losers = rows.filter(r => r.profit != null && r.profit < 0).sort((a,b) => a.profit - b.profit).slice(0, 10);
+  if (losers.length) {
+    html += '<div style="margin-top:14px;padding:12px 14px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;">'
+      + '<div style="font-weight:800;font-size:13px;color:var(--red);margin-bottom:7px;">'
+      + '🔻 ' + losers.length + ' SKU pe loss ho raha hai</div>'
+      + losers.map(r => {
+          const gap = r.breakEven - r.asp;
+          return '<div style="font-size:11.5px;padding:5px 0;border-bottom:1px solid #ffe0e0;">'
+            + '<strong>' + esc(r.sku) + '</strong> — ' + plMoney(r.profit) + ' loss ('
+            + r.margin.toFixed(1) + '% margin)<br>'
+            + '<span style="color:var(--text-muted);">👉 '
+            + (gap > 0
+                ? 'Price ₹' + Math.round(gap) + ' badhao (abhi ₹' + Math.round(r.asp) + ', break-even ₹' + Math.round(r.breakEven) + ')'
+                : r.adSpend > r.revenue * 0.3
+                  ? 'Ad spend ' + Math.round(r.adSpend/r.revenue*100) + '% of sales hai — bids kam karo'
+                  : r.retPct > 10
+                    ? 'Return rate ' + r.retPct.toFixed(0) + '% hai — quality/listing accuracy check karo'
+                    : 'Cost price ya fees review karo')
+            + '</span></div>';
+        }).join('')
+      + '</div>';
+  }
+
+  return html;
+}
+
+// ─── cost entry ───────────────────────────────────────────────────
+function plSetRate() {
+  const g = (id, def) => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : def; };
+  const r = _pl.rates;
+  r.referral   = g('pl-referral', r.referral);
+  r.gstOnFees  = g('pl-gstfees', r.gstOnFees);
+  r.tds        = g('pl-tds', r.tds);
+  r.tcs        = g('pl-tcs', r.tcs);
+  r.returnCost = g('pl-retcost', r.returnCost);
+  r.packaging  = g('pl-pack', r.packaging);
+  r.otherPct   = g('pl-other', r.otherPct);
+  r.shipFlat   = g('pl-shipflat', r.shipFlat);
+  const sm = document.getElementById('pl-shipmode');
+  if (sm) r.shipMode = sm.value;
+  raRenderResults();
+}
+
+function plOpenCostEntry(focusSku) {
+  const rows = _pl.rows.length ? _pl.rows : plBuild();
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const body = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">'
+    + 'Har SKU ka cost price (product ka apna kharcha) daalo. Khali chhod sakte ho — '
+    + 'jo bharoge unka profit dikhega.</div>'
+    + '<div style="max-height:52vh;overflow-y:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;"><thead><tr>'
+    + '<th style="text-align:left;font-size:11px;padding:5px;">SKU</th>'
+    + '<th style="text-align:right;font-size:11px;padding:5px;">Bech rahe</th>'
+    + '<th style="text-align:right;font-size:11px;padding:5px;">Cost ₹</th></tr></thead><tbody>'
+    + rows.map(r =>
+        '<tr' + (focusSku && r.sku === focusSku ? ' style="background:#fff8e7;"' : '') + '>'
+        + '<td style="padding:4px 5px;font-size:11px;"><strong>' + esc(r.sku) + '</strong><br>'
+        + '<span style="font-size:9.5px;color:var(--text-muted);">' + esc((r.title||'').slice(0,32)) + '</span></td>'
+        + '<td style="padding:4px 5px;text-align:right;font-size:11px;">₹' + Math.round(r.asp) + '</td>'
+        + '<td style="padding:4px 5px;text-align:right;">'
+        + '<input type="number" data-sku="' + esc(r.sku) + '" class="pl-cost-in" '
+        + 'value="' + (r.hasCost ? r.cost : '') + '" placeholder="—" '
+        + 'style="width:78px;padding:3px 6px;font-size:11px;text-align:right;border:1px solid var(--border);border-radius:5px;"></td>'
+        + '</tr>').join('')
+    + '</tbody></table></div>'
+    + '<div style="margin-top:12px;display:flex;gap:8px;">'
+    + '<button class="btn btn-primary" onclick="plSaveCosts()">Save</button>'
+    + '<button class="btn btn-outline" onclick="closePanel()">Cancel</button></div>';
+  openPanel('💰 Cost Price', body);
+}
+
+function plSaveCosts() {
+  document.querySelectorAll('.pl-cost-in').forEach(el => {
+    const sku = el.getAttribute('data-sku');
+    const v = el.value;
+    if (v === '' || isNaN(parseFloat(v))) delete _pl.costs[sku.toUpperCase()];
+    else _pl.costs[sku.toUpperCase()] = parseFloat(v);
+  });
+  closePanel();
+  showToast('Cost price save ho gaya', 'success');
+  raRenderResults();
+}
+
+function plBulkCost() {
+  const pct = prompt('Cost price selling price ka kitna % hai? (e.g. 60 matlab 40% gross margin)', '60');
+  if (pct == null) return;
+  const p = parseFloat(pct);
+  if (isNaN(p) || p <= 0 || p >= 100) { showToast('1 se 99 ke beech number daalo', 'error'); return; }
+  const rows = _pl.rows.length ? _pl.rows : plBuild();
+  rows.forEach(r => { if (r.asp) _pl.costs[r.sku.toUpperCase()] = Math.round(r.asp * p / 100); });
+  showToast(rows.length + ' SKU ka cost set ho gaya (' + p + '% of price) — zaroorat ho to edit kar lo', 'success');
+  raRenderResults();
+}
+
+// ─── Excel ────────────────────────────────────────────────────────
+function plExportExcel() {
+  const rows = _pl.rows.length ? _pl.rows : plBuild();
+  if (!rows.length) { showToast('Pehle analysis chalao', 'error'); return; }
+  const t = plTotals(rows);
+  const r8 = _pl.rates;
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['PROFIT & LOSS — ' + (_ra.clientName || 'Seller')],
+    ['Generated: ' + new Date().toLocaleDateString('en-IN')], [],
+    ['RATES USED'],
+    ['Referral fee %', r8.referral], ['GST on fees %', r8.gstOnFees],
+    ['TDS 194-O %', r8.tds], ['TCS GST %', r8.tcs],
+    ['Return cost/unit', r8.returnCost], ['Packaging/unit', r8.packaging],
+    ['Shipping mode', r8.shipMode], [],
+    ['SUMMARY', 'Amount', '% of revenue'],
+    ['Gross Revenue', Math.round(t.revenue), 100],
+    ['Referral / Commission', -Math.round(t.referral), -(t.referral/t.revenue*100).toFixed(1)],
+    ['Closing Fee', -Math.round(t.closing), -(t.closing/t.revenue*100).toFixed(1)],
+    ['Shipping / Fulfilment', -Math.round(t.shipping), -(t.shipping/t.revenue*100).toFixed(1)],
+    ['GST on fees', -Math.round(t.gstOnFees), -(t.gstOnFees/t.revenue*100).toFixed(1)],
+    ['TDS (194-O)', -Math.round(t.tds), -(t.tds/t.revenue*100).toFixed(1)],
+    ['TCS (GST)', -Math.round(t.tcs), -(t.tcs/t.revenue*100).toFixed(1)],
+    ['Return refunds', -Math.round(t.returnRevLoss), -(t.returnRevLoss/t.revenue*100).toFixed(1)],
+    ['Return handling', -Math.round(t.returnHandling), -(t.returnHandling/t.revenue*100).toFixed(1)],
+    ['Packaging', -Math.round(t.packaging), -(t.packaging/t.revenue*100).toFixed(1)],
+    ['Ad Spend', -Math.round(t.adSpend), -(t.adSpend/t.revenue*100).toFixed(1)],
+    ['Net Receipt', Math.round(t.netReceipt), (t.netReceipt/t.revenue*100).toFixed(1)],
+    ['COGS', -Math.round(t.cogs), -(t.cogs/t.revenue*100).toFixed(1)],
+    ['NET PROFIT', Math.round(t.profit), t.margin.toFixed(1)],
+  ]), 'Summary');
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['SKU-WISE P&L'], [],
+    ['SKU','Title','Units','Returned','Net Units','ASP','Revenue',
+     'Referral','Closing','Shipping','GST on Fees','TDS','TCS',
+     'Return Refund','Return Handling','Packaging','Ad Spend',
+     'Total Deductions','Net Receipt','Cost/unit','COGS','Profit','Margin %','Break-even'],
+    ...rows.map(r => [r.sku, r.title, r.units, r.retUnits, r.netUnits,
+      Math.round(r.asp), Math.round(r.revenue),
+      Math.round(r.referral), Math.round(r.closing), Math.round(r.shipping),
+      Math.round(r.gstOnFees), Math.round(r.tds), Math.round(r.tcs),
+      Math.round(r.returnRevLoss), Math.round(r.returnHandling),
+      Math.round(r.packaging), Math.round(r.adSpend),
+      Math.round(r.totalDeductions), Math.round(r.netReceipt),
+      r.hasCost ? r.cost : '', r.hasCost ? Math.round(r.cogs) : '',
+      r.profit == null ? '' : Math.round(r.profit),
+      r.margin == null ? '' : Number(r.margin.toFixed(1)),
+      r.breakEven == null ? '' : Math.round(r.breakEven)]),
+  ]), 'SKU-wise');
+
+  XLSX.writeFile(wb, 'PnL_' + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g,'_')
+    + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  showToast('P&L Excel download ho gayi!', 'success');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AI LISTING WRITER
+// Flagged listings ka content AI se banao → team review kare →
+// approve hue SKUs ka Amazon flat-file export.
+//
+// AI ka output SEEDHA Amazon pe nahi jata — review compulsory hai.
+// ══════════════════════════════════════════════════════════════════
+var _ai = {
+  status: null,      // { ready, maxBatch, limits }
+  queue: [],         // jo generate karne hain
+  results: {},       // sku -> generated
+  approved: {},      // sku -> true
+  busy: false,
+  progress: '',
+};
+
+async function aiCheckStatus() {
+  if (_ai.status) return _ai.status;
+  try {
+    const r = await api('GET', '/listing-ai/status?_=' + Date.now());
+    _ai.status = r || { ready: false };
+  } catch (e) {
+    _ai.status = { ready: false, error: e.message };
+  }
+  return _ai.status;
+}
+
+// bucket ke listings ko queue me daalo
+function aiQueueBucket(grade) {
+  const B = raListingBuckets(10);
+  const list = grade === 'low' ? B.low : grade === 'medium' ? B.medium : B.all;
+  _ai.queue = list.map(x => x.sku);
+  return aiRunGenerate();
+}
+
+function aiQueueOne(sku) {
+  _ai.queue = [sku];
+  return aiRunGenerate();
+}
+
+function aiPayloadFor(sku) {
+  const it = (_ra.listingBySku || {})[String(sku).toUpperCase()];
+  if (!it) return null;
+  const audit = raListingAudit().find(x => x.sku === it.sku);
+  const perf = Object.values(_ra.asinMap || {})
+    .find(a => a.sku && String(a.sku).toUpperCase() === String(sku).toUpperCase()) || {};
+  const kw = (_ra.keywordMap && perf.asin) ? (_ra.keywordMap[perf.asin] || []) : [];
+  return {
+    sku: it.sku,
+    name: it.name,
+    brand: it.brand,
+    ptype: it.ptype,
+    bullets: it.bullets,
+    desc: it.desc,
+    keywords: it.keywords,
+    price: it.price || it.mrp || 0,
+    searchTerms: kw,
+    issues: audit ? audit.issues.map(i => i.area + ': ' + i.what) : [],
+  };
+}
+
+async function aiRunGenerate() {
+  if (_ai.busy) { showToast('Pehle wala batch chal raha hai', 'error'); return; }
+  const st = await aiCheckStatus();
+  if (!st.ready) {
+    showToast('AI setup nahi hai — neeche instructions dekho', 'error');
+    _ai.status = st;
+    raRenderResults();
+    return;
+  }
+  const skus = _ai.queue.filter(s => !_ai.results[String(s).toUpperCase()]);
+  if (!skus.length) { showToast('Sab pehle se ban chuke hain', 'success'); return; }
+
+  _ai.busy = true;
+  const batch = st.maxBatch || 8;
+  let done = 0, failed = 0;
+
+  try {
+    for (let i = 0; i < skus.length; i += batch) {
+      const chunk = skus.slice(i, i + batch);
+      _ai.progress = 'Generate ho raha hai... ' + done + '/' + skus.length;
+      aiPaintProgress();
+
+      const items = chunk.map(aiPayloadFor).filter(Boolean);
+      if (!items.length) continue;
+
+      try {
+        const r = await api('POST', '/listing-ai/generate', { items });
+        if (r && Array.isArray(r.results)) {
+          r.results.forEach(res => {
+            _ai.results[String(res.sku).toUpperCase()] = res;
+          });
+          done += r.results.length;
+        } else if (r && r.error) {
+          failed += chunk.length;
+          showToast(r.error, 'error');
+          break;
+        }
+      } catch (e) {
+        failed += chunk.length;
+        showToast('Batch fail: ' + e.message, 'error');
+        break;
+      }
+    }
+  } finally {
+    _ai.busy = false;
+    _ai.progress = '';
+  }
+
+  showToast(done + ' listings ka content ban gaya' + (failed ? ' (' + failed + ' fail)' : '')
+    + ' — ab review karo', done ? 'success' : 'error');
+  raRenderResults();
+}
+
+function aiPaintProgress() {
+  const el = document.getElementById('ai-progress');
+  if (el) el.innerHTML = _ai.progress
+    ? '<span style="color:var(--amber);font-size:12px;">⏳ ' + _ai.progress + '</span>' : '';
+}
+
+function aiToggleApprove(sku) {
+  const k = String(sku).toUpperCase();
+  if (_ai.approved[k]) delete _ai.approved[k];
+  else _ai.approved[k] = true;
+  const badge = document.getElementById('ai-appr-' + k);
+  if (badge) {
+    badge.textContent = _ai.approved[k] ? '✅ Approved' : 'Approve karo';
+    badge.className = 'badge badge-' + (_ai.approved[k] ? 'green' : 'gray');
+  }
+  const cnt = document.getElementById('ai-appr-count');
+  if (cnt) cnt.textContent = Object.keys(_ai.approved).length;
+}
+
+function aiEditField(sku, field, idx, el) {
+  const k = String(sku).toUpperCase();
+  const r = _ai.results[k];
+  if (!r) return;
+  if (field === 'bullets' || field === 'keywords') r[field][idx] = el.value;
+  else r[field] = el.value;
+  const lim = (_ai.status && _ai.status.limits) || {};
+  const max = field === 'title' ? (lim.title || 200)
+            : field === 'bullets' ? (lim.bullet || 500)
+            : field === 'keywords' ? (lim.keyword || 250)
+            : (lim.description || 2000);
+  const c = document.getElementById('cnt-' + k + '-' + field + '-' + idx);
+  if (c) {
+    c.textContent = el.value.length + '/' + max;
+    c.style.color = el.value.length > max ? 'var(--red)' : 'var(--text-muted)';
+  }
+}
+
+// ─── UI ───────────────────────────────────────────────────────────
+function aiSectionHtml() {
+  if (!_ra.listingItems || !_ra.listingItems.length) return '';
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const st = _ai.status;
+  const results = Object.values(_ai.results);
+  const lim = (st && st.limits) || { title:200, bullet:500, keyword:250, description:2000 };
+
+  let html = '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+    + '✨ AI Listing Writer</div>';
+
+  // setup missing
+  if (st && !st.ready) {
+    return html + '<div style="padding:12px 14px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;">'
+      + '<div style="font-weight:700;font-size:13px;margin-bottom:5px;">⚙️ AI setup baaki hai</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);line-height:1.7;">'
+      + 'Railway dashboard → apna project → <strong>Variables</strong> → add karo:<br>'
+      + '<code style="background:#fff;padding:2px 6px;border-radius:4px;">ANTHROPIC_API_KEY</code> = aapki API key<br>'
+      + 'Phir redeploy karo. Key <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> se milegi.'
+      + (st.error ? '<br><span style="color:var(--red);">Error: ' + esc(st.error) + '</span>' : '')
+      + '</div></div>';
+  }
+
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:9px;">'
+    + 'AI title, 5 bullets, description aur 5 backend keyword slots banata hai — '
+    + 'Search Term report ke asli converting keywords use karke. '
+    + '<strong>Har listing review karo, phir approve karo.</strong> '
+    + 'Sirf approved listings hi export file me jayengi.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<button class="btn btn-primary btn-sm" onclick="aiQueueBucket(\'low\')">✨ Low wale banao</button>'
+    + '<button class="btn btn-outline btn-sm" onclick="aiQueueBucket(\'medium\')">✨ Medium wale banao</button>'
+    + '<span id="ai-progress"></span>'
+    + (results.length
+        ? '<span style="margin-left:auto;font-size:12px;">Approved: <strong id="ai-appr-count">'
+          + Object.keys(_ai.approved).length + '</strong> / ' + results.length + '</span>'
+          + '<button class="btn btn-primary btn-sm" onclick="aiExportFlatFile()">📥 Amazon Upload File</button>'
+          + '<button class="btn btn-outline btn-sm" onclick="aiExportReview()">📋 Review Sheet</button>'
+        : '')
+    + '</div></div>';
+
+  if (!results.length) return html;
+
+  // review cards
+  const fld = (sku, label, field, idx, val, max, rows) => {
+    const k = String(sku).toUpperCase();
+    const id = 'cnt-' + k + '-' + field + '-' + idx;
+    const over = String(val || '').length > max;
+    return '<div style="margin-bottom:7px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+      + '<span style="font-size:10px;font-weight:700;color:var(--text-muted);">' + label + '</span>'
+      + '<span id="' + id + '" style="font-size:9.5px;color:' + (over ? 'var(--red)' : 'var(--text-muted)') + ';">'
+      + String(val || '').length + '/' + max + '</span></div>'
+      + '<textarea rows="' + (rows || 2) + '" '
+      + 'oninput="aiEditField(\'' + esc(sku).replace(/'/g,"\\'") + '\',\'' + field + '\',' + idx + ',this)" '
+      + 'style="width:100%;font-size:11.5px;padding:5px 7px;border:1px solid var(--border);border-radius:5px;'
+      + 'font-family:inherit;resize:vertical;">' + esc(val || '') + '</textarea></div>';
+  };
+
+  results.forEach(r => {
+    const k = String(r.sku).toUpperCase();
+    const ok = !!_ai.approved[k];
+    html += '<div style="border:1px solid var(--border);border-left:4px solid '
+      + (ok ? 'var(--green)' : 'var(--secondary)') + ';border-radius:0 9px 9px 0;padding:12px 14px;margin-bottom:11px;background:#fff;">'
+      + '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
+      + '<strong style="font-size:12.5px;">' + esc(r.sku) + '</strong>'
+      + '<span style="font-size:11px;color:var(--text-muted);">' + esc((r.old.title || '').slice(0,44)) + '</span>'
+      + '<span id="ai-appr-' + k + '" class="badge badge-' + (ok ? 'green' : 'gray') + '" '
+      + 'style="margin-left:auto;cursor:pointer;" onclick="aiToggleApprove(\'' + esc(r.sku).replace(/'/g,"\\'") + '\')">'
+      + (ok ? '✅ Approved' : 'Approve karo') + '</span></div>'
+      + (r.notes ? '<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-bottom:8px;">'
+          + '💡 ' + esc(r.notes) + '</div>' : '')
+
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">'
+      // purana
+      + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:5px;">ABHI KYA HAI</div>'
+      + '<div style="font-size:11px;background:var(--bg);border-radius:6px;padding:8px;line-height:1.55;">'
+      + '<strong>Title:</strong> ' + esc(r.old.title || '(khali)') + '<br><br>'
+      + '<strong>Bullets:</strong> ' + (r.old.bullets.length
+          ? r.old.bullets.map((b,i) => (i+1) + '. ' + esc(b.slice(0,90))).join('<br>')
+          : '(khali)') + '<br><br>'
+      + '<strong>Keywords:</strong> ' + (r.old.keywords.length
+          ? esc(r.old.keywords.join(' | ').slice(0,140)) : '(khali)') + '<br><br>'
+      + '<strong>Description:</strong> ' + (r.old.description
+          ? esc(r.old.description.slice(0,180)) + '...' : '(khali)')
+      + '</div></div>'
+      // naya (editable)
+      + '<div><div style="font-size:10px;font-weight:700;color:var(--secondary);margin-bottom:5px;">'
+      + 'AI KA SUGGESTION — edit kar sakte ho</div>'
+      + fld(r.sku, 'TITLE', 'title', 0, r.title, lim.title, 3)
+      + r.bullets.map((b,i) => fld(r.sku, 'BULLET ' + (i+1), 'bullets', i, b, lim.bullet, 2)).join('')
+      + fld(r.sku, 'DESCRIPTION', 'description', 0, r.description, lim.description, 5)
+      + r.keywords.map((kk,i) => fld(r.sku, 'KEYWORD SLOT ' + (i+1), 'keywords', i, kk, lim.keyword, 2)).join('')
+      + '</div></div></div>';
+  });
+
+  html += '<div style="padding:10px 12px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;font-size:11.5px;">'
+    + '⚠️ <strong>Upload karne se pehle:</strong> har listing padho. AI kabhi-kabhi galat detail likh deta hai '
+    + '(size, material, quantity). Galat content se listing suppress ho sakti hai. '
+    + 'Amazon pe chhote batch me upload karke test karo, ek saath 200 nahi.</div>';
+
+  return html;
+}
+
+// ─── EXPORT: Amazon flat file ─────────────────────────────────────
+// Original Category Listings Report ki structure preserve karke sirf
+// approved SKUs ke values badalte hain — isse Amazon file accept karta hai.
+function aiExportFlatFile() {
+  const wb0 = _ra.listing && _ra.listing.wb;
+  if (!wb0) { showToast('Category Listings Report upload nahi hai', 'error'); return; }
+  const approved = Object.keys(_ai.approved);
+  if (!approved.length) { showToast('Pehle kuch listings approve karo', 'error'); return; }
+
+  const shName = wb0.SheetNames.indexOf('Template') >= 0 ? 'Template' : wb0.SheetNames[0];
+  const sh = gcFixRef(wb0.Sheets[shName]);
+  const raw = XLSX.utils.sheet_to_json(sh, { header: 1, defval: null });
+  if (raw.length < 6) { showToast('Template sheet padhi nahi ja rahi', 'error'); return; }
+
+  const disp = (raw[3] || []).map(x => String(x == null ? '' : x).trim());
+  const tech = (raw[4] || []).map(x => String(x == null ? '' : x).trim());
+  const findCol = (d, t) => {
+    for (let i = 0; i < disp.length; i++) if (d && d.test(disp[i])) return i;
+    for (let i = 0; i < tech.length; i++) if (t && t.test(tech[i])) return i;
+    return -1;
+  };
+  const findAll = (d, t) => {
+    const o = [];
+    for (let i = 0; i < Math.max(disp.length, tech.length); i++)
+      if ((d && d.test(disp[i] || '')) || (t && t.test(tech[i] || ''))) o.push(i);
+    return o;
+  };
+  const cSku   = findCol(/^SKU$/i, /contribution_sku/);
+  const cName  = findCol(/^Item Name$/i, /^item_name\[/);
+  const cDesc  = findCol(/^Product Description$/i, /^product_description\[/);
+  const cAct   = findCol(/^Listing Action$/i, /::record_action/);
+  const bCols  = findAll(/^Bullet Point$/i, /^bullet_point\[/);
+  const kCols  = findAll(/^Generic Keyword$/i, /^generic_keyword\[/);
+  if (cSku < 0) { showToast('SKU column nahi mila', 'error'); return; }
+
+  const want = {};
+  approved.forEach(k => { want[k] = true; });
+
+  // header rows waise ke waise, sirf approved rows rakho
+  const out = [raw[0] || [], raw[1] || [], raw[2] || [], raw[3] || [], raw[4] || []];
+  let changed = 0;
+  for (let i = 5; i < raw.length; i++) {
+    const r = (raw[i] || []).slice();
+    const sku = String(r[cSku] == null ? '' : r[cSku]).trim();
+    if (!sku || /^ABC123$/i.test(sku)) continue;
+    const k = sku.toUpperCase();
+    if (!want[k]) continue;
+    const g = _ai.results[k];
+    if (!g) continue;
+
+    if (cName >= 0 && g.title) r[cName] = g.title;
+    if (cDesc >= 0 && g.description) r[cDesc] = g.description;
+    bCols.forEach((c, j) => { if (g.bullets[j]) r[c] = g.bullets[j]; });
+    kCols.forEach((c, j) => { if (g.keywords[j]) r[c] = g.keywords[j]; });
+    if (cAct >= 0) r[cAct] = 'PartialUpdate';
+    out.push(r);
+    changed++;
+  }
+
+  if (!changed) { showToast('Koi row match nahi hui', 'error'); return; }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(out), 'Template');
+  XLSX.writeFile(wb, 'Amazon_Listing_Update_'
+    + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
+    + new Date().toISOString().slice(0, 10) + '.xlsx');
+  showToast(changed + ' listings ka upload file ready — Seller Central pe test karke chadhao', 'success');
+}
+
+// ─── EXPORT: human review sheet ───────────────────────────────────
+function aiExportReview() {
+  const results = Object.values(_ai.results);
+  if (!results.length) { showToast('Pehle content generate karo', 'error'); return; }
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['AI LISTING SUGGESTIONS — ' + (_ra.clientName || 'Seller')],
+    ['Generated: ' + new Date().toLocaleDateString('en-IN')],
+    ['Approved: ' + Object.keys(_ai.approved).length + ' / ' + results.length],
+    ['NOTE: Upload se pehle har listing verify karo — size, material, quantity galat na ho.'], [],
+    ['SKU', 'Approved', 'Field', 'Abhi kya hai', 'AI ka suggestion', 'Chars'],
+    ...results.flatMap(r => {
+      const ok = _ai.approved[String(r.sku).toUpperCase()] ? 'YES' : '';
+      const rows = [[r.sku, ok, 'Title', r.old.title || '', r.title, r.title.length]];
+      r.bullets.forEach((b, i) =>
+        rows.push(['', '', 'Bullet ' + (i+1), r.old.bullets[i] || '', b, b.length]));
+      rows.push(['', '', 'Description', (r.old.description || '').slice(0, 500), r.description, r.description.length]);
+      r.keywords.forEach((k, i) =>
+        rows.push(['', '', 'Keyword ' + (i+1), r.old.keywords[i] || '', k, k.length]));
+      if (r.notes) rows.push(['', '', 'AI notes', '', r.notes, '']);
+      rows.push(['', '', '', '', '', '']);
+      return rows;
+    }),
+  ]), 'Review');
+
+  XLSX.writeFile(wb, 'AI_Listing_Review_'
+    + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
+    + new Date().toISOString().slice(0, 10) + '.xlsx');
+  showToast('Review sheet download ho gayi', 'success');
+}
+
+// ─── LISTING SECTIONS (Category Listings Report se) ──────────────
+function raListingSectionsHtml() {
+  const S = _ra.listingSummary;
+  if (!S) return '';
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  let html = '';
+
+  // ── health strip ──
+  html += '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+    + '📋 Listing Health — ' + S.total + ' listings</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">'
+    + 'Data source: <strong>Category Listings Report</strong> (Seller Central → Inventory → '
+    + 'Inventory Reports → Category Listings Report)'
+    + (_ra.business ? ' + Business Report' : '')
+    + (_ra.searchterm ? ' + Search Term Report' : '')
+    + (!_ra.business || !_ra.searchterm
+        ? ' <span style="color:var(--amber);">— '
+          + [!_ra.business ? 'Business Report' : null, !_ra.searchterm ? 'Search Term Report' : null]
+              .filter(Boolean).join(' aur ')
+          + ' bhi upload karo to sales aur keyword suggestions bhi milengi.</span>'
+        : '')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;">'
+    + raSummaryCard('🚚','MFN', S.mfn, S.mfn > S.fba ? 'amber' : 'blue')
+    + raSummaryCard('📦','FBA', S.fba, 'green')
+    + raSummaryCard('🔑','No Backend KW', S.noKeywords, S.noKeywords ? 'red' : 'green')
+    + raSummaryCard('📝','<5 Bullets', S.shortBullets, S.shortBullets ? 'amber' : 'green')
+    + raSummaryCard('🏷️','On Sale', S.onSale, S.onSale < S.total * 0.2 ? 'amber' : 'green')
+    + raSummaryCard('⛔','MFN Qty=0', S.zeroQty, S.zeroQty ? 'red' : 'green')
+    + '</div>';
+
+  // sabse bada quick win — khali keyword slots
+  if (S.partialKeywords || S.noKeywords) {
+    const affected = S.noKeywords + S.partialKeywords;
+    html += '<div style="padding:11px 13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;margin-bottom:16px;font-size:12.5px;">'
+      + '<strong>🔑 Sabse bada quick win:</strong> ' + affected + ' listings (' + pct(affected, S.total) + '%) ke backend keyword slots '
+      + 'poore nahi bhare. Har listing me ' + S.kwSlots + ' slots hote hain, har slot ~250 characters. '
+      + 'Ye free SEO space hai — bharne me sirf bulk upload lagta hai, aur indexing turant improve hoti hai.</div>';
+  }
+
+  // ── FBA candidates ──
+  const fba = raFbaCandidates();
+  if (fba.length) {
+    const go = fba.filter(x => x.verdict === 'go');
+    const test = fba.filter(x => x.verdict === 'test');
+    const skip = fba.filter(x => x.verdict === 'skip');
+    html += '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+      + '📦 FBA Migration — Top ' + fba.length + ' MFN Products</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">'
+      + 'Sirf wahi products jinme FBA ki economics banti hai. '
+      + '<span style="color:var(--green);font-weight:700;">' + go.length + ' GO</span> · '
+      + '<span style="color:var(--amber);font-weight:700;">' + test.length + ' TEST</span> · '
+      + '<span style="color:var(--text-muted);font-weight:700;">' + skip.length + ' SKIP</span></div>'
+      + '<div class="table-wrap"><table><thead><tr>'
+      + '<th>SKU / Product</th><th>Units</th><th>Price</th><th>FBA Fee</th><th>Verdict</th><th>Kya karna hai</th>'
+      + '</tr></thead><tbody>'
+      + fba.map(x => {
+          const col = x.verdict === 'go' ? 'green' : x.verdict === 'test' ? 'amber' : 'gray';
+          const lbl = x.verdict === 'go' ? '✅ GO' : x.verdict === 'test' ? '🧪 TEST' : '⏭️ SKIP';
+          return '<tr>'
+            + '<td><strong style="font-size:11px;">' + esc(x.sku) + '</strong><br>'
+            + '<span style="font-size:10px;color:var(--text-muted);">' + esc(x.name.slice(0,44)) + '</span></td>'
+            + '<td style="text-align:center;">' + x.units + '</td>'
+            + '<td>₹' + Math.round(x.price) + '</td>'
+            + '<td>₹' + x.fee.total + '<br><span style="font-size:9px;color:var(--text-muted);">'
+            + Math.round(x.fee.total / (x.price || 1) * 100) + '% of price</span></td>'
+            + '<td><span class="badge badge-' + col + '">' + lbl + '</span></td>'
+            + '<td style="font-size:11px;">' + esc(x.why) + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>'
+      + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px;font-style:italic;">'
+      + 'FBA fee estimate hai (Standard size, local/regional). Exact fee Amazon ke current rate card se check karo.</div>';
+  }
+
+  // ── content audit — quality buckets ──
+  const B = raListingBuckets(10);
+  if (B.all.length) {
+    html += '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+      + '✍️ Listing Optimisation</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px;">'
+      + raSummaryCard('🔴','Low (0-39)', B.counts.low, B.counts.low ? 'red' : 'green')
+      + raSummaryCard('🟡','Medium (40-69)', B.counts.medium, B.counts.medium ? 'amber' : 'green')
+      + raSummaryCard('🟢','Good (70+)', B.counts.good, 'green')
+      + raSummaryCard('✅','No Issues', Math.max(0, B.counts.clean), 'blue')
+      + '</div>';
+
+    const bucketHtml = (list, title, colour, note) => {
+      if (!list.length) return '<div style="margin-bottom:14px;"><div style="font-weight:800;font-size:13px;color:' + colour + ';">'
+        + title + '</div><div style="font-size:12px;color:var(--text-muted);padding:8px;">Is bucket me koi listing nahi — achhi baat hai.</div></div>';
+      let s = '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">'
+        + '<span style="font-weight:800;font-size:13px;color:' + colour + ';">' + title + '</span>'
+        + '<span class="badge" style="background:' + colour + ';color:#fff;">' + list.length + ' dikhaye</span>'
+        + '<span style="font-size:11px;color:var(--text-muted);">' + note + '</span></div>';
+      list.forEach(x => {
+        const scoreCol = x.score >= 70 ? 'var(--green)' : x.score >= 40 ? 'var(--amber)' : 'var(--red)';
+        s += '<div style="border:1px solid var(--border);border-left:4px solid ' + scoreCol + ';border-radius:0 8px 8px 0;padding:11px 13px;margin-bottom:9px;background:#fff;">'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">'
+          + '<strong style="font-size:12px;">' + esc(x.sku) + '</strong>'
+          + '<span style="font-size:11px;color:var(--text-muted);">' + esc(x.name.slice(0,50)) + '</span>'
+          + '<span style="margin-left:auto;font-size:11px;font-weight:700;color:' + scoreCol + ';">Score ' + x.score + '/100</span>'
+          + '</div>'
+          + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:7px;">'
+          + 'Title ' + x.titleLen + ' chars · ' + x.bulletCount + '/5 bullets · Desc ' + x.descLen + ' chars · '
+          + x.keywords.length + '/' + x.keywordSlots + ' keyword slots'
+          + (x.sales ? ' · ' + gcR(x.sales) + ' sales' : ' · abhi sale nahi') + '</div>'
+          + x.issues.map(is =>
+              '<div style="padding:6px 9px;background:var(--bg);border-radius:6px;margin-bottom:5px;">'
+              + '<div style="font-size:11.5px;font-weight:700;">'
+              + (is.sev === 'high' ? '🔴' : '🟡') + ' ' + is.area + ' — ' + esc(is.what) + '</div>'
+              + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">👉 ' + esc(is.fix) + '</div></div>'
+            ).join('')
+          + '</div>';
+      });
+      return s;
+    };
+
+    html += bucketHtml(B.low, '🔴 LOW — Sabse pehle inpe kaam karo', 'var(--red)',
+                       'score 40 se neeche · revenue ke hisaab se sorted');
+    html += bucketHtml(B.medium, '🟡 MEDIUM — Iske baad ye', 'var(--amber)',
+                       'score 40-69 · thoda kaam bacha hai');
+    html += aiSectionHtml();
+  }
+
+  // ── discount / coupon ──
+  const plays = raPricingPlays();
+  if (plays.length) {
+    html += '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
+      + '🏷️ Discount &amp; Coupon Opportunities</div>'
+      + '<div class="table-wrap"><table><thead><tr>'
+      + '<th>SKU / Product</th><th>Sessions</th><th>CVR</th><th>Price</th><th>Suggestion</th>'
+      + '</tr></thead><tbody>'
+      + plays.map(x =>
+          '<tr><td><strong style="font-size:11px;">' + esc(x.sku) + '</strong><br>'
+          + '<span style="font-size:10px;color:var(--text-muted);">' + esc(x.name.slice(0,40)) + '</span></td>'
+          + '<td style="text-align:center;">' + x.sessions + '</td>'
+          + '<td style="text-align:center;">' + (x.cvr ? x.cvr.toFixed(1) + '%' : '—') + '</td>'
+          + '<td>₹' + Math.round(x.price || x.mrp) + (x.discPct ? '<br><span style="font-size:9px;color:var(--green);">' + x.discPct + '% off</span>' : '') + '</td>'
+          + '<td>' + x.plays.map(p =>
+              '<div style="margin-bottom:4px;"><span class="badge badge-' + (p.sev === 'high' ? 'red' : 'amber') + '" style="font-size:9px;">'
+              + esc(p.type) + '</span> <strong style="font-size:11px;">' + esc(p.what) + '</strong>'
+              + '<div style="font-size:10.5px;color:var(--text-muted);">' + esc(p.why) + '</div></div>').join('')
+          + '</td></tr>').join('')
+      + '</tbody></table></div>';
+  }
+
+  return html;
+}
+
 // ─── MAIN ANALYSIS ───────────────────────────────────────────────
 async function raRunAnalysis() {
   if (!_ra.client) { showToast('Pehle seller select karo!','error'); return; }
-  const hasData = ['business','targeting','advertised','searchterm','inventory','returns'].some(k => _ra[k]);
+  const hasData = ['business','targeting','advertised','searchterm','inventory','returns','listing'].some(k => _ra[k]);
   if (!hasData) { showToast('Pehle koi report upload karo!','error'); return; }
 
   document.getElementById('ra-results').innerHTML = '<div class="loading"><div class="spinner"></div> ASIN-level analysis chal rahi hai...</div>';
@@ -17072,6 +18754,8 @@ async function raRunAnalysis() {
   if (_ra.targeting)  raParseTargeting();
   if (_ra.searchterm) raParseSearchTerms();
   if (_ra.returns)    raParseReturns();
+  if (_ra.listing)    raParseListingDispatch();
+  _ra._topSkus = null;
 
   // Generate tasks per ASIN
   _ra.tasks = [];
@@ -17234,6 +18918,8 @@ function raParseSearchTerms() {
   });
 }
 
+function raParseListingDispatch() { try { raParseListing(); } catch (e) { console.warn('listing parse', e); } }
+
 function raParseReturns() {
   const text = _ra.returns.text;
   const rows = text.includes('\t') ? raTSV(text) : raCSV(text);
@@ -17266,7 +18952,14 @@ function raGenerateTasks() {
     // 1. Out of Stock — Smart MFN/FBA detection
     // If FBA stock = 0 BUT units sold > 0, likely seller is fulfilling via MFN
     // (selling but no FBA inventory = MFN seller fulfillment)
-    const isMFNSelling = (a.stock === 0 && a.units > 0);
+    // Category Listings Report se ASLI fulfillment channel — guess nahi.
+    // Pehle logic "FBA stock 0 + sale ho rahi" dekh ke MFN maan leta tha,
+    // jisse genuinely-MFN seller ke HAR product pe FBA suggest ho jata tha.
+    const li = _ra.listingBySku && a.sku ? _ra.listingBySku[String(a.sku).toUpperCase()] : null;
+    const knownFBA = li ? li.isFBA : null;
+    const isMFNSelling = knownFBA === true ? false
+                       : knownFBA === false ? (a.units > 0)
+                       : (a.stock === 0 && a.units > 0);
     const isTrueOOS = (a.stock === 0 && a.units === 0 && a.sessions > 0);
 
     if (isTrueOOS) {
@@ -17280,7 +18973,7 @@ function raGenerateTasks() {
         deadline: 1,
         metric: 'FBA Stock: 0 | Sessions: ' + a.sessions + ' | Units: 0',
       });
-    } else if (isMFNSelling && a.units >= 5) {
+    } else if (isMFNSelling && a.units >= 5 && raFbaWorthIt(a, li)) {
       // MFN selling well: 0 FBA stock, but selling units → migrate to FBA for better visibility
       _ra.tasks.push({
         asin: a.asin, title: a.title, sku: a.sku,
@@ -17583,6 +19276,9 @@ function raRenderResults() {
     + raSummaryCard('📋','Total Tasks',tasks.length,'green')
     + '</div>';
 
+  html += raListingSectionsHtml();
+  html += plSectionHtml();
+
   // Urgent section
   if (urgent.length) {
     html += '<div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:10px;padding:8px 12px;background:#fadbd8;border-radius:8px;">🚨 Urgent — Abhi Karo</div>';
@@ -17636,6 +19332,12 @@ function raRenderResults() {
   }
 
   document.getElementById('ra-results').innerHTML = html;
+  if (_ra.listingItems && _ra.listingItems.length && !_ai.status) {
+    aiCheckStatus().then(() => {
+      const cur = document.getElementById('ra-results');
+      if (cur && cur.innerHTML === html) raRenderResults();
+    });
+  }
 
   // Add PDF download button at top of results
   const resultsDiv = document.getElementById('ra-results');

@@ -17761,37 +17761,31 @@ async function raHandleUpload(type, input) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// P&L CALCULATOR — seller ka asli profit/loss
-// Cost price seller daalta hai, baaki sab reports se aata hai.
-// Saare rates EDITABLE hain — Amazon fee structure badalta rehta hai,
-// aur referral fee category ke hisaab se 2%–17% tak alag hoti hai.
+// EXPENSES SUMMARY
+// Seller ki sale pe Amazon + ads + returns kitna le ja rahe hain.
+// Product cost (COGS) yahan nahi hai — seller purchasing detail
+// share nahi karta, isliye Net Receipt tak hi jaate hain.
 // ══════════════════════════════════════════════════════════════════
-var _pl = {
-  costs: {},            // SKU -> cost price (seller enters)
-  rates: null,
-  rows: [],
-  showAll: false,
-};
+var _ex = { rates: null, rows: [], showAll: false };
 
-function plDefaultRates() {
+function exDefaultRates() {
   return {
     referral: 8,        // % of selling price — CATEGORY WISE ALAG, verify karo
-    closingMode: 'slab',// slab | flat
+    closingMode: 'slab',
     closingFlat: 25,
-    shipMode: 'easyship', // fba | easyship | selfship
+    shipMode: 'easyship',
     shipFlat: 65,
     gstOnFees: 18,      // % — Amazon ki fees pe GST
-    gstOnSale: 18,      // % — product ka GST (output tax)
-    tds: 0.1,           // % u/s 194-O — Oct 2024 se 0.1% (pehle 1% tha)
-    tcs: 0.5,           // % under GST — verify current rate
+    tds: 0.1,           // % u/s 194-O
+    tcs: 0.5,           // % under GST
     returnRate: null,   // null = reports se auto
-    returnCost: 60,     // ₹ per returned unit (reverse logistics)
-    packaging: 8,       // ₹ per unit
-    otherPct: 0,        // % misc
+    returnCost: 60,     // Rs per returned unit
+    packaging: 8,       // Rs per unit
+    otherPct: 0,
   };
 }
 
-function plClosingFee(price, rates) {
+function exClosingFee(price, rates) {
   if (rates.closingMode === 'flat') return rates.closingFlat;
   if (price <= 250) return 5;
   if (price <= 500) return 12;
@@ -17799,18 +17793,17 @@ function plClosingFee(price, rates) {
   return 45;
 }
 
-function plShipFee(item, rates) {
+function exShipFee(item, rates) {
   if (rates.shipMode === 'fba') return raFbaFee(item.weightG || 500, item.price || 0).fulfillment;
-  if (rates.shipMode === 'selfship') return 0;   // seller apna courier — otherPct me daale
-  return rates.shipFlat;                          // easy ship
+  if (rates.shipMode === 'selfship') return 0;
+  return rates.shipFlat;
 }
 
-// ─── BUILD P&L ────────────────────────────────────────────────────
-function plBuild() {
-  const rates = _pl.rates || (_pl.rates = plDefaultRates());
+// ─── BUILD ────────────────────────────────────────────────────────
+function exBuild() {
+  const rates = _ex.rates || (_ex.rates = exDefaultRates());
   const listing = _ra.listingBySku || {};
 
-  // ASIN-level performance ko SKU pe laao
   const bySku = {};
   Object.values(_ra.asinMap || {}).forEach(a => {
     if (a.asin === '_returns') return;
@@ -17821,8 +17814,8 @@ function plBuild() {
       sku, asin: a.asin || '', title: a.title || '',
       units: 0, sales: 0, adSpend: 0, adSales: 0, returns: 0, sessions: 0,
     });
-    x.units   += a.units   || 0;
-    x.sales   += a.sales   || 0;
+    x.units += a.units || 0;
+    x.sales += a.sales || 0;
     x.adSpend += a.adSpend || 0;
     x.adSales += a.adSales || 0;
     x.returns += a.returns || 0;
@@ -17833,88 +17826,64 @@ function plBuild() {
     const li = listing[x.sku.toUpperCase()] || {};
     const units = x.units || 0;
     const revenue = x.sales || 0;
-    const asp = units ? revenue / units : (li.price || 0);   // average selling price
+    const asp = units ? revenue / units : (li.price || 0);
 
-    // ── returns ──
     const retUnits = rates.returnRate != null
       ? Math.round(units * rates.returnRate / 100)
       : (x.returns || 0);
-    const netUnits = Math.max(0, units - retUnits);
-    const returnRevLoss = retUnits * asp;                    // refund
-    const returnHandling = retUnits * rates.returnCost;      // reverse logistics
+    const returnRevLoss = retUnits * asp;
+    const returnHandling = retUnits * rates.returnCost;
 
-    // ── cost of goods ──
-    const cost = _pl.costs[x.sku.toUpperCase()];
-    const hasCost = cost != null && cost !== '' && !isNaN(cost);
-    const cogs = hasCost ? netUnits * Number(cost) : null;
-
-    // ── Amazon fees (net units pe — return pe fee refund ho jaati hai,
-    //    par closing/shipping aksar nahi hoti; conservative rakhte hain) ──
     const referral = revenue * rates.referral / 100;
-    const closing  = units * plClosingFee(asp, rates);
-    const shipping = units * plShipFee(li, rates);
+    const closing = units * exClosingFee(asp, rates);
+    const shipping = units * exShipFee(li, rates);
     const feeSubtotal = referral + closing + shipping;
     const gstOnFees = feeSubtotal * rates.gstOnFees / 100;
 
-    // ── taxes deducted by Amazon ──
     const tds = revenue * rates.tds / 100;
     const tcs = revenue * rates.tcs / 100;
 
-    // ── seller ke apne kharche ──
     const packaging = units * rates.packaging;
     const adSpend = x.adSpend || 0;
     const other = revenue * rates.otherPct / 100;
 
-    const totalDeductions = feeSubtotal + gstOnFees + tds + tcs
-                          + returnRevLoss + returnHandling + packaging + adSpend + other;
+    const amazonSide = feeSubtotal + gstOnFees + tds + tcs;
+    const returnSide = returnRevLoss + returnHandling;
+    const totalDeductions = amazonSide + returnSide + packaging + adSpend + other;
     const netReceipt = revenue - totalDeductions;
-    const profit = hasCost ? netReceipt - cogs : null;
-    const margin = (hasCost && revenue) ? (profit / revenue * 100) : null;
-    const perUnit = (hasCost && netUnits) ? profit / netUnits : null;
-    const breakEven = hasCost && netUnits
-      ? (Number(cost) + (totalDeductions / Math.max(1, units)))
-      : null;
 
     return {
-      ...x, li, asp, units, netUnits, retUnits, revenue,
-      cost: hasCost ? Number(cost) : null, hasCost, cogs,
-      referral, closing, shipping, feeSubtotal, gstOnFees,
-      tds, tcs, returnRevLoss, returnHandling, packaging, adSpend, other,
-      totalDeductions, netReceipt, profit, margin, perUnit, breakEven,
+      ...x, li, asp, units, retUnits, revenue,
+      referral, closing, shipping, feeSubtotal, gstOnFees, tds, tcs,
+      returnRevLoss, returnHandling, packaging, adSpend, other,
+      amazonSide, returnSide, totalDeductions, netReceipt,
+      netPct: revenue ? netReceipt / revenue * 100 : 0,
+      dedPct: revenue ? totalDeductions / revenue * 100 : 0,
       retPct: units ? retUnits / units * 100 : 0,
       acos: x.adSales ? adSpend / x.adSales * 100 : (revenue ? adSpend / revenue * 100 : 0),
     };
   });
 
   rows.sort((a, b) => b.revenue - a.revenue);
-  _pl.rows = rows;
+  _ex.rows = rows;
   return rows;
 }
 
-function plTotals(rows) {
-  const t = {
-    units: 0, netUnits: 0, retUnits: 0, revenue: 0, cogs: 0,
-    referral: 0, closing: 0, shipping: 0, gstOnFees: 0, tds: 0, tcs: 0,
-    returnRevLoss: 0, returnHandling: 0, packaging: 0, adSpend: 0, other: 0,
-    totalDeductions: 0, netReceipt: 0, profit: 0, withCost: 0,
-  };
+function exTotals(rows) {
+  const t = { units:0, retUnits:0, revenue:0, referral:0, closing:0, shipping:0,
+    gstOnFees:0, tds:0, tcs:0, returnRevLoss:0, returnHandling:0, packaging:0,
+    adSpend:0, other:0, amazonSide:0, returnSide:0, totalDeductions:0, netReceipt:0 };
   rows.forEach(r => {
-    t.units += r.units; t.netUnits += r.netUnits; t.retUnits += r.retUnits;
-    t.revenue += r.revenue;
-    t.referral += r.referral; t.closing += r.closing; t.shipping += r.shipping;
-    t.gstOnFees += r.gstOnFees; t.tds += r.tds; t.tcs += r.tcs;
-    t.returnRevLoss += r.returnRevLoss; t.returnHandling += r.returnHandling;
-    t.packaging += r.packaging; t.adSpend += r.adSpend; t.other += r.other;
-    t.totalDeductions += r.totalDeductions; t.netReceipt += r.netReceipt;
-    if (r.hasCost) { t.cogs += r.cogs; t.profit += r.profit; t.withCost++; }
+    ['units','retUnits','revenue','referral','closing','shipping','gstOnFees','tds','tcs',
+     'returnRevLoss','returnHandling','packaging','adSpend','other','amazonSide','returnSide',
+     'totalDeductions','netReceipt'].forEach(k => { t[k] += r[k] || 0; });
   });
-  t.margin = t.revenue ? t.profit / t.revenue * 100 : 0;
-  t.coverage = rows.length ? t.withCost / rows.length * 100 : 0;
+  t.netPct = t.revenue ? t.netReceipt / t.revenue * 100 : 0;
+  t.dedPct = t.revenue ? t.totalDeductions / t.revenue * 100 : 0;
   return t;
 }
 
-// ─── UI ───────────────────────────────────────────────────────────
-function plMoney(v) {
+function exMoney(v) {
   if (v == null || !isFinite(v)) return '—';
   const a = Math.abs(v), s = v < 0 ? '-' : '';
   if (a >= 1e7) return s + '₹' + (a/1e7).toFixed(2) + 'Cr';
@@ -17922,12 +17891,13 @@ function plMoney(v) {
   return s + '₹' + Math.round(a).toLocaleString('en-IN');
 }
 
-function plSectionHtml() {
+// ─── UI ───────────────────────────────────────────────────────────
+function exSectionHtml() {
   if (!_ra.asinMap || !Object.keys(_ra.asinMap).length) return '';
-  const rates = _pl.rates || (_pl.rates = plDefaultRates());
-  const rows = plBuild();
+  const rates = _ex.rates || (_ex.rates = exDefaultRates());
+  const rows = exBuild();
   if (!rows.length) return '';
-  const t = plTotals(rows);
+  const t = exTotals(rows);
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -17936,161 +17906,150 @@ function plSectionHtml() {
     + '<div style="display:flex;align-items:center;gap:3px;">'
     + '<input type="number" id="' + id + '" value="' + val + '" step="' + (step||'0.1') + '" '
     + 'style="width:68px;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;" '
-    + 'onchange="plSetRate()">'
+    + 'onchange="exSetRate()">'
     + '<span style="font-size:10px;color:var(--text-muted);">' + (suffix||'%') + '</span></div></div>';
 
   let html = '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
-    + '💰 Profit &amp; Loss</div>';
+    + '💸 Expenses Summary</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px;">'
+    + 'Sale se Amazon ki fees, taxes, returns aur ads nikaalne ke baad kitna haath me aata hai. '
+    + 'Product ka apna cost isme nahi hai — wo aapke paas hi rehta hai.</div>';
 
-  // ── rates panel ──
+  // rates
   html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">'
     + '<div style="font-weight:700;font-size:12px;margin-bottom:8px;">⚙️ Rates — apne hisaab se badal lo</div>'
     + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
-    + num('pl-referral', 'Referral fee', rates.referral)
-    + num('pl-gstfees', 'GST on fees', rates.gstOnFees)
-    + num('pl-tds', 'TDS (194-O)', rates.tds, '0.01')
-    + num('pl-tcs', 'TCS (GST)', rates.tcs, '0.01')
-    + num('pl-retcost', 'Return cost', rates.returnCost, '1', '₹/unit')
-    + num('pl-pack', 'Packaging', rates.packaging, '1', '₹/unit')
-    + num('pl-other', 'Other', rates.otherPct)
+    + num('ex-referral', 'Referral fee', rates.referral)
+    + num('ex-gstfees', 'GST on fees', rates.gstOnFees)
+    + num('ex-tds', 'TDS (194-O)', rates.tds, '0.01')
+    + num('ex-tcs', 'TCS (GST)', rates.tcs, '0.01')
+    + num('ex-retcost', 'Return cost', rates.returnCost, '1', '₹/unit')
+    + num('ex-pack', 'Packaging', rates.packaging, '1', '₹/unit')
+    + num('ex-other', 'Other', rates.otherPct)
     + '<div><div style="font-size:9.5px;font-weight:700;color:var(--text-muted);">Shipping</div>'
-    + '<select id="pl-shipmode" onchange="plSetRate()" style="padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;">'
+    + '<select id="ex-shipmode" onchange="exSetRate()" style="padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;">'
     + '<option value="easyship"' + (rates.shipMode==='easyship'?' selected':'') + '>Easy Ship</option>'
     + '<option value="fba"' + (rates.shipMode==='fba'?' selected':'') + '>FBA</option>'
     + '<option value="selfship"' + (rates.shipMode==='selfship'?' selected':'') + '>Self Ship</option>'
     + '</select></div>'
-    + (rates.shipMode === 'easyship' ? num('pl-shipflat', 'Ship cost', rates.shipFlat, '1', '₹/unit') : '')
+    + (rates.shipMode === 'easyship' ? num('ex-shipflat', 'Ship cost', rates.shipFlat, '1', '₹/unit') : '')
+    + '<button class="btn btn-sm btn-outline" style="margin-left:auto;" onclick="exExportExcel()">📥 Excel</button>'
     + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-top:8px;font-style:italic;">'
     + 'Referral fee category ke hisaab se 2%–17% tak alag hoti hai — apni category ka rate Seller Central se dekh ke daalo. '
-    + 'TDS/TCS rates government change karti rehti hai, verify kar lena.</div>'
+    + 'TDS/TCS rates government change karti rehti hai, verify kar lena.</div></div>';
+
+  // KPI
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:14px;">'
+    + gcKpiMini('Gross Revenue', exMoney(t.revenue))
+    + gcKpiMini('Total Deductions', exMoney(t.totalDeductions))
+    + gcKpiMini('Net Receipt', exMoney(t.netReceipt))
+    + gcKpiMini('Haath Me Aata Hai', t.netPct.toFixed(1) + '%')
     + '</div>';
 
-  // ── cost entry ──
-  const missing = rows.filter(r => !r.hasCost).length;
-  html += '<div style="background:' + (missing ? '#fff8e7' : '#f0fff4') + ';border-left:4px solid '
-    + (missing ? 'var(--amber)' : 'var(--green)') + ';border-radius:0 8px 8px 0;padding:11px 13px;margin-bottom:14px;">'
-    + '<div style="font-weight:700;font-size:12.5px;margin-bottom:4px;">'
-    + (missing ? '📝 ' + missing + ' SKU ka cost price daalna baaki hai' : '✅ Sabhi ' + rows.length + ' SKU ka cost price bhara hai')
-    + '</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">'
-    + 'Cost price = product ka apna kharcha (manufacturing ya purchase). '
-    + 'Iske bina fees to dikh jayengi par asli profit nahi.</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-    + '<button class="btn btn-sm btn-outline" onclick="plOpenCostEntry()">✏️ Cost Price Daalo</button>'
-    + '<button class="btn btn-sm btn-outline" onclick="plBulkCost()">⚡ Sabko ek hi % margin</button>'
-    + '<button class="btn btn-sm btn-outline" onclick="plExportExcel()">📥 Excel</button>'
-    + '</div></div>';
-
-  // ── waterfall summary ──
-  const line = (label, val, cls, note) =>
+  // breakdown
+  const line = (label, val, note, cls) =>
     '<tr' + (cls === 'total' ? ' style="border-top:2px solid var(--border);font-weight:800;"' : '') + '>'
     + '<td style="padding:5px 8px;font-size:12px;">' + label
     + (note ? '<br><span style="font-size:9.5px;color:var(--text-muted);">' + note + '</span>' : '') + '</td>'
     + '<td style="padding:5px 8px;text-align:right;font-size:12px;'
     + (cls === 'neg' ? 'color:var(--red);' : cls === 'pos' ? 'color:var(--green);' : '') + '">'
-    + (cls === 'neg' ? '− ' : '') + plMoney(Math.abs(val)) + '</td>'
+    + (cls === 'neg' ? '− ' : '') + exMoney(Math.abs(val)) + '</td>'
     + '<td style="padding:5px 8px;text-align:right;font-size:11px;color:var(--text-muted);">'
     + (t.revenue ? (val / t.revenue * 100).toFixed(1) + '%' : '—') + '</td></tr>';
 
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:16px;">'
     + '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;">'
-    + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Breakdown — sab alag-alag</div>'
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">Har kharcha alag-alag</div>'
     + '<table style="width:100%;border-collapse:collapse;"><tbody>'
-    + line('💵 Gross Revenue', t.revenue, 'pos')
-    + line('🏪 Referral / Commission', t.referral, 'neg', rates.referral + '% of sales')
-    + line('🧾 Closing Fee', t.closing, 'neg', 'price slab ke hisaab se')
-    + line('🚚 Shipping / Fulfilment', t.shipping, 'neg', rates.shipMode.toUpperCase())
-    + line('📊 GST on Amazon fees', t.gstOnFees, 'neg', rates.gstOnFees + '% of fees')
-    + line('🧮 TDS (194-O)', t.tds, 'neg', rates.tds + '% of sales')
-    + line('🧮 TCS (GST)', t.tcs, 'neg', rates.tcs + '% of sales')
-    + line('↩️ Return refunds', t.returnRevLoss, 'neg', t.retUnits + ' units wapas')
-    + line('📦 Return handling', t.returnHandling, 'neg', '₹' + rates.returnCost + '/unit')
-    + line('🎁 Packaging', t.packaging, 'neg', '₹' + rates.packaging + '/unit')
-    + line('📢 Ad Spend', t.adSpend, 'neg', 'ACOS ' + (t.revenue ? (t.adSpend/t.revenue*100).toFixed(1) : 0) + '% of sales')
-    + (t.other ? line('🔧 Other', t.other, 'neg') : '')
-    + line('= Net Receipt (COGS se pehle)', t.netReceipt, t.netReceipt >= 0 ? 'pos' : 'neg', 'total')
-    + (t.withCost ? line('🏭 COGS (' + t.withCost + '/' + rows.length + ' SKU)', t.cogs, 'neg') : '')
-    + (t.withCost ? line('= NET PROFIT', t.profit, t.profit >= 0 ? 'pos' : 'neg', 'total') : '')
+    + line('💵 Gross Revenue', t.revenue, '', 'pos')
+    + line('🏪 Referral / Commission', t.referral, rates.referral + '% of sales', 'neg')
+    + line('🧾 Closing Fee', t.closing, 'price slab ke hisaab se', 'neg')
+    + line('🚚 Shipping / Fulfilment', t.shipping, rates.shipMode.toUpperCase(), 'neg')
+    + line('📊 GST on Amazon fees', t.gstOnFees, rates.gstOnFees + '% of fees', 'neg')
+    + line('🧮 TDS (194-O)', t.tds, rates.tds + '% of sales', 'neg')
+    + line('🧮 TCS (GST)', t.tcs, rates.tcs + '% of sales', 'neg')
+    + line('↩️ Return refunds', t.returnRevLoss, t.retUnits + ' units wapas', 'neg')
+    + line('📦 Return handling', t.returnHandling, '₹' + rates.returnCost + '/unit', 'neg')
+    + line('🎁 Packaging', t.packaging, '₹' + rates.packaging + '/unit', 'neg')
+    + line('📢 Ad Spend', t.adSpend, 'TACOS ' + (t.revenue ? (t.adSpend/t.revenue*100).toFixed(1) : 0) + '%', 'neg')
+    + (t.other ? line('🔧 Other', t.other, '', 'neg') : '')
+    + line('= Net Receipt', t.netReceipt, 'product cost isme nahi hai', t.netReceipt >= 0 ? 'pos' : 'neg')
     + '</tbody></table></div>';
 
-  // ── KPI cards ──
-  const pc = t.profit >= 0 ? 'var(--green)' : 'var(--red)';
-  html += '<div>'
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;">'
-    + gcKpiMini('Gross Revenue', plMoney(t.revenue))
-    + gcKpiMini('Total Deductions', plMoney(t.totalDeductions))
-    + gcKpiMini('Units (net)', String(t.netUnits))
-    + gcKpiMini('Return %', (t.units ? (t.retUnits/t.units*100).toFixed(1) : 0) + '%')
-    + '</div>'
-    + (t.withCost
-        ? '<div style="margin-top:10px;background:#fff;border:1px solid var(--border);border-left:4px solid ' + pc + ';border-radius:0 10px 10px 0;padding:13px;">'
-          + '<div style="font-size:11px;color:var(--text-muted);">NET ' + (t.profit >= 0 ? 'PROFIT' : 'LOSS') + '</div>'
-          + '<div style="font-size:26px;font-weight:800;color:' + pc + ';">' + plMoney(t.profit) + '</div>'
-          + '<div style="font-size:11.5px;color:var(--text-muted);margin-top:3px;">'
-          + 'Margin ' + t.margin.toFixed(1) + '% · ' + t.withCost + '/' + rows.length + ' SKU ka cost bhara hai'
-          + (t.coverage < 100 ? ' (baaki ka cost daalo to poora picture milega)' : '') + '</div></div>'
-        : '<div style="margin-top:10px;padding:13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 10px 10px 0;">'
-          + '<div style="font-size:12.5px;font-weight:700;">Cost price ke bina profit nahi nikal sakta</div>'
-          + '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;">'
-          + 'Upar deductions sab dikh rahi hain. Net Receipt <strong>' + plMoney(t.netReceipt) + '</strong> hai — '
-          + 'isme se product cost ghatao to profit milega.</div></div>')
+  // kaun kitna le gaya
+  const share = [
+    ['Amazon (fees + tax)', t.amazonSide, 'var(--secondary)'],
+    ['Ads', t.adSpend, 'rgba(140,90,165,1)'],
+    ['Returns', t.returnSide, 'var(--red)'],
+    ['Packaging + other', t.packaging + t.other, 'var(--text-muted)'],
+    ['Aapke paas bacha', t.netReceipt, 'var(--green)'],
+  ];
+  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;">'
+    + '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">₹100 ki sale pe kya hota hai</div>'
+    + share.map(s => {
+        const pct = t.revenue ? s[1] / t.revenue * 100 : 0;
+        return '<div style="margin-bottom:9px;">'
+          + '<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;">'
+          + '<span>' + s[0] + '</span>'
+          + '<strong>₹' + pct.toFixed(1) + '</strong></div>'
+          + '<div style="height:9px;background:var(--border);border-radius:5px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + Math.max(0, Math.min(100, pct)) + '%;background:' + s[2] + ';"></div>'
+          + '</div></div>';
+      }).join('')
     + '</div></div>';
 
-  // ── per SKU table ──
-  const show = _pl.showAll ? rows : rows.slice(0, 25);
+  // SKU table
+  const show = _ex.showAll ? rows : rows.slice(0, 25);
   html += '<div class="card"><div class="card-header">'
-    + '<span class="card-title">📋 SKU-wise P&amp;L</span>'
+    + '<span class="card-title">📋 SKU-wise Expenses</span>'
     + '<span style="font-size:11px;color:var(--text-muted);">' + show.length + ' of ' + rows.length
-    + (rows.length > 25 ? ' · <a href="#" onclick="_pl.showAll=!_pl.showAll;raRenderResults();return false;">'
-        + (_pl.showAll ? 'kam dikhao' : 'sab dikhao') + '</a>' : '') + '</span></div>'
+    + (rows.length > 25 ? ' · <a href="#" onclick="_ex.showAll=!_ex.showAll;raRenderResults();return false;">'
+        + (_ex.showAll ? 'kam dikhao' : 'sab dikhao') + '</a>' : '') + '</span></div>'
     + '<div class="card-body" style="padding:0;"><div class="table-wrap"><table><thead><tr>'
-    + '<th>SKU</th><th>Units</th><th>Revenue</th><th>Fees</th><th>Ads</th><th>Returns</th>'
-    + '<th>Cost</th><th>Profit</th><th>Margin</th><th>Break-even</th>'
+    + '<th>SKU</th><th>Units</th><th>Revenue</th><th>Amazon Fees</th><th>Ads</th>'
+    + '<th>Returns</th><th>Total Out</th><th>Net Receipt</th><th>Net %</th>'
     + '</tr></thead><tbody>'
     + show.map(r => {
-        const col = r.profit == null ? 'var(--text-muted)' : r.profit >= 0 ? 'var(--green)' : 'var(--red)';
+        const col = r.netPct >= 40 ? 'var(--green)' : r.netPct >= 20 ? 'var(--amber)' : 'var(--red)';
         return '<tr>'
           + '<td><strong style="font-size:11px;">' + esc(r.sku) + '</strong><br>'
-          + '<span style="font-size:9.5px;color:var(--text-muted);">' + esc((r.title||'').slice(0,34)) + '</span></td>'
+          + '<span style="font-size:9.5px;color:var(--text-muted);">' + esc((r.title||'').slice(0,32)) + '</span></td>'
           + '<td style="text-align:center;">' + r.units
           + (r.retUnits ? '<br><span style="font-size:9px;color:var(--red);">-' + r.retUnits + '</span>' : '') + '</td>'
-          + '<td>' + plMoney(r.revenue) + '</td>'
-          + '<td>' + plMoney(r.feeSubtotal + r.gstOnFees + r.tds + r.tcs) + '</td>'
-          + '<td>' + plMoney(r.adSpend) + '</td>'
-          + '<td>' + plMoney(r.returnRevLoss + r.returnHandling) + '</td>'
-          + '<td>' + (r.hasCost
-              ? '₹' + r.cost + '<br><span style="font-size:9px;color:var(--text-muted);">' + plMoney(r.cogs) + '</span>'
-              : '<button class="btn btn-sm btn-outline" style="padding:2px 7px;font-size:10px;" onclick="plOpenCostEntry(\'' + esc(r.sku).replace(/'/g,"\\'") + '\')">daalo</button>') + '</td>'
-          + '<td style="font-weight:700;color:' + col + ';">' + (r.profit == null ? '—' : plMoney(r.profit)) + '</td>'
-          + '<td style="color:' + col + ';">' + (r.margin == null ? '—' : r.margin.toFixed(1) + '%') + '</td>'
-          + '<td style="font-size:11px;">' + (r.breakEven == null ? '—' : '₹' + Math.round(r.breakEven))
-          + (r.breakEven != null && r.asp ? '<br><span style="font-size:9px;color:'
-              + (r.asp > r.breakEven ? 'var(--green)' : 'var(--red)') + ';">bech rahe ₹' + Math.round(r.asp) + '</span>' : '')
-          + '</td></tr>';
+          + '<td>' + exMoney(r.revenue) + '</td>'
+          + '<td>' + exMoney(r.amazonSide) + '</td>'
+          + '<td>' + exMoney(r.adSpend) + '</td>'
+          + '<td>' + exMoney(r.returnSide) + '</td>'
+          + '<td>' + exMoney(r.totalDeductions) + '</td>'
+          + '<td style="font-weight:700;color:' + col + ';">' + exMoney(r.netReceipt) + '</td>'
+          + '<td style="color:' + col + ';">' + r.netPct.toFixed(1) + '%</td></tr>';
       }).join('')
     + '</tbody></table></div></div></div>';
 
-  // ── loss makers ──
-  const losers = rows.filter(r => r.profit != null && r.profit < 0).sort((a,b) => a.profit - b.profit).slice(0, 10);
-  if (losers.length) {
+  // red flags — cost ke bina bhi ye pakka loss hai
+  const bad = rows.filter(r => r.netReceipt <= 0 || r.netPct < 15)
+    .sort((a,b) => a.netPct - b.netPct).slice(0, 10);
+  if (bad.length) {
     html += '<div style="margin-top:14px;padding:12px 14px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;">'
       + '<div style="font-weight:800;font-size:13px;color:var(--red);margin-bottom:7px;">'
-      + '🔻 ' + losers.length + ' SKU pe loss ho raha hai</div>'
-      + losers.map(r => {
-          const gap = r.breakEven - r.asp;
+      + '🔻 ' + bad.length + ' SKU pe bahut kam bach raha hai</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">'
+      + 'Ye product cost se pehle ka number hai — matlab cost jodne ke baad aur bura hoga.</div>'
+      + bad.map(r => {
+          const why = r.netReceipt <= 0
+            ? 'Fees + ads + returns revenue se zyada hain'
+            : r.adSpend > r.revenue * 0.3
+              ? 'Ad spend ' + Math.round(r.adSpend/r.revenue*100) + '% of sales hai — bids kam karo'
+              : r.retPct > 10
+                ? 'Return rate ' + r.retPct.toFixed(0) + '% hai — quality ya listing accuracy check karo'
+                : r.asp < 250
+                  ? 'Price ₹' + Math.round(r.asp) + ' hai — fixed fees itni chhoti sale pe bhaari padti hain'
+                  : 'Fees zyada ja rahi hain — pricing review karo';
           return '<div style="font-size:11.5px;padding:5px 0;border-bottom:1px solid #ffe0e0;">'
-            + '<strong>' + esc(r.sku) + '</strong> — ' + plMoney(r.profit) + ' loss ('
-            + r.margin.toFixed(1) + '% margin)<br>'
-            + '<span style="color:var(--text-muted);">👉 '
-            + (gap > 0
-                ? 'Price ₹' + Math.round(gap) + ' badhao (abhi ₹' + Math.round(r.asp) + ', break-even ₹' + Math.round(r.breakEven) + ')'
-                : r.adSpend > r.revenue * 0.3
-                  ? 'Ad spend ' + Math.round(r.adSpend/r.revenue*100) + '% of sales hai — bids kam karo'
-                  : r.retPct > 10
-                    ? 'Return rate ' + r.retPct.toFixed(0) + '% hai — quality/listing accuracy check karo'
-                    : 'Cost price ya fees review karo')
-            + '</span></div>';
+            + '<strong>' + esc(r.sku) + '</strong> — ' + exMoney(r.revenue) + ' sale me se sirf '
+            + exMoney(r.netReceipt) + ' bacha (' + r.netPct.toFixed(1) + '%)<br>'
+            + '<span style="color:var(--text-muted);">👉 ' + why + '</span></div>';
         }).join('')
       + '</div>';
   }
@@ -18098,92 +18057,39 @@ function plSectionHtml() {
   return html;
 }
 
-// ─── cost entry ───────────────────────────────────────────────────
-function plSetRate() {
+function exSetRate() {
   const g = (id, def) => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : def; };
-  const r = _pl.rates;
-  r.referral   = g('pl-referral', r.referral);
-  r.gstOnFees  = g('pl-gstfees', r.gstOnFees);
-  r.tds        = g('pl-tds', r.tds);
-  r.tcs        = g('pl-tcs', r.tcs);
-  r.returnCost = g('pl-retcost', r.returnCost);
-  r.packaging  = g('pl-pack', r.packaging);
-  r.otherPct   = g('pl-other', r.otherPct);
-  r.shipFlat   = g('pl-shipflat', r.shipFlat);
-  const sm = document.getElementById('pl-shipmode');
+  const r = _ex.rates;
+  r.referral   = g('ex-referral', r.referral);
+  r.gstOnFees  = g('ex-gstfees', r.gstOnFees);
+  r.tds        = g('ex-tds', r.tds);
+  r.tcs        = g('ex-tcs', r.tcs);
+  r.returnCost = g('ex-retcost', r.returnCost);
+  r.packaging  = g('ex-pack', r.packaging);
+  r.otherPct   = g('ex-other', r.otherPct);
+  r.shipFlat   = g('ex-shipflat', r.shipFlat);
+  const sm = document.getElementById('ex-shipmode');
   if (sm) r.shipMode = sm.value;
   raRenderResults();
 }
 
-function plOpenCostEntry(focusSku) {
-  const rows = _pl.rows.length ? _pl.rows : plBuild();
-  const esc = s => String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const body = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">'
-    + 'Har SKU ka cost price (product ka apna kharcha) daalo. Khali chhod sakte ho — '
-    + 'jo bharoge unka profit dikhega.</div>'
-    + '<div style="max-height:52vh;overflow-y:auto;">'
-    + '<table style="width:100%;border-collapse:collapse;"><thead><tr>'
-    + '<th style="text-align:left;font-size:11px;padding:5px;">SKU</th>'
-    + '<th style="text-align:right;font-size:11px;padding:5px;">Bech rahe</th>'
-    + '<th style="text-align:right;font-size:11px;padding:5px;">Cost ₹</th></tr></thead><tbody>'
-    + rows.map(r =>
-        '<tr' + (focusSku && r.sku === focusSku ? ' style="background:#fff8e7;"' : '') + '>'
-        + '<td style="padding:4px 5px;font-size:11px;"><strong>' + esc(r.sku) + '</strong><br>'
-        + '<span style="font-size:9.5px;color:var(--text-muted);">' + esc((r.title||'').slice(0,32)) + '</span></td>'
-        + '<td style="padding:4px 5px;text-align:right;font-size:11px;">₹' + Math.round(r.asp) + '</td>'
-        + '<td style="padding:4px 5px;text-align:right;">'
-        + '<input type="number" data-sku="' + esc(r.sku) + '" class="pl-cost-in" '
-        + 'value="' + (r.hasCost ? r.cost : '') + '" placeholder="—" '
-        + 'style="width:78px;padding:3px 6px;font-size:11px;text-align:right;border:1px solid var(--border);border-radius:5px;"></td>'
-        + '</tr>').join('')
-    + '</tbody></table></div>'
-    + '<div style="margin-top:12px;display:flex;gap:8px;">'
-    + '<button class="btn btn-primary" onclick="plSaveCosts()">Save</button>'
-    + '<button class="btn btn-outline" onclick="closePanel()">Cancel</button></div>';
-  openPanel('💰 Cost Price', body);
-}
-
-function plSaveCosts() {
-  document.querySelectorAll('.pl-cost-in').forEach(el => {
-    const sku = el.getAttribute('data-sku');
-    const v = el.value;
-    if (v === '' || isNaN(parseFloat(v))) delete _pl.costs[sku.toUpperCase()];
-    else _pl.costs[sku.toUpperCase()] = parseFloat(v);
-  });
-  closePanel();
-  showToast('Cost price save ho gaya', 'success');
-  raRenderResults();
-}
-
-function plBulkCost() {
-  const pct = prompt('Cost price selling price ka kitna % hai? (e.g. 60 matlab 40% gross margin)', '60');
-  if (pct == null) return;
-  const p = parseFloat(pct);
-  if (isNaN(p) || p <= 0 || p >= 100) { showToast('1 se 99 ke beech number daalo', 'error'); return; }
-  const rows = _pl.rows.length ? _pl.rows : plBuild();
-  rows.forEach(r => { if (r.asp) _pl.costs[r.sku.toUpperCase()] = Math.round(r.asp * p / 100); });
-  showToast(rows.length + ' SKU ka cost set ho gaya (' + p + '% of price) — zaroorat ho to edit kar lo', 'success');
-  raRenderResults();
-}
-
-// ─── Excel ────────────────────────────────────────────────────────
-function plExportExcel() {
-  const rows = _pl.rows.length ? _pl.rows : plBuild();
+function exExportExcel() {
+  const rows = _ex.rows.length ? _ex.rows : exBuild();
   if (!rows.length) { showToast('Pehle analysis chalao', 'error'); return; }
-  const t = plTotals(rows);
-  const r8 = _pl.rates;
+  const t = exTotals(rows);
+  const r8 = _ex.rates;
   const wb = XLSX.utils.book_new();
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['PROFIT & LOSS — ' + (_ra.clientName || 'Seller')],
-    ['Generated: ' + new Date().toLocaleDateString('en-IN')], [],
+    ['EXPENSES SUMMARY — ' + (_ra.clientName || 'Seller')],
+    ['Generated: ' + new Date().toLocaleDateString('en-IN')],
+    ['NOTE: Product cost (COGS) isme shaamil nahi hai. Net Receipt = sale minus Amazon fees, taxes, returns, ads.'], [],
     ['RATES USED'],
     ['Referral fee %', r8.referral], ['GST on fees %', r8.gstOnFees],
     ['TDS 194-O %', r8.tds], ['TCS GST %', r8.tcs],
     ['Return cost/unit', r8.returnCost], ['Packaging/unit', r8.packaging],
     ['Shipping mode', r8.shipMode], [],
-    ['SUMMARY', 'Amount', '% of revenue'],
+    ['LINE ITEM', 'Amount', '% of revenue'],
     ['Gross Revenue', Math.round(t.revenue), 100],
     ['Referral / Commission', -Math.round(t.referral), -(t.referral/t.revenue*100).toFixed(1)],
     ['Closing Fee', -Math.round(t.closing), -(t.closing/t.revenue*100).toFixed(1)],
@@ -18195,33 +18101,28 @@ function plExportExcel() {
     ['Return handling', -Math.round(t.returnHandling), -(t.returnHandling/t.revenue*100).toFixed(1)],
     ['Packaging', -Math.round(t.packaging), -(t.packaging/t.revenue*100).toFixed(1)],
     ['Ad Spend', -Math.round(t.adSpend), -(t.adSpend/t.revenue*100).toFixed(1)],
-    ['Net Receipt', Math.round(t.netReceipt), (t.netReceipt/t.revenue*100).toFixed(1)],
-    ['COGS', -Math.round(t.cogs), -(t.cogs/t.revenue*100).toFixed(1)],
-    ['NET PROFIT', Math.round(t.profit), t.margin.toFixed(1)],
+    ['TOTAL DEDUCTIONS', -Math.round(t.totalDeductions), -(t.dedPct).toFixed(1)],
+    ['NET RECEIPT', Math.round(t.netReceipt), t.netPct.toFixed(1)],
   ]), 'Summary');
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['SKU-WISE P&L'], [],
-    ['SKU','Title','Units','Returned','Net Units','ASP','Revenue',
+    ['SKU-WISE EXPENSES'], [],
+    ['SKU','Title','Units','Returned','ASP','Revenue',
      'Referral','Closing','Shipping','GST on Fees','TDS','TCS',
      'Return Refund','Return Handling','Packaging','Ad Spend',
-     'Total Deductions','Net Receipt','Cost/unit','COGS','Profit','Margin %','Break-even'],
-    ...rows.map(r => [r.sku, r.title, r.units, r.retUnits, r.netUnits,
-      Math.round(r.asp), Math.round(r.revenue),
+     'Amazon Side Total','Total Deductions','Net Receipt','Net %'],
+    ...rows.map(r => [r.sku, r.title, r.units, r.retUnits, Math.round(r.asp), Math.round(r.revenue),
       Math.round(r.referral), Math.round(r.closing), Math.round(r.shipping),
       Math.round(r.gstOnFees), Math.round(r.tds), Math.round(r.tcs),
       Math.round(r.returnRevLoss), Math.round(r.returnHandling),
       Math.round(r.packaging), Math.round(r.adSpend),
-      Math.round(r.totalDeductions), Math.round(r.netReceipt),
-      r.hasCost ? r.cost : '', r.hasCost ? Math.round(r.cogs) : '',
-      r.profit == null ? '' : Math.round(r.profit),
-      r.margin == null ? '' : Number(r.margin.toFixed(1)),
-      r.breakEven == null ? '' : Math.round(r.breakEven)]),
+      Math.round(r.amazonSide), Math.round(r.totalDeductions),
+      Math.round(r.netReceipt), Number(r.netPct.toFixed(1))]),
   ]), 'SKU-wise');
 
-  XLSX.writeFile(wb, 'PnL_' + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g,'_')
+  XLSX.writeFile(wb, 'Expenses_Summary_' + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g,'_')
     + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
-  showToast('P&L Excel download ho gayi!', 'success');
+  showToast('Expenses Summary download ho gayi!', 'success');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -19396,7 +19297,7 @@ function raRenderResults() {
     + '</div>';
 
   html += raListingSectionsHtml();
-  html += plSectionHtml();
+  html += exSectionHtml();
 
   // Urgent section
   if (urgent.length) {

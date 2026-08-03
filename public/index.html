@@ -18225,273 +18225,439 @@ function plExportExcel() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// AI LISTING WRITER
-// Flagged listings ka content AI se banao → team review kare →
-// approve hue SKUs ka Amazon flat-file export.
+// LISTING SUGGESTION ENGINE  (koi AI API nahi — sab apne data se)
 //
-// AI ka output SEEDHA Amazon pe nahi jata — review compulsory hai.
+// Kaam ka tarika: Search Term / Targeting report se ASLI converting
+// keywords nikalte hain, dekhte hain kaunse listing me pehle se nahi
+// hain, aur wahi suggest karte hain. Content invent nahi karte —
+// product ki detail (size, material) sirf seller ko pata hai.
 // ══════════════════════════════════════════════════════════════════
-var _ai = {
-  status: null,      // { ready, maxBatch, limits }
-  queue: [],         // jo generate karne hain
-  results: {},       // sku -> generated
-  approved: {},      // sku -> true
-  busy: false,
-  progress: '',
-};
 
-async function aiCheckStatus() {
-  if (_ai.status) return _ai.status;
-  try {
-    const r = await api('GET', '/listing-ai/status?_=' + Date.now());
-    _ai.status = r || { ready: false };
-  } catch (e) {
-    _ai.status = { ready: false, error: e.message };
-  }
-  return _ai.status;
+const LS_STOP = new Set(('a an the and or for with of to in on at by from is are be this that '
+  + 'it its as your you our we my me all new best top buy online india shop store amazon '
+  + 'free offer sale price cheap discount').split(' '));
+
+function lsWords(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z0-9\u0900-\u097F ]+/g, ' ')
+    .split(/\s+/).filter(w => w.length > 2 && !LS_STOP.has(w));
 }
 
-// bucket ke listings ko queue me daalo
-function aiQueueBucket(grade) {
-  const B = raListingBuckets(10);
-  const list = grade === 'low' ? B.low : grade === 'medium' ? B.medium : B.all;
-  _ai.queue = list.map(x => x.sku);
-  return aiRunGenerate();
-}
-
-function aiQueueOne(sku) {
-  _ai.queue = [sku];
-  return aiRunGenerate();
-}
-
-function aiPayloadFor(sku) {
-  const it = (_ra.listingBySku || {})[String(sku).toUpperCase()];
-  if (!it) return null;
-  const audit = raListingAudit().find(x => x.sku === it.sku);
-  const perf = Object.values(_ra.asinMap || {})
-    .find(a => a.sku && String(a.sku).toUpperCase() === String(sku).toUpperCase()) || {};
-  const kw = (_ra.keywordMap && perf.asin) ? (_ra.keywordMap[perf.asin] || []) : [];
-  return {
-    sku: it.sku,
-    name: it.name,
-    brand: it.brand,
-    ptype: it.ptype,
-    bullets: it.bullets,
-    desc: it.desc,
-    keywords: it.keywords,
-    price: it.price || it.mrp || 0,
-    searchTerms: kw,
-    issues: audit ? audit.issues.map(i => i.area + ': ' + i.what) : [],
+// ─── keyword pool — seller ke apne data se ────────────────────────
+function lsKeywordPool() {
+  const pool = {};
+  const add = (term, orders, conv, sales, asin) => {
+    const t = String(term || '').toLowerCase().trim();
+    if (!t || t.length < 3) return;
+    if (/^b0[a-z0-9]{8}$/i.test(t)) return;            // ASIN targeting, keyword nahi
+    const x = pool[t] || (pool[t] = { term: t, orders: 0, sales: 0, conv: 0, asins: {} });
+    x.orders += orders || 0;
+    x.sales += sales || 0;
+    x.conv = Math.max(x.conv, conv || 0);
+    if (asin) x.asins[asin] = true;
   };
+
+  const km = _ra.keywordMap || {};
+  (km._converting || []).forEach(k => add(k.term, k.orders, k.conv, k.sales));
+  Object.keys(km).forEach(key => {
+    if (key.charAt(0) === '_') return;
+    (km[key] || []).forEach(k => add(k.term, k.orders, k.conv, k.sales, key));
+  });
+
+  // Targeting report se bhi (agar upload hai)
+  if (_ra.targeting) {
+    try {
+      raCSV(_ra.targeting.text).forEach(r => {
+        const t = r['Targeting'] || r['Keyword Text'] || '';
+        const o = raNum(r['7 Day Total Orders (#)']);
+        const s = raNum(r['7 Day Total Sales (₹)']);
+        if (t && o > 0) add(t, o, 0, s, r['Advertised ASIN'] || '');
+      });
+    } catch (e) { /* optional */ }
+  }
+
+  return Object.values(pool)
+    .filter(k => k.orders > 0)
+    .sort((a, b) => b.orders - a.orders || b.sales - a.sales);
 }
 
-async function aiRunGenerate() {
-  if (_ai.busy) { showToast('Pehle wala batch chal raha hai', 'error'); return; }
-  const st = await aiCheckStatus();
-  if (!st.ready) {
-    showToast('AI setup nahi hai — neeche instructions dekho', 'error');
-    _ai.status = st;
-    raRenderResults();
-    return;
+// ─── ek listing ke liye relevant keywords ─────────────────────────
+function lsMatchFor(item, pool, perfAsin) {
+  const own = new Set(lsWords(item.name + ' ' + item.ptype + ' ' + item.brand));
+  const scored = pool.map(k => {
+    const kw = lsWords(k.term);
+    if (!kw.length) return null;
+    const hit = kw.filter(w => own.has(w)).length;
+    const overlap = hit / kw.length;
+    // same ASIN ka keyword ho to pakka relevant
+    const direct = perfAsin && k.asins[perfAsin] ? 1 : 0;
+    if (!direct && overlap < 0.34) return null;
+    return { ...k, relevance: direct ? 1 : overlap, direct: !!direct };
+  }).filter(Boolean);
+  scored.sort((a, b) => (b.direct - a.direct) || (b.orders - a.orders));
+  return scored;
+}
+
+// keyword listing me pehle se hai kya
+function lsAlreadyHas(item, term) {
+  const hay = (item.name + ' ' + item.bullets.join(' ') + ' ' + item.desc + ' '
+    + item.keywords.join(' ')).toLowerCase();
+  const kw = lsWords(term);
+  if (!kw.length) return true;
+  return kw.every(w => hay.indexOf(w) >= 0);
+}
+
+// backend keyword slots bharo — title/bullets ke words repeat mat karo
+function lsBuildSlots(item, matches, slotCount, slotMax) {
+  const visible = new Set(lsWords(item.name + ' ' + item.bullets.join(' ')));
+  const used = new Set();
+  const words = [];
+  matches.forEach(m => {
+    lsWords(m.term).forEach(w => {
+      if (visible.has(w) || used.has(w)) return;
+      used.add(w);
+      words.push(w);
+    });
+  });
+  // purane backend keywords bhi rakho (jo visible me nahi hain)
+  item.keywords.forEach(k => lsWords(k).forEach(w => {
+    if (visible.has(w) || used.has(w)) return;
+    used.add(w); words.push(w);
+  }));
+
+  const slots = [];
+  let cur = '';
+  words.forEach(w => {
+    if (slots.length >= slotCount) return;
+    const next = cur ? cur + ' ' + w : w;
+    if (next.length > slotMax) { slots.push(cur); cur = w; }
+    else cur = next;
+  });
+  if (cur && slots.length < slotCount) slots.push(cur);
+  return slots;
+}
+
+// ─── per-listing suggestions ──────────────────────────────────────
+function lsSuggestFor(item, pool, perf) {
+  const asin = perf && perf.asin ? perf.asin : '';
+  const matches = lsMatchFor(item, pool, asin);
+  const missing = matches.filter(m => !lsAlreadyHas(item, m.term));
+  const slotMax = 250;
+  const slotCount = item.keywordSlots || 5;
+
+  const s = { sku: item.sku, name: item.name, item, matches, missing, actions: [] };
+
+  // ── TITLE ──
+  const titleWords = new Set(lsWords(item.name));
+  const first80 = new Set(lsWords(String(item.name).slice(0, 80)));
+  const titleAdd = missing.filter(m => {
+    const kw = lsWords(m.term);
+    return kw.some(w => !titleWords.has(w));
+  }).slice(0, 4);
+  const notInFront = matches.filter(m => {
+    const kw = lsWords(m.term);
+    return kw.length && kw.every(w => titleWords.has(w)) && !kw.every(w => first80.has(w));
+  }).slice(0, 3);
+
+  if (item.titleLen > 200) {
+    s.actions.push({ area: 'Title', sev: 'high',
+      what: 'Title ' + item.titleLen + ' characters ka hai — 200 se aage truncate ho jata hai.',
+      how: 'Chhota karo. Pehle 80 characters me ye rakho: brand + main keyword + key feature. '
+         + 'Baaki detail bullets me daal do.' });
+  } else if (item.titleLen < 80) {
+    s.actions.push({ area: 'Title', sev: 'high',
+      what: 'Title sirf ' + item.titleLen + ' characters ka hai — 200 tak use kar sakte ho.',
+      how: 'Structure: Brand + Main keyword + Material/Type + Size/Quantity + Use-case.'
+         + (titleAdd.length ? ' Ye keywords daalo (aapke apne data me convert kar rahe hain): '
+             + titleAdd.map(m => m.term + ' (' + m.orders + ' orders)').join(', ') : '') });
+  } else if (titleAdd.length) {
+    s.actions.push({ area: 'Title', sev: 'medium',
+      what: 'Converting keywords title me nahi hain.',
+      how: 'Ye add karne layak hain: ' + titleAdd.map(m => m.term + ' (' + m.orders + ' orders)').join(', ')
+         + '. Title ' + item.titleLen + '/200 chars hai, jagah bachi hai.' });
   }
-  const skus = _ai.queue.filter(s => !_ai.results[String(s).toUpperCase()]);
-  if (!skus.length) { showToast('Sab pehle se ban chuke hain', 'success'); return; }
+  if (notInFront.length) {
+    s.actions.push({ area: 'Title', sev: 'medium',
+      what: 'Achhe keywords title me to hain par 80 characters ke baad.',
+      how: 'Mobile pe pehle ~80 characters hi dikhte hain. Ye aage laao: '
+         + notInFront.map(m => m.term).join(', ') });
+  }
 
-  _ai.busy = true;
-  const batch = st.maxBatch || 8;
-  let done = 0, failed = 0;
-
-  try {
-    for (let i = 0; i < skus.length; i += batch) {
-      const chunk = skus.slice(i, i + batch);
-      _ai.progress = 'Generate ho raha hai... ' + done + '/' + skus.length;
-      aiPaintProgress();
-
-      const items = chunk.map(aiPayloadFor).filter(Boolean);
-      if (!items.length) continue;
-
-      try {
-        const r = await api('POST', '/listing-ai/generate', { items });
-        if (r && Array.isArray(r.results)) {
-          r.results.forEach(res => {
-            _ai.results[String(res.sku).toUpperCase()] = res;
-          });
-          done += r.results.length;
-        } else if (r && r.error) {
-          failed += chunk.length;
-          showToast(r.error, 'error');
-          break;
-        }
-      } catch (e) {
-        failed += chunk.length;
-        showToast('Batch fail: ' + e.message, 'error');
-        break;
-      }
+  // ── BULLETS ──
+  if (item.bulletCount < 5) {
+    const need = 5 - item.bulletCount;
+    const angles = ['material aur build quality', 'size / quantity aur kis kaam aata hai',
+                    'kaise use karein ya care instructions', 'kis mauke pe / gifting',
+                    'warranty ya brand ka bharosa'];
+    s.actions.push({ area: 'Bullets', sev: item.bulletCount < 3 ? 'high' : 'medium',
+      what: item.bulletCount + '/5 bullets bhare hain — ' + need + ' khali.',
+      how: need + ' aur likho. Jo angles abhi miss hain: ' + angles.slice(item.bulletCount, 5).join('; ')
+         + '. Har bullet CAPS me benefit se shuru karo, phir 1-2 line detail.'
+         + (missing.length ? ' Inme ye keywords natural tarike se aa jayein: '
+             + missing.slice(0, 5).map(m => m.term).join(', ') : '') });
+  } else {
+    const shortB = item.bullets.filter(b => b.length < 100).length;
+    if (shortB >= 3) {
+      s.actions.push({ area: 'Bullets', sev: 'medium',
+        what: shortB + ' bullets 100 characters se chhote hain.',
+        how: 'Har bullet 150-250 characters karo — feature ke saath benefit bhi likho.'
+           + (missing.length ? ' Ye keywords weave kar sakte ho: '
+               + missing.slice(0, 4).map(m => m.term).join(', ') : '') });
     }
-  } finally {
-    _ai.busy = false;
-    _ai.progress = '';
   }
 
-  showToast(done + ' listings ka content ban gaya' + (failed ? ' (' + failed + ' fail)' : '')
-    + ' — ab review karo', done ? 'success' : 'error');
-  raRenderResults();
-}
-
-function aiPaintProgress() {
-  const el = document.getElementById('ai-progress');
-  if (el) el.innerHTML = _ai.progress
-    ? '<span style="color:var(--amber);font-size:12px;">⏳ ' + _ai.progress + '</span>' : '';
-}
-
-function aiToggleApprove(sku) {
-  const k = String(sku).toUpperCase();
-  if (_ai.approved[k]) delete _ai.approved[k];
-  else _ai.approved[k] = true;
-  const badge = document.getElementById('ai-appr-' + k);
-  if (badge) {
-    badge.textContent = _ai.approved[k] ? '✅ Approved' : 'Approve karo';
-    badge.className = 'badge badge-' + (_ai.approved[k] ? 'green' : 'gray');
+  // ── DESCRIPTION ──
+  if (!item.descLen) {
+    s.actions.push({ area: 'Description', sev: 'high',
+      what: 'Description bilkul khali hai.',
+      how: '800-1500 characters likho — product kya hai, kis kaam aata hai, kaise use karein, '
+         + 'care instructions, aur brand ke baare me 2 line.'
+         + (missing.length ? ' Keywords: ' + missing.slice(0, 6).map(m => m.term).join(', ') : '') });
+  } else if (item.descLen < 500) {
+    s.actions.push({ area: 'Description', sev: 'medium',
+      what: 'Description sirf ' + item.descLen + ' characters ka hai.',
+      how: '1000+ tak le jao. Use cases, care instructions aur brand story add karo.'
+         + (missing.length ? ' Keywords: ' + missing.slice(0, 5).map(m => m.term).join(', ') : '') });
   }
-  const cnt = document.getElementById('ai-appr-count');
-  if (cnt) cnt.textContent = Object.keys(_ai.approved).length;
+
+  // ── BACKEND KEYWORDS — ye ready-to-paste hai ──
+  const slots = lsBuildSlots(item, missing.length ? missing : matches, slotCount, slotMax);
+  s.slots = slots;
+  if (!item.keywords.length) {
+    s.actions.push({ area: 'Backend Keywords', sev: 'high',
+      what: 'Ek bhi backend search term nahi bhara — ' + slotCount + ' slots khali hain.',
+      how: slots.length
+        ? 'Neeche ready slots diye hain — seedha copy-paste karo.'
+        : 'Search Term report upload karo to yahan ready keywords mil jayenge.' });
+  } else if (item.keywords.length < slotCount) {
+    s.actions.push({ area: 'Backend Keywords', sev: 'medium',
+      what: item.keywords.length + '/' + slotCount + ' slots bhare hain.',
+      how: (slotCount - item.keywords.length) + ' slots khali hain — har slot ~250 characters ka '
+         + 'free SEO space hai.' });
+  } else if (missing.length) {
+    s.actions.push({ area: 'Backend Keywords', sev: 'medium',
+      what: missing.length + ' converting keywords listing me kahin nahi hain.',
+      how: 'Backend slots update karo — neeche ready version diya hai.' });
+  }
+
+  // ── CONVERSION ──
+  if (perf && perf.sessions >= 50 && perf.cvr > 0 && perf.cvr < 5) {
+    s.actions.push({ area: 'Conversion', sev: 'high',
+      what: perf.sessions + ' sessions par conversion sirf ' + perf.cvr.toFixed(1) + '% hai.',
+      how: 'Traffic aa raha hai par khareed nahi rahe — main image, price aur reviews check karo. '
+         + 'Content se pehle ye dekho.' });
+  }
+
+  s.score = Math.max(0, 100 - s.actions.reduce((t, a) => t + (a.sev === 'high' ? 20 : 10), 0));
+  s.grade = s.score < 40 ? 'low' : s.score < 70 ? 'medium' : 'good';
+  return s;
 }
 
-function aiEditField(sku, field, idx, el) {
-  const k = String(sku).toUpperCase();
-  const r = _ai.results[k];
-  if (!r) return;
-  if (field === 'bullets' || field === 'keywords') r[field][idx] = el.value;
-  else r[field] = el.value;
-  const lim = (_ai.status && _ai.status.limits) || {};
-  const max = field === 'title' ? (lim.title || 200)
-            : field === 'bullets' ? (lim.bullet || 500)
-            : field === 'keywords' ? (lim.keyword || 250)
-            : (lim.description || 2000);
-  const c = document.getElementById('cnt-' + k + '-' + field + '-' + idx);
-  if (c) {
-    c.textContent = el.value.length + '/' + max;
-    c.style.color = el.value.length > max ? 'var(--red)' : 'var(--text-muted)';
-  }
+function lsBuildAll() {
+  if (!_ra.listingItems || !_ra.listingItems.length) return null;
+  const pool = lsKeywordPool();
+  const perfBySku = {};
+  Object.values(_ra.asinMap || {}).forEach(a => {
+    if (a.sku) perfBySku[String(a.sku).toUpperCase()] = a;
+  });
+
+  const all = _ra.listingItems
+    .filter(x => /active/i.test(x.status))
+    .map(x => {
+      const perf = perfBySku[x.sku.toUpperCase()] || {};
+      const s = lsSuggestFor(x, pool, perf);
+      s.sales = perf.sales || 0;
+      s.units = perf.units || 0;
+      s.sessions = perf.sessions || 0;
+      return s;
+    })
+    .filter(s => s.actions.length);
+
+  const pick = g => all.filter(s => s.grade === g)
+    .sort((a, b) => (b.sales - a.sales) || (a.score - b.score)).slice(0, 10);
+
+  return {
+    pool, all,
+    low: pick('low'), medium: pick('medium'),
+    counts: {
+      low: all.filter(s => s.grade === 'low').length,
+      medium: all.filter(s => s.grade === 'medium').length,
+      good: all.filter(s => s.grade === 'good').length,
+      poolSize: pool.length,
+    },
+  };
 }
 
 // ─── UI ───────────────────────────────────────────────────────────
-function aiSectionHtml() {
-  if (!_ra.listingItems || !_ra.listingItems.length) return '';
+var _ls = { data: null, showAll: false };
+
+function lsSectionHtml() {
+  const D = lsBuildAll();
+  _ls.data = D;
+  if (!D || !D.all.length) return '';
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const st = _ai.status;
-  const results = Object.values(_ai.results);
-  const lim = (st && st.limits) || { title:200, bullet:500, keyword:250, description:2000 };
 
   let html = '<div style="margin:18px 0 10px;font-size:16px;font-weight:700;padding:8px 12px;background:#eaf2f8;border-radius:8px;">'
-    + '✨ AI Listing Writer</div>';
+    + '💡 Listing Suggestions</div>';
 
-  // setup missing
-  if (st && !st.ready) {
-    return html + '<div style="padding:12px 14px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;">'
-      + '<div style="font-weight:700;font-size:13px;margin-bottom:5px;">⚙️ AI setup baaki hai</div>'
-      + '<div style="font-size:12px;color:var(--text-muted);line-height:1.7;">'
-      + 'Railway dashboard → apna project → <strong>Variables</strong> → add karo:<br>'
-      + '<code style="background:#fff;padding:2px 6px;border-radius:4px;">ANTHROPIC_API_KEY</code> = aapki API key<br>'
-      + 'Phir redeploy karo. Key <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> se milegi.'
-      + (st.error ? '<br><span style="color:var(--red);">Error: ' + esc(st.error) + '</span>' : '')
-      + '</div></div>';
-  }
+  // keyword pool ka status
+  html += D.counts.poolSize
+    ? '<div style="padding:10px 12px;background:#eafaf1;border-left:4px solid var(--green);border-radius:0 8px 8px 0;margin-bottom:12px;font-size:12px;">'
+      + '✅ <strong>' + D.counts.poolSize + ' converting keywords</strong> mile aapke apne Search Term / Targeting report se. '
+      + 'Suggestions inhi pe based hain — koi guess nahi, aapka apna data hai.</div>'
+    : '<div style="padding:10px 12px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;margin-bottom:12px;font-size:12px;">'
+      + '⚠️ <strong>Search Term Report upload nahi hui.</strong> Abhi sirf structure ke suggestions '
+      + '(title length, bullets, description) mil rahe hain. Search Term Report daalo to '
+      + '<strong>listing-wise keyword suggestions</strong> bhi mil jayengi — ye sabse kaam ki cheez hai.</div>';
 
-  html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:9px;">'
-    + 'AI title, 5 bullets, description aur 5 backend keyword slots banata hai — '
-    + 'Search Term report ke asli converting keywords use karke. '
-    + '<strong>Har listing review karo, phir approve karo.</strong> '
-    + 'Sirf approved listings hi export file me jayengi.</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-    + '<button class="btn btn-primary btn-sm" onclick="aiQueueBucket(\'low\')">✨ Low wale banao</button>'
-    + '<button class="btn btn-outline btn-sm" onclick="aiQueueBucket(\'medium\')">✨ Medium wale banao</button>'
-    + '<span id="ai-progress"></span>'
-    + (results.length
-        ? '<span style="margin-left:auto;font-size:12px;">Approved: <strong id="ai-appr-count">'
-          + Object.keys(_ai.approved).length + '</strong> / ' + results.length + '</span>'
-          + '<button class="btn btn-primary btn-sm" onclick="aiExportFlatFile()">📥 Amazon Upload File</button>'
-          + '<button class="btn btn-outline btn-sm" onclick="aiExportReview()">📋 Review Sheet</button>'
-        : '')
-    + '</div></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px;">'
+    + raSummaryCard('🔴','Low (0-39)', D.counts.low, D.counts.low ? 'red' : 'green')
+    + raSummaryCard('🟡','Medium (40-69)', D.counts.medium, D.counts.medium ? 'amber' : 'green')
+    + raSummaryCard('🟢','Good (70+)', D.counts.good, 'green')
+    + raSummaryCard('🔑','Keyword Pool', D.counts.poolSize, 'blue')
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    + '<button class="btn btn-primary btn-sm" onclick="lsExportSuggestions()">📋 Suggestions Excel</button>'
+    + '<button class="btn btn-outline btn-sm" onclick="lsExportKeywordFile()">📥 Backend Keywords — Amazon File</button>'
+    + '</div>';
 
-  if (!results.length) return html;
+  const card = s => {
+    const col = s.score >= 70 ? 'var(--green)' : s.score >= 40 ? 'var(--amber)' : 'var(--red)';
+    const it = s.item;
+    return '<div style="border:1px solid var(--border);border-left:4px solid ' + col + ';border-radius:0 9px 9px 0;padding:12px 14px;margin-bottom:10px;background:#fff;">'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">'
+      + '<strong style="font-size:12.5px;">' + esc(s.sku) + '</strong>'
+      + '<span style="font-size:11px;color:var(--text-muted);">' + esc((s.name || '').slice(0,48)) + '</span>'
+      + '<span style="margin-left:auto;font-size:11px;font-weight:700;color:' + col + ';">Score ' + s.score + '/100</span></div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">'
+      + 'Title ' + it.titleLen + ' chars · ' + it.bulletCount + '/5 bullets · Desc ' + it.descLen + ' chars · '
+      + it.keywords.length + '/' + it.keywordSlots + ' keyword slots'
+      + (s.sales ? ' · ' + gcR(s.sales) + ' sales' : ' · abhi sale nahi') + '</div>'
 
-  // review cards
-  const fld = (sku, label, field, idx, val, max, rows) => {
-    const k = String(sku).toUpperCase();
-    const id = 'cnt-' + k + '-' + field + '-' + idx;
-    const over = String(val || '').length > max;
-    return '<div style="margin-bottom:7px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
-      + '<span style="font-size:10px;font-weight:700;color:var(--text-muted);">' + label + '</span>'
-      + '<span id="' + id + '" style="font-size:9.5px;color:' + (over ? 'var(--red)' : 'var(--text-muted)') + ';">'
-      + String(val || '').length + '/' + max + '</span></div>'
-      + '<textarea rows="' + (rows || 2) + '" '
-      + 'oninput="aiEditField(\'' + esc(sku).replace(/'/g,"\\'") + '\',\'' + field + '\',' + idx + ',this)" '
-      + 'style="width:100%;font-size:11.5px;padding:5px 7px;border:1px solid var(--border);border-radius:5px;'
-      + 'font-family:inherit;resize:vertical;">' + esc(val || '') + '</textarea></div>';
+      + s.actions.map(a =>
+          '<div style="padding:7px 9px;background:var(--bg);border-radius:6px;margin-bottom:5px;">'
+          + '<div style="font-size:11.5px;font-weight:700;">'
+          + (a.sev === 'high' ? '🔴' : '🟡') + ' ' + a.area + ' — ' + esc(a.what) + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.55;">👉 ' + esc(a.how) + '</div></div>').join('')
+
+      // missing keywords — sabse kaam ki cheez
+      + (s.missing.length
+          ? '<div style="margin-top:8px;padding:8px 10px;background:#eafaf1;border-radius:6px;">'
+            + '<div style="font-size:11px;font-weight:700;margin-bottom:4px;">🔑 Ye keywords listing me daalo — aapke apne data me convert kar rahe hain</div>'
+            + '<div style="display:flex;gap:5px;flex-wrap:wrap;">'
+            + s.missing.slice(0, 12).map(m =>
+                '<span style="background:#fff;border:1px solid var(--green);border-radius:4px;padding:2px 7px;font-size:10.5px;">'
+                + esc(m.term) + ' <strong style="color:var(--green);">' + m.orders + '</strong></span>').join('')
+            + '</div>'
+            + '<div style="font-size:9.5px;color:var(--text-muted);margin-top:4px;">number = kitne orders us keyword se aaye</div>'
+            + '</div>' : '')
+
+      // ready-to-paste backend slots
+      + (s.slots && s.slots.length
+          ? '<div style="margin-top:8px;">'
+            + '<div style="font-size:11px;font-weight:700;margin-bottom:4px;">📋 Backend keyword slots — seedha copy-paste karo</div>'
+            + s.slots.map((sl, i) =>
+                '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;">'
+                + '<span style="font-size:10px;color:var(--text-muted);min-width:44px;padding-top:4px;">Slot ' + (i+1) + '</span>'
+                + '<textarea readonly rows="2" onclick="this.select()" '
+                + 'style="flex:1;font-size:10.5px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;font-family:inherit;background:#fafbfc;">'
+                + esc(sl) + '</textarea>'
+                + '<span style="font-size:9.5px;color:var(--text-muted);padding-top:4px;">' + sl.length + '/250</span>'
+                + '</div>').join('')
+            + '</div>' : '')
+      + '</div>';
   };
 
-  results.forEach(r => {
-    const k = String(r.sku).toUpperCase();
-    const ok = !!_ai.approved[k];
-    html += '<div style="border:1px solid var(--border);border-left:4px solid '
-      + (ok ? 'var(--green)' : 'var(--secondary)') + ';border-radius:0 9px 9px 0;padding:12px 14px;margin-bottom:11px;background:#fff;">'
-      + '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
-      + '<strong style="font-size:12.5px;">' + esc(r.sku) + '</strong>'
-      + '<span style="font-size:11px;color:var(--text-muted);">' + esc((r.old.title || '').slice(0,44)) + '</span>'
-      + '<span id="ai-appr-' + k + '" class="badge badge-' + (ok ? 'green' : 'gray') + '" '
-      + 'style="margin-left:auto;cursor:pointer;" onclick="aiToggleApprove(\'' + esc(r.sku).replace(/'/g,"\\'") + '\')">'
-      + (ok ? '✅ Approved' : 'Approve karo') + '</span></div>'
-      + (r.notes ? '<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-bottom:8px;">'
-          + '💡 ' + esc(r.notes) + '</div>' : '')
+  const bucket = (list, title, colour, note) => {
+    if (!list.length) return '<div style="margin:14px 0;"><span style="font-weight:800;font-size:13px;color:' + colour + ';">'
+      + title + '</span><div style="font-size:12px;color:var(--text-muted);padding:6px;">Is bucket me koi listing nahi.</div></div>';
+    return '<div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px;">'
+      + '<span style="font-weight:800;font-size:13px;color:' + colour + ';">' + title + '</span>'
+      + '<span class="badge" style="background:' + colour + ';color:#fff;">' + list.length + '</span>'
+      + '<span style="font-size:11px;color:var(--text-muted);">' + note + '</span></div>'
+      + list.map(card).join('');
+  };
 
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">'
-      // purana
-      + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:5px;">ABHI KYA HAI</div>'
-      + '<div style="font-size:11px;background:var(--bg);border-radius:6px;padding:8px;line-height:1.55;">'
-      + '<strong>Title:</strong> ' + esc(r.old.title || '(khali)') + '<br><br>'
-      + '<strong>Bullets:</strong> ' + (r.old.bullets.length
-          ? r.old.bullets.map((b,i) => (i+1) + '. ' + esc(b.slice(0,90))).join('<br>')
-          : '(khali)') + '<br><br>'
-      + '<strong>Keywords:</strong> ' + (r.old.keywords.length
-          ? esc(r.old.keywords.join(' | ').slice(0,140)) : '(khali)') + '<br><br>'
-      + '<strong>Description:</strong> ' + (r.old.description
-          ? esc(r.old.description.slice(0,180)) + '...' : '(khali)')
-      + '</div></div>'
-      // naya (editable)
-      + '<div><div style="font-size:10px;font-weight:700;color:var(--secondary);margin-bottom:5px;">'
-      + 'AI KA SUGGESTION — edit kar sakte ho</div>'
-      + fld(r.sku, 'TITLE', 'title', 0, r.title, lim.title, 3)
-      + r.bullets.map((b,i) => fld(r.sku, 'BULLET ' + (i+1), 'bullets', i, b, lim.bullet, 2)).join('')
-      + fld(r.sku, 'DESCRIPTION', 'description', 0, r.description, lim.description, 5)
-      + r.keywords.map((kk,i) => fld(r.sku, 'KEYWORD SLOT ' + (i+1), 'keywords', i, kk, lim.keyword, 2)).join('')
-      + '</div></div></div>';
-  });
+  html += bucket(D.low, '🔴 LOW — Sabse pehle inpe kaam karo', 'var(--red)',
+                 'score 40 se neeche · revenue ke hisaab se sorted');
+  html += bucket(D.medium, '🟡 MEDIUM — Iske baad ye', 'var(--amber)',
+                 'score 40-69');
 
-  html += '<div style="padding:10px 12px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;font-size:11.5px;">'
-    + '⚠️ <strong>Upload karne se pehle:</strong> har listing padho. AI kabhi-kabhi galat detail likh deta hai '
-    + '(size, material, quantity). Galat content se listing suppress ho sakti hai. '
-    + 'Amazon pe chhote batch me upload karke test karo, ek saath 200 nahi.</div>';
+  html += '<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text-muted);">'
+    + 'ℹ️ Ye suggestions aapke apne reports se bane hain — keywords Search Term/Targeting report se, '
+    + 'gaps Category Listings Report se. Title, bullets aur description ka <strong>text aapko likhna hai</strong> — '
+    + 'product ki asli detail (size, material, quantity) sirf aapko pata hai. '
+    + 'Backend keyword slots ready hain, wo seedha use kar sakte ho.</div>';
 
   return html;
 }
 
-// ─── EXPORT: Amazon flat file ─────────────────────────────────────
-// Original Category Listings Report ki structure preserve karke sirf
-// approved SKUs ke values badalte hain — isse Amazon file accept karta hai.
-function aiExportFlatFile() {
+// ─── EXPORT: suggestions Excel ────────────────────────────────────
+function lsExportSuggestions() {
+  const D = _ls.data || lsBuildAll();
+  if (!D || !D.all.length) { showToast('Pehle analysis chalao', 'error'); return; }
+  const wb = XLSX.utils.book_new();
+
+  const rows = [];
+  D.all.sort((a, b) => (a.score - b.score) || (b.sales - a.sales)).forEach(s => {
+    const it = s.item;
+    s.actions.forEach((a, i) => {
+      rows.push([
+        i === 0 ? s.sku : '', i === 0 ? s.name : '',
+        i === 0 ? s.grade.toUpperCase() : '', i === 0 ? s.score : '',
+        a.area, a.sev.toUpperCase(), a.what, a.how,
+      ]);
+    });
+    if (s.missing.length) {
+      rows.push(['', '', '', '', 'Keywords to add', '',
+        s.missing.length + ' converting keywords listing me nahi hain',
+        s.missing.slice(0, 15).map(m => m.term + ' (' + m.orders + ')').join(', ')]);
+    }
+    (s.slots || []).forEach((sl, i) => {
+      rows.push(['', '', '', '', 'Backend slot ' + (i + 1), '', sl.length + '/250 chars', sl]);
+    });
+    rows.push(['', '', '', '', '', '', '', '']);
+  });
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['LISTING SUGGESTIONS — ' + (_ra.clientName || 'Seller')],
+    ['Generated: ' + new Date().toLocaleDateString('en-IN')],
+    ['Keyword pool: ' + D.counts.poolSize + ' converting terms (aapke apne Search Term / Targeting report se)'],
+    ['Low: ' + D.counts.low + '   Medium: ' + D.counts.medium + '   Good: ' + D.counts.good],
+    ['NOTE: Title/bullets/description ka text aap likho — product detail sirf aapko pata hai.'],
+    ['Backend keyword slots ready hain, seedha paste kar sakte ho.'], [],
+    ['SKU', 'Product', 'Grade', 'Score', 'Area', 'Priority', 'Kya problem hai', 'Kya karna hai'],
+    ...rows,
+  ]), 'Suggestions');
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['CONVERTING KEYWORDS — poora pool'],
+    ['Aapke apne ads data se. Orders ke hisaab se sorted.'], [],
+    ['Keyword', 'Orders', 'Sales (Rs)'],
+    ...D.pool.slice(0, 300).map(k => [k.term, k.orders, Math.round(k.sales)]),
+  ]), 'Keyword Pool');
+
+  XLSX.writeFile(wb, 'Listing_Suggestions_'
+    + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
+    + new Date().toISOString().slice(0, 10) + '.xlsx');
+  showToast('Suggestions Excel download ho gayi', 'success');
+}
+
+// ─── EXPORT: sirf backend keywords ka Amazon flat file ────────────
+// Sirf generic_keyword columns bharte hain — customer ko dikhne wala
+// content (title/bullets/desc) chhedte nahi. Isliye safe hai.
+function lsExportKeywordFile() {
+  const D = _ls.data || lsBuildAll();
+  if (!D) { showToast('Pehle analysis chalao', 'error'); return; }
   const wb0 = _ra.listing && _ra.listing.wb;
   if (!wb0) { showToast('Category Listings Report upload nahi hai', 'error'); return; }
-  const approved = Object.keys(_ai.approved);
-  if (!approved.length) { showToast('Pehle kuch listings approve karo', 'error'); return; }
+  if (!D.counts.poolSize) {
+    showToast('Search Term Report ke bina keywords nahi ban sakte', 'error'); return;
+  }
 
   const shName = wb0.SheetNames.indexOf('Template') >= 0 ? 'Template' : wb0.SheetNames[0];
-  const sh = gcFixRef(wb0.Sheets[shName]);
-  const raw = XLSX.utils.sheet_to_json(sh, { header: 1, defval: null });
+  const raw = XLSX.utils.sheet_to_json(gcFixRef(wb0.Sheets[shName]), { header: 1, defval: null });
   if (raw.length < 6) { showToast('Template sheet padhi nahi ja rahi', 'error'); return; }
 
   const disp = (raw[3] || []).map(x => String(x == null ? '' : x).trim());
@@ -18501,84 +18667,37 @@ function aiExportFlatFile() {
     for (let i = 0; i < tech.length; i++) if (t && t.test(tech[i])) return i;
     return -1;
   };
-  const findAll = (d, t) => {
-    const o = [];
-    for (let i = 0; i < Math.max(disp.length, tech.length); i++)
-      if ((d && d.test(disp[i] || '')) || (t && t.test(tech[i] || ''))) o.push(i);
-    return o;
-  };
-  const cSku   = findCol(/^SKU$/i, /contribution_sku/);
-  const cName  = findCol(/^Item Name$/i, /^item_name\[/);
-  const cDesc  = findCol(/^Product Description$/i, /^product_description\[/);
-  const cAct   = findCol(/^Listing Action$/i, /::record_action/);
-  const bCols  = findAll(/^Bullet Point$/i, /^bullet_point\[/);
-  const kCols  = findAll(/^Generic Keyword$/i, /^generic_keyword\[/);
-  if (cSku < 0) { showToast('SKU column nahi mila', 'error'); return; }
+  const kCols = [];
+  for (let i = 0; i < Math.max(disp.length, tech.length); i++)
+    if (/^Generic Keyword$/i.test(disp[i] || '') || /^generic_keyword\[/.test(tech[i] || '')) kCols.push(i);
+  const cSku = findCol(/^SKU$/i, /contribution_sku/);
+  const cAct = findCol(/^Listing Action$/i, /::record_action/);
+  if (cSku < 0 || !kCols.length) { showToast('SKU ya keyword columns nahi mile', 'error'); return; }
 
-  const want = {};
-  approved.forEach(k => { want[k] = true; });
+  const bySku = {};
+  D.all.forEach(s => { if (s.slots && s.slots.length) bySku[s.sku.toUpperCase()] = s.slots; });
 
-  // header rows waise ke waise, sirf approved rows rakho
   const out = [raw[0] || [], raw[1] || [], raw[2] || [], raw[3] || [], raw[4] || []];
   let changed = 0;
   for (let i = 5; i < raw.length; i++) {
     const r = (raw[i] || []).slice();
     const sku = String(r[cSku] == null ? '' : r[cSku]).trim();
     if (!sku || /^ABC123$/i.test(sku)) continue;
-    const k = sku.toUpperCase();
-    if (!want[k]) continue;
-    const g = _ai.results[k];
-    if (!g) continue;
-
-    if (cName >= 0 && g.title) r[cName] = g.title;
-    if (cDesc >= 0 && g.description) r[cDesc] = g.description;
-    bCols.forEach((c, j) => { if (g.bullets[j]) r[c] = g.bullets[j]; });
-    kCols.forEach((c, j) => { if (g.keywords[j]) r[c] = g.keywords[j]; });
+    const slots = bySku[sku.toUpperCase()];
+    if (!slots) continue;
+    kCols.forEach((c, j) => { if (slots[j]) r[c] = slots[j]; });
     if (cAct >= 0) r[cAct] = 'PartialUpdate';
     out.push(r);
     changed++;
   }
-
-  if (!changed) { showToast('Koi row match nahi hui', 'error'); return; }
+  if (!changed) { showToast('Koi listing match nahi hui', 'error'); return; }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(out), 'Template');
-  XLSX.writeFile(wb, 'Amazon_Listing_Update_'
+  XLSX.writeFile(wb, 'Amazon_Backend_Keywords_'
     + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
     + new Date().toISOString().slice(0, 10) + '.xlsx');
-  showToast(changed + ' listings ka upload file ready — Seller Central pe test karke chadhao', 'success');
-}
-
-// ─── EXPORT: human review sheet ───────────────────────────────────
-function aiExportReview() {
-  const results = Object.values(_ai.results);
-  if (!results.length) { showToast('Pehle content generate karo', 'error'); return; }
-  const wb = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['AI LISTING SUGGESTIONS — ' + (_ra.clientName || 'Seller')],
-    ['Generated: ' + new Date().toLocaleDateString('en-IN')],
-    ['Approved: ' + Object.keys(_ai.approved).length + ' / ' + results.length],
-    ['NOTE: Upload se pehle har listing verify karo — size, material, quantity galat na ho.'], [],
-    ['SKU', 'Approved', 'Field', 'Abhi kya hai', 'AI ka suggestion', 'Chars'],
-    ...results.flatMap(r => {
-      const ok = _ai.approved[String(r.sku).toUpperCase()] ? 'YES' : '';
-      const rows = [[r.sku, ok, 'Title', r.old.title || '', r.title, r.title.length]];
-      r.bullets.forEach((b, i) =>
-        rows.push(['', '', 'Bullet ' + (i+1), r.old.bullets[i] || '', b, b.length]));
-      rows.push(['', '', 'Description', (r.old.description || '').slice(0, 500), r.description, r.description.length]);
-      r.keywords.forEach((k, i) =>
-        rows.push(['', '', 'Keyword ' + (i+1), r.old.keywords[i] || '', k, k.length]));
-      if (r.notes) rows.push(['', '', 'AI notes', '', r.notes, '']);
-      rows.push(['', '', '', '', '', '']);
-      return rows;
-    }),
-  ]), 'Review');
-
-  XLSX.writeFile(wb, 'AI_Listing_Review_'
-    + String(_ra.clientName || 'Seller').replace(/[^a-zA-Z0-9]/g, '_') + '_'
-    + new Date().toISOString().slice(0, 10) + '.xlsx');
-  showToast('Review sheet download ho gayi', 'success');
+  showToast(changed + ' listings ke backend keywords ready — pehle 2-3 test karke upload karo', 'success');
 }
 
 // ─── LISTING SECTIONS (Category Listings Report se) ──────────────
@@ -18704,7 +18823,7 @@ function raListingSectionsHtml() {
                        'score 40 se neeche · revenue ke hisaab se sorted');
     html += bucketHtml(B.medium, '🟡 MEDIUM — Iske baad ye', 'var(--amber)',
                        'score 40-69 · thoda kaam bacha hai');
-    html += aiSectionHtml();
+    html += lsSectionHtml();
   }
 
   // ── discount / coupon ──
@@ -19332,12 +19451,6 @@ function raRenderResults() {
   }
 
   document.getElementById('ra-results').innerHTML = html;
-  if (_ra.listingItems && _ra.listingItems.length && !_ai.status) {
-    aiCheckStatus().then(() => {
-      const cur = document.getElementById('ra-results');
-      if (cur && cur.innerHTML === html) raRenderResults();
-    });
-  }
 
   // Add PDF download button at top of results
   const resultsDiv = document.getElementById('ra-results');

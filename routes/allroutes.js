@@ -1197,12 +1197,11 @@ monthlyReportsRouter.get('/dsr', authMiddleware, async (req, res) => {
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ error: 'from and to dates required' });
 
-    const { data, error } = await supabase.from('dsr_data')
+    const data = await fetchAll(() => supabase.from('dsr_data')
       .select('client_code, client_name, sales_amount, orders_count, ad_spend, return_rate, report_date')
       .gte('report_date', from)
       .lte('report_date', to)
-      .order('report_date', { ascending: true });
-    if (error) throw error;
+      .order('report_date', { ascending: true }));
 
     // Group by client
     const clientMap = {};
@@ -1251,8 +1250,8 @@ monthlyReportsRouter.get('/executive', authMiddleware, async (req, res) => {
         .gte('approved_at', from).lte('approved_at', to+'T23:59:59').eq('status', 'Done'),
       supabase.from('crm_calls').select('crm_executive, created_at, call_outcome')
         .gte('created_at', from).lte('created_at', to+'T23:59:59'),
-      supabase.from('dsr_data').select('entered_by, report_date')
-        .gte('report_date', from).lte('report_date', to),
+      fetchAll(() => supabase.from('dsr_data').select('entered_by, report_date')
+        .gte('report_date', from).lte('report_date', to)).then(d => ({ data: d })),
     ]);
 
     const users = usersRes.data || [];
@@ -1583,13 +1582,15 @@ misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
     // DEFENSIVE: Use case-insensitive ILIKE with trim to handle "Active " with whitespace,
     // "active" lowercase, etc. Also explicitly exclude Inactive/Closed/Hold even if accidentally
     // marked as 'Active' with weird casing
-    const [clientsRes, dsrRes] = await Promise.all([
-      supabase.from('clients')
-        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status'),
-      supabase.from('dsr_data')
+    const [clientRows, dsrRows] = await Promise.all([
+      fetchAll(() => supabase.from('clients')
+        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status')),
+      fetchAll(() => supabase.from('dsr_data')
         .select('client_code, report_date, entered_by')
-        .gte('report_date', from).lte('report_date', to),
+        .gte('report_date', from).lte('report_date', to)),
     ]);
+    const clientsRes = { data: clientRows };
+    const dsrRes = { data: dsrRows };
 
     // Frontend filter: ONLY truly active clients with valid AM
     // (defensive — handles trim, casing, and excludes hold/inactive/closed)
@@ -2392,7 +2393,7 @@ productivityRouter.get('/productivity', authMiddleware, async (req, res) => {
       supabase.from('tickets').select('ticket_id, assigned_to, resolved_by, status, created_at, approved_at, hours_to_close, priority').gte('created_at', fromISO).lte('created_at', toISO),
       supabase.from('crm_calls').select('call_id, crm_executive, call_outcome, created_at').gte('created_at', fromISO).lte('created_at', toISO),
       supabase.from('work_log').select('log_id, executive_name, work_type, created_at').gte('created_at', fromISO).lte('created_at', toISO),
-      supabase.from('dsr_data').select('entered_by, report_date').gte('report_date', from).lte('report_date', to),
+      fetchAll(() => supabase.from('dsr_data').select('entered_by, report_date').gte('report_date', from).lte('report_date', to)).then(d => ({ data: d })),
       supabase.from('report_analyzer_logs').select('log_id, client_code, analyzed_by, analyzed_by_role, tasks_generated, analyzed_at').gte('analyzed_at', fromISO).lte('analyzed_at', toISO),
     ]);
 
@@ -2623,8 +2624,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
     // Parallel fetch
     const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes, ticketsRes, usersRes] = await Promise.all([
       supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').in('status', ['Active','Hold']),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo)).then(d => ({ data: d })),
       supabase.from('ads_data').select('client_code, acos'),
       supabase.from('tickets').select('ticket_id, client_code, status, created_at, hours_to_close, resolved_by, assigned_to').gte('created_at', bounds.currFrom + 'T00:00:00'),
       supabase.from('users').select('name, role, joining_date').eq('is_active', true).eq('role', 'Account Manager'),
@@ -2852,8 +2853,8 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
     const bounds = _monthBoundaries(req.query.refDate);
     const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes] = await Promise.all([
       supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').ilike('am_name', requestedAM).in('status', ['Active','Hold']),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo)).then(d => ({ data: d })),
       supabase.from('ads_data').select('client_code, acos'),
     ]);
     const clients = clientsRes.data || [];
@@ -3127,6 +3128,31 @@ feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (re
 });
 
 // ══════════════════════════════════════════════════════════════════
+// PAGINATION HELPER
+// Supabase har request pe max 1000 rows deta hai — bina error, bina warning.
+// Bade date-range me data chup-chaap kat jata hai aur report galat ho jati hai
+// (jaise: 390 clients x 6 din = 2340 expected, sirf 1000 aayi).
+// fetchAll() pages me poora data laata hai.
+//
+//   const rows = await fetchAll(() => supabase.from('dsr_data')
+//     .select('...').gte('report_date', from).lte('report_date', to));
+//
+// NOTE: buildQuery ek NAYA query object return kare — reuse nahi.
+// ══════════════════════════════════════════════════════════════════
+async function fetchAll(buildQuery, pageSize = 1000) {
+  let out = [];
+  for (let page = 0; page < 200; page++) {
+    const offset = page * pageSize;
+    const { data, error } = await buildQuery().range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    out = out.concat(rows);
+    if (rows.length < pageSize) break;
+  }
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════
 // DSR RAW ROUTES  —  day-wise grid ke liye
 // Supabase default 1000 rows per request deta hai; 400+ sellers x 31 din
 // us cap se upar chala jata hai aur data chup-chaap kat jata hai.
@@ -3137,26 +3163,16 @@ const dsrRouter = require('express').Router();
 dsrRouter.get('/', authMiddleware, async (req, res) => {
   try {
     const { from, to, client } = req.query;
-    const PAGE = 1000;
-    let out = [], offset = 0;
 
-    for (let guard = 0; guard < 60; guard++) {
+    const out = await fetchAll(() => {
       let q = supabase.from('dsr_data')
         .select('client_code, client_name, report_date, sales_amount, orders_count, ad_spend, returns_count, entered_by')
-        .order('report_date', { ascending: true })
-        .range(offset, offset + PAGE - 1);
+        .order('report_date', { ascending: true });
       if (from)   q = q.gte('report_date', from);
       if (to)     q = q.lte('report_date', to);
       if (client) q = q.eq('client_code', client);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      const rows = data || [];
-      out = out.concat(rows);
-      if (rows.length < PAGE) break;      // aakhri page
-      offset += PAGE;
-    }
+      return q;
+    });
 
     res.json(out.map(r => ({
       client_code: r.client_code,

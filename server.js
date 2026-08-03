@@ -69,10 +69,10 @@ app.use('/api/documents',        require('./routes/allroutes').docsRouter);
 app.use('/api/approvals',        require('./routes/allroutes').approvalRouter);
 app.use('/api/reports',          require('./routes/allroutes').productivityRouter);
 app.use('/api/reports',          require('./routes/allroutes').salesRetentionRouter);
-app.use('/api/flipkart-analyzer', require('./routes/allroutes').flipkartAnalyzerRouter);
 app.use('/api/chat',             require('./routes/chat'));
 app.use('/api/ads-analyzer', require('./routes/allroutes').adsAnalyzerRouter);
-app.use('/api/feedback', require('./routes/allroutes').feedbackRouter);
+const { feedbackRouter } = require('./routes/allroutes');
+app.use('/api/feedback', feedbackRouter);
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

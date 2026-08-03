@@ -3131,13 +3131,13 @@ feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (re
 // PAGINATION HELPER
 // Supabase har request pe max 1000 rows deta hai — bina error, bina warning.
 // Bade date-range me data chup-chaap kat jata hai aur report galat ho jati hai
-// (jaise: 390 clients x 6 din = 2340 expected, sirf 1000 aayi).
+// (jaise: 390 clients x 6 din = 2340 expected, sirf 1000 aa rahi thi).
 // fetchAll() pages me poora data laata hai.
 //
 //   const rows = await fetchAll(() => supabase.from('dsr_data')
 //     .select('...').gte('report_date', from).lte('report_date', to));
 //
-// NOTE: buildQuery ek NAYA query object return kare — reuse nahi.
+// NOTE: buildQuery har baar NAYA query object return kare — reuse nahi.
 // ══════════════════════════════════════════════════════════════════
 async function fetchAll(buildQuery, pageSize = 1000) {
   let out = [];
@@ -3186,6 +3186,7 @@ dsrRouter.get('/', authMiddleware, async (req, res) => {
     })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
 
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {

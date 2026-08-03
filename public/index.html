@@ -10348,16 +10348,51 @@ let _fb = { file: null, preview: null, result: null, busy: false };
 
 const FB_LEAD_ROLES_UI = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
 
+// Feedback ke apne calls — toast spam nahi, ek jagah saaf status
+async function fbApi(path) {
+  try {
+    const res = await fetch(API + path, {
+      headers: { 'Authorization':'Bearer ' + TOKEN, 'Cache-Control':'no-cache' },
+      cache: 'no-store',
+    });
+    if (res.status === 401) { doLogout(); return { fail:'auth' }; }
+    if (res.status === 404) return { fail:'missing' };
+    if (!res.ok) return { fail:'http', code: res.status };
+    const txt = await res.text();
+    try { return { data: JSON.parse(txt) }; }
+    catch (e) {
+      // JSON ki jagah HTML mila = route mount nahi hua (SPA fallback)
+      return { fail: /^\s*</.test(txt) ? 'missing' : 'badjson' };
+    }
+  } catch (e) { return { fail:'network' }; }
+}
+
 async function renderFeedback() {
   const isLead = FB_LEAD_ROLES_UI.includes(APP.user?.role);
 
-  const [clients, progress, recent, board] = await Promise.all([
+  const [clients, rProg, rRec, rBoard] = await Promise.all([
     getClients(),
-    api('GET', '/feedback/progress?_=' + Date.now()),
-    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
-    isLead ? api('GET', '/feedback/leaderboard?_=' + Date.now()) : Promise.resolve(null),
+    fbApi('/feedback/progress?_=' + Date.now()),
+    fbApi('/feedback/recent?limit=30&_=' + Date.now()),
+    isLead ? fbApi('/feedback/leaderboard?_=' + Date.now()) : Promise.resolve({ data:null }),
   ]);
   if (clients) APP.clients = clients;
+
+  const progress = rProg.data, recent = rRec.data, board = rBoard.data;
+  const fails = [rProg, rRec, rBoard].filter(x => x && x.fail);
+  const backendDown = fails.some(f => f.fail === 'missing');
+  const banner = backendDown
+    ? '<div style="padding:12px 14px;background:#fff5f5;border-left:4px solid var(--red);border-radius:0 8px 8px 0;margin-bottom:16px;">'
+      + '<div style="font-weight:700;font-size:13px;color:var(--red);">⚠️ Feedback backend abhi live nahi hai</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6;">'
+      + 'Page to khul gaya par server pe <code>/feedback/*</code> routes mount nahi hue — '
+      + 'upload aur leaderboard tab tak kaam nahi karenge. '
+      + 'Ye <code>allroutes.js</code> me theek hoga (feedback router aur multer <code>upload</code> ka order).'
+      + '</div></div>'
+    : fails.length
+      ? '<div style="padding:11px 13px;background:#fff8e7;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;margin-bottom:16px;font-size:12px;">'
+        + '⚠️ Kuch data load nahi ho paya — page refresh karke dekho.</div>'
+      : '';
 
   // Sirf registered + active sellers (manual entry nahi)
   const list = (APP.clients || []).filter(c => {
@@ -10371,8 +10406,8 @@ async function renderFeedback() {
   const pct = Math.min(100, Math.round((p.mine || 0) / (p.target || 5) * 100));
   const doneCol = (p.mine || 0) >= (p.target || 5) ? 'var(--green)' : 'var(--amber)';
 
-  document.getElementById('page-content').innerHTML =
-    '<div class="card" style="margin-bottom:16px;">'
+  document.getElementById('page-content').innerHTML = banner
+    + '<div class="card" style="margin-bottom:16px;">'
     + '<div class="card-header"><span class="card-title">⭐ Feedback Upload</span>'
     + '<span style="font-size:12px;color:var(--text-muted);">Target: ' + (p.target || 5)
     + ' unique/month · 96-day unique check</span></div>'
@@ -10422,7 +10457,9 @@ async function renderFeedback() {
     + '</select></div>'
     + '<div class="form-group"><label style="font-weight:700;">Note (optional)</label>'
     + '<input type="text" class="form-control" id="fb-note" placeholder="e.g. 5★ on packaging"></div>'
-    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;" onclick="fbSubmit()">Upload &amp; Check</button>'
+    + '<button class="btn btn-primary" id="fb-submit" style="width:100%;padding:10px;font-size:14px;"'
+    + (backendDown ? ' disabled title="Backend routes live nahi hain"' : '') + ' onclick="fbSubmit()">'
+    + (backendDown ? 'Backend live nahi hai' : 'Upload &amp; Check') + '</button>'
     + '</div>'
 
     + '</div></div></div>'
@@ -10551,10 +10588,11 @@ function fbResetForm() {
 }
 
 async function fbRefresh() {
-  const [progress, recent] = await Promise.all([
-    api('GET', '/feedback/progress?_=' + Date.now()),
-    api('GET', '/feedback/recent?limit=30&_=' + Date.now()),
+  const [rp, rr] = await Promise.all([
+    fbApi('/feedback/progress?_=' + Date.now()),
+    fbApi('/feedback/recent?limit=30&_=' + Date.now()),
   ]);
+  const progress = rp.data, recent = rr.data;
   if (recent) {
     const el = document.getElementById('fb-recent');
     if (el) el.innerHTML = fbRecentHtml(recent);

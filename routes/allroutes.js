@@ -299,7 +299,7 @@ tasksRouter.patch('/:id', authMiddleware, async (req, res) => {
 
 tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
-  const { from, to, exec } = req.query;
+  const { from, to, exec, client } = req.query;
 
   const leadRoles = ['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'Sub Admin', 'Team Lead', 'Viewer'];
   const isLead = leadRoles.includes(role);
@@ -309,6 +309,9 @@ tasksRouter.get('/worklog', authMiddleware, async (req, res) => {
   // Date filter
   if (from) query = query.gte('created_at', from + 'T00:00:00');
   if (to)   query = query.lte('created_at', to + 'T23:59:59');
+
+  // Client filter (Growth Comparison ka work-done section)
+  if (client) query = query.eq('client_code', client);
 
   // Role filter
   if (!isLead) {
@@ -727,10 +730,12 @@ const hurdleRouter = require('express').Router();
 
 hurdleRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
+  const { client } = req.query;
   let query = supabase.from('hurdles').select('*').order('created_at', { ascending: false });
   if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'SME', 'Team Lead'].includes(role)) {
     query = query.eq('added_by', name);
   }
+  if (client) query = query.eq('client_code', client);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
@@ -1192,12 +1197,11 @@ monthlyReportsRouter.get('/dsr', authMiddleware, async (req, res) => {
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ error: 'from and to dates required' });
 
-    const { data, error } = await supabase.from('dsr_data')
+    const data = await fetchAll(() => supabase.from('dsr_data')
       .select('client_code, client_name, sales_amount, orders_count, ad_spend, return_rate, report_date')
       .gte('report_date', from)
       .lte('report_date', to)
-      .order('report_date', { ascending: true });
-    if (error) throw error;
+      .order('report_date', { ascending: true }));
 
     // Group by client
     const clientMap = {};
@@ -1246,8 +1250,8 @@ monthlyReportsRouter.get('/executive', authMiddleware, async (req, res) => {
         .gte('approved_at', from).lte('approved_at', to+'T23:59:59').eq('status', 'Done'),
       supabase.from('crm_calls').select('crm_executive, created_at, call_outcome')
         .gte('created_at', from).lte('created_at', to+'T23:59:59'),
-      supabase.from('dsr_data').select('entered_by, report_date')
-        .gte('report_date', from).lte('report_date', to),
+      fetchAll(() => supabase.from('dsr_data').select('entered_by, report_date')
+        .gte('report_date', from).lte('report_date', to)).then(d => ({ data: d })),
     ]);
 
     const users = usersRes.data || [];
@@ -1578,13 +1582,15 @@ misRouter.get('/dsr-missing', authMiddleware, async (req, res) => {
     // DEFENSIVE: Use case-insensitive ILIKE with trim to handle "Active " with whitespace,
     // "active" lowercase, etc. Also explicitly exclude Inactive/Closed/Hold even if accidentally
     // marked as 'Active' with weird casing
-    const [clientsRes, dsrRes] = await Promise.all([
-      supabase.from('clients')
-        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status'),
-      supabase.from('dsr_data')
+    const [clientRows, dsrRows] = await Promise.all([
+      fetchAll(() => supabase.from('clients')
+        .select('client_code, busy_name, marketplace, am_name, ads_manager, crm_executive, status')),
+      fetchAll(() => supabase.from('dsr_data')
         .select('client_code, report_date, entered_by')
-        .gte('report_date', from).lte('report_date', to),
+        .gte('report_date', from).lte('report_date', to)),
     ]);
+    const clientsRes = { data: clientRows };
+    const dsrRes = { data: dsrRows };
 
     // Frontend filter: ONLY truly active clients with valid AM
     // (defensive — handles trim, casing, and excludes hold/inactive/closed)
@@ -2387,7 +2393,7 @@ productivityRouter.get('/productivity', authMiddleware, async (req, res) => {
       supabase.from('tickets').select('ticket_id, assigned_to, resolved_by, status, created_at, approved_at, hours_to_close, priority').gte('created_at', fromISO).lte('created_at', toISO),
       supabase.from('crm_calls').select('call_id, crm_executive, call_outcome, created_at').gte('created_at', fromISO).lte('created_at', toISO),
       supabase.from('work_log').select('log_id, executive_name, work_type, created_at').gte('created_at', fromISO).lte('created_at', toISO),
-      supabase.from('dsr_data').select('entered_by, report_date').gte('report_date', from).lte('report_date', to),
+      fetchAll(() => supabase.from('dsr_data').select('entered_by, report_date').gte('report_date', from).lte('report_date', to)).then(d => ({ data: d })),
       supabase.from('report_analyzer_logs').select('log_id, client_code, analyzed_by, analyzed_by_role, tasks_generated, analyzed_at').gte('analyzed_at', fromISO).lte('analyzed_at', toISO),
     ]);
 
@@ -2618,8 +2624,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
     // Parallel fetch
     const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes, ticketsRes, usersRes] = await Promise.all([
       supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').in('status', ['Active','Hold']),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo)).then(d => ({ data: d })),
       supabase.from('ads_data').select('client_code, acos'),
       supabase.from('tickets').select('ticket_id, client_code, status, created_at, hours_to_close, resolved_by, assigned_to').gte('created_at', bounds.currFrom + 'T00:00:00'),
       supabase.from('users').select('name, role, joining_date').eq('is_active', true).eq('role', 'Account Manager'),
@@ -2847,8 +2853,8 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
     const bounds = _monthBoundaries(req.query.refDate);
     const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes] = await Promise.all([
       supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').ilike('am_name', requestedAM).in('status', ['Active','Hold']),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo),
-      supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo)).then(d => ({ data: d })),
       supabase.from('ads_data').select('client_code, acos'),
     ]);
     const clients = clientsRes.data || [];
@@ -2954,6 +2960,233 @@ salesRetentionRouter.post('/sales-retention/regenerate-ai', authMiddleware, asyn
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ══════════════════════════════════════════════════════════════════
+// FEEDBACK ROUTES  —  screenshot upload + 96-day uniqueness check
+// NOTE: `upload` (multer) is defined further up with docsRouter; this
+// router is declared AFTER it on purpose — referencing it earlier makes
+// Express throw "Router.use() requires a middleware function".
+// ══════════════════════════════════════════════════════════════════
+const feedbackRouter = require('express').Router();
+
+const FB_TARGET = 5;              // unique feedback per executive per month
+const FB_UNIQUE_DAYS = 96;        // same seller counts again only after this
+const FB_LEAD_ROLES = ['Admin', 'Ops Lead', 'Sub Admin', 'SME', 'Team Lead', 'Senior Executive'];
+
+function fbMonthStart() {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+}
+
+// ── GET /feedback/progress ──
+feedbackRouter.get('/progress', authMiddleware, async (req, res) => {
+  try {
+    const { name } = req.user;
+    const monthStart = fbMonthStart();
+
+    const { data, error } = await supabase.from('feedback_records')
+      .select('uploaded_by, is_unique')
+      .gte('created_at', monthStart);
+    if (error) throw error;
+
+    const rows = data || [];
+    res.json({
+      target: FB_TARGET,
+      mine: rows.filter(r => r.uploaded_by === name && r.is_unique).length,
+      team_total: rows.filter(r => r.is_unique).length,
+      flagged_dup: rows.filter(r => r.uploaded_by === name && !r.is_unique).length,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /feedback/recent ──
+feedbackRouter.get('/recent', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
+
+    let query = supabase.from('feedback_records').select('*')
+      .order('created_at', { ascending: false }).limit(limit);
+    if (!FB_LEAD_ROLES.includes(role)) query = query.eq('uploaded_by', name);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json((data || []).map(r => ({
+      id: r.id,
+      clientCode: r.client_code,
+      clientName: r.client_name,
+      fbType: r.fb_type,
+      note: r.note,
+      uploadedBy: r.uploaded_by,
+      uploadedByRole: r.uploaded_by_role,
+      isUnique: r.is_unique,
+      daysSince: r.days_since,
+      url: r.image_url,
+      createdAt: r.created_at,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /feedback/leaderboard  (leads only) ──
+feedbackRouter.get('/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    if (!FB_LEAD_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const monthStart = fbMonthStart();
+
+    const [fbRes, userRes] = await Promise.all([
+      supabase.from('feedback_records').select('uploaded_by, uploaded_by_role, is_unique')
+        .gte('created_at', monthStart),
+      supabase.from('users').select('name, role').eq('status', 'Active'),
+    ]);
+    if (fbRes.error) throw fbRes.error;
+
+    const agg = {};
+    for (const u of (userRes.data || [])) {
+      agg[u.name] = { name: u.name, role: u.role, unique: 0, duplicate: 0 };
+    }
+    for (const r of (fbRes.data || [])) {
+      const k = r.uploaded_by;
+      if (!k) continue;
+      const x = agg[k] || (agg[k] = { name: k, role: r.uploaded_by_role || '', unique: 0, duplicate: 0 });
+      if (r.is_unique) x.unique++; else x.duplicate++;
+    }
+
+    const executives = Object.values(agg)
+      .filter(e => e.unique || e.duplicate)
+      .map(e => ({
+        ...e,
+        target: FB_TARGET,
+        pct: Math.round(e.unique / FB_TARGET * 100),
+        achieved: e.unique >= FB_TARGET,
+      }))
+      .sort((a, b) => b.unique - a.unique || a.name.localeCompare(b.name));
+
+    res.json({ target: FB_TARGET, executives });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /feedback/upload ──
+feedbackRouter.post('/upload', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    const { clientCode, clientName, fbType, note } = req.body;
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'Screenshot nahi mila' });
+    if (!clientCode) return res.status(400).json({ error: 'Seller select karo' });
+
+    // ── 96-day uniqueness: is seller ka pichhla feedback kab tha ──
+    const cutoff = new Date(Date.now() - FB_UNIQUE_DAYS * 86400000).toISOString();
+    const { data: prevRows, error: prevErr } = await supabase.from('feedback_records')
+      .select('created_at')
+      .eq('client_code', clientCode)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (prevErr) throw prevErr;
+
+    const prev = (prevRows || [])[0];
+    const daysSince = prev
+      ? Math.floor((Date.now() - new Date(prev.created_at).getTime()) / 86400000)
+      : null;
+    const isUnique = !prev || prev.created_at < cutoff;
+
+    // ── storage ──
+    const safe = String(file.originalname || 'shot').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = clientCode + '/' + Date.now() + '_' + safe;
+
+    const { error: stErr } = await supabase.storage
+      .from('feedback-shots')
+      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (stErr) throw stErr;
+
+    const { data: urlData } = supabase.storage.from('feedback-shots').getPublicUrl(path);
+    const imageUrl = urlData ? urlData.publicUrl : null;
+
+    // ── record ──
+    const { error: dbErr } = await supabase.from('feedback_records').insert({
+      client_code: clientCode,
+      client_name: clientName || clientCode,
+      fb_type: fbType || 'Product feedback',
+      note: note || null,
+      image_url: imageUrl,
+      image_path: path,
+      uploaded_by: req.user.name,
+      uploaded_by_role: req.user.role,
+      is_unique: isUnique,
+      days_since: daysSince,
+    });
+    if (dbErr) throw dbErr;
+
+    res.json({
+      success: true,
+      unique: isUnique,
+      daysSince,
+      sellerName: clientName || clientCode,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// PAGINATION HELPER
+// Supabase har request pe max 1000 rows deta hai — bina error, bina warning.
+// Bade date-range me data chup-chaap kat jata hai aur report galat ho jati hai
+// (jaise: 390 clients x 6 din = 2340 expected, sirf 1000 aayi).
+// fetchAll() pages me poora data laata hai.
+//
+//   const rows = await fetchAll(() => supabase.from('dsr_data')
+//     .select('...').gte('report_date', from).lte('report_date', to));
+//
+// NOTE: buildQuery ek NAYA query object return kare — reuse nahi.
+// ══════════════════════════════════════════════════════════════════
+async function fetchAll(buildQuery, pageSize = 1000) {
+  let out = [];
+  for (let page = 0; page < 200; page++) {
+    const offset = page * pageSize;
+    const { data, error } = await buildQuery().range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    out = out.concat(rows);
+    if (rows.length < pageSize) break;
+  }
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DSR RAW ROUTES  —  day-wise grid ke liye
+// Supabase default 1000 rows per request deta hai; 400+ sellers x 31 din
+// us cap se upar chala jata hai aur data chup-chaap kat jata hai.
+// Isliye yahan pages me poora data laate hain.
+// ══════════════════════════════════════════════════════════════════
+const dsrRouter = require('express').Router();
+
+dsrRouter.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { from, to, client } = req.query;
+
+    const out = await fetchAll(() => {
+      let q = supabase.from('dsr_data')
+        .select('client_code, client_name, report_date, sales_amount, orders_count, ad_spend, returns_count, entered_by')
+        .order('report_date', { ascending: true });
+      if (from)   q = q.gte('report_date', from);
+      if (to)     q = q.lte('report_date', to);
+      if (client) q = q.eq('client_code', client);
+      return q;
+    });
+
+    res.json(out.map(r => ({
+      client_code: r.client_code,
+      client_name: r.client_name,
+      report_date: r.report_date,
+      sales_amount: Number(r.sales_amount) || 0,
+      orders_count: Number(r.orders_count) || 0,
+      ad_spend: Number(r.ad_spend) || 0,
+      returns_count: Number(r.returns_count) || 0,
+      entered_by: r.entered_by,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
@@ -2962,4 +3195,5 @@ module.exports = {
   flipkartAnalyzerRouter, adsAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
+  feedbackRouter, dsrRouter,
 };

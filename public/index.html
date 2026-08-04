@@ -17954,11 +17954,19 @@ async function raHandleUpload(type, input) {
   const cardEl = document.getElementById('racard-'+type);
   statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
   try {
-    // Category Listings Report .xlsm hai — binary padhna padega
+    // Excel files binary padhni padti hain.
+    // 'listing' ko workbook chahiye (multi-sheet, 5 header rows).
+    // Baaki parsers CSV text pe chalte hain — unke liye convert kar dete hain,
+    // warna .text undefined milega aur raCSV crash karega.
     if (/\.(xlsm|xlsx|xls)$/i.test(file.name)) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array', bookVBA: false });
-      _ra[type] = { wb, filename: file.name };
+      if (type === 'listing') {
+        _ra[type] = { wb, filename: file.name };
+      } else {
+        const sh = gcFixRef(wb.Sheets[wb.SheetNames[0]]);
+        _ra[type] = { text: XLSX.utils.sheet_to_csv(sh), wb, filename: file.name };
+      }
       statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
       cardEl.style.borderColor = 'var(--green)';
       cardEl.style.background = '#f0fff4';

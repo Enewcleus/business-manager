@@ -3188,6 +3188,96 @@ dsrRouter.get('/', authMiddleware, async (req, res) => {
 });
 
 
+
+// ══════════════════════════════════════════════════════════════════
+// REPORT NOTES  —  executive ke comments jo report me merge hote hain
+//
+// Structured hain, free-text blob nahi: har note ka ek category hota
+// hai aur character limit hai. Internal notes seller ke PDF me nahi
+// jaate — wo sirf team ko dikhte hain.
+// ══════════════════════════════════════════════════════════════════
+const reportNotesRouter = require('express').Router();
+
+const RN_CATS = ['work_done', 'observation', 'next_step', 'seller_pending'];
+const RN_MAX = 400;          // ek note kitna lamba
+const RN_MAX_NOTES = 40;     // ek report pe max notes
+
+// GET /report-notes?client=C1&module=growth&period=2026-07
+reportNotesRouter.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { client, module: mod, period } = req.query;
+    if (!client) return res.status(400).json({ error: 'client zaroori hai' });
+    let q = supabase.from('report_notes').select('*')
+      .eq('client_code', client)
+      .order('created_at', { ascending: true });
+    if (mod) q = q.eq('module', mod);
+    if (period) q = q.eq('period', period);
+    const { data, error } = await q;
+    if (error) throw error;
+    res.json((data || []).map(r => ({
+      id: r.id,
+      clientCode: r.client_code,
+      module: r.module,
+      period: r.period,
+      category: r.category,
+      text: r.note_text,
+      internal: !!r.is_internal,
+      author: r.author_name,
+      authorRole: r.author_role,
+      createdAt: r.created_at,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /report-notes
+reportNotesRouter.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { clientCode, module: mod, period, category, text, internal } = req.body || {};
+    if (!clientCode) return res.status(400).json({ error: 'Seller select karo' });
+    if (!RN_CATS.includes(category)) return res.status(400).json({ error: 'Category galat hai' });
+    const t = String(text || '').trim();
+    if (!t) return res.status(400).json({ error: 'Note khali hai' });
+    if (t.length > RN_MAX) return res.status(400).json({ error: 'Note ' + RN_MAX + ' characters se chhota rakho' });
+
+    const { count } = await supabase.from('report_notes')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_code', clientCode).eq('module', mod || '').eq('period', period || '');
+    if ((count || 0) >= RN_MAX_NOTES) {
+      return res.status(400).json({ error: 'Is report pe ' + RN_MAX_NOTES + ' notes ki limit hai' });
+    }
+
+    const { error } = await supabase.from('report_notes').insert({
+      client_code: clientCode,
+      module: mod || '',
+      period: period || '',
+      category,
+      note_text: t,
+      is_internal: !!internal,
+      author_name: req.user.name,
+      author_role: req.user.role,
+    });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /report-notes/:id  — apna note ya lead hi hata sakta hai
+reportNotesRouter.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const leads = ['Admin', 'Ops Lead', 'Sub Admin', 'Team Lead', 'SME', 'Account Manager'];
+    const { data: row, error: e1 } = await supabase.from('report_notes')
+      .select('author_name').eq('id', req.params.id).single();
+    if (e1) throw e1;
+    if (!row) return res.status(404).json({ error: 'Note nahi mila' });
+    if (row.author_name !== req.user.name && !leads.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Sirf apna note hata sakte ho' });
+    }
+    const { error } = await supabase.from('report_notes').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
@@ -3196,5 +3286,5 @@ module.exports = {
   flipkartAnalyzerRouter, adsAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
-  feedbackRouter, dsrRouter,
+  feedbackRouter, dsrRouter, reportNotesRouter,
 };

@@ -9163,6 +9163,7 @@ function renderRetentionContent(data) {
       <button class="ret-tab active" data-tab="am-dashboard" onclick="switchRetTab('am-dashboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 AM Dashboard</button>
       ${canViewAll ? '<button class="ret-tab" data-tab="insights" onclick="switchRetTab(\'insights\')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>' : ''}
       <button class="ret-tab" data-tab="churn-risk" onclick="switchRetTab('churn-risk')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Churn Risk Sellers</button>
+      <button class="ret-tab" data-tab="ads-team" onclick="switchRetTab('ads-team')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">📢 Ads Team View</button>
     </div>`;
 
   document.getElementById('retention-content').innerHTML = `
@@ -9184,12 +9185,117 @@ function switchRetTab(tab) {
   if (tab === 'am-dashboard') container.innerHTML = renderAMDashboardTab(data.amList, data.growthTarget);
   else if (tab === 'insights') container.innerHTML = renderRetentionInsightsTab(data.aiInsights);
   else if (tab === 'churn-risk') container.innerHTML = renderChurnRiskTab(data.amList);
+  else if (tab === 'ads-team') loadAdsTeamView(container);
+}
+
+function toggleAtRiskPanel() {
+  const panel = document.getElementById('atrisk-panel');
+  const chev = document.getElementById('atrisk-chev');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (chev) chev.textContent = open ? '▾' : '▴';
+}
+
+async function toggleGMSDetail(amName) {
+  const key = amName.replace(/[^a-zA-Z0-9]/g, '_');
+  const el = document.getElementById('gms-detail-' + key);
+  if (!el) return;
+  if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:var(--text-muted);">Loading...</div>';
+  const data = await api('GET', '/reports/sales-retention/am/' + encodeURIComponent(amName));
+  if (!data || !data.sellers) { el.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:var(--red);">Load failed</div>'; return; }
+  const sellers = data.sellers || [];
+  const rows = sellers.map(s => {
+    const tgt = s.gmsTarget || 0;
+    const curr = s.currSales || 0;
+    const pace = s.gmsPace || 0;
+    const delta = pace - tgt;
+    const pct = tgt > 0 ? Math.min(100, Math.round((curr/tgt)*100)) : 0;
+    const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
+    const barCol = pct >= 90 ? 'var(--green)' : pct >= 60 ? '#d35400' : 'var(--red)';
+    return `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:6px 10px;font-size:11px;">
+        <div style="font-weight:700;">${s.busyName}</div>
+        <div style="font-size:9px;color:var(--text-muted);">${s.marketplace||''}</div>
+        <div style="height:3px;background:var(--border);border-radius:2px;margin-top:3px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+      </td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${tgt ? fmtINR(tgt) : '—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${fmtINR(curr)}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${pace ? fmtINR(pace) : '—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:800;color:${deltaCol};">${tgt ? (delta>=0?'+':'') + fmtINR(Math.abs(delta)) : '—'}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:420px;">
+      <thead style="background:var(--bg);">
+        <tr>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Target</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Delta</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--text-muted);">No seller data</td></tr>'}</tbody>
+    </table>
+  </div>`;
 }
 
 function renderAMDashboardTab(amList, growthTarget) {
   if (!amList.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No AM data found</h3></div>';
 
+  // At-risk banner
+  const atRiskSellers = [];
+  amList.forEach(am => {
+    (am.sellers || []).forEach(s => {
+      if (['zero','negative'].includes(s.bucket)) {
+        atRiskSellers.push({ name: s.busyName, am: am.amName, bucket: s.bucket, growth: s.growthPct, curr: s.currSales, marketplace: s.marketplace || '' });
+      }
+    });
+  });
+  atRiskSellers.sort((a,b) => a.growth - b.growth);
+
+  const atRiskBanner = atRiskSellers.length ? `
+  <div style="background:#fdf2f2;border:1.5px solid var(--red);border-radius:10px;margin-bottom:12px;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;" onclick="toggleAtRiskPanel()">
+      <span style="background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;">${atRiskSellers.length}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--red);flex:1;">🚨 Sellers drop zone mein ja rahe hain</span>
+      <span style="font-size:11px;color:var(--red);opacity:.8;">${atRiskSellers.filter(s=>s.bucket==='zero').length} zero · ${atRiskSellers.filter(s=>s.bucket==='negative').length} declining</span>
+      <span id="atrisk-chev" style="color:var(--red);font-size:14px;">▾</span>
+    </div>
+    <div id="atrisk-panel" style="display:none;border-top:1px solid #f5c6cb;">
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
+          <thead style="background:#fdf2f2;">
+            <tr>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">Seller</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">AM</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Status</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--red);">Current Sale</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Growth</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${atRiskSellers.slice(0,50).map(s => `
+            <tr style="border-top:1px solid #f5c6cb;">
+              <td style="padding:7px 12px;font-weight:600;">${s.name}<div style="font-size:10px;color:var(--text-muted);">${s.marketplace}</div></td>
+              <td style="padding:7px 12px;font-size:11px;color:var(--text-muted);">${s.am}</td>
+              <td style="padding:7px 8px;text-align:center;">
+                <span style="background:${s.bucket==='zero'?'#7a000022':'var(--red)22'};color:${s.bucket==='zero'?'#7a0000':'var(--red)'};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">${s.bucket==='zero'?'🚨 Zero':'🔻 Declining'}</span>
+              </td>
+              <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmtINR(s.curr)}</td>
+              <td style="padding:7px 8px;text-align:center;color:var(--red);font-weight:800;">${s.growth}%</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>` : '';
+
   return `
+  ${atRiskBanner}
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
     ${amList.map((am, i) => {
       const growthCol = growthColor(am.momGrowthPct);
@@ -9256,6 +9362,73 @@ function renderAMDashboardTab(amList, growthTarget) {
           ${am.agedTickets ? '<span style="color:var(--red);font-weight:700;">⏰ ' + am.agedTickets + ' aged</span>' : ''}
           ${am.avgACOS != null ? '<span>📉 ACOS ' + am.avgACOS + '%</span>' : ''}
         </div>
+
+        ${(()=>{
+          const gms = am.gmsData || {};
+          const tgt = gms.target || 0;
+          const pace = gms.pace || am.projectedMonthSales || 0;
+          const curr = gms.currentSale || am.currMonthSales || 0;
+          const delta = pace - tgt;
+          const pct = tgt > 0 ? Math.min(100, Math.round((curr/tgt)*100)) : 0;
+          const barCol = pct >= 90 ? 'var(--green)' : pct >= 60 ? '#d35400' : 'var(--red)';
+          const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
+          const key = am.amName.replace(/[^a-zA-Z0-9]/g,'_');
+          if (!tgt && !curr) return '';
+          return `<div style="margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);cursor:pointer;" onclick="event.stopPropagation();toggleGMSDetail('${am.amName.replace(/'/g,"\\'")}')">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">📊 GMS TARGET</span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="font-size:10px;color:var(--text-muted);">Tgt: <strong>${tgt?fmtINR(tgt):'—'}</strong></span>
+                <span style="font-size:10px;color:var(--text-muted);">Pace: <strong style="color:${deltaCol}">${pace?fmtINR(pace):'—'}</strong></span>
+                <span style="font-size:11px;font-weight:800;color:${deltaCol};">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</span>
+                <span style="font-size:10px;color:var(--text-muted);">▾</span>
+              </div>
+            </div>
+            <div style="height:3px;background:var(--border);"><div style="height:100%;width:${pct}%;background:${barCol};"></div></div>
+            <div id="gms-detail-${key}" style="display:none;"></div>
+          </div>`;
+        })()}
+
+        ${(()=>{
+          const fb = am.feedbackData || {};
+          const done = typeof fb.thisMonth === 'number' ? fb.thisMonth : 0;
+          const tgt = 5;
+          const rem = Math.max(0, tgt - done);
+          const pct = Math.min(100, Math.round((done/tgt)*100));
+          const barCol = done >= tgt ? 'var(--green)' : done >= 3 ? '#d35400' : 'var(--red)';
+          return `<div style="margin-top:6px;background:var(--bg);border-radius:8px;padding:6px 10px;border:1px solid var(--border);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">⭐ FEEDBACK THIS MONTH</span>
+              <span style="font-size:11px;font-weight:800;color:${done>=tgt?'var(--green)':'var(--red)'};">${done}/${tgt}
+                ${rem > 0 ? `<span style="font-size:10px;color:#d35400;"> · ${rem} baki</span>` : `<span style="font-size:10px;color:var(--green);"> ✓</span>`}
+              </span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:2px;">90-day uniqueness · ${fb.pendingUnique||0} sellers eligible</div>
+          </div>`;
+        })()}
+
+        ${(()=>{
+          const conn = am.connectivityData || {};
+          const total = am.totalSellers || 0;
+          const met = conn.sellersMet || 0;
+          const notMet = total - met;
+          const pct = total > 0 ? Math.round((met/total)*100) : 0;
+          const barCol = pct >= 80 ? 'var(--green)' : pct >= 50 ? '#d35400' : 'var(--red)';
+          const label = pct >= 80 ? '✅ Good' : pct >= 50 ? '⚠️ Avg' : '🚨 Low';
+          return `<div style="margin-top:6px;background:var(--bg);border-radius:8px;padding:6px 10px;border:1px solid ${pct<50&&total>0?'var(--red)':'var(--border)'};">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">📞 CONNECTIVITY <span style="font-weight:400;">(3x/week · 3min+)</span></span>
+              <span style="font-size:11px;font-weight:800;color:${barCol};">${label} ${total>0?pct+'%':''}</span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:9px;color:var(--text-muted);">
+              <span>${met}/${total} sellers connected this week</span>
+              ${notMet>0&&total>0?`<span style="color:var(--red);font-weight:600;">${notMet} missed</span>`:''}
+            </div>
+          </div>`;
+        })()}
+
       </div>`;
     }).join('')}
   </div>
@@ -9426,6 +9599,120 @@ function renderChurnRiskTab(amList) {
     </div>
   </div>
   ${riskSellers.length > 100 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Showing top 100 of ' + riskSellers.length + '</div>' : ''}`;
+}
+
+async function loadAdsTeamView(container) {
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Ads team data load ho raha hai...</div>';
+  const data = await api('GET', '/reports/sales-retention/ads-team?_=' + Date.now());
+  if (!data) { container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Load failed</h3></div>'; return; }
+  container.innerHTML = renderAdsTeamView(data);
+}
+
+function renderAdsTeamView(data) {
+  const { executives, canViewAll } = data;
+  if (!executives || executives.length === 0) return '<div class="empty-state"><div class="emoji">📢</div><h3>No ads data found</h3></div>';
+
+  const acosColor = (s, tgt) => {
+    if (s === null) return 'var(--text-muted)';
+    if (s > 25) return 'var(--red)';
+    if (s < 18) return '#d35400';
+    return 'var(--green)';
+  };
+
+  const execBlocks = executives.map(exec => {
+    const gmsPct = exec.totalGmsTgt > 0 ? Math.min(100, Math.round((exec.totalCurrSales / exec.totalGmsTgt) * 100)) : 0;
+    const barCol = gmsPct >= 90 ? 'var(--green)' : gmsPct >= 60 ? '#d35400' : 'var(--red)';
+    const deltaCol = exec.totalGmsDelta >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const sellerRows = exec.sellers.map(s => {
+      const gmsBarPct = s.gmsTgt > 0 ? Math.min(100, Math.round((s.currSales / s.gmsTgt) * 100)) : 0;
+      const gmsBarCol = gmsBarPct >= 90 ? 'var(--green)' : gmsBarPct >= 60 ? '#d35400' : 'var(--red)';
+      const acosCol = acosColor(s.currAcos, s.acosTgt);
+      const acosStatus = s.currAcos === null ? '—' : s.currAcos > 25 ? '🔴 High' : s.currAcos < 18 ? '🟡 Low' : '🟢 OK';
+
+      return `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px 10px;font-size:12px;">
+          <div style="font-weight:600;">${s.busyName}</div>
+          <div style="font-size:10px;color:var(--text-muted);">${s.marketplace} · ${s.amName}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;"><div style="height:100%;width:${gmsBarPct}%;background:${gmsBarCol};border-radius:2px;"></div></div>
+        </td>
+        <td style="padding:8px;text-align:right;font-size:12px;">${s.gmsTgt ? fmtINR(s.gmsTgt) : '—'}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;">${fmtINR(s.currSales)}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;font-weight:700;color:${s.gmsDelta >= 0 ? 'var(--green)' : 'var(--red)'};">${s.gmsTgt ? (s.gmsDelta >= 0 ? '+' : '') + fmtINR(Math.abs(s.gmsDelta)) : '—'}</td>
+        <td style="padding:8px;text-align:center;font-size:12px;">
+          <span style="color:${acosCol};font-weight:700;">${s.currAcos !== null ? s.currAcos + '%' : '—'}</span>
+          ${s.acosTgt !== null ? `<div style="font-size:10px;color:var(--text-muted);">Tgt: ${s.acosTgt}%</div>` : ''}
+        </td>
+        <td style="padding:8px;text-align:center;font-size:11px;">${acosStatus}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;color:var(--primary);font-weight:600;">${s.dailySpend ? fmtINR(s.dailySpend) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+    <div style="background:var(--card-bg);border:2px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;">
+      <div style="padding:12px 14px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;cursor:pointer;" onclick="toggleAdsExecDetail('${exec.execName.replace(/'/g,"\\'")}')">
+        <div>
+          <div style="font-size:14px;font-weight:800;">${exec.execName}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${exec.totalSellers} sellers</div>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">GMS Target</div>
+            <div style="font-size:13px;font-weight:700;">${exec.totalGmsTgt ? fmtINR(exec.totalGmsTgt) : '—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Pace</div>
+            <div style="font-size:13px;font-weight:700;color:${deltaCol};">${fmtINR(exec.totalGmsPace)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Delta</div>
+            <div style="font-size:13px;font-weight:800;color:${deltaCol};">${exec.totalGmsTgt ? (exec.totalGmsDelta >= 0 ? '+' : '') + fmtINR(Math.abs(exec.totalGmsDelta)) : '—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Daily Spend</div>
+            <div style="font-size:13px;font-weight:700;color:var(--primary);">${fmtINR(exec.totalDailySpend)}</div>
+          </div>
+        </div>
+      </div>
+      <div style="height:3px;background:var(--border);"><div style="height:100%;width:${gmsPct}%;background:${barCol};"></div></div>
+      <div id="ads-exec-${exec.execName.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+          <thead style="background:var(--bg);">
+            <tr>
+              <th style="padding:7px 10px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Delta</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">ACOS (Tgt 18-25%)</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Daily Spend</th>
+            </tr>
+          </thead>
+          <tbody>${sellerRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  const total = executives.reduce((s, e) => ({ tgt: s.tgt + e.totalGmsTgt, pace: s.pace + e.totalGmsPace, spend: s.spend + e.totalDailySpend }), { tgt: 0, pace: 0, spend: 0 });
+
+  return `
+  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;border-radius:14px;padding:14px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+    <div><div style="font-size:10px;opacity:.7;">Total GMS Target</div><div style="font-size:18px;font-weight:800;color:#D4A03D;">${fmtINR(total.tgt)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Team Pace</div><div style="font-size:18px;font-weight:800;color:${total.pace >= total.tgt ? '#27ae60' : '#e74c3c'};">${fmtINR(total.pace)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Delta</div><div style="font-size:18px;font-weight:800;color:${total.pace >= total.tgt ? '#27ae60' : '#e74c3c'};">${(total.pace - total.tgt >= 0 ? '+' : '') + fmtINR(Math.abs(total.pace - total.tgt))}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Total Daily Spend</div><div style="font-size:18px;font-weight:800;color:#3498db;">${fmtINR(total.spend)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">ACOS Target</div><div style="font-size:18px;font-weight:800;">18–25%</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Executive card click karo → seller-wise detail dekhne ke liye</div>
+  ${execBlocks}`;
+}
+
+function toggleAdsExecDetail(execName) {
+  const key = execName.replace(/[^a-zA-Z0-9]/g, '_');
+  const el = document.getElementById('ads-exec-' + key);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function exportRetentionCSV() {
@@ -11833,7 +12120,6 @@ async function gcCompare() {
   try {
     _gc.result = _gc.mp === 'amazon' ? gcBuildAmazon() : gcBuildFlipkart();
     _gc.work = _gc.includeWork === false ? null : await gcFetchWork();
-    await rnLoad('growth', _gc.client, (_gc.B.from || '').slice(-8));
     gcRenderResults();
     document.getElementById('gc-pdf-btn').style.display = '';
     document.getElementById('gc-xls-btn').style.display = '';
@@ -12829,189 +13115,6 @@ function gcProjectionHtml() {
   return html;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// REPORT NOTES  —  executive apni baat likhe, report me merge ho jaye
-//
-// Structured format hai, khali box nahi — har note ka category hota
-// hai. Isse executive ko pata rehta hai kya likhna hai, aur report me
-// sab ek jaisa dikhta hai.
-// ══════════════════════════════════════════════════════════════════
-var _rn = { module: '', client: '', period: '', notes: [], busy: false };
-
-const RN_CATS = [
-  { key:'work_done',      icon:'✅', label:'Kaam Hua',
-    hint:'Is period me aapne kya kiya',
-    eg:'12 campaigns ke bids optimise kiye, 47 negative keywords add kiye' },
-  { key:'observation',    icon:'👀', label:'Observation',
-    hint:'Kya notice kiya — data me ya market me',
-    eg:'Competitor ne price Rs 40 gira diya, isliye conversion gira' },
-  { key:'next_step',      icon:'📌', label:'Aage Ka Plan',
-    hint:'Agle period me kya karenge',
-    eg:'A+ content banayenge aur 3 ASIN pe coupon lagayenge' },
-  { key:'seller_pending', icon:'⏳', label:'Seller Se Chahiye',
-    hint:'Seller ke end se kya pending hai',
-    eg:'GST invoice aur 4 ASIN ke naye images chahiye' },
-];
-const RN_MAXLEN = 400;
-
-function rnCat(k) { return RN_CATS.find(c => c.key === k) || RN_CATS[0]; }
-
-async function rnLoad(module, client, period) {
-  _rn.module = module; _rn.client = client; _rn.period = period || '';
-  _rn.notes = [];
-  if (!client) return [];
-  try {
-    const r = await api('GET', '/report-notes?client=' + encodeURIComponent(client)
-      + '&module=' + encodeURIComponent(module)
-      + (period ? '&period=' + encodeURIComponent(period) : '')
-      + '&_=' + Date.now());
-    _rn.notes = Array.isArray(r) ? r : [];
-  } catch (e) { console.warn('notes load', e); }
-  return _rn.notes;
-}
-
-async function rnAdd() {
-  if (_rn.busy) return;
-  const cat = document.getElementById('rn-cat').value;
-  const el = document.getElementById('rn-text');
-  const text = String(el.value || '').trim();
-  const internal = !!(document.getElementById('rn-internal') || {}).checked;
-  if (!text) { showToast('Kuch likho pehle', 'error'); return; }
-  if (text.length > RN_MAXLEN) { showToast(RN_MAXLEN + ' characters se chhota rakho', 'error'); return; }
-  if (!_rn.client) { showToast('Pehle seller select karo', 'error'); return; }
-
-  _rn.busy = true;
-  try {
-    const r = await api('POST', '/report-notes', {
-      clientCode: _rn.client, module: _rn.module, period: _rn.period,
-      category: cat, text, internal,
-    });
-    if (r && r.error) { showToast(r.error, 'error'); return; }
-    el.value = '';
-    await rnLoad(_rn.module, _rn.client, _rn.period);
-    rnPaint();
-    showToast('Note add ho gaya', 'success');
-  } catch (e) {
-    showToast('Save nahi hua: ' + e.message, 'error');
-  } finally { _rn.busy = false; }
-}
-
-async function rnDelete(id) {
-  try {
-    const r = await api('DELETE', '/report-notes/' + id);
-    if (r && r.error) { showToast(r.error, 'error'); return; }
-    await rnLoad(_rn.module, _rn.client, _rn.period);
-    rnPaint();
-  } catch (e) { showToast(e.message, 'error'); }
-}
-
-function rnCount(el) {
-  const c = document.getElementById('rn-count');
-  if (c) {
-    c.textContent = el.value.length + '/' + RN_MAXLEN;
-    c.style.color = el.value.length > RN_MAXLEN ? 'var(--red)' : 'var(--text-muted)';
-  }
-}
-
-function rnCatChange() {
-  const c = rnCat(document.getElementById('rn-cat').value);
-  const t = document.getElementById('rn-text');
-  if (t) t.placeholder = 'e.g. ' + c.eg;
-  const hint = document.getElementById('rn-hint');
-  if (hint) hint.textContent = c.hint;
-}
-
-// ─── UI ───────────────────────────────────────────────────────────
-function rnSectionHtml() {
-  if (!_rn.client) return '';
-  const esc = s => String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const c0 = RN_CATS[0];
-
-  let html = '<div class="card" style="margin-bottom:16px;" id="rn-block">'
-    + '<div class="card-header"><span class="card-title">📝 Report Notes</span>'
-    + '<span style="font-size:12px;color:var(--text-muted);">'
-    + _rn.notes.length + ' note' + (_rn.notes.length === 1 ? '' : 's')
-    + ' · report me merge honge</span></div>'
-    + '<div class="card-body">'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">'
-    + 'Jo bhi likhoge wo PDF report me alag section me aa jayega. '
-    + 'Category choose karo — usse seller ko clear rehta hai ki kya kaam hua, kya plan hai, '
-    + 'aur unke end se kya pending hai.</div>'
-
-    // entry form
-    + '<div style="background:var(--bg);border-radius:9px;padding:11px;margin-bottom:12px;">'
-    + '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">'
-    + '<div><div style="font-size:10px;font-weight:700;color:var(--text-muted);">CATEGORY</div>'
-    + '<select id="rn-cat" class="form-control" style="padding:5px 8px;font-size:12px;width:180px;" onchange="rnCatChange()">'
-    + RN_CATS.map(c => '<option value="' + c.key + '">' + c.icon + ' ' + c.label + '</option>').join('')
-    + '</select></div>'
-    + '<div style="font-size:11px;color:var(--text-muted);padding-bottom:6px;" id="rn-hint">' + c0.hint + '</div>'
-    + '<label style="margin-left:auto;font-size:11px;display:flex;gap:5px;align-items:center;cursor:pointer;padding-bottom:6px;">'
-    + '<input type="checkbox" id="rn-internal"> Internal only (seller ko nahi jayega)</label>'
-    + '</div>'
-    + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
-    + '<span style="font-size:10px;font-weight:700;color:var(--text-muted);">NOTE</span>'
-    + '<span id="rn-count" style="font-size:9.5px;color:var(--text-muted);">0/' + RN_MAXLEN + '</span></div>'
-    + '<textarea id="rn-text" rows="2" oninput="rnCount(this)" '
-    + 'placeholder="e.g. ' + esc(c0.eg) + '" '
-    + 'style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;resize:vertical;"></textarea>'
-    + '<div style="margin-top:7px;"><button class="btn btn-primary btn-sm" onclick="rnAdd()">+ Add Note</button></div>'
-    + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:7px;font-style:italic;">'
-    + 'Seedha aur chhota likho — seller ko yahi padhna hai. Ek line me ek baat.</div>'
-    + '</div>';
-
-  // existing notes, category-wise
-  if (_rn.notes.length) {
-    RN_CATS.forEach(cat => {
-      const list = _rn.notes.filter(n => n.category === cat.key);
-      if (!list.length) return;
-      html += '<div style="margin-bottom:10px;">'
-        + '<div style="font-weight:700;font-size:12px;margin-bottom:5px;">' + cat.icon + ' ' + cat.label + '</div>'
-        + list.map(n =>
-            '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;background:#fff;'
-            + 'border:1px solid var(--border);border-left:3px solid '
-            + (n.internal ? 'var(--text-muted)' : 'var(--secondary)') + ';border-radius:0 6px 6px 0;margin-bottom:5px;">'
-            + '<div style="flex:1;">'
-            + '<div style="font-size:12px;line-height:1.5;">' + esc(n.text) + '</div>'
-            + '<div style="font-size:9.5px;color:var(--text-muted);margin-top:3px;">'
-            + esc(n.author) + ' · ' + new Date(n.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'})
-            + (n.internal ? ' · <strong>internal only</strong>' : '') + '</div></div>'
-            + '<span style="cursor:pointer;color:var(--red);font-size:14px;" title="hatao" '
-            + 'onclick="rnDelete(' + n.id + ')">×</span></div>').join('')
-        + '</div>';
-    });
-    const ext = _rn.notes.filter(n => !n.internal).length;
-    html += '<div style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg);border-radius:6px;">'
-      + 'ℹ️ ' + ext + ' note' + (ext === 1 ? '' : 's') + ' seller ki PDF me jayenge'
-      + (_rn.notes.length - ext ? ', ' + (_rn.notes.length - ext) + ' internal only hain' : '') + '.</div>';
-  } else {
-    html += '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:12px;">'
-      + 'Abhi koi note nahi. Upar se add karo.</div>';
-  }
-
-  return html + '</div></div>';
-}
-
-function rnPaint() {
-  const el = document.getElementById('rn-block');
-  if (!el) return;
-  const wrap = document.createElement('div');
-  wrap.innerHTML = rnSectionHtml();
-  const fresh = wrap.firstChild;
-  if (fresh) el.parentNode.replaceChild(fresh, el);
-}
-
-// ─── PDF ke liye — sirf non-internal notes ────────────────────────
-function rnForReport() {
-  const out = [];
-  RN_CATS.forEach(cat => {
-    const list = _rn.notes.filter(n => n.category === cat.key && !n.internal);
-    if (list.length) out.push({ cat, list });
-  });
-  return out;
-}
-
 // ─── RESULTS RENDER ───────────────────────────────────────────────
 function gcDestroyCharts() {
   Object.values(_gc.charts || {}).forEach(c => { try { c.destroy(); } catch(e){} });
@@ -13144,7 +13247,6 @@ function gcRenderResults() {
     html += '</div>';
   }
 
-  html += rnSectionHtml();
   html += gcProjectionHtml();
   html += gcWorkHtml(_gc.work, R);
   html += gcActionHtml(gcActionPlan(R), isAmz);
@@ -13328,17 +13430,6 @@ function gcExportExcel() {
     ...plan.week.map(o => ['IS HAFTE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
     ...plan.month.map(o => ['IS MAHINE', o.id, o.title, Math.round(o.aSales), Math.round(o.bSales), o.pct, o.tag + ' — ' + o.why, o.act]),
   ]);
-
-  const NT = rnForReport();
-  if (NT.length) {
-    add('Team Notes', [
-      ['TEAM KI BAAT'],
-      ['Is period me kya kaam hua, kya dekha, aage kya plan hai'], [],
-      ['Category', 'Note', 'Likhne wala', 'Date'],
-      ...NT.flatMap(g => g.list.map(nt => [g.cat.label, nt.text, nt.author,
-        new Date(nt.createdAt).toLocaleDateString('en-IN')])),
-    ]);
-  }
 
   const PJ = gcProjection();
   if (PJ) {
@@ -13669,29 +13760,6 @@ async function gcExportPDF() {
     bucket(plan.week,  'IS HAFTE', RED,  'urgent - abhi dekho');
     bucket(plan.month, 'IS MAHINE', BLUE, 'plan karke karo');
     chrome();
-
-    // ══ NOTES ══
-    const NT = rnForReport();
-    if (NT.length) {
-      doc.addPage(); header('Team Ki Baat');
-      y = 92;
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GREY);
-      doc.text(gcAscii('Is period me kya kaam hua, kya dekha, aur aage kya plan hai.'), Mg, y);
-      y += 20;
-      NT.forEach(grp => {
-        if (y > H - 110) { chrome(); doc.addPage(); header('Team Ki Baat (contd.)'); y = 92; }
-        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK);
-        doc.text(gcAscii(grp.cat.label), Mg, y); y += 15;
-        grp.list.forEach(nt => {
-          const ls = doc.splitTextToSize(gcAscii('- ' + nt.text), W - 2*Mg - 10);
-          if (y + ls.length*12 > H - 60) { chrome(); doc.addPage(); header('Team Ki Baat (contd.)'); y = 92; }
-          doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(70,76,86);
-          doc.text(ls, Mg + 8, y); y += ls.length*12 + 5;
-        });
-        y += 8;
-      });
-      chrome();
-    }
 
     // ══ PROJECTION ══
     const PJ = gcProjection();
@@ -17954,19 +18022,11 @@ async function raHandleUpload(type, input) {
   const cardEl = document.getElementById('racard-'+type);
   statusEl.innerHTML = '<span style="color:var(--amber);">⏳ Reading...</span>';
   try {
-    // Excel files binary padhni padti hain.
-    // 'listing' ko workbook chahiye (multi-sheet, 5 header rows).
-    // Baaki parsers CSV text pe chalte hain — unke liye convert kar dete hain,
-    // warna .text undefined milega aur raCSV crash karega.
+    // Category Listings Report .xlsm hai — binary padhna padega
     if (/\.(xlsm|xlsx|xls)$/i.test(file.name)) {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array', bookVBA: false });
-      if (type === 'listing') {
-        _ra[type] = { wb, filename: file.name };
-      } else {
-        const sh = gcFixRef(wb.Sheets[wb.SheetNames[0]]);
-        _ra[type] = { text: XLSX.utils.sheet_to_csv(sh), wb, filename: file.name };
-      }
+      _ra[type] = { wb, filename: file.name };
       statusEl.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + '</span>';
       cardEl.style.borderColor = 'var(--green)';
       cardEl.style.background = '#f0fff4';
@@ -18983,12 +19043,6 @@ function raListingSectionsHtml() {
 async function raRunAnalysis() {
   if (!_ra.client) { showToast('Pehle seller select karo!','error'); return; }
   const hasData = ['business','targeting','advertised','searchterm','inventory','returns','listing'].some(k => _ra[k]);
-  if (_ra.client && (!_rn.client || _rn.client !== _ra.client || _rn.module !== 'report')) {
-    rnLoad('report', _ra.client, '').then(() => {
-      const el = document.getElementById('rn-block');
-      if (el) rnPaint();
-    });
-  }
   if (!hasData) { showToast('Pehle koi report upload karo!','error'); return; }
 
   document.getElementById('ra-results').innerHTML = '<div class="loading"><div class="spinner"></div> ASIN-level analysis chal rahi hai...</div>';
@@ -19529,7 +19583,6 @@ function raRenderResults() {
     + raSummaryCard('📋','Total Tasks',tasks.length,'green')
     + '</div>';
 
-  html += rnSectionHtml();
   html += raListingSectionsHtml();
   html += exSectionHtml();
 

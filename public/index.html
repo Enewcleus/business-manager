@@ -9163,6 +9163,7 @@ function renderRetentionContent(data) {
       <button class="ret-tab active" data-tab="am-dashboard" onclick="switchRetTab('am-dashboard')" style="background:var(--primary);color:#fff;border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🏆 AM Dashboard</button>
       ${canViewAll ? '<button class="ret-tab" data-tab="insights" onclick="switchRetTab(\'insights\')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">💡 AI Insights</button>' : ''}
       <button class="ret-tab" data-tab="churn-risk" onclick="switchRetTab('churn-risk')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">🚨 Churn Risk Sellers</button>
+      <button class="ret-tab" data-tab="ads-team" onclick="switchRetTab('ads-team')" style="background:transparent;color:var(--text);border:none;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:700;">📢 Ads Team View</button>
     </div>`;
 
   document.getElementById('retention-content').innerHTML = `
@@ -9184,12 +9185,117 @@ function switchRetTab(tab) {
   if (tab === 'am-dashboard') container.innerHTML = renderAMDashboardTab(data.amList, data.growthTarget);
   else if (tab === 'insights') container.innerHTML = renderRetentionInsightsTab(data.aiInsights);
   else if (tab === 'churn-risk') container.innerHTML = renderChurnRiskTab(data.amList);
+  else if (tab === 'ads-team') loadAdsTeamView(container);
+}
+
+function toggleAtRiskPanel() {
+  const panel = document.getElementById('atrisk-panel');
+  const chev = document.getElementById('atrisk-chev');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (chev) chev.textContent = open ? '▾' : '▴';
+}
+
+async function toggleGMSDetail(amName) {
+  const key = amName.replace(/[^a-zA-Z0-9]/g, '_');
+  const el = document.getElementById('gms-detail-' + key);
+  if (!el) return;
+  if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:var(--text-muted);">Loading...</div>';
+  const data = await api('GET', '/reports/sales-retention/am/' + encodeURIComponent(amName));
+  if (!data || !data.sellers) { el.innerHTML = '<div style="padding:8px 10px;font-size:11px;color:var(--red);">Load failed</div>'; return; }
+  const sellers = data.sellers || [];
+  const rows = sellers.map(s => {
+    const tgt = s.gmsTarget || 0;
+    const curr = s.currSales || 0;
+    const pace = s.gmsPace || 0;
+    const delta = pace - tgt;
+    const pct = tgt > 0 ? Math.min(100, Math.round((curr/tgt)*100)) : 0;
+    const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
+    const barCol = pct >= 90 ? 'var(--green)' : pct >= 60 ? '#d35400' : 'var(--red)';
+    return `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:6px 10px;font-size:11px;">
+        <div style="font-weight:700;">${s.busyName}</div>
+        <div style="font-size:9px;color:var(--text-muted);">${s.marketplace||''}</div>
+        <div style="height:3px;background:var(--border);border-radius:2px;margin-top:3px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+      </td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${tgt ? fmtINR(tgt) : '—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${fmtINR(curr)}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:11px;">${pace ? fmtINR(pace) : '—'}</td>
+      <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:800;color:${deltaCol};">${tgt ? (delta>=0?'+':'') + fmtINR(Math.abs(delta)) : '—'}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:420px;">
+      <thead style="background:var(--bg);">
+        <tr>
+          <th style="padding:5px 10px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Target</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>
+          <th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Delta</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--text-muted);">No seller data</td></tr>'}</tbody>
+    </table>
+  </div>`;
 }
 
 function renderAMDashboardTab(amList, growthTarget) {
   if (!amList.length) return '<div class="empty-state"><div class="emoji">📭</div><h3>No AM data found</h3></div>';
 
+  // At-risk banner
+  const atRiskSellers = [];
+  amList.forEach(am => {
+    (am.sellers || []).forEach(s => {
+      if (['zero','negative'].includes(s.bucket)) {
+        atRiskSellers.push({ name: s.busyName, am: am.amName, bucket: s.bucket, growth: s.growthPct, curr: s.currSales, marketplace: s.marketplace || '' });
+      }
+    });
+  });
+  atRiskSellers.sort((a,b) => a.growth - b.growth);
+
+  const atRiskBanner = atRiskSellers.length ? `
+  <div style="background:#fdf2f2;border:1.5px solid var(--red);border-radius:10px;margin-bottom:12px;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;" onclick="toggleAtRiskPanel()">
+      <span style="background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;">${atRiskSellers.length}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--red);flex:1;">🚨 Sellers drop zone mein ja rahe hain</span>
+      <span style="font-size:11px;color:var(--red);opacity:.8;">${atRiskSellers.filter(s=>s.bucket==='zero').length} zero · ${atRiskSellers.filter(s=>s.bucket==='negative').length} declining</span>
+      <span id="atrisk-chev" style="color:var(--red);font-size:14px;">▾</span>
+    </div>
+    <div id="atrisk-panel" style="display:none;border-top:1px solid #f5c6cb;">
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
+          <thead style="background:#fdf2f2;">
+            <tr>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">Seller</th>
+              <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">AM</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Status</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--red);">Current Sale</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Growth</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${atRiskSellers.slice(0,50).map(s => `
+            <tr style="border-top:1px solid #f5c6cb;">
+              <td style="padding:7px 12px;font-weight:600;">${s.name}<div style="font-size:10px;color:var(--text-muted);">${s.marketplace}</div></td>
+              <td style="padding:7px 12px;font-size:11px;color:var(--text-muted);">${s.am}</td>
+              <td style="padding:7px 8px;text-align:center;">
+                <span style="background:${s.bucket==='zero'?'#7a000022':'var(--red)22'};color:${s.bucket==='zero'?'#7a0000':'var(--red)'};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">${s.bucket==='zero'?'🚨 Zero':'🔻 Declining'}</span>
+              </td>
+              <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmtINR(s.curr)}</td>
+              <td style="padding:7px 8px;text-align:center;color:var(--red);font-weight:800;">${s.growth}%</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>` : '';
+
   return `
+  ${atRiskBanner}
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
     ${amList.map((am, i) => {
       const growthCol = growthColor(am.momGrowthPct);
@@ -9256,6 +9362,73 @@ function renderAMDashboardTab(amList, growthTarget) {
           ${am.agedTickets ? '<span style="color:var(--red);font-weight:700;">⏰ ' + am.agedTickets + ' aged</span>' : ''}
           ${am.avgACOS != null ? '<span>📉 ACOS ' + am.avgACOS + '%</span>' : ''}
         </div>
+
+        ${(()=>{
+          const gms = am.gmsData || {};
+          const tgt = gms.target || 0;
+          const pace = gms.pace || am.projectedMonthSales || 0;
+          const curr = gms.currentSale || am.currMonthSales || 0;
+          const delta = pace - tgt;
+          const pct = tgt > 0 ? Math.min(100, Math.round((curr/tgt)*100)) : 0;
+          const barCol = pct >= 90 ? 'var(--green)' : pct >= 60 ? '#d35400' : 'var(--red)';
+          const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
+          const key = am.amName.replace(/[^a-zA-Z0-9]/g,'_');
+          if (!tgt && !curr) return '';
+          return `<div style="margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);cursor:pointer;" onclick="event.stopPropagation();toggleGMSDetail('${am.amName.replace(/'/g,"\\'")}')">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">📊 GMS TARGET</span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="font-size:10px;color:var(--text-muted);">Tgt: <strong>${tgt?fmtINR(tgt):'—'}</strong></span>
+                <span style="font-size:10px;color:var(--text-muted);">Pace: <strong style="color:${deltaCol}">${pace?fmtINR(pace):'—'}</strong></span>
+                <span style="font-size:11px;font-weight:800;color:${deltaCol};">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</span>
+                <span style="font-size:10px;color:var(--text-muted);">▾</span>
+              </div>
+            </div>
+            <div style="height:3px;background:var(--border);"><div style="height:100%;width:${pct}%;background:${barCol};"></div></div>
+            <div id="gms-detail-${key}" style="display:none;"></div>
+          </div>`;
+        })()}
+
+        ${(()=>{
+          const fb = am.feedbackData || {};
+          const done = typeof fb.thisMonth === 'number' ? fb.thisMonth : 0;
+          const tgt = 5;
+          const rem = Math.max(0, tgt - done);
+          const pct = Math.min(100, Math.round((done/tgt)*100));
+          const barCol = done >= tgt ? 'var(--green)' : done >= 3 ? '#d35400' : 'var(--red)';
+          return `<div style="margin-top:6px;background:var(--bg);border-radius:8px;padding:6px 10px;border:1px solid var(--border);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">⭐ FEEDBACK THIS MONTH</span>
+              <span style="font-size:11px;font-weight:800;color:${done>=tgt?'var(--green)':'var(--red)'};">${done}/${tgt}
+                ${rem > 0 ? `<span style="font-size:10px;color:#d35400;"> · ${rem} baki</span>` : `<span style="font-size:10px;color:var(--green);"> ✓</span>`}
+              </span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+            <div style="font-size:9px;color:var(--text-muted);margin-top:2px;">90-day uniqueness · ${fb.pendingUnique||0} sellers eligible</div>
+          </div>`;
+        })()}
+
+        ${(()=>{
+          const conn = am.connectivityData || {};
+          const total = am.totalSellers || 0;
+          const met = conn.sellersMet || 0;
+          const notMet = total - met;
+          const pct = total > 0 ? Math.round((met/total)*100) : 0;
+          const barCol = pct >= 80 ? 'var(--green)' : pct >= 50 ? '#d35400' : 'var(--red)';
+          const label = pct >= 80 ? '✅ Good' : pct >= 50 ? '⚠️ Avg' : '🚨 Low';
+          return `<div style="margin-top:6px;background:var(--bg);border-radius:8px;padding:6px 10px;border:1px solid ${pct<50&&total>0?'var(--red)':'var(--border)'};">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:700;color:var(--text-muted);">📞 CONNECTIVITY <span style="font-weight:400;">(3x/week · 3min+)</span></span>
+              <span style="font-size:11px;font-weight:800;color:${barCol};">${label} ${total>0?pct+'%':''}</span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px;"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:9px;color:var(--text-muted);">
+              <span>${met}/${total} sellers connected this week</span>
+              ${notMet>0&&total>0?`<span style="color:var(--red);font-weight:600;">${notMet} missed</span>`:''}
+            </div>
+          </div>`;
+        })()}
+
       </div>`;
     }).join('')}
   </div>
@@ -9426,6 +9599,120 @@ function renderChurnRiskTab(amList) {
     </div>
   </div>
   ${riskSellers.length > 100 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;text-align:center;">Showing top 100 of ' + riskSellers.length + '</div>' : ''}`;
+}
+
+async function loadAdsTeamView(container) {
+  container.innerHTML = '<div class="loading"><div class="spinner"></div> Ads team data load ho raha hai...</div>';
+  const data = await api('GET', '/reports/sales-retention/ads-team?_=' + Date.now());
+  if (!data) { container.innerHTML = '<div class="empty-state"><div class="emoji">⚠️</div><h3>Load failed</h3></div>'; return; }
+  container.innerHTML = renderAdsTeamView(data);
+}
+
+function renderAdsTeamView(data) {
+  const { executives, canViewAll } = data;
+  if (!executives || executives.length === 0) return '<div class="empty-state"><div class="emoji">📢</div><h3>No ads data found</h3></div>';
+
+  const acosColor = (s, tgt) => {
+    if (s === null) return 'var(--text-muted)';
+    if (s > 25) return 'var(--red)';
+    if (s < 18) return '#d35400';
+    return 'var(--green)';
+  };
+
+  const execBlocks = executives.map(exec => {
+    const gmsPct = exec.totalGmsTgt > 0 ? Math.min(100, Math.round((exec.totalCurrSales / exec.totalGmsTgt) * 100)) : 0;
+    const barCol = gmsPct >= 90 ? 'var(--green)' : gmsPct >= 60 ? '#d35400' : 'var(--red)';
+    const deltaCol = exec.totalGmsDelta >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const sellerRows = exec.sellers.map(s => {
+      const gmsBarPct = s.gmsTgt > 0 ? Math.min(100, Math.round((s.currSales / s.gmsTgt) * 100)) : 0;
+      const gmsBarCol = gmsBarPct >= 90 ? 'var(--green)' : gmsBarPct >= 60 ? '#d35400' : 'var(--red)';
+      const acosCol = acosColor(s.currAcos, s.acosTgt);
+      const acosStatus = s.currAcos === null ? '—' : s.currAcos > 25 ? '🔴 High' : s.currAcos < 18 ? '🟡 Low' : '🟢 OK';
+
+      return `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px 10px;font-size:12px;">
+          <div style="font-weight:600;">${s.busyName}</div>
+          <div style="font-size:10px;color:var(--text-muted);">${s.marketplace} · ${s.amName}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;"><div style="height:100%;width:${gmsBarPct}%;background:${gmsBarCol};border-radius:2px;"></div></div>
+        </td>
+        <td style="padding:8px;text-align:right;font-size:12px;">${s.gmsTgt ? fmtINR(s.gmsTgt) : '—'}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;">${fmtINR(s.currSales)}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;font-weight:700;color:${s.gmsDelta >= 0 ? 'var(--green)' : 'var(--red)'};">${s.gmsTgt ? (s.gmsDelta >= 0 ? '+' : '') + fmtINR(Math.abs(s.gmsDelta)) : '—'}</td>
+        <td style="padding:8px;text-align:center;font-size:12px;">
+          <span style="color:${acosCol};font-weight:700;">${s.currAcos !== null ? s.currAcos + '%' : '—'}</span>
+          ${s.acosTgt !== null ? `<div style="font-size:10px;color:var(--text-muted);">Tgt: ${s.acosTgt}%</div>` : ''}
+        </td>
+        <td style="padding:8px;text-align:center;font-size:11px;">${acosStatus}</td>
+        <td style="padding:8px;text-align:right;font-size:12px;color:var(--primary);font-weight:600;">${s.dailySpend ? fmtINR(s.dailySpend) : '—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+    <div style="background:var(--card-bg);border:2px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;">
+      <div style="padding:12px 14px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;cursor:pointer;" onclick="toggleAdsExecDetail('${exec.execName.replace(/'/g,"\\'")}')">
+        <div>
+          <div style="font-size:14px;font-weight:800;">${exec.execName}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${exec.totalSellers} sellers</div>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">GMS Target</div>
+            <div style="font-size:13px;font-weight:700;">${exec.totalGmsTgt ? fmtINR(exec.totalGmsTgt) : '—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Pace</div>
+            <div style="font-size:13px;font-weight:700;color:${deltaCol};">${fmtINR(exec.totalGmsPace)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Delta</div>
+            <div style="font-size:13px;font-weight:800;color:${deltaCol};">${exec.totalGmsTgt ? (exec.totalGmsDelta >= 0 ? '+' : '') + fmtINR(Math.abs(exec.totalGmsDelta)) : '—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10px;color:var(--text-muted);">Daily Spend</div>
+            <div style="font-size:13px;font-weight:700;color:var(--primary);">${fmtINR(exec.totalDailySpend)}</div>
+          </div>
+        </div>
+      </div>
+      <div style="height:3px;background:var(--border);"><div style="height:100%;width:${gmsPct}%;background:${barCol};"></div></div>
+      <div id="ads-exec-${exec.execName.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+          <thead style="background:var(--bg);">
+            <tr>
+              <th style="padding:7px 10px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Delta</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">ACOS (Tgt 18-25%)</th>
+              <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>
+              <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Daily Spend</th>
+            </tr>
+          </thead>
+          <tbody>${sellerRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  const total = executives.reduce((s, e) => ({ tgt: s.tgt + e.totalGmsTgt, pace: s.pace + e.totalGmsPace, spend: s.spend + e.totalDailySpend }), { tgt: 0, pace: 0, spend: 0 });
+
+  return `
+  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;border-radius:14px;padding:14px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
+    <div><div style="font-size:10px;opacity:.7;">Total GMS Target</div><div style="font-size:18px;font-weight:800;color:#D4A03D;">${fmtINR(total.tgt)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Team Pace</div><div style="font-size:18px;font-weight:800;color:${total.pace >= total.tgt ? '#27ae60' : '#e74c3c'};">${fmtINR(total.pace)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Delta</div><div style="font-size:18px;font-weight:800;color:${total.pace >= total.tgt ? '#27ae60' : '#e74c3c'};">${(total.pace - total.tgt >= 0 ? '+' : '') + fmtINR(Math.abs(total.pace - total.tgt))}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">Total Daily Spend</div><div style="font-size:18px;font-weight:800;color:#3498db;">${fmtINR(total.spend)}</div></div>
+    <div><div style="font-size:10px;opacity:.7;">ACOS Target</div><div style="font-size:18px;font-weight:800;">18–25%</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Executive card click karo → seller-wise detail dekhne ke liye</div>
+  ${execBlocks}`;
+}
+
+function toggleAdsExecDetail(execName) {
+  const key = execName.replace(/[^a-zA-Z0-9]/g, '_');
+  const el = document.getElementById('ads-exec-' + key);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function exportRetentionCSV() {

@@ -2480,7 +2480,7 @@ productivityRouter.post('/productivity/regenerate-ai', authMiddleware, async (re
 
 const salesRetentionRouter = require('express').Router();
 
-const SR_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra'];
+const SR_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra','ankit'];
 const GROWTH_TARGET_PCT = 15; // Minimum expected monthly growth per seller
 
 // Helpers
@@ -2887,6 +2887,52 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
 
     res.json({ amName: requestedAM, period: bounds, sellers });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ads Team View — seller-wise GMS + ACOS target + daily ad spend
+salesRetentionRouter.get('/sales-retention/ads-team', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const lowerName = (name || '').toLowerCase();
+    const isNamedAdmin = SR_NAMED_ADMINS.some(n => lowerName.includes(n));
+    const FULL_ACCESS = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    const isAdsLead = isNamedAdmin || FULL_ACCESS.includes(role);
+    const isAdsExec = role === 'Ads Executive';
+    if (!isAdsLead && !isAdsExec) return res.status(403).json({ error: 'Not authorized' });
+    const bounds = _monthBoundaries(req.query.refDate);
+    let clientsQuery = supabase.from('clients').select('client_code, busy_name, am_name, ads_manager, marketplace, status').in('status', ['Active','Hold']).not('ads_manager', 'is', null);
+    if (isAdsExec && !isNamedAdmin) clientsQuery = clientsQuery.eq('ads_manager', name);
+    const { data: clients } = await clientsQuery;
+    if (!clients || clients.length === 0) return res.json({ executives: [], period: bounds });
+    const codes = clients.map(c => c.client_code);
+    const [dsrCurrRes, dsrPrevRes, dsrDailyRes] = await Promise.all([
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo).in('client_code', codes)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo).in('client_code', codes)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, ad_spend, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo).in('client_code', codes).order('report_date', { ascending: false })).then(d => ({ data: d })),
+    ]);
+    const currMonthly = _clientMonthlyTotals(dsrCurrRes.data);
+    const prevMonthly = _clientMonthlyTotals(dsrPrevRes.data);
+    const dailySpendMap = {};
+    (dsrDailyRes.data || []).forEach(d => { if (!dailySpendMap[d.client_code]) dailySpendMap[d.client_code] = d.ad_spend || 0; });
+    const execMap = {};
+    clients.forEach(c => { const exec = c.ads_manager || 'Unassigned'; if (!execMap[exec]) execMap[exec] = []; execMap[exec].push(c); });
+    const executives = Object.entries(execMap).map(([execName, execClients]) => {
+      const sellers = execClients.map(c => {
+        const curr = currMonthly[c.client_code] || { sales: 0, adSpend: 0 };
+        const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0 };
+        const dg = _drrGrowth(curr.sales, prev.sales, bounds);
+        const gmsTgt = prev.sales > 0 ? Math.round(prev.sales * 1.20) : 0;
+        const prevAcos = prev.adSpend > 0 && prev.sales > 0 ? parseFloat(((prev.adSpend / prev.sales) * 100).toFixed(1)) : null;
+        let acosTgt = null;
+        if (prevAcos !== null) acosTgt = prevAcos < 18 ? 18 : prevAcos > 25 ? 25 : parseFloat(prevAcos.toFixed(1));
+        const currAcos = curr.adSpend > 0 && curr.sales > 0 ? parseFloat(((curr.adSpend / curr.sales) * 100).toFixed(1)) : null;
+        const gmsPace = dg.projected || 0;
+        return { clientCode: c.client_code, busyName: c.busy_name, marketplace: c.marketplace || '', amName: c.am_name || '', currSales: Math.round(curr.sales), prevSales: Math.round(prev.sales), currAdSpend: Math.round(curr.adSpend), gmsTgt, gmsPace: Math.round(gmsPace), gmsDelta: Math.round(gmsPace - gmsTgt), prevAcos, currAcos, acosTgt, dailySpend: Math.round(dailySpendMap[c.client_code] || 0), growthPct: dg.growthPct };
+      }).sort((a, b) => a.gmsDelta - b.gmsDelta);
+      return { execName, totalSellers: sellers.length, totalGmsTgt: sellers.reduce((s,x)=>s+x.gmsTgt,0), totalCurrSales: sellers.reduce((s,x)=>s+x.currSales,0), totalGmsPace: sellers.reduce((s,x)=>s+x.gmsPace,0), totalGmsDelta: sellers.reduce((s,x)=>s+x.gmsPace,0) - sellers.reduce((s,x)=>s+x.gmsTgt,0), totalDailySpend: sellers.reduce((s,x)=>s+x.dailySpend,0), sellers };
+    }).sort((a,b) => b.totalGmsPace - a.totalGmsPace);
+    res.json({ executives, period: bounds, canViewAll: isAdsLead });
+  } catch(e) { console.error('Ads team view error:', e); res.status(500).json({ error: e.message }); }
 });
 
 // AI insights cache (separate from productivity cache)

@@ -4,6 +4,8 @@ const { authMiddleware } = require('../middleware/auth');
 
 async function getFilteredClients(user) {
   const { role, name } = user;
+  const lowerName = (name || '').toLowerCase();
+  const isAdsLead = lowerName.includes('ankit'); // Ankit Sahu — Ads Lead, sees all clients
 
   // Defensive marketplace filter: only apply if access list contains valid Amazon/Flipkart/Meesho values
   // (legacy bulk imports had junk like ["Other"] which filtered out all real clients)
@@ -16,7 +18,7 @@ async function getFilteredClients(user) {
   }
 
   // Admin, Ops Lead, CSI Lead, CSI Executive, Sub Admin, CRM Executive, CRM Lead, Viewer — sab clients
-  if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive', 'Viewer'].includes(role)) {
+  if (['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CSI Executive', 'Sub Admin', 'CRM Executive', 'Viewer'].includes(role) || isAdsLead) {
     let q = supabase.from('clients').select('*').order('busy_name');
     if (marketplaceFilter) q = q.in('marketplace', marketplaceFilter);
     const { data, error } = await q;

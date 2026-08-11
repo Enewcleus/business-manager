@@ -360,7 +360,9 @@ dashRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
   try {
     let clientQuery = supabase.from('clients').select('health_status, status');
-    if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Viewer'].includes(role)) {
+    const lowerName = (name || '').toLowerCase();
+    const isAdsLead = lowerName.includes('ankit'); // Ankit Sahu — Ads Lead
+    if (!['Admin', 'Ops Lead', 'CRM Lead', 'CSI Lead', 'CRM Executive', 'Sub Admin', 'Viewer'].includes(role) && !isAdsLead) {
       if (role === 'Account Manager') clientQuery = clientQuery.eq('am_name', name);
       else if (role === 'Ads Executive') clientQuery = clientQuery.eq('ads_manager', name);
       else if (['SME', 'Team Lead', 'Senior Executive'].includes(role)) {
@@ -689,8 +691,10 @@ const adsRouter = require('express').Router();
 
 adsRouter.get('/', authMiddleware, async (req, res) => {
   const { role, name } = req.user;
+  const lowerName = (name || '').toLowerCase();
+  const isAdsLead = lowerName.includes('ankit');
   let query = supabase.from('ads_data').select('*').order('client_name');
-  if (role === 'Ads Executive') query = query.eq('ads_manager', name);
+  if (role === 'Ads Executive' && !isAdsLead) query = query.eq('ads_manager', name);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data.map(a => ({

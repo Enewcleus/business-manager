@@ -2480,7 +2480,7 @@ productivityRouter.post('/productivity/regenerate-ai', authMiddleware, async (re
 
 const salesRetentionRouter = require('express').Router();
 
-const SR_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra'];
+const SR_NAMED_ADMINS = ['piyush','gaurav','manpreet','devendra','shivendra','ankit'];
 const GROWTH_TARGET_PCT = 15; // Minimum expected monthly growth per seller
 
 // Helpers
@@ -2889,6 +2889,128 @@ salesRetentionRouter.get('/sales-retention/am/:amName', authMiddleware, async (r
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Ads Team View — seller-wise GMS + ACOS target + daily ad spend
+salesRetentionRouter.get('/sales-retention/ads-team', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const lowerName = (name || '').toLowerCase();
+    const isNamedAdmin = SR_NAMED_ADMINS.some(n => lowerName.includes(n));
+    const FULL_ACCESS = ['Admin','Ops Lead','CRM Lead','CSI Lead','Sub Admin'];
+    const isAdsLead = isNamedAdmin || FULL_ACCESS.includes(role);
+    const isAdsExec = role === 'Ads Executive';
+    if (!isAdsLead && !isAdsExec) return res.status(403).json({ error: 'Not authorized' });
+
+    const bounds = _monthBoundaries(req.query.refDate);
+
+    // Fetch clients assigned to ads executives
+    let clientsQuery = supabase.from('clients')
+      .select('client_code, busy_name, am_name, ads_manager, marketplace, status')
+      .in('status', ['Active','Hold'])
+      .not('ads_manager', 'is', null);
+    if (isAdsExec && !isNamedAdmin) clientsQuery = clientsQuery.eq('ads_manager', name);
+    const { data: clients } = await clientsQuery;
+
+    if (!clients || clients.length === 0) return res.json({ executives: [], period: bounds });
+
+    const codes = clients.map(c => c.client_code);
+
+    // DSR data - current month (sales + ad spend daily)
+    const [dsrCurrRes, dsrPrevRes, dsrDailyRes] = await Promise.all([
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo).in('client_code', codes)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo).in('client_code', codes)).then(d => ({ data: d })),
+      fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo).in('client_code', codes).order('report_date', { ascending: false })).then(d => ({ data: d })),
+    ]);
+
+    const currMonthly = _clientMonthlyTotals(dsrCurrRes.data);
+    const prevMonthly = _clientMonthlyTotals(dsrPrevRes.data);
+
+    // Daily ad spend - last entry per client
+    const dailySpendMap = {};
+    (dsrDailyRes.data || []).forEach(d => {
+      if (!dailySpendMap[d.client_code]) dailySpendMap[d.client_code] = d.ad_spend || 0;
+    });
+
+    // Group by ads_manager
+    const execMap = {};
+    clients.forEach(c => {
+      const exec = c.ads_manager || 'Unassigned';
+      if (!execMap[exec]) execMap[exec] = [];
+      execMap[exec].push(c);
+    });
+
+    const executives = Object.entries(execMap).map(([execName, execClients]) => {
+      const sellers = execClients.map(c => {
+        const curr = currMonthly[c.client_code] || { sales: 0, adSpend: 0 };
+        const prev = prevMonthly[c.client_code] || { sales: 0, adSpend: 0 };
+        const dg = _drrGrowth(curr.sales, prev.sales, bounds);
+
+        // GMS target = prev month sales + 20%
+        const gmsTgt = prev.sales > 0 ? Math.round(prev.sales * 1.20) : 0;
+
+        // ACOS target: if prev ACOS exists keep in 18-25% band
+        const prevAcos = prev.adSpend > 0 && prev.sales > 0 ? parseFloat(((prev.adSpend / prev.sales) * 100).toFixed(1)) : null;
+        let acosTgt = null;
+        if (prevAcos !== null) {
+          if (prevAcos < 18) acosTgt = 18;
+          else if (prevAcos > 25) acosTgt = 25;
+          else acosTgt = parseFloat(prevAcos.toFixed(1));
+        }
+
+        // Current ACOS
+        const currAcos = curr.adSpend > 0 && curr.sales > 0 ? parseFloat(((curr.adSpend / curr.sales) * 100).toFixed(1)) : null;
+        const acosStatus = currAcos === null ? 'no-data' : currAcos <= 25 ? (currAcos >= 18 ? 'good' : 'low') : 'high';
+
+        // Daily ad spend (latest DSR entry)
+        const dailySpend = dailySpendMap[c.client_code] || 0;
+
+        // GMS delta
+        const gmsPace = dg.projected || 0;
+        const gmsDelta = gmsPace - gmsTgt;
+
+        return {
+          clientCode: c.client_code,
+          busyName: c.busy_name,
+          marketplace: c.marketplace || '',
+          amName: c.am_name || '',
+          currSales: Math.round(curr.sales),
+          prevSales: Math.round(prev.sales),
+          currAdSpend: Math.round(curr.adSpend),
+          gmsTgt,
+          gmsPace: Math.round(gmsPace),
+          gmsDelta: Math.round(gmsDelta),
+          prevAcos,
+          currAcos,
+          acosTgt,
+          acosStatus,
+          dailySpend: Math.round(dailySpend),
+          growthPct: dg.growthPct,
+        };
+      }).sort((a, b) => a.gmsDelta - b.gmsDelta); // worst first
+
+      const totalGmsTgt = sellers.reduce((s, x) => s + x.gmsTgt, 0);
+      const totalCurrSales = sellers.reduce((s, x) => s + x.currSales, 0);
+      const totalGmsPace = sellers.reduce((s, x) => s + x.gmsPace, 0);
+      const totalDailySpend = sellers.reduce((s, x) => s + x.dailySpend, 0);
+
+      return {
+        execName,
+        totalSellers: sellers.length,
+        totalGmsTgt,
+        totalCurrSales,
+        totalGmsPace,
+        totalGmsDelta: totalGmsPace - totalGmsTgt,
+        totalDailySpend,
+        sellers,
+      };
+    }).sort((a, b) => b.totalGmsPace - a.totalGmsPace);
+
+    res.json({ executives, period: bounds, canViewAll: isAdsLead });
+  } catch(e) {
+    console.error('Ads team view error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // AI insights cache (separate from productivity cache)
 const _retentionAICache = new Map();
 async function getRetentionAIInsights(amList, bounds) {
@@ -3188,96 +3310,6 @@ dsrRouter.get('/', authMiddleware, async (req, res) => {
 });
 
 
-
-// ══════════════════════════════════════════════════════════════════
-// REPORT NOTES  —  executive ke comments jo report me merge hote hain
-//
-// Structured hain, free-text blob nahi: har note ka ek category hota
-// hai aur character limit hai. Internal notes seller ke PDF me nahi
-// jaate — wo sirf team ko dikhte hain.
-// ══════════════════════════════════════════════════════════════════
-const reportNotesRouter = require('express').Router();
-
-const RN_CATS = ['work_done', 'observation', 'next_step', 'seller_pending'];
-const RN_MAX = 400;          // ek note kitna lamba
-const RN_MAX_NOTES = 40;     // ek report pe max notes
-
-// GET /report-notes?client=C1&module=growth&period=2026-07
-reportNotesRouter.get('/', authMiddleware, async (req, res) => {
-  try {
-    const { client, module: mod, period } = req.query;
-    if (!client) return res.status(400).json({ error: 'client zaroori hai' });
-    let q = supabase.from('report_notes').select('*')
-      .eq('client_code', client)
-      .order('created_at', { ascending: true });
-    if (mod) q = q.eq('module', mod);
-    if (period) q = q.eq('period', period);
-    const { data, error } = await q;
-    if (error) throw error;
-    res.json((data || []).map(r => ({
-      id: r.id,
-      clientCode: r.client_code,
-      module: r.module,
-      period: r.period,
-      category: r.category,
-      text: r.note_text,
-      internal: !!r.is_internal,
-      author: r.author_name,
-      authorRole: r.author_role,
-      createdAt: r.created_at,
-    })));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /report-notes
-reportNotesRouter.post('/', authMiddleware, async (req, res) => {
-  try {
-    const { clientCode, module: mod, period, category, text, internal } = req.body || {};
-    if (!clientCode) return res.status(400).json({ error: 'Seller select karo' });
-    if (!RN_CATS.includes(category)) return res.status(400).json({ error: 'Category galat hai' });
-    const t = String(text || '').trim();
-    if (!t) return res.status(400).json({ error: 'Note khali hai' });
-    if (t.length > RN_MAX) return res.status(400).json({ error: 'Note ' + RN_MAX + ' characters se chhota rakho' });
-
-    const { count } = await supabase.from('report_notes')
-      .select('id', { count: 'exact', head: true })
-      .eq('client_code', clientCode).eq('module', mod || '').eq('period', period || '');
-    if ((count || 0) >= RN_MAX_NOTES) {
-      return res.status(400).json({ error: 'Is report pe ' + RN_MAX_NOTES + ' notes ki limit hai' });
-    }
-
-    const { error } = await supabase.from('report_notes').insert({
-      client_code: clientCode,
-      module: mod || '',
-      period: period || '',
-      category,
-      note_text: t,
-      is_internal: !!internal,
-      author_name: req.user.name,
-      author_role: req.user.role,
-    });
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// DELETE /report-notes/:id  — apna note ya lead hi hata sakta hai
-reportNotesRouter.delete('/:id', authMiddleware, async (req, res) => {
-  try {
-    const leads = ['Admin', 'Ops Lead', 'Sub Admin', 'Team Lead', 'SME', 'Account Manager'];
-    const { data: row, error: e1 } = await supabase.from('report_notes')
-      .select('author_name').eq('id', req.params.id).single();
-    if (e1) throw e1;
-    if (!row) return res.status(404).json({ error: 'Note nahi mila' });
-    if (row.author_name !== req.user.name && !leads.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Sirf apna note hata sakte ho' });
-    }
-    const { error } = await supabase.from('report_notes').delete().eq('id', req.params.id);
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── SINGLE EXPORT — SABHI ROUTERS SAATH ──────────────────────
 module.exports = {
   crmRouter, csiRouter, tasksRouter, dashRouter, notifRouter,
@@ -3286,5 +3318,5 @@ module.exports = {
   flipkartAnalyzerRouter, adsAnalyzerRouter,
   expectationsRouter, monthlyReportsRouter, misRouter, docsRouter, approvalRouter,
   productivityRouter, salesRetentionRouter,
-  feedbackRouter, dsrRouter, reportNotesRouter,
+  feedbackRouter, dsrRouter,
 };

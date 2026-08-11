@@ -6974,7 +6974,12 @@ function openEditUser(userId){
 async function submitEditUser(userId){
   const name=document.getElementById('eu-name').value.trim(),designation=document.getElementById('eu-designation').value.trim(),department=document.getElementById('eu-dept').value,role=document.getElementById('eu-role').value,reportingTo=document.getElementById('eu-manager').value,isActive=document.getElementById('eu-active').value==='true';
   const r=await api('PATCH',`/users/${userId}`,{name,designation,department,role,reportingTo,isActive});
-  if(r?.success){showToast('✅ User updated!','success');closePanel();renderAdmin();}else showToast(r?.error||'Failed','error');
+  if(r?.success){
+    showToast('✅ User updated!','success');
+    closePanel();
+    window._adminUsers = null; // cache clear karo
+    await renderAdmin(); // fresh reload
+  } else showToast(r?.error||'Failed','error');
 }
 
 function openResetPassword(){

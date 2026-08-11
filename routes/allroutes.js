@@ -2621,14 +2621,16 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
     const refDate = req.query.refDate || null;
     const bounds = _monthBoundaries(refDate);
 
-    // Parallel fetch
-    const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes, ticketsRes, usersRes] = await Promise.all([
+    // Parallel fetch — added seller_monthly_sales + feedback_records
+    const [clientsRes, dsrCurrRes, dsrPrevRes, adsRes, ticketsRes, usersRes, monthlySalesRes, feedbackRes] = await Promise.all([
       supabase.from('clients').select('client_code, busy_name, am_name, marketplace, service_plan, status, seller_aging, renewal_date').in('status', ['Active','Hold']),
       fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.currFrom).lte('report_date', bounds.currTo)).then(d => ({ data: d })),
       fetchAll(() => supabase.from('dsr_data').select('client_code, sales_amount, ad_spend, orders_count, report_date').gte('report_date', bounds.prevFrom).lte('report_date', bounds.prevTo)).then(d => ({ data: d })),
       supabase.from('ads_data').select('client_code, acos'),
       supabase.from('tickets').select('ticket_id, client_code, status, created_at, hours_to_close, resolved_by, assigned_to').gte('created_at', bounds.currFrom + 'T00:00:00'),
       supabase.from('users').select('name, role, joining_date').eq('is_active', true).eq('role', 'Account Manager'),
+      supabase.from('seller_monthly_sales').select('client_code, final_sale, month_year').eq('month_year', bounds.prevLabel),
+      supabase.from('feedback_records').select('uploaded_by, is_unique, uploaded_at').gte('uploaded_at', bounds.currFrom + 'T00:00:00').lte('uploaded_at', bounds.currTo + 'T23:59:59'),
     ]);
 
     const clients = clientsRes.data || [];
@@ -2638,6 +2640,20 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
     (adsRes.data || []).forEach(a => { if (a.client_code) adsMap[a.client_code] = parseFloat(a.acos) || null; });
     const tickets = ticketsRes.data || [];
     const today = new Date();
+
+    // GMS target map: client_code -> last month final sale (from admin upload)
+    const monthlySalesMap = {};
+    (monthlySalesRes.data || []).forEach(r => { monthlySalesMap[r.client_code] = parseFloat(r.final_sale) || 0; });
+
+    // Feedback map: am_name -> { thisMonth, uniqueCount }
+    const feedbackMap = {};
+    (feedbackRes.data || []).forEach(f => {
+      const am = (f.uploaded_by || '').trim();
+      if (!am) return;
+      if (!feedbackMap[am]) feedbackMap[am] = { thisMonth: 0, uniqueCount: 0 };
+      feedbackMap[am].thisMonth++;
+      if (f.is_unique) feedbackMap[am].uniqueCount++;
+    });
 
     // Build per-seller records grouped by AM
     const amMap = {};
@@ -2672,6 +2688,13 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
       entry.totalAdSpend += curr.adSpend;
       entry.totalOrders  += curr.orders;
 
+      // GMS target from admin upload (last month final sale × 1.20)
+      const lastMonthFinal = monthlySalesMap[c.client_code] || prev.sales || 0;
+      const gmsTgt = lastMonthFinal > 0 ? Math.round(lastMonthFinal * 1.20) : 0;
+      const gmsPace = dg.projected || 0;
+      entry.totalGmsTgt = (entry.totalGmsTgt || 0) + gmsTgt;
+      entry.totalGmsPace = (entry.totalGmsPace || 0) + gmsPace;
+
       if (bucket === 'zero') entry.zeroSaleCount++;
       else if (bucket === 'negative') entry.negativeGrowthCount++;
       else if (bucket === 'below_target') entry.belowTargetCount++;
@@ -2697,6 +2720,8 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         bucket,
         acos: adsMap[c.client_code] || null,
         renewalDate: c.renewal_date,
+        gmsTarget: gmsTgt,
+        gmsPace: Math.round(gmsPace),
       });
     });
 
@@ -2781,6 +2806,18 @@ salesRetentionRouter.get('/sales-retention', authMiddleware, async (req, res) =>
         grade: gradeObj.grade,
         gradeLabel: gradeObj.label,
         sellers: am.sellers,
+        // GMS target data
+        gmsData: {
+          target: am.totalGmsTgt || 0,
+          currentSale: Math.round(am.currSales),
+          pace: am.totalGmsPace || 0,
+        },
+        // Feedback data
+        feedbackData: {
+          thisMonth: (feedbackMap[am.am_name] || {}).thisMonth || 0,
+          uniqueCount: (feedbackMap[am.am_name] || {}).uniqueCount || 0,
+          pendingUnique: 0, // calculated from feedback module separately
+        },
       };
     }).sort((a, b) => b.retentionScore - a.retentionScore);
 
@@ -2933,6 +2970,65 @@ salesRetentionRouter.get('/sales-retention/ads-team', authMiddleware, async (req
     }).sort((a,b) => b.totalGmsPace - a.totalGmsPace);
     res.json({ executives, period: bounds, canViewAll: isAdsLead });
   } catch(e) { console.error('Ads team view error:', e); res.status(500).json({ error: e.message }); }
+});
+
+// Admin: Upload monthly seller sales CSV → populates seller_monthly_sales table
+salesRetentionRouter.post('/sales-retention/upload-monthly-sales', authMiddleware, async (req, res) => {
+  try {
+    const { role, name } = req.user;
+    const ALLOWED = ['Admin','Ops Lead','Sub Admin'];
+    if (!ALLOWED.includes(role)) return res.status(403).json({ error: 'Admin only' });
+
+    const { rows, monthYear } = req.body;
+    if (!rows || !Array.isArray(rows) || !monthYear) {
+      return res.status(400).json({ error: 'rows array aur monthYear required hai' });
+    }
+
+    // Upsert rows
+    const records = rows.map(r => ({
+      client_code: (r.client_code || r.clientCode || '').toString().trim(),
+      final_sale: parseFloat(r.final_sale || r.finalSale || r.sale || 0) || 0,
+      month_year: monthYear.trim(),
+      uploaded_by: name,
+      uploaded_at: new Date().toISOString(),
+    })).filter(r => r.client_code && r.final_sale > 0);
+
+    if (!records.length) return res.status(400).json({ error: 'Valid records nahi mile' });
+
+    const { error } = await supabase.from('seller_monthly_sales')
+      .upsert(records, { onConflict: 'client_code,month_year' });
+
+    if (error) throw error;
+    res.json({ success: true, uploaded: records.length, monthYear });
+  } catch(e) {
+    console.error('Monthly sales upload error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin: Get upload history for seller_monthly_sales
+salesRetentionRouter.get('/sales-retention/monthly-sales-status', authMiddleware, async (req, res) => {
+  try {
+    const { role } = req.user;
+    const ALLOWED = ['Admin','Ops Lead','Sub Admin'];
+    if (!ALLOWED.includes(role)) return res.status(403).json({ error: 'Admin only' });
+
+    const { data, error } = await supabase.from('seller_monthly_sales')
+      .select('month_year, uploaded_by, uploaded_at')
+      .order('uploaded_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    // Group by month_year
+    const byMonth = {};
+    (data || []).forEach(r => {
+      if (!byMonth[r.month_year]) byMonth[r.month_year] = { count: 0, uploadedBy: r.uploaded_by, uploadedAt: r.uploaded_at };
+      byMonth[r.month_year].count++;
+    });
+
+    res.json({ months: Object.entries(byMonth).map(([m, v]) => ({ monthYear: m, ...v })) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // AI insights cache (separate from productivity cache)

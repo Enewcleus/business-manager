@@ -6680,11 +6680,91 @@ async function renderAdmin(){
       <div class="card-body" id="close-requests-list">
         <div class="loading"><div class="spinner"></div> Loading...</div>
       </div>
+    </div>
+
+    <!-- 📊 MONTHLY SALES UPLOAD (GMS Target) -->
+    <div class="card" style="border-left:4px solid #1D9E75;">
+      <div class="card-header" style="background:#e1f5ee;">
+        <span class="card-title" style="color:#0F6E56;">📊 Monthly Seller Sales Upload — GMS Target</span>
+        <button class="btn btn-sm" style="background:#1D9E75;color:#fff;" onclick="downloadMonthlySalesTemplate()">📥 Template Download</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Har month end pe upload karo — is se agle month ka GMS target automatically 20% upar set ho jaayega.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px;">Month (jis ka data hai)</label>
+            <input type="text" id="gms-month-year" class="form-control" placeholder="e.g. July 2026" style="font-size:13px;">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px;">CSV File (client_code, final_sale)</label>
+            <input type="file" id="gms-csv-file" accept=".csv" class="form-control" style="font-size:13px;">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="uploadMonthlySalesCSV()" style="background:#1D9E75;border-color:#1D9E75;">📤 Upload & Set Targets</button>
+        <div id="gms-upload-status" style="margin-top:10px;font-size:12px;"></div>
+        <div id="gms-upload-history" style="margin-top:12px;"></div>
+      </div>
     </div>`;
 
   window._adminUsers=users;
   loadCloseRequests();
   renderAccessMatrix().catch(()=>{});
+  loadGMSUploadHistory();
+}
+
+function downloadMonthlySalesTemplate() {
+  const csv = 'client_code,final_sale\nABC123,450000\nDEF456,280000';
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='monthly_sales_template.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function uploadMonthlySalesCSV() {
+  const monthYear = (document.getElementById('gms-month-year').value || '').trim();
+  const fileInput = document.getElementById('gms-csv-file');
+  const statusEl = document.getElementById('gms-upload-status');
+  if (!monthYear) { showToast('Month year likho pehle (e.g. July 2026)', 'error'); return; }
+  if (!fileInput.files.length) { showToast('CSV file select karo', 'error'); return; }
+  statusEl.innerHTML = '<span style="color:var(--text-muted);">⏳ Parsing CSV...</span>';
+  const text = await fileInput.files[0].text();
+  const lines = text.trim().split('\n');
+  const header = lines[0].toLowerCase().split(',').map(h => h.trim());
+  const codeIdx = header.indexOf('client_code');
+  const saleIdx = header.indexOf('final_sale');
+  if (codeIdx === -1 || saleIdx === -1) {
+    statusEl.innerHTML = '<span style="color:var(--red);">❌ CSV mein client_code aur final_sale columns chahiye</span>';
+    return;
+  }
+  const rows = lines.slice(1).map(line => {
+    const cols = line.split(',');
+    return { client_code: (cols[codeIdx]||'').trim(), final_sale: parseFloat((cols[saleIdx]||'0').trim()) || 0 };
+  }).filter(r => r.client_code && r.final_sale > 0);
+  if (!rows.length) { statusEl.innerHTML = '<span style="color:var(--red);">❌ Valid rows nahi mile CSV mein</span>'; return; }
+  statusEl.innerHTML = `<span style="color:var(--text-muted);">⏳ ${rows.length} rows upload ho rahi hain...</span>`;
+  const result = await api('POST', '/reports/sales-retention/upload-monthly-sales', { rows, monthYear });
+  if (result?.success) {
+    statusEl.innerHTML = `<span style="color:var(--green);">✅ ${result.uploaded} sellers ka data upload ho gaya — ${monthYear}</span>`;
+    showToast(`✅ ${result.uploaded} sellers uploaded for ${monthYear}`, 'success');
+    loadGMSUploadHistory();
+  } else {
+    statusEl.innerHTML = `<span style="color:var(--red);">❌ ${result?.error || 'Upload failed'}</span>`;
+  }
+}
+
+async function loadGMSUploadHistory() {
+  const el = document.getElementById('gms-upload-history');
+  if (!el) return;
+  const data = await api('GET', '/reports/sales-retention/monthly-sales-status');
+  if (!data || !data.months || !data.months.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">Recent uploads:</div>` +
+    data.months.slice(0,5).map(m => `
+    <div style="display:flex;gap:12px;align-items:center;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px;">
+      <span style="font-weight:600;color:#0F6E56;">${m.monthYear}</span>
+      <span style="color:var(--text-muted);">${m.count} sellers</span>
+      <span style="color:var(--text-muted);">by ${m.uploadedBy}</span>
+      <span style="color:var(--text-muted);margin-left:auto;">${new Date(m.uploadedAt).toLocaleDateString('en-IN')}</span>
+    </div>`).join('');
 }
 
 function showHierarchy(){

@@ -1053,6 +1053,7 @@ function openSeller360(clientCode, busyName) {
 }
 
 async function renderSeller360() {
+  const clients = await getClients();
   if(clients) APP.clients=clients;
   document.getElementById('page-content').innerHTML=`
     <div class="card">
@@ -1760,23 +1761,20 @@ async function renderDashboard() {
                 </tr>
               </thead>
               <tbody>
-                ${(myAM.sellers||[]).slice(0,15).map(s => {
-                  const tg = s.gmsTarget||0;
-                  const pg = s.gmsPace||0;
-                  const dl = pg - tg;
-                  const dlCol = dl>=0?'var(--green)':'var(--red)';
-                  const bkt = s.bucket||'';
-                  const statusLabel = bkt==='zero'?'🚨 Zero':bkt==='negative'?'🔻 Down':bkt==='healthy'?'✅ Good':bkt==='below_target'?'⚠️ Below':'—';
-                  return `<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360('${s.clientCode}','${(s.busyName||'').replace(/'/g,"\\'")}')">
-                    <td style="padding:7px 12px;">
-                      <div style="font-weight:600;font-size:12px;">${s.busyName}</div>
-                      <div style="font-size:10px;color:var(--text-muted);">${s.marketplace||''}</div>
-                    </td>
-                    <td style="padding:7px 8px;text-align:right;">${tg?fmtINR(tg):'—'}</td>
-                    <td style="padding:7px 8px;text-align:right;">${fmtINR(s.currSales||0)}</td>
-                    <td style="padding:7px 8px;text-align:right;color:${dlCol};font-weight:700;">${pg?fmtINR(pg):'—'}</td>
-                    <td style="padding:7px 8px;text-align:center;font-size:11px;">${statusLabel}</td>
-                  </tr>`;
+                ${(myAM.sellers||[]).slice(0,15).map(function(s) {
+                  var tg = s.gmsTarget||0;
+                  var pg = s.gmsPace||0;
+                  var dl = pg - tg;
+                  var dlCol = dl>=0?'var(--green)':'var(--red)';
+                  var bkt = s.bucket||'';
+                  var statusLabel = bkt==='zero'?'🚨 Zero':bkt==='negative'?'🔻 Down':bkt==='healthy'?'✅ Good':bkt==='below_target'?'⚠️ Below':'—';
+                  return '<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360(\''+s.clientCode+'\',\''+(s.busyName||'').replace(/\'/g,"\\'")+'\')">'+
+                    '<td style="padding:7px 12px;"><div style="font-weight:600;font-size:12px;">'+(s.busyName||'')+'</div><div style="font-size:10px;color:var(--text-muted);">'+(s.marketplace||'')+'</div></td>'+
+                    '<td style="padding:7px 8px;text-align:right;">'+(tg?fmtINR(tg):'—')+'</td>'+
+                    '<td style="padding:7px 8px;text-align:right;">'+fmtINR(s.currSales||0)+'</td>'+
+                    '<td style="padding:7px 8px;text-align:right;color:'+dlCol+';font-weight:700;">'+(pg?fmtINR(pg):'—')+'</td>'+
+                    '<td style="padding:7px 8px;text-align:center;font-size:11px;">'+statusLabel+'</td>'+
+                  '</tr>';
                 }).join('')}
               </tbody>
             </table>

@@ -1466,8 +1466,8 @@ async function renderDashboard() {
   ]);
   const team = isAdmin ? (await api('GET','/dashboard/team') || []) : [];
   const crmCalls = await api('GET','/crm/today') || [];
-  // Admin: fetch retention summary for GMS + at-risk + feedback
-  const retentionData = isAdmin ? (await api('GET','/reports/sales-retention?skipAI=1').catch(()=>null)) : null;
+  // Admin + AM: fetch retention summary for GMS + feedback + connectivity
+  const retentionData = (isAdmin || u.role === 'Account Manager') ? (await api('GET','/reports/sales-retention?skipAI=1').catch(()=>null)) : null;
 
   if(!dash) return;
   if(clients && clients.length) APP.clients = clients;
@@ -1674,6 +1674,117 @@ async function renderDashboard() {
     pc.appendChild(amCard);
   }
 
+
+  }
+
+  // ── AM: GMS Target + Feedback + Connectivity strip ──
+  if(!isAdmin && u.role === 'Account Manager' && retentionData) {
+    const amList = retentionData.amList || [];
+    const myAM = amList.find(am => am.amName.toLowerCase() === u.name.toLowerCase()) || amList[0];
+
+    if(myAM) {
+      const gms = myAM.gmsData || {};
+      const tgt = gms.target || 0;
+      const curr = gms.currentSale || myAM.currMonthSales || 0;
+      const pace = gms.pace || myAM.projectedMonthSales || 0;
+      const delta = pace - tgt;
+      const gmsPct = tgt > 0 ? Math.min(100, Math.round((curr/tgt)*100)) : 0;
+      const gmsBarCol = gmsPct >= 90 ? '#27ae60' : gmsPct >= 60 ? '#d35400' : '#e74c3c';
+      const deltaCol = delta >= 0 ? '#27ae60' : '#e74c3c';
+
+      const fb = myAM.feedbackData || {};
+      const fbDone = fb.thisMonth || 0;
+      const fbTgt = 5;
+      const fbPct = Math.min(100, Math.round((fbDone/fbTgt)*100));
+      const fbCol = fbDone >= fbTgt ? '#27ae60' : fbDone >= 3 ? '#d35400' : '#e74c3c';
+
+      const conn = myAM.connectivityData || {};
+      const connMet = conn.sellersMet || 0;
+      const connTotal = myAM.totalSellers || 0;
+      const connPct = connTotal > 0 ? Math.round((connMet/connTotal)*100) : 0;
+      const connCol = connPct >= 80 ? '#27ae60' : connPct >= 50 ? '#d35400' : '#e74c3c';
+
+      var amStrip = document.createElement('div');
+      amStrip.style.cssText = 'margin-bottom:14px;';
+      amStrip.innerHTML = `
+        <div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:14px;margin-bottom:10px;">
+          <div style="font-size:11px;opacity:.7;margin-bottom:10px;">📊 ${(retentionData.period||{}).currLabel||'This Month'} — Mera Performance</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+            <div>
+              <div style="font-size:10px;opacity:.7;">GMS Target</div>
+              <div style="font-size:17px;font-weight:800;color:#D4A03D;">${tgt?fmtINR(tgt):'—'}</div>
+              <div style="font-size:10px;opacity:.7;">Pace: <span style="color:${deltaCol};font-weight:700;">${pace?fmtINR(pace):'—'}</span></div>
+            </div>
+            <div>
+              <div style="font-size:10px;opacity:.7;">Current Sale</div>
+              <div style="font-size:17px;font-weight:800;">${fmtINR(curr)}</div>
+              <div style="font-size:10px;opacity:.7;">Delta: <span style="color:${deltaCol};font-weight:700;">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</span></div>
+            </div>
+            <div>
+              <div style="font-size:10px;opacity:.7;">Feedback</div>
+              <div style="font-size:17px;font-weight:800;color:${fbCol};">${fbDone}/${fbTgt}</div>
+              <div style="font-size:10px;opacity:.7;">${fbTgt-fbDone>0?fbTgt-fbDone+' baki':'✓ Complete'}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;opacity:.7;">Connectivity</div>
+              <div style="font-size:17px;font-weight:800;color:${connCol};">${connPct}%</div>
+              <div style="font-size:10px;opacity:.7;">${connMet}/${connTotal} sellers</div>
+            </div>
+            <div>
+              <div style="font-size:10px;opacity:.7;">Score / Grade</div>
+              <div style="font-size:17px;font-weight:800;color:#D4A03D;">${myAM.retentionScore||0}/100</div>
+              <div style="font-size:10px;opacity:.7;">${myAM.grade||'—'} · ${myAM.totalSellers||0} sellers</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:10px;opacity:.7;margin-bottom:3px;"><span>GMS Progress</span><span>${gmsPct}%</span></div>
+            <div style="height:6px;background:rgba(255,255,255,0.2);border-radius:3px;"><div style="height:100%;width:${gmsPct}%;background:${gmsBarCol};border-radius:3px;transition:width 0.5s;"></div></div>
+          </div>
+        </div>
+
+        <!-- Seller-wise GMS mini table -->
+        <div class="card" style="margin-bottom:10px;">
+          <div class="card-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <span class="card-title">📊 Seller-wise GMS Targets</span>
+            <span style="font-size:11px;color:var(--text-muted);">Click to expand</span>
+          </div>
+          <div style="display:none;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
+              <thead style="background:var(--bg);">
+                <tr>
+                  <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
+                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>
+                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
+                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>
+                  <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(myAM.sellers||[]).slice(0,15).map(s => {
+                  const tg = s.gmsTarget||0;
+                  const pg = s.gmsPace||0;
+                  const dl = pg - tg;
+                  const dlCol = dl>=0?'var(--green)':'var(--red)';
+                  const bkt = s.bucket||'';
+                  const statusLabel = bkt==='zero'?'🚨 Zero':bkt==='negative'?'🔻 Down':bkt==='healthy'?'✅ Good':bkt==='below_target'?'⚠️ Below':'—';
+                  return `<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360('${s.clientCode}','${(s.busyName||'').replace(/'/g,"\\'")}')">
+                    <td style="padding:7px 12px;">
+                      <div style="font-weight:600;font-size:12px;">${s.busyName}</div>
+                      <div style="font-size:10px;color:var(--text-muted);">${s.marketplace||''}</div>
+                    </td>
+                    <td style="padding:7px 8px;text-align:right;">${tg?fmtINR(tg):'—'}</td>
+                    <td style="padding:7px 8px;text-align:right;">${fmtINR(s.currSales||0)}</td>
+                    <td style="padding:7px 8px;text-align:right;color:${dlCol};font-weight:700;">${pg?fmtINR(pg):'—'}</td>
+                    <td style="padding:7px 8px;text-align:center;font-size:11px;">${statusLabel}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      pc.appendChild(amStrip);
+    }
+  }
 
   if(isAdmin && team.length) {
     var teamCard = document.createElement('div');

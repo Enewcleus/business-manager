@@ -1041,8 +1041,18 @@ async function saveDSR() {
 }
 
 // ── SELLER 360 ───────────────────────────────────────────────
+function openSeller360(clientCode, busyName) {
+  navigate('seller360');
+  setTimeout(() => {
+    if (clientCode) {
+      load360(clientCode);
+      const sel = document.getElementById('s360-client');
+      if (sel) sel.value = clientCode;
+    }
+  }, 500);
+}
+
 async function renderSeller360() {
-  const clients=await getClients();
   if(clients) APP.clients=clients;
   document.getElementById('page-content').innerHTML=`
     <div class="card">
@@ -1612,7 +1622,7 @@ async function renderDashboard() {
             </thead>
             <tbody>
               ${atRisk.slice(0,20).map(s=>`
-              <tr style="border-top:1px solid #f5c6cb;">
+              <tr style="border-top:1px solid #f5c6cb;cursor:pointer;" onclick="openSeller360('${s.clientCode||''}','${s.busyName.replace(/'/g,"\\'")}')">
                 <td style="padding:7px 12px;font-weight:600;">${s.busyName}<div style="font-size:10px;color:var(--text-muted);">${s.marketplace||''}</div></td>
                 <td style="padding:7px 12px;font-size:11px;color:var(--text-muted);">${s.amName}</td>
                 <td style="padding:7px 8px;text-align:center;"><span style="background:${s.bucket==='zero'?'#7a000022':'var(--red)22'};color:${s.bucket==='zero'?'#7a0000':'var(--red)'};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">${s.bucket==='zero'?'🚨 Zero':'🔻 Declining'}</span></td>
@@ -1629,7 +1639,7 @@ async function renderDashboard() {
     var amCard = document.createElement('div');
     amCard.className = 'card';
     amCard.innerHTML = '<div class="card-header"><span class="card-title">🏆 AM Retention Leaderboard</span><button class="btn btn-sm btn-outline" onclick="navigate(\'retention\')">Full Report →</button></div>' +
-      '<div class="card-body" style="padding:0;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">' +
+      '<div class="card-body" style="padding:0;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">' +
       '<thead style="background:var(--bg);"><tr>' +
       '<th style="padding:8px 12px;text-align:left;">#</th>' +
       '<th style="padding:8px 12px;text-align:left;">AM</th>' +
@@ -1637,12 +1647,17 @@ async function renderDashboard() {
       '<th style="padding:8px;text-align:center;">Grade</th>' +
       '<th style="padding:8px;text-align:right;">Current Sale</th>' +
       '<th style="padding:8px;text-align:center;">MoM</th>' +
-      '<th style="padding:8px;text-align:center;">GMS Target</th>' +
+      '<th style="padding:8px;text-align:right;">GMS Target</th>' +
+      '<th style="padding:8px;text-align:right;">Delta</th>' +
       '<th style="padding:8px;text-align:center;">Sellers</th>' +
       '</tr></thead><tbody>' +
       amList.slice(0,10).map((am,i) => {
         const gms = am.gmsData || {};
+        const tgt = gms.target || 0;
+        const pace = gms.pace || am.projectedMonthSales || 0;
+        const delta = pace - tgt;
         const momCol = (am.momGrowthPct||0)>=15?'var(--green)':(am.momGrowthPct||0)>=0?'#d35400':'var(--red)';
+        const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
         return `<tr style="border-top:1px solid var(--border);">
           <td style="padding:8px 12px;font-weight:700;color:var(--text-muted);">${i+1}</td>
           <td style="padding:8px 12px;font-weight:600;">${am.amName}</td>
@@ -1650,7 +1665,8 @@ async function renderDashboard() {
           <td style="padding:8px;text-align:center;"><span style="background:#eaf3de;color:#3B6D11;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">${am.grade}</span></td>
           <td style="padding:8px;text-align:right;">${fmtINR(am.currMonthSales||0)}</td>
           <td style="padding:8px;text-align:center;font-weight:700;color:${momCol};">${(am.momGrowthPct||0)>=0?'+':''}${am.momGrowthPct||0}%</td>
-          <td style="padding:8px;text-align:center;font-size:11px;">${gms.target?fmtINR(gms.target):'—'}</td>
+          <td style="padding:8px;text-align:right;">${tgt?fmtINR(tgt):'—'}</td>
+          <td style="padding:8px;text-align:right;font-weight:700;color:${deltaCol};">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</td>
           <td style="padding:8px;text-align:center;">${am.totalSellers}</td>
         </tr>`;
       }).join('') +

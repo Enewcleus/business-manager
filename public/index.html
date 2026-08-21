@@ -1564,75 +1564,60 @@ async function renderDashboard() {
     // Summary strip
     var retStrip = document.createElement('div');
     retStrip.style.cssText = 'background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:16px;margin-bottom:14px;';
-    retStrip.innerHTML = `
-      <div style="font-size:12px;opacity:.7;margin-bottom:10px;">📊 Sales Retention Summary — ${(rd.period||{}).currLabel||'This Month'}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
-        <div>
-          <div style="font-size:10px;opacity:.7;">Company GMS</div>
-          <div style="font-size:18px;font-weight:800;color:#D4A03D;">${fmtINR(cs.currMonthSales||0)}</div>
-          <div style="font-size:10px;opacity:.7;">MoM: <span style="color:${(cs.momGrowthPct||0)>=0?'#27ae60':'#e74c3c'};font-weight:700;">${(cs.momGrowthPct||0)>=0?'+':''}${cs.momGrowthPct||0}%</span></div>
-        </div>
-        <div>
-          <div style="font-size:10px;opacity:.7;">GMS Target</div>
-          <div style="font-size:18px;font-weight:800;">${totalGmsTgt ? fmtINR(totalGmsTgt) : '—'}</div>
-          <div style="font-size:10px;opacity:.7;">Pace: <span style="color:${gmsDelta>=0?'#27ae60':'#e74c3c'};font-weight:700;">${totalGmsTgt?(gmsDelta>=0?'+':'')+fmtINR(Math.abs(gmsDelta)):'—'}</span></div>
-        </div>
-        <div>
-          <div style="font-size:10px;opacity:.7;">At-Risk Sellers</div>
-          <div style="font-size:18px;font-weight:800;color:${atRisk.length>0?'#e74c3c':'#27ae60'};">${atRisk.length}</div>
-          <div style="font-size:10px;opacity:.7;">${atRisk.filter(s=>s.bucket==='zero').length} zero · ${atRisk.filter(s=>s.bucket==='negative').length} declining</div>
-        </div>
-        <div>
-          <div style="font-size:10px;opacity:.7;">Healthy Sellers</div>
-          <div style="font-size:18px;font-weight:800;color:#27ae60;">${cs.healthyPct||0}%</div>
-          <div style="font-size:10px;opacity:.7;">${cs.totalSellers||0} total sellers</div>
-        </div>
-        <div>
-          <div style="font-size:10px;opacity:.7;">Feedback (Team)</div>
-          <div style="font-size:18px;font-weight:800;color:${totalFbDone>=totalFbTgt?'#27ae60':'#e74c3c'};">${totalFbDone}/${totalFbTgt}</div>
-          <div style="font-size:10px;opacity:.7;">${Math.round((totalFbDone/Math.max(totalFbTgt,1))*100)}% complete</div>
-        </div>
-        <div>
-          <div style="font-size:10px;opacity:.7;">Connectivity</div>
-          <div style="font-size:18px;font-weight:800;color:${connPct>=80?'#27ae60':connPct>=50?'#d35400':'#e74c3c'};">${connPct}%</div>
-          <div style="font-size:10px;opacity:.7;">${totalConnMet}/${totalSellers} sellers</div>
-        </div>
-      </div>`;
+    var zeroCount = atRisk.filter(function(s){return s.bucket==='zero';}).length;
+    var negCount = atRisk.filter(function(s){return s.bucket==='negative';}).length;
+    var momPct = cs.momGrowthPct||0;
+    var gmsDelCol = gmsDelta>=0?'#27ae60':'#e74c3c';
+    var fbPctNum = Math.round((totalFbDone/Math.max(totalFbTgt,1))*100);
+    var connColStr = connPct>=80?'#27ae60':connPct>=50?'#d35400':'#e74c3c';
+    retStrip.innerHTML =
+      '<div style="font-size:12px;opacity:.7;margin-bottom:10px;">📊 Sales Retention Summary — '+((rd.period||{}).currLabel||'This Month')+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">'+
+        '<div><div style="font-size:10px;opacity:.7;">Company GMS</div><div style="font-size:18px;font-weight:800;color:#D4A03D;">'+fmtINR(cs.currMonthSales||0)+'</div><div style="font-size:10px;opacity:.7;">MoM: <span style="color:'+(momPct>=0?'#27ae60':'#e74c3c')+';font-weight:700;">'+(momPct>=0?'+':'')+momPct+'%</span></div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">GMS Target</div><div style="font-size:18px;font-weight:800;">'+(totalGmsTgt?fmtINR(totalGmsTgt):'—')+'</div><div style="font-size:10px;opacity:.7;">Pace: <span style="color:'+gmsDelCol+';font-weight:700;">'+(totalGmsTgt?(gmsDelta>=0?'+':'')+fmtINR(Math.abs(gmsDelta)):'—')+'</span></div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">At-Risk Sellers</div><div style="font-size:18px;font-weight:800;color:'+(atRisk.length>0?'#e74c3c':'#27ae60')+';">'+atRisk.length+'</div><div style="font-size:10px;opacity:.7;">'+zeroCount+' zero · '+negCount+' declining</div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Healthy Sellers</div><div style="font-size:18px;font-weight:800;color:#27ae60;">'+(cs.healthyPct||0)+'%</div><div style="font-size:10px;opacity:.7;">'+(cs.totalSellers||0)+' total sellers</div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Feedback (Team)</div><div style="font-size:18px;font-weight:800;color:'+(totalFbDone>=totalFbTgt?'#27ae60':'#e74c3c')+';">'+totalFbDone+'/'+totalFbTgt+'</div><div style="font-size:10px;opacity:.7;">'+fbPctNum+'% complete</div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Connectivity</div><div style="font-size:18px;font-weight:800;color:'+connColStr+';">'+connPct+'%</div><div style="font-size:10px;opacity:.7;">'+totalConnMet+'/'+totalSellers+' sellers</div></div>'+
+      '</div>';
     pc.appendChild(retStrip);
 
     // At-risk banner (if any)
     if(atRisk.length > 0) {
       var riskCard = document.createElement('div');
       riskCard.style.cssText = 'background:#fdf2f2;border:1.5px solid var(--red);border-radius:10px;margin-bottom:14px;overflow:hidden;';
-      riskCard.innerHTML = `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-          <span style="background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;">${atRisk.length}</span>
-          <span style="font-size:13px;font-weight:700;color:var(--red);flex:1;">🚨 Sellers drop zone mein — immediate action needed</span>
-          <span style="color:var(--red);">▾</span>
-        </div>
-        <div style="display:none;border-top:1px solid #f5c6cb;overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
-            <thead style="background:#fdf2f2;">
-              <tr>
-                <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">Seller</th>
-                <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">AM</th>
-                <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Status</th>
-                <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--red);">Current Sale</th>
-                <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Growth</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${atRisk.slice(0,20).map(s=>`
-              <tr style="border-top:1px solid #f5c6cb;cursor:pointer;" onclick="openSeller360('${s.clientCode||''}','${s.busyName.replace(/'/g,"\\'")}')">
-                <td style="padding:7px 12px;font-weight:600;">${s.busyName}<div style="font-size:10px;color:var(--text-muted);">${s.marketplace||''}</div></td>
-                <td style="padding:7px 12px;font-size:11px;color:var(--text-muted);">${s.amName}</td>
-                <td style="padding:7px 8px;text-align:center;"><span style="background:${s.bucket==='zero'?'#7a000022':'var(--red)22'};color:${s.bucket==='zero'?'#7a0000':'var(--red)'};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">${s.bucket==='zero'?'🚨 Zero':'🔻 Declining'}</span></td>
-                <td style="padding:7px 8px;text-align:right;font-size:12px;">${fmtINR(s.currSales||0)}</td>
-                <td style="padding:7px 8px;text-align:center;color:var(--red);font-weight:800;">${s.growthPct||0}%</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>`;
+      var riskRows = atRisk.slice(0,20).map(function(s) {
+        var bgCol = s.bucket==='zero'?'#7a000022':'var(--red)22';
+        var txtCol = s.bucket==='zero'?'#7a0000':'var(--red)';
+        var statusLbl = s.bucket==='zero'?'🚨 Zero':'🔻 Declining';
+        var sname = (s.busyName||'').replace(/'/g,"\\'");
+        return '<tr style="border-top:1px solid #f5c6cb;cursor:pointer;" onclick="openSeller360(\''+(s.clientCode||'')+'\',\''+sname+'\')">'+
+          '<td style="padding:7px 12px;font-weight:600;">'+(s.busyName||'')+'<div style="font-size:10px;color:var(--text-muted);">'+(s.marketplace||'')+'</div></td>'+
+          '<td style="padding:7px 12px;font-size:11px;color:var(--text-muted);">'+(s.amName||'')+'</td>'+
+          '<td style="padding:7px 8px;text-align:center;"><span style="background:'+bgCol+';color:'+txtCol+';padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;">'+statusLbl+'</span></td>'+
+          '<td style="padding:7px 8px;text-align:right;font-size:12px;">'+fmtINR(s.currSales||0)+'</td>'+
+          '<td style="padding:7px 8px;text-align:center;color:var(--red);font-weight:800;">'+(s.growthPct||0)+'%</td>'+
+          '</tr>';
+      }).join('');
+
+      riskCard.innerHTML =
+        '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">'+
+          '<span style="background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;">'+atRisk.length+'</span>'+
+          '<span style="font-size:13px;font-weight:700;color:var(--red);flex:1;">🚨 Sellers drop zone mein — immediate action needed</span>'+
+          '<span style="color:var(--red);">▾</span>'+
+        '</div>'+
+        '<div style="display:none;border-top:1px solid #f5c6cb;overflow-x:auto;">'+
+          '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">'+
+            '<thead style="background:#fdf2f2;"><tr>'+
+              '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">Seller</th>'+
+              '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--red);">AM</th>'+
+              '<th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Status</th>'+
+              '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--red);">Current Sale</th>'+
+              '<th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--red);">Growth</th>'+
+            '</tr></thead>'+
+            '<tbody>'+riskRows+'</tbody>'+
+          '</table>'+
+        '</div>';
       pc.appendChild(riskCard);
     }
 
@@ -1652,24 +1637,24 @@ async function renderDashboard() {
       '<th style="padding:8px;text-align:right;">Delta</th>' +
       '<th style="padding:8px;text-align:center;">Sellers</th>' +
       '</tr></thead><tbody>' +
-      amList.slice(0,10).map((am,i) => {
-        const gms = am.gmsData || {};
-        const tgt = gms.target || 0;
-        const pace = gms.pace || am.projectedMonthSales || 0;
-        const delta = pace - tgt;
-        const momCol = (am.momGrowthPct||0)>=15?'var(--green)':(am.momGrowthPct||0)>=0?'#d35400':'var(--red)';
-        const deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<tr style="border-top:1px solid var(--border);">
-          <td style="padding:8px 12px;font-weight:700;color:var(--text-muted);">${i+1}</td>
-          <td style="padding:8px 12px;font-weight:600;">${am.amName}</td>
-          <td style="padding:8px;text-align:center;font-weight:700;color:var(--primary);">${am.retentionScore}/100</td>
-          <td style="padding:8px;text-align:center;"><span style="background:#eaf3de;color:#3B6D11;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">${am.grade}</span></td>
-          <td style="padding:8px;text-align:right;">${fmtINR(am.currMonthSales||0)}</td>
-          <td style="padding:8px;text-align:center;font-weight:700;color:${momCol};">${(am.momGrowthPct||0)>=0?'+':''}${am.momGrowthPct||0}%</td>
-          <td style="padding:8px;text-align:right;">${tgt?fmtINR(tgt):'—'}</td>
-          <td style="padding:8px;text-align:right;font-weight:700;color:${deltaCol};">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</td>
-          <td style="padding:8px;text-align:center;">${am.totalSellers}</td>
-        </tr>`;
+      amList.slice(0,10).map(function(am,i) {
+        var gms = am.gmsData || {};
+        var tgt = gms.target || 0;
+        var pace = gms.pace || am.projectedMonthSales || 0;
+        var delta = pace - tgt;
+        var momCol = (am.momGrowthPct||0)>=15?'var(--green)':(am.momGrowthPct||0)>=0?'#d35400':'var(--red)';
+        var deltaCol = delta >= 0 ? 'var(--green)' : 'var(--red)';
+        return '<tr style="border-top:1px solid var(--border);">'+
+          '<td style="padding:8px 12px;font-weight:700;color:var(--text-muted);">'+(i+1)+'</td>'+
+          '<td style="padding:8px 12px;font-weight:600;">'+am.amName+'</td>'+
+          '<td style="padding:8px;text-align:center;font-weight:700;color:var(--primary);">'+(am.retentionScore||0)+'/100</td>'+
+          '<td style="padding:8px;text-align:center;"><span style="background:#eaf3de;color:#3B6D11;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">'+(am.grade||'—')+'</span></td>'+
+          '<td style="padding:8px;text-align:right;">'+fmtINR(am.currMonthSales||0)+'</td>'+
+          '<td style="padding:8px;text-align:center;font-weight:700;color:'+momCol+';">'+((am.momGrowthPct||0)>=0?'+':''+(am.momGrowthPct||0))+'%</td>'+
+          '<td style="padding:8px;text-align:right;">'+(tgt?fmtINR(tgt):'—')+'</td>'+
+          '<td style="padding:8px;text-align:right;font-weight:700;color:'+deltaCol+';">'+(tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—')+'</td>'+
+          '<td style="padding:8px;text-align:center;">'+(am.totalSellers||0)+'</td>'+
+          '</tr>';
       }).join('') +
       '</tbody></table></div>';
     pc.appendChild(amCard);
@@ -1707,79 +1692,57 @@ async function renderDashboard() {
 
       var amStrip = document.createElement('div');
       amStrip.style.cssText = 'margin-bottom:14px;';
-      amStrip.innerHTML = `
-        <div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:14px;margin-bottom:10px;">
-          <div style="font-size:11px;opacity:.7;margin-bottom:10px;">📊 ${(retentionData.period||{}).currLabel||'This Month'} — Mera Performance</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-            <div>
-              <div style="font-size:10px;opacity:.7;">GMS Target</div>
-              <div style="font-size:17px;font-weight:800;color:#D4A03D;">${tgt?fmtINR(tgt):'—'}</div>
-              <div style="font-size:10px;opacity:.7;">Pace: <span style="color:${deltaCol};font-weight:700;">${pace?fmtINR(pace):'—'}</span></div>
-            </div>
-            <div>
-              <div style="font-size:10px;opacity:.7;">Current Sale</div>
-              <div style="font-size:17px;font-weight:800;">${fmtINR(curr)}</div>
-              <div style="font-size:10px;opacity:.7;">Delta: <span style="color:${deltaCol};font-weight:700;">${tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—'}</span></div>
-            </div>
-            <div>
-              <div style="font-size:10px;opacity:.7;">Feedback</div>
-              <div style="font-size:17px;font-weight:800;color:${fbCol};">${fbDone}/${fbTgt}</div>
-              <div style="font-size:10px;opacity:.7;">${fbTgt-fbDone>0?fbTgt-fbDone+' baki':'✓ Complete'}</div>
-            </div>
-            <div>
-              <div style="font-size:10px;opacity:.7;">Connectivity</div>
-              <div style="font-size:17px;font-weight:800;color:${connCol};">${connPct}%</div>
-              <div style="font-size:10px;opacity:.7;">${connMet}/${connTotal} sellers</div>
-            </div>
-            <div>
-              <div style="font-size:10px;opacity:.7;">Score / Grade</div>
-              <div style="font-size:17px;font-weight:800;color:#D4A03D;">${myAM.retentionScore||0}/100</div>
-              <div style="font-size:10px;opacity:.7;">${myAM.grade||'—'} · ${myAM.totalSellers||0} sellers</div>
-            </div>
-          </div>
-          <div style="margin-top:10px;">
-            <div style="display:flex;justify-content:space-between;font-size:10px;opacity:.7;margin-bottom:3px;"><span>GMS Progress</span><span>${gmsPct}%</span></div>
-            <div style="height:6px;background:rgba(255,255,255,0.2);border-radius:3px;"><div style="height:100%;width:${gmsPct}%;background:${gmsBarCol};border-radius:3px;transition:width 0.5s;"></div></div>
-          </div>
-        </div>
 
-        <!-- Seller-wise GMS mini table -->
-        <div class="card" style="margin-bottom:10px;">
-          <div class="card-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-            <span class="card-title">📊 Seller-wise GMS Targets</span>
-            <span style="font-size:11px;color:var(--text-muted);">Click to expand</span>
-          </div>
-          <div style="display:none;overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
-              <thead style="background:var(--bg);">
-                <tr>
-                  <th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>
-                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>
-                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>
-                  <th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>
-                  <th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${(myAM.sellers||[]).slice(0,15).map(function(s) {
-                  var tg = s.gmsTarget||0;
-                  var pg = s.gmsPace||0;
-                  var dl = pg - tg;
-                  var dlCol = dl>=0?'var(--green)':'var(--red)';
-                  var bkt = s.bucket||'';
-                  var statusLabel = bkt==='zero'?'🚨 Zero':bkt==='negative'?'🔻 Down':bkt==='healthy'?'✅ Good':bkt==='below_target'?'⚠️ Below':'—';
-                  return '<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360(\''+s.clientCode+'\',\''+(s.busyName||'').replace(/\'/g,"\\'")+'\')">'+
-                    '<td style="padding:7px 12px;"><div style="font-weight:600;font-size:12px;">'+(s.busyName||'')+'</div><div style="font-size:10px;color:var(--text-muted);">'+(s.marketplace||'')+'</div></td>'+
-                    '<td style="padding:7px 8px;text-align:right;">'+(tg?fmtINR(tg):'—')+'</td>'+
-                    '<td style="padding:7px 8px;text-align:right;">'+fmtINR(s.currSales||0)+'</td>'+
-                    '<td style="padding:7px 8px;text-align:right;color:'+dlCol+';font-weight:700;">'+(pg?fmtINR(pg):'—')+'</td>'+
-                    '<td style="padding:7px 8px;text-align:center;font-size:11px;">'+statusLabel+'</td>'+
-                  '</tr>';
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>`;
+      var sellerRows = (myAM.sellers||[]).slice(0,15).map(function(s) {
+        var tg = s.gmsTarget||0;
+        var pg = s.gmsPace||0;
+        var dl = pg - tg;
+        var dlCol = dl>=0?'var(--green)':'var(--red)';
+        var bkt = s.bucket||'';
+        var statusLabel = bkt==='zero'?'🚨 Zero':bkt==='negative'?'🔻 Down':bkt==='healthy'?'✅ Good':bkt==='below_target'?'⚠️ Below':'—';
+        var sname = (s.busyName||'').replace(/'/g,"\\'");
+        return '<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360(\''+s.clientCode+'\',\''+sname+'\')">'+
+          '<td style="padding:7px 12px;"><div style="font-weight:600;font-size:12px;">'+(s.busyName||'')+'</div><div style="font-size:10px;color:var(--text-muted);">'+(s.marketplace||'')+'</div></td>'+
+          '<td style="padding:7px 8px;text-align:right;">'+(tg?fmtINR(tg):'—')+'</td>'+
+          '<td style="padding:7px 8px;text-align:right;">'+fmtINR(s.currSales||0)+'</td>'+
+          '<td style="padding:7px 8px;text-align:right;color:'+dlCol+';font-weight:700;">'+(pg?fmtINR(pg):'—')+'</td>'+
+          '<td style="padding:7px 8px;text-align:center;font-size:11px;">'+statusLabel+'</td>'+
+          '</tr>';
+      }).join('');
+
+      amStrip.innerHTML =
+        '<div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:14px;margin-bottom:10px;">'+
+          '<div style="font-size:11px;opacity:.7;margin-bottom:10px;">📊 '+((retentionData.period||{}).currLabel||'This Month')+' — Mera Performance</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">'+
+            '<div><div style="font-size:10px;opacity:.7;">GMS Target</div><div style="font-size:17px;font-weight:800;color:#D4A03D;">'+(tgt?fmtINR(tgt):'—')+'</div><div style="font-size:10px;opacity:.7;">Pace: <span style="color:'+deltaCol+';font-weight:700;">'+(pace?fmtINR(pace):'—')+'</span></div></div>'+
+            '<div><div style="font-size:10px;opacity:.7;">Current Sale</div><div style="font-size:17px;font-weight:800;">'+fmtINR(curr)+'</div><div style="font-size:10px;opacity:.7;">Delta: <span style="color:'+deltaCol+';font-weight:700;">'+(tgt?(delta>=0?'+':'')+fmtINR(Math.abs(delta)):'—')+'</span></div></div>'+
+            '<div><div style="font-size:10px;opacity:.7;">Feedback</div><div style="font-size:17px;font-weight:800;color:'+fbCol+';">'+fbDone+'/'+fbTgt+'</div><div style="font-size:10px;opacity:.7;">'+(fbTgt-fbDone>0?(fbTgt-fbDone)+' baki':'✓ Complete')+'</div></div>'+
+            '<div><div style="font-size:10px;opacity:.7;">Connectivity</div><div style="font-size:17px;font-weight:800;color:'+connCol+';">'+connPct+'%</div><div style="font-size:10px;opacity:.7;">'+connMet+'/'+connTotal+' sellers</div></div>'+
+            '<div><div style="font-size:10px;opacity:.7;">Score / Grade</div><div style="font-size:17px;font-weight:800;color:#D4A03D;">'+(myAM.retentionScore||0)+'/100</div><div style="font-size:10px;opacity:.7;">'+(myAM.grade||'—')+' · '+(myAM.totalSellers||0)+' sellers</div></div>'+
+          '</div>'+
+          '<div style="margin-top:10px;">'+
+            '<div style="display:flex;justify-content:space-between;font-size:10px;opacity:.7;margin-bottom:3px;"><span>GMS Progress</span><span>'+gmsPct+'%</span></div>'+
+            '<div style="height:6px;background:rgba(255,255,255,0.2);border-radius:3px;"><div style="height:100%;width:'+gmsPct+'%;background:'+gmsBarCol+';border-radius:3px;"></div></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="card" style="margin-bottom:10px;">'+
+          '<div class="card-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">'+
+            '<span class="card-title">📊 Seller-wise GMS Targets</span>'+
+            '<span style="font-size:11px;color:var(--text-muted);">Click to expand</span>'+
+          '</div>'+
+          '<div style="display:none;overflow-x:auto;">'+
+            '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">'+
+              '<thead style="background:var(--bg);"><tr>'+
+                '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>'+
+                '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>'+
+                '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>'+
+                '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>'+
+                '<th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>'+
+              '</tr></thead>'+
+              '<tbody>'+sellerRows+'</tbody>'+
+            '</table>'+
+          '</div>'+
+        '</div>';
       pc.appendChild(amStrip);
     }
   }
@@ -10412,7 +10375,7 @@ function initTheme(){
   if(saved){const t=JSON.parse(saved);applyTheme(t.primary,t.secondary);}
   else{applyTheme('#1C2B2D','#D4A03D');}
   const tc=document.getElementById('theme-colors');
-  if(tc){tc.innerHTML=THEMES.map(t=>`<div class="theme-btn" style="background:${t.primary};" title="${t.name}" onclick="applyTheme('${t.primary}','${t.secondary}')"></div>`).join('');}
+  if(tc){tc.innerHTML=THEMES.map(function(t){return '<div class="theme-btn" style="background:'+t.primary+';" title="'+t.name+'" onclick="applyTheme(\''+t.primary+'\',\''+t.secondary+'\')"></div>';}).join('');}
 }
 function applyTheme(primary,secondary){document.documentElement.style.setProperty('--primary',primary);document.documentElement.style.setProperty('--secondary',secondary);localStorage.setItem('en_theme',JSON.stringify({primary,secondary}));}
 function toggleThemePanel(){document.getElementById('theme-panel').classList.toggle('show');}
@@ -21853,14 +21816,12 @@ function filterGroupMembers(q) {
   const filtered = q.trim() ? users.filter(u => u.name !== me && u.name.toLowerCase().includes(q.toLowerCase())) : users.filter(u => u.name !== me);
   const list = document.getElementById('grp-member-list');
   if (!list) return;
-  list.innerHTML = filtered.map(u => `
-    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
-      <input type="checkbox" class="grp-member-cb" value="${u.name}" style="width:16px;height:16px;">
-      <div>
-        <div style="font-weight:600;font-size:13px;">${u.name}</div>
-        <div style="font-size:11px;color:var(--text-muted);">${u.role||''}</div>
-      </div>
-    </label>`).join('');
+  list.innerHTML = filtered.map(function(u) {
+    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">'+
+      '<input type="checkbox" class="grp-member-cb" value="'+u.name+'" style="width:16px;height:16px;">'+
+      '<div><div style="font-weight:600;font-size:13px;">'+u.name+'</div><div style="font-size:11px;color:var(--text-muted);">'+(u.role||'')+'</div></div>'+
+      '</label>';
+  }).join('');
 }
 
 async function submitCreateGroup() {

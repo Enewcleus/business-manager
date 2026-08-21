@@ -1536,8 +1536,8 @@ async function renderDashboard() {
   pc.appendChild(kpiDiv);
 
   // ── Admin: Retention & GMS Summary ──
-  // Admin retention strip - temporarily disabled
-  if(false && isAdmin && retentionData) {
+  // Admin retention strip
+  if(isAdmin && retentionData) {
     const rd = retentionData;
     const amList = rd.amList || [];
     const cs = rd.companySummary || {};
@@ -1664,6 +1664,98 @@ async function renderDashboard() {
 
   // AM retention strip - temporarily disabled for fix
   // TODO: re-enable after syntax fix
+
+  if(!isAdmin && u.role === 'Account Manager' && retentionData) {
+    var amList2 = retentionData.amList || [];
+    var myAM = null;
+    for(var ai=0; ai<amList2.length; ai++) {
+      if(amList2[ai].amName.toLowerCase() === u.name.toLowerCase()) { myAM = amList2[ai]; break; }
+    }
+    if(!myAM && amList2.length) myAM = amList2[0];
+    if(myAM) {
+      var gms2 = myAM.gmsData || {};
+      var tgt2 = gms2.target || 0;
+      var curr2 = gms2.currentSale || myAM.currMonthSales || 0;
+      var pace2 = gms2.pace || myAM.projectedMonthSales || 0;
+      var delta2 = pace2 - tgt2;
+      var gmsPct2 = tgt2 > 0 ? Math.min(100, Math.round((curr2/tgt2)*100)) : 0;
+      var gmsBarCol2 = gmsPct2 >= 90 ? '#27ae60' : gmsPct2 >= 60 ? '#d35400' : '#e74c3c';
+      var deltaCol2 = delta2 >= 0 ? '#27ae60' : '#e74c3c';
+      var fb2 = myAM.feedbackData || {};
+      var fbDone2 = fb2.thisMonth || 0;
+      var fbTgt2 = 5;
+      var fbCol2 = fbDone2 >= fbTgt2 ? '#27ae60' : fbDone2 >= 3 ? '#d35400' : '#e74c3c';
+      var conn2 = myAM.connectivityData || {};
+      var connMet2 = conn2.sellersMet || 0;
+      var connTotal2 = myAM.totalSellers || 0;
+      var connPct2 = connTotal2 > 0 ? Math.round((connMet2/connTotal2)*100) : 0;
+      var connCol2 = connPct2 >= 80 ? '#27ae60' : connPct2 >= 50 ? '#d35400' : '#e74c3c';
+
+      var sellerRows2 = '';
+      var sellers2 = (myAM.sellers||[]).slice(0,15);
+      for(var si=0; si<sellers2.length; si++) {
+        var s2 = sellers2[si];
+        var stg = s2.gmsTarget||0;
+        var spg = s2.gmsPace||0;
+        var sdl = spg - stg;
+        var sdlCol = sdl>=0?'var(--green)':'var(--red)';
+        var sbkt = s2.bucket||'';
+        var sLbl = sbkt==='zero'?'Zero':sbkt==='negative'?'Down':sbkt==='healthy'?'Good':sbkt==='below_target'?'Below':'—';
+        var sname2 = (s2.busyName||'').replace(/'/g,'');
+        sellerRows2 += '<tr style="border-top:1px solid var(--border);cursor:pointer;" onclick="openSeller360(\''+s2.clientCode+'\',\''+sname2+'\')">'+
+          '<td style="padding:7px 12px;"><div style="font-weight:600;font-size:12px;">'+(s2.busyName||'')+'</div>'+
+          '<div style="font-size:10px;color:var(--text-muted);">'+(s2.marketplace||'')+'</div></td>'+
+          '<td style="padding:7px 8px;text-align:right;">'+(stg?fmtINR(stg):'—')+'</td>'+
+          '<td style="padding:7px 8px;text-align:right;">'+fmtINR(s2.currSales||0)+'</td>'+
+          '<td style="padding:7px 8px;text-align:right;color:'+sdlCol+';font-weight:700;">'+(spg?fmtINR(spg):'—')+'</td>'+
+          '<td style="padding:7px 8px;text-align:center;font-size:11px;">'+sLbl+'</td></tr>';
+      }
+
+      var amStrip2 = document.createElement('div');
+      amStrip2.style.cssText = 'margin-bottom:14px;';
+      var periodLabel = ((retentionData.period||{}).currLabel||'This Month');
+      amStrip2.innerHTML =
+        '<div style="background:linear-gradient(135deg,#1C2B2D,#2c3e50);color:#fff;border-radius:14px;padding:14px;margin-bottom:10px;">'+
+        '<div style="font-size:11px;opacity:.7;margin-bottom:10px;">'+periodLabel+' — Mera Performance</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;">'+
+        '<div><div style="font-size:10px;opacity:.7;">GMS Target</div>'+
+        '<div style="font-size:16px;font-weight:800;color:#D4A03D;">'+(tgt2?fmtINR(tgt2):'—')+'</div>'+
+        '<div style="font-size:10px;opacity:.7;">Pace: <span style="color:'+deltaCol2+';font-weight:700;">'+(pace2?fmtINR(pace2):'—')+'</span></div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Current Sale</div>'+
+        '<div style="font-size:16px;font-weight:800;">'+fmtINR(curr2)+'</div>'+
+        '<div style="font-size:10px;opacity:.7;">Delta: <span style="color:'+deltaCol2+';font-weight:700;">'+(tgt2?(delta2>=0?'+':'')+fmtINR(Math.abs(delta2)):'—')+'</span></div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Feedback</div>'+
+        '<div style="font-size:16px;font-weight:800;color:'+fbCol2+';">'+fbDone2+'/'+fbTgt2+'</div>'+
+        '<div style="font-size:10px;opacity:.7;">'+(fbTgt2-fbDone2>0?(fbTgt2-fbDone2)+' baki':'Complete')+'</div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Connectivity</div>'+
+        '<div style="font-size:16px;font-weight:800;color:'+connCol2+';">'+connPct2+'%</div>'+
+        '<div style="font-size:10px;opacity:.7;">'+connMet2+'/'+connTotal2+' sellers</div></div>'+
+        '<div><div style="font-size:10px;opacity:.7;">Score/Grade</div>'+
+        '<div style="font-size:16px;font-weight:800;color:#D4A03D;">'+(myAM.retentionScore||0)+'/100</div>'+
+        '<div style="font-size:10px;opacity:.7;">'+(myAM.grade||'—')+' · '+(myAM.totalSellers||0)+' sellers</div></div>'+
+        '</div>'+
+        '<div style="margin-top:10px;">'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px;opacity:.7;margin-bottom:3px;">'+
+        '<span>GMS Progress</span><span>'+gmsPct2+'%</span></div>'+
+        '<div style="height:6px;background:rgba(255,255,255,0.2);border-radius:3px;">'+
+        '<div style="height:100%;width:'+gmsPct2+'%;background:'+gmsBarCol2+';border-radius:3px;"></div></div>'+
+        '</div></div>'+
+        '<div class="card" style="margin-bottom:10px;">'+
+        '<div class="card-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">'+
+        '<span class="card-title">Seller-wise GMS Targets</span>'+
+        '<span style="font-size:11px;color:var(--text-muted);">Click to expand ▾</span></div>'+
+        '<div style="display:none;overflow-x:auto;">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:480px;">'+
+        '<thead style="background:var(--bg);"><tr>'+
+        '<th style="padding:7px 12px;text-align:left;font-size:10px;color:var(--text-muted);">Seller</th>'+
+        '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">GMS Tgt</th>'+
+        '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Current</th>'+
+        '<th style="padding:7px 8px;text-align:right;font-size:10px;color:var(--text-muted);">Pace</th>'+
+        '<th style="padding:7px 8px;text-align:center;font-size:10px;color:var(--text-muted);">Status</th>'+
+        '</tr></thead><tbody>'+sellerRows2+'</tbody></table></div></div>';
+      pc.appendChild(amStrip2);
+    }
+  }
 
   if(isAdmin && team.length) {
     var teamCard = document.createElement('div');

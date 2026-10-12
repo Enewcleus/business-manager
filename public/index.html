@@ -16951,6 +16951,12 @@ async function renderAdsAnalyzer() {
 
     // ── Individual mode ──
     + '<div id="ad-mode-individual">'
+    + '<div style="margin-bottom:12px;padding:10px 14px;background:var(--bg-secondary);border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+    + '<span style="font-size:13px;font-weight:600;">⚡ Saari files ek saath select karo:</span>'
+    + '<button class="btn btn-sm btn-primary" onclick="document.getElementById(\'ad-bulk-input\').click()">📂 Select Multiple Files</button>'
+    + '<span style="font-size:11px;color:var(--text-muted);">Ctrl+A se saari select karo ya ek ek — auto-detect hoga</span>'
+    + '<input type="file" id="ad-bulk-input" multiple accept=".xlsx,.xls,.csv" style="display:none;" onchange="adBulkUpload(this)">'
+    + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">'
     + AD_REPORTS.map(r => adUploadCard(r[0], r[1], r[2], r[3])).join('')
     + '</div></div>'
@@ -17083,6 +17089,71 @@ async function adHandleCombined(input) {
     status.innerHTML = '<span style="color:var(--red);">❌ ' + adEsc(e.message) + '</span>';
     card.style.borderColor = 'var(--red)';
   }
+}
+
+// ── Bulk upload: saari files ek saath, filename se auto-detect ──
+async function adBulkUpload(input) {
+  if (!input.files || !input.files.length) return;
+  const files = Array.from(input.files);
+
+  // Filename keywords → report type mapping
+  const TYPE_MAP = [
+    { key: 'campaign',    hints: ['campaign_report', 'campaign report', 'sp_campaign', 'sponsored_products_campaign'] },
+    { key: 'searchterm',  hints: ['search_term', 'search term', 'sp_search', 'sponsored_products_search'] },
+    { key: 'targeting',   hints: ['targeting_report', 'targeting report', 'sp_targeting', 'sponsored_products_targeting'] },
+    { key: 'business',    hints: ['business_report', 'business report', 'businessreport'] },
+    { key: 'advproduct',  hints: ['advertised_product', 'advertised product', 'sp_advertised', 'sponsored_products_advertised'] },
+    { key: 'placement',   hints: ['placement_report', 'placement report', 'sp_placement', 'sponsored_products_placement'] },
+    { key: 'inventory',   hints: ['inventory', 'fba_inventory', 'fbm_inventory', 'inventory_report'] },
+  ];
+
+  let matched = 0, skipped = 0;
+  const results = [];
+
+  for (const file of files) {
+    const fname = file.name.toLowerCase().replace(/[\s\(\)]/g, '_');
+    let detectedKey = null;
+
+    for (const { key, hints } of TYPE_MAP) {
+      if (hints.some(h => fname.includes(h.replace(/\s/g,'_')))) {
+        detectedKey = key;
+        break;
+      }
+    }
+
+    if (!detectedKey) {
+      // Try partial match
+      if (fname.includes('campaign'))   detectedKey = 'campaign';
+      else if (fname.includes('search')) detectedKey = 'searchterm';
+      else if (fname.includes('target')) detectedKey = 'targeting';
+      else if (fname.includes('business')) detectedKey = 'business';
+      else if (fname.includes('advertised') || fname.includes('advert')) detectedKey = 'advproduct';
+      else if (fname.includes('placement')) detectedKey = 'placement';
+      else if (fname.includes('inventory') || fname.includes('fba') || fname.includes('fbm')) detectedKey = 'inventory';
+    }
+
+    if (!detectedKey) { skipped++; results.push('❓ ' + file.name + ' — pehchana nahi'); continue; }
+
+    try {
+      const rows = await adReadToRows(file);
+      _ad.reports[detectedKey] = { rows, filename: file.name };
+
+      // Update individual card UI
+      const status = document.getElementById('adstatus-' + detectedKey);
+      const card   = document.getElementById('adcard-' + detectedKey);
+      if (status) status.innerHTML = '<span style="color:var(--green);">✅ ' + adEsc(file.name) + ' (' + rows.length + ' rows)</span>';
+      if (card)   { card.style.borderColor = 'var(--green)'; card.style.background = '#f0fff4'; }
+
+      matched++;
+      results.push('✅ ' + file.name + ' → ' + detectedKey);
+    } catch (e) {
+      skipped++;
+      results.push('❌ ' + file.name + ' — ' + e.message);
+    }
+  }
+
+  showToast(matched + ' reports load ho gayi' + (skipped ? ', ' + skipped + ' skip' : '') + '!', matched > 0 ? 'success' : 'error');
+  console.log('[adBulkUpload]', results);
 }
 
 // Fix broken !ref (some Amazon xlsx underreport range)

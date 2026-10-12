@@ -18398,7 +18398,11 @@ function adExportAdPlan() {
   XLSX.utils.book_append_sheet(wb, ws2, 'ASIN Priority');
 
   // ── SHEETS 3-5: Keywords (Exact / Phrase / Broad) ──
-  const kwBase = (I.kwBids || []).filter(k => k.action === 'UP' || k.action === 'HOLD');
+  // kwBids is {targeting:{up:[],down:[]}, searchterm:{up:[],down:[]}}
+  const _kw = I.kwBids || {};
+  const kwUp   = [...(_kw.targeting?.up || []), ...(_kw.searchterm?.up || [])];
+  const kwDown = [...(_kw.targeting?.down || []), ...(_kw.searchterm?.down || [])];
+  const kwBase = kwUp;
   const kwHeaders = ['ASIN','Title','Category','Keyword','Bid (Rs)','Priority'];
 
   function makeKwSheet(kws, label) {
@@ -18406,7 +18410,7 @@ function adExportAdPlan() {
       k.asin || '-',
       k.title || '-',
       k.category || 'General',
-      k.keyword || k.target || '-',
+      k.name || k.keyword || k.target || '-',
       k.suggestedBid ? Math.round(k.suggestedBid) : k.bid ? Math.round(k.bid) : '-',
       idx < 10 ? 'P1' : idx < 25 ? 'P2' : 'P3'
     ]);
@@ -18426,10 +18430,8 @@ function adExportAdPlan() {
 
   // Exact: top converting keywords (orders > 0)
   const exactKws = kwBase.filter(k => (k.orders || 0) > 0).sort((a,b) => (b.orders||0)-(a.orders||0));
-  // Phrase: medium volume keywords
   const phraseKws = kwBase.filter(k => (k.impressions||0) > 200 && (k.ctr||0) > 0.3);
-  // Broad: discovery keywords (high impressions, some clicks)
-  const broadKws = (I.kwBids || []).filter(k => (k.impressions||0) > 100).sort((a,b) => (b.impressions||0)-(a.impressions||0));
+  const broadKws = [...kwUp, ...kwDown].filter(k => (k.impressions||0) > 100).sort((a,b) => (b.impressions||0)-(a.impressions||0));
 
   XLSX.utils.book_append_sheet(wb, makeKwSheet(exactKws.length ? exactKws : kwBase, 'KW - Exact Match'), 'KW - Exact Match');
   XLSX.utils.book_append_sheet(wb, makeKwSheet(phraseKws.length ? phraseKws : kwBase.slice(10), 'KW - Phrase Match'), 'KW - Phrase Match');
@@ -18474,21 +18476,13 @@ function adExportAdPlan() {
   // ── SHEET 7: Negative Keywords ──
   const negHeaders = ['Campaign','Negative Keyword','Match Type','Reason'];
   const negRows = [];
-  (I.wasted || []).filter(w => (w.orders||0) === 0 && (w.spend||0) > 0).slice(0, 50).forEach(w => {
+  (I.wasted || []).slice(0, 50).forEach(w => {
+    const kw = w.name || w.term || w.keyword || w.searchTerm || w['Customer Search Term'] || '-';
     negRows.push([
-      w.campaign || 'All Campaigns',
-      w.keyword || w.searchTerm || '-',
+      w.campaign || w.campaignName || 'All Campaigns',
+      kw,
       'Exact',
       'Zero orders — Rs ' + adFmt(w.spend||0) + ' wasted'
-    ]);
-  });
-  // Also add high-ACOS search terms
-  (I.wasted || []).filter(w => (w.orders||0) > 0 && (w.acos||0) > 50).slice(0, 20).forEach(w => {
-    negRows.push([
-      w.campaign || 'All Campaigns',
-      w.keyword || w.searchTerm || '-',
-      'Phrase',
-      'Very high ACOS ' + (w.acos||0).toFixed(0) + '% — add as negative'
     ]);
   });
   const negData = [
@@ -18517,7 +18511,7 @@ function adExportAdPlan() {
     generatedAt: new Date().toISOString(),
     summary: {
       totalCampaigns: (I.campaigns||[]).length,
-      totalKeywords: (I.kwBids||[]).length,
+      totalKeywords: kwUp.length + kwDown.length,
       negativeKeywords: negRows.length,
       placements: plcRows.length
     }
